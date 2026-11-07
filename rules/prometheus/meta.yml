@@ -35,7 +35,7 @@ groups:
         for: 10m
         labels: { severity: warning, component: prometheus, tier: "1", scope: rule_group }
         annotations:
-          summary: "Rule group 耗時超過 interval 的 80%；比值超過 1 就開始跳過 evaluation"
+          summary: "Rule group 耗時超過 evaluation_interval 的 80%；比值超過 1 就開始跳過 evaluation"
           runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#rule-group-ratio
       - alert: RuleGroupMissingEvaluations
         expr: increase(prometheus_rule_group_iterations_missed_total[10m]) > 0
@@ -79,7 +79,7 @@ groups:
         for: 10m
         labels: { severity: warning, component: prometheus, tier: "2", scope: target }
         annotations:
-          summary: "Scrape 耗時接近 30s interval，實際間隔即將拉長"
+          summary: "scrape_duration_seconds 接近 30s 的 scrape_interval，實際間隔即將拉長"
           runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#scrape-ratio
       - alert: ScrapeIntervalStretched
         expr: prometheus_target_interval_length_seconds{interval="30s",quantile="0.9"} > 40

@@ -81,5 +81,6 @@ nav:
   - 寫 rule:
       - 信任契約: contracts.md
       - 契約計算器: tools/calculator.md
+      - 名詞：設定與 metric: reference/terms.md
   - 實驗報告: reports/index.md
   - 來源: reference/sources.md

@@ -484,5 +484,119 @@
   "v1.155.0",
   "docs/victoriametrics/MetricsQL.md",
   "before the lookbehind window"
+ ],
+ "p-cfg-scrape-interval": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "config/config.go",
+  "ScrapeInterval:     model.Duration(1 * time.Minute)"
+ ],
+ "p-cfg-scrape-timeout": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "config/config.go",
+  "ScrapeTimeout:      model.Duration(10 * time.Second)"
+ ],
+ "p-cfg-eval-interval": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "config/config.go",
+  "EvaluationInterval: model.Duration(1 * time.Minute)"
+ ],
+ "p-cfg-timeout-check": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "config/config.go",
+  "if c.ScrapeTimeout > c.ScrapeInterval {"
+ ],
+ "p-metric-scrape-duration": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "scrape/scrape.go",
+  "scrapeDurationMetricName      = "
+ ],
+ "p-metric-interval-length": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "scrape/metrics.go",
+  "prometheus_target_interval_length_seconds"
+ ],
+ "p-metric-group-interval": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "rules/group.go",
+  "\"rule_group_interval_seconds\""
+ ],
+ "p-metric-group-duration": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "rules/group.go",
+  "\"rule_group_last_duration_seconds\""
+ ],
+ "p-lookback-default": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "promql/engine.go",
+  "defaultLookbackDelta = "
+ ],
+ "p-rulefmt-interval": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "model/rulefmt/rulefmt.go",
+  "Interval model.Duration"
+ ],
+ "p-rulefmt-for": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "model/rulefmt/rulefmt.go",
+  "yaml:\"for,omitempty\""
+ ],
+ "p255-query-offset": [
+  "prometheus/prometheus",
+  "v2.55.1",
+  "model/rulefmt/rulefmt.go",
+  "query_offset"
+ ],
+ "vma-eval-interval": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "app/vmalert/main.go",
+  "\"evaluationInterval\""
+ ],
+ "vma-iter-duration": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "app/vmalert/rule/group.go",
+  "vmalert_iteration_duration_seconds"
+ ],
+ "vma-cfg-interval": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "app/vmalert/config/config.go",
+  "yaml:\"interval"
+ ],
+ "vmag-default-interval": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "lib/promscrape/config.go",
+  "defaultScrapeInterval = time.Minute"
+ ],
+ "vmag-scrape-duration": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "lib/promscrape/scrapework.go",
+  "\"scrape_duration_seconds\""
+ ],
+ "am-route-defaults": [
+  "prometheus/alertmanager",
+  "v0.29.0",
+  "dispatch/route.go",
+  "GroupInterval:     5 * time.Minute"
+ ],
+ "am-cfg-route": [
+  "prometheus/alertmanager",
+  "v0.29.0",
+  "config/config.go",
+  "GroupInterval  *model.Duration"
  ]
 }

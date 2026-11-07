@@ -11,11 +11,11 @@ role: >-
 architecture: architecture/prometheus.md
 
 silent_failures:
-  - text: Scrape 比 interval 慢時，for 反覆重置、alert 永遠不 firing；失敗計數為 0，up 為 1。
+  - text: "Scrape 耗時（`scrape_duration_seconds`）超過 `scrape_interval` 時 tick 被丟掉，實際間隔拉長，`for` 反覆重置、alert 永遠不 firing；這時 `prometheus_rule_evaluation_failures_total` 是 0，`up` 是 1。"
     evidence: tested
     source: art-prom
     refs: [exp-prom-silent, p-alert-delete]
-  - text: Rule group 耗時超過 interval 時跳過 evaluation，rule 的 health 仍是 ok。
+  - text: "Rule group 耗時（`prometheus_rule_group_last_duration_seconds`）超過這個 group 的 `evaluation_interval` 時跳過 evaluation，`/api/v1/rules` 的 `health` 仍是 `ok`。"
     evidence: tested
     source: art-prom
     refs: [exp-prom-cpu, p-group-missed]
@@ -27,7 +27,7 @@ silent_failures:
     evidence: tested
     source: art-prom
     refs: [exp-prom-storage, p-db-run]
-  - text: Crash loop 時 vector(1) 與不帶 for 的 heartbeat 每次啟動都立刻恢復。
+  - text: "Crash loop 時 `vector(1)` 與不帶 `for` 的 heartbeat 每次啟動都立刻恢復。"
     evidence: tested
     source: art-prom
     refs: [exp-prom-heartbeat]
@@ -101,7 +101,7 @@ signals:
   - id: rule-group-ratio
     tier: 1
     question: Rule group 跑得完嗎
-    signal: prometheus_rule_group_last_duration_seconds / prometheus_rule_group_interval_seconds > 0.8，以及 iterations_missed
+    signal: "`prometheus_rule_group_last_duration_seconds` ÷ `prometheus_rule_group_interval_seconds` > 0.8；已經跳過的次數看 `prometheus_rule_group_iterations_missed_total`"
     metrics:
       - prometheus_rule_group_last_duration_seconds
       - prometheus_rule_group_interval_seconds
@@ -190,8 +190,8 @@ signals:
 
   - id: scrape-ratio
     tier: 2
-    question: Scrape 接近 interval 了嗎
-    signal: scrape_duration_seconds ÷ interval；prometheus_target_interval_length_seconds
+    question: Scrape 耗時接近 scrape_interval 了嗎
+    signal: "`scrape_duration_seconds` ÷ `scrape_interval`（`/api/v1/targets` 的 `scrapeInterval`）；實際間隔看 `prometheus_target_interval_length_seconds`"
     metrics: [scrape_duration_seconds, prometheus_target_interval_length_seconds]
     evaluate_on: federate
     evidence: tested

@@ -568,3 +568,136 @@ refs:
     file: "docs/victoriametrics/MetricsQL.md"
     line: 31
     url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/docs/victoriametrics/MetricsQL.md#L31"
+  p-cfg-scrape-interval:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "config/config.go"
+    line: 145
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/config/config.go#L145"
+  p-cfg-scrape-timeout:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "config/config.go"
+    line: 146
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/config/config.go#L146"
+  p-cfg-eval-interval:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "config/config.go"
+    line: 147
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/config/config.go#L147"
+  p-cfg-timeout-check:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "config/config.go"
+    line: 690
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/config/config.go#L690"
+  p-metric-scrape-duration:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "scrape/scrape.go"
+    line: 1792
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/scrape/scrape.go#L1792"
+  p-metric-interval-length:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "scrape/metrics.go"
+    line: 173
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/scrape/metrics.go#L173"
+  p-metric-group-interval:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "rules/group.go"
+    line: 847
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/rules/group.go#L847"
+  p-metric-group-duration:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "rules/group.go"
+    line: 863
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/rules/group.go#L863"
+  p-lookback-default:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "promql/engine.go"
+    line: 57
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/promql/engine.go#L57"
+  p-rulefmt-interval:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "model/rulefmt/rulefmt.go"
+    line: 139
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/model/rulefmt/rulefmt.go#L139"
+  p-rulefmt-for:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "model/rulefmt/rulefmt.go"
+    line: 149
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/model/rulefmt/rulefmt.go#L149"
+  p255-query-offset:
+    kind: code
+    project: "Prometheus"
+    version: "v2.55.1"
+    file: "model/rulefmt/rulefmt.go"
+    line: 141
+    url: "https://github.com/prometheus/prometheus/blob/v2.55.1/model/rulefmt/rulefmt.go#L141"
+  vma-eval-interval:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/main.go"
+    line: 67
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/main.go#L67"
+  vma-iter-duration:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/group.go"
+    line: 312
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/group.go#L312"
+  vma-cfg-interval:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/config/config.go"
+    line: 29
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/config/config.go#L29"
+  vmag-default-interval:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "lib/promscrape/config.go"
+    line: 1423
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/lib/promscrape/config.go#L1423"
+  vmag-scrape-duration:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "lib/promscrape/scrapework.go"
+    line: 1028
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/lib/promscrape/scrapework.go#L1028"
+  am-route-defaults:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.29.0"
+    file: "dispatch/route.go"
+    line: 34
+    url: "https://github.com/prometheus/alertmanager/blob/v0.29.0/dispatch/route.go#L34"
+  am-cfg-route:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.29.0"
+    file: "config/config.go"
+    line: 902
+    url: "https://github.com/prometheus/alertmanager/blob/v0.29.0/config/config.go#L902"

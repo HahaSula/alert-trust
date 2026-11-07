@@ -108,7 +108,7 @@ signals:
   - id: group-ratio
     tier: 2
     question: Group 跑得完嗎
-    signal: vmalert_iteration_duration_seconds ÷ interval；iteration_missed
+    signal: "`vmalert_iteration_duration_seconds` ÷ group 的 `interval`（預設 `-evaluationInterval`）；已經跳過的次數看 `vmalert_iteration_missed_total`"
     metrics: [vmalert_iteration_duration_seconds, vmalert_iteration_missed_total]
     evaluate_on: observer
     evidence: tested

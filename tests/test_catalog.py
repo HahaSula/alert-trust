@@ -43,6 +43,22 @@ class CatalogTest(unittest.TestCase):
                 self.assertNotIn("](", build_pages.src(key, sources))
 
 
+class TermsTest(unittest.TestCase):
+    def test_terms_have_refs_and_unique_tokens(self):
+        refs, seen = C.load_refs(), {}
+        for key, t in C.load_terms().items():
+            self.assertTrue(t.get("refs"), key)
+            for r in t["refs"]:
+                self.assertIn(r, refs, f"{key}: {r}")
+            for tok in t.get("tokens", []):
+                self.assertNotIn(tok, seen, f"{tok} in {seen.get(tok)} and {key}")
+                seen[tok] = key
+
+    def test_codeify_wraps_known_names_once(self):
+        out = build_pages.codeify("scrape_duration_seconds ÷ `scrape_interval`")
+        self.assertEqual(out, "`scrape_duration_seconds` ÷ `scrape_interval`")
+
+
 class LintTest(unittest.TestCase):
     def _rules(self, expr, **ann):
         return {"rules/x.yml#A": {"alert": "A", "expr": expr, "annotations": ann},

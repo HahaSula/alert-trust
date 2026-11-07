@@ -173,6 +173,19 @@ def check_refs(components: list[dict], contracts: dict, root: str) -> tuple[list
 
     for cid, c in contracts.items():
         check(f"contracts.yaml#{cid}", c)
+    seen_tokens: dict[str, str] = {}
+    for key, t in C.load_terms(root).items():
+        if t.get("kind") not in ("config", "metric"):
+            errors.append(f"terms.yaml: {key} 的 kind 要是 config 或 metric")
+        if not t.get("refs"):
+            errors.append(f"terms.yaml: {key} 沒有 refs")
+        for r in t.get("refs", []) or []:
+            if r not in refs:
+                errors.append(f"terms.yaml: {key} 的 refs 裡的 {r} 不存在")
+        for tok in t.get("tokens", []) or []:
+            if tok in seen_tokens:
+                errors.append(f"terms.yaml: token {tok!r} 同時屬於 {seen_tokens[tok]} 與 {key}")
+            seen_tokens[tok] = key
     for card in components:
         for i, sf in enumerate(card.get("silent_failures", [])):
             check(f"{card['_path']}#silent_failures[{i}]", sf)

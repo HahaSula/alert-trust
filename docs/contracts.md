@@ -22,19 +22,21 @@ Rule 能不能信，取決於一組時間不等式。不等式兩邊的比值就
 
 ## 符號
 
-| 符號 | 意思 | 從哪裡看 |
-|---|---|---|
-| `S` | 設定的 scrape interval | `/api/v1/targets` 的 `scrapeInterval` |
-| `d` | 尖峰 scrape 耗時（不含 commit） | `max_over_time(scrape_duration_seconds[7d])` |
-| `I` | 實際的資料間隔 | `d > S` 時約 `⌈d/S⌉ × S`，否則為 `S` |
-| `E` | Rule group 的 evaluation interval | Group 設定，或 `prometheus_rule_group_interval_seconds` |
-| `T` | Rule group 尖峰耗時 | `max_over_time(prometheus_rule_group_last_duration_seconds[7d])`；vmalert 用 `vmalert_iteration_duration_seconds` |
-| `R` | Range selector 長度 | 表達式裡的 `[5m]` |
-| `O` | 查詢 offset | 表達式的 `offset`，或 2.53 起的 `query_offset` |
-| `F` | `for` | Rule 定義 |
-| `k` | 要容忍的 scrape 失敗次數 | 建議至少 1 |
-| `L` | 資料從時間戳到查得到的延遲 | `time() - timestamp(m)` 的尖峰；log 用 canary 的端到端延遲 |
-| `D` | vmalert 的 `eval_delay` | `-rule.evalDelay`，預設 30s |
+每個符號都對應一個明確的設定或 metric，點名稱可以看設定位置、預設值和原始碼依據。
+
+| 符號 | 意思 | 設定在哪裡 | 實際值從哪裡看 |
+|---|---|---|---|
+| `S` | Scrape interval（設定值） | `scrape_interval` | `/api/v1/targets` 的 `scrapeInterval` |
+| `d` | Scrape 耗時的尖峰（不含寫入） | — | `max_over_time(scrape_duration_seconds[7d])`；名稱見 `scrape_duration_seconds` |
+| `I` | 實際的資料間隔 | — | `prometheus_target_interval_length_seconds`；`d > S` 時約 `⌈d/S⌉ × S` |
+| `E` | Rule group 的 evaluation interval | `evaluation_interval`，group 的 `interval` 覆寫 | `prometheus_rule_group_interval_seconds` |
+| `T` | Rule group 耗時的尖峰 | — | Prometheus：`prometheus_rule_group_last_duration_seconds`；vmalert：`vmalert_iteration_duration_seconds` |
+| `R` | Range selector 長度 | 表達式裡的 `[5m]` | 讀 rule 檔 |
+| `O` | 查詢 offset | `query_offset`，或表達式的 `offset` | `/api/v1/rules` 的 `queryOffset`（2.53+） |
+| `F` | Alert 的 for | `for` | `/api/v1/rules` 的 `duration` |
+| `k` | 要容忍的 scrape 失敗次數 | 自己決定，建議至少 1 | — |
+| `L` | 資料從時間戳到查得到的延遲 | — | `time() - timestamp(m)` 的尖峰；log 用 canary 的端到端延遲 |
+| `D` | vmalert 的查詢延遲 | `eval_delay` | vmalert 的 `/flags` |
 
 ## 採集
 

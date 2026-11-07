@@ -1,0 +1,207 @@
+# 名詞表：每個「interval」「耗時」到底是哪個設定、哪個 metric。
+# tokens：頁面裡用反引號寫出這些名稱時，hooks/refs.py 會自動連到這一筆。
+# kind：config（設定項或 flag）、metric（可以查的 series）。
+terms:
+  # ---------- 設定 ----------
+  scrape_interval:
+    title: Scrape interval
+    symbol: S
+    kind: config
+    systems: [prometheus, vmagent]
+    tokens: [scrape_interval, global.scrape_interval, "scrape_configs[].scrape_interval"]
+    where: "Prometheus：`global.scrape_interval`，每個 job 可在 `scrape_configs[].scrape_interval` 覆寫。vmagent：`-promscrape.config` 檔案裡同名的設定。"
+    default: "1m（兩者相同）"
+    observe:
+      - "`/api/v1/targets` 的 `scrapeInterval`：這個 target 實際套用的設定值"
+      - "`prometheus_target_interval_length_seconds`：實際的 scrape 間隔，和設定值比較就知道有沒有被拉長"
+    note: "這是「設定值」。實際間隔 I 在 scrape 耗時超過它時會被拉長，見信任契約。"
+    refs: [p-cfg-scrape-interval, vmag-default-interval]
+
+  scrape_timeout:
+    title: Scrape timeout
+    kind: config
+    systems: [prometheus, vmagent]
+    tokens: [scrape_timeout, global.scrape_timeout]
+    where: "`global.scrape_timeout`，可在 `scrape_configs[].scrape_timeout` 覆寫"
+    default: "10s；不能大於 scrape_interval，否則設定檢查失敗"
+    observe:
+      - "`/api/v1/targets` 的 `scrapeTimeout`"
+      - "Exporter 收到的 `X-Prometheus-Scrape-Timeout-Seconds` header"
+    note: "只限制 HTTP 階段。`scrape_duration_seconds` 超過它卻成功時，多出來的時間花在 Prometheus 內部的 parse 與寫入。"
+    refs: [p-cfg-scrape-timeout, p-cfg-timeout-check, p-scrape-report]
+
+  evaluation_interval:
+    title: Rule group 的 evaluation interval
+    symbol: E
+    kind: config
+    systems: [prometheus, vmalert]
+    tokens: [evaluation_interval, global.evaluation_interval, -evaluationInterval]
+    where: "Prometheus：`global.evaluation_interval`，每個 group 可用 rule 檔的 `interval` 覆寫。vmalert：`-evaluationInterval`，group 的 `interval` 覆寫。"
+    default: "1m（兩者相同）"
+    observe:
+      - "`prometheus_rule_group_interval_seconds`：每個 group 實際套用的值"
+      - "`/api/v1/rules` 每個 group 的 `interval`"
+    refs: [p-cfg-eval-interval, p-rulefmt-interval, vma-eval-interval, vma-cfg-interval, p-metric-group-interval]
+
+  query_offset:
+    title: Rule 的查詢 offset
+    symbol: O
+    kind: config
+    systems: [prometheus]
+    tokens: [query_offset, rule_query_offset]
+    where: "2.53 起：rule group 的 `query_offset`，或全域 `global.rule_query_offset`。更舊的版本要在表達式的每個 selector 寫 `offset`。"
+    default: "0"
+    observe:
+      - "`/api/v1/rules` 的 group `queryOffset`（2.53+）；API 不回傳表達式裡的 `offset`，要讀 rule 檔"
+    note: "vmalert 對應的是 eval_delay。"
+    refs: [p255-query-offset]
+
+  for:
+    title: Alert 的 for
+    symbol: F
+    kind: config
+    systems: [prometheus, vmalert]
+    tokens: [for]
+    where: "Rule 定義的 `for`"
+    default: "0"
+    observe:
+      - "`ALERTS_FOR_STATE`：pending 開始的時間；`changes(ALERTS_FOR_STATE[1h])` 看 for 有沒有被重置"
+    note: "Prometheus 重啟後，for 小於 `--rules.alert.for-grace-period`（預設 10m）的 alert 會從零計時。"
+    refs: [p-rulefmt-for, p-forgrace, p-alert-delete]
+
+  lookback_delta:
+    title: Lookback delta
+    kind: config
+    systems: [prometheus]
+    tokens: [lookback_delta, --query.lookback-delta, lookback]
+    where: "`--query.lookback-delta`"
+    default: "5m"
+    note: "沒寫 range 的 selector（如 `up == 0`）往回找最近一個點的上限。vmalert 對應的是 `-datasource.queryStep`。"
+    refs: [p-lookback, p-lookback-default]
+
+  resend_delay:
+    title: Alert 續送間隔
+    kind: config
+    systems: [prometheus, vmalert]
+    tokens: [resend_delay, --rules.alert.resend-delay, -rule.resendDelay, resendDelay]
+    where: "Prometheus：`--rules.alert.resend-delay`。vmalert：`-rule.resendDelay`。"
+    default: "Prometheus 1m；vmalert 0"
+    note: "送給 Alertmanager 的 EndsAt = 評估時間 + 4 × max(resend, E)。續送中斷超過它，Alertmanager 會自動 resolve。"
+    refs: [p-resenddelay, vma-resend, p-alert-validuntil]
+
+  eval_delay:
+    title: vmalert 的 eval_delay
+    symbol: D
+    kind: config
+    systems: [vmalert]
+    tokens: [eval_delay, -rule.evalDelay, eval_alignment]
+    where: "`-rule.evalDelay`，group 的 `eval_delay` 覆寫；`eval_alignment`（預設 true）再按 interval 向下取整"
+    default: "30s"
+    note: "查詢時間 = 對齊(now − eval_delay)，實際延遲落在 eval_delay 到 eval_delay + E 之間。對應 Prometheus 的 query_offset。"
+    refs: [vma-evaldelay, vma-evalalign]
+
+  query_step:
+    title: vmalert 的 queryStep
+    kind: config
+    systems: [vmalert]
+    tokens: [-datasource.queryStep, queryStep]
+    where: "`-datasource.queryStep`"
+    default: "5m"
+    note: "沒寫 range 的查詢最多往回找這麼久。資料停止後，`m > 0` 這類條件還會繼續成立約 6 分鐘。"
+    refs: [vma-querystep]
+
+  query_max_concurrency:
+    title: Prometheus 查詢併發上限
+    kind: config
+    systems: [prometheus]
+    tokens: [--query.max-concurrency]
+    where: "`--query.max-concurrency`"
+    default: "20"
+    observe:
+      - "`prometheus_engine_queries` ÷ `prometheus_engine_queries_concurrent_max`"
+    note: "Rule 與 API（Grafana）共用這組 slot。"
+    refs: [p-maxconc, p-engine-queue]
+
+  group_interval:
+    title: Alertmanager 的 group_wait、group_interval、repeat_interval
+    kind: config
+    systems: [alertmanager]
+    tokens: [group_interval, group_wait, repeat_interval]
+    where: "`alertmanager.yml` 的 `route`，子路由可覆寫"
+    default: "group_wait 30s、group_interval 5m、repeat_interval 4h"
+    note: "失敗計數要等一輪 flush 結束才增加，所以通知失敗的告警視窗至少要 2 × 最大的 group_interval。"
+    refs: [am-route-defaults, am-cfg-route, am-aggr-run]
+
+  # ---------- Metric ----------
+  scrape_duration_seconds:
+    title: Scrape 耗時
+    symbol: d
+    kind: metric
+    systems: [prometheus, vmagent]
+    tokens: [scrape_duration_seconds]
+    where: "由 scraper 自己寫入的 series，每個 target 一條，帶 `job`、`instance`"
+    observe:
+      - "尖峰：`max_over_time(scrape_duration_seconds[7d])`"
+      - "比值：`scrape_duration_seconds` ÷ scrape_interval（`/api/v1/targets` 的 `scrapeInterval`）"
+    note: "不含寫入（commit）時間，實際查得到的時間更晚。它不在 Prometheus 的 `/metrics` 裡，外部觀察者要用 `/federate` 拿。"
+    refs: [p-metric-scrape-duration, vmag-scrape-duration, p-scrape-report]
+
+  prometheus_target_interval_length_seconds:
+    title: 實際 scrape 間隔
+    symbol: I
+    kind: metric
+    systems: [prometheus]
+    tokens: [prometheus_target_interval_length_seconds]
+    where: "Prometheus 的 `/metrics`；summary，依設定的 `interval` label 分組"
+    observe:
+      - "`prometheus_target_interval_length_seconds{interval=\"30s\",quantile=\"0.9\"}` 明顯大於 30s，代表 tick 被丟掉"
+    refs: [p-metric-interval-length]
+
+  prometheus_rule_group_interval_seconds:
+    title: Rule group 的設定 interval
+    kind: metric
+    systems: [prometheus]
+    tokens: [prometheus_rule_group_interval_seconds]
+    where: "Prometheus 的 `/metrics`，帶 `rule_group`"
+    refs: [p-metric-group-interval]
+
+  prometheus_rule_group_last_duration_seconds:
+    title: Rule group 耗時
+    symbol: T
+    kind: metric
+    systems: [prometheus]
+    tokens: [prometheus_rule_group_last_duration_seconds]
+    where: "Prometheus 的 `/metrics`，帶 `rule_group`；只有最近一次的值"
+    observe:
+      - "比值：`prometheus_rule_group_last_duration_seconds / prometheus_rule_group_interval_seconds`，超過 1 就開始跳過 evaluation"
+      - "尖峰：`max_over_time(prometheus_rule_group_last_duration_seconds[7d])`"
+    refs: [p-metric-group-duration, p-group-missed]
+
+  prometheus_rule_group_iterations_missed_total:
+    title: 跳過的 evaluation 次數
+    kind: metric
+    systems: [prometheus]
+    tokens: [prometheus_rule_group_iterations_missed_total, iterations_missed_total]
+    where: "Prometheus 的 `/metrics`，帶 `rule_group`"
+    refs: [p-group-missed]
+
+  vmalert_iteration_duration_seconds:
+    title: vmalert group 耗時
+    symbol: T
+    kind: metric
+    systems: [vmalert]
+    tokens: [vmalert_iteration_duration_seconds]
+    where: "vmalert 的 `/metrics`；summary，帶 `group`"
+    observe:
+      - "`vmalert_iteration_duration_seconds{quantile=\"0.9\"}` ÷ group interval"
+    note: "每條 alerting rule 會同步等所有 Alertmanager 回應，Alertmanager 變慢也會拉長它。"
+    refs: [vma-iter-duration, vma-exec-send]
+
+  vmalert_iteration_missed_total:
+    title: vmalert 跳過的 evaluation 次數
+    kind: metric
+    systems: [vmalert]
+    tokens: [vmalert_iteration_missed_total, iteration_missed]
+    where: "vmalert 的 `/metrics`，帶 `group`"
+    note: "查詢飽和（429）時查詢失敗得很快，這個值可能一直是 0。"
+    refs: [vma-missed, exp-vm-faults]

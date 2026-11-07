@@ -75,7 +75,7 @@ signals:
   - id: scrape-health
     tier: 2
     question: Scrape 正常嗎
-    signal: scrapes_failed、scrape pool 沒有 target、scrape 耗時 ÷ interval
+    signal: "`vm_promscrape_scrapes_failed_total`、scrape pool 沒有 target、`scrape_duration_seconds` ÷ `scrape_interval`"
     metrics: [vm_promscrape_scrapes_failed_total, vm_promscrape_scrape_pool_targets, scrape_duration_seconds]
     evaluate_on: observer
     evidence: upstream

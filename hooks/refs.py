@@ -41,3 +41,45 @@ def on_page_markdown(markdown, page, config, files):  # noqa: ARG001 - MkDocs ho
     if not used:
         return markdown
     return markdown.rstrip() + "\n\n" + "\n".join(f"[^{k}]: {render(refs[k])}" for k in used) + "\n"
+
+
+# ---------- automatic links to the glossary ----------
+FENCE = re.compile(r"^(```|~~~)", re.M)
+INLINE = re.compile(r"(?<![\[`])`([^`\n]+)`(?![`\]])")
+_TERMS: dict = {}
+
+
+def term_tokens() -> dict:
+    if not _TERMS:
+        with open(os.path.join(ROOT, "catalog", "terms.yaml"), encoding="utf-8") as f:
+            for key, t in ((yaml.safe_load(f) or {}).get("terms") or {}).items():
+                anchor = key.replace("_", "-").replace(".", "-")
+                for tok in t.get("tokens", [key]):
+                    _TERMS[tok] = anchor
+    return _TERMS
+
+
+def link_terms(markdown: str, src_uri: str) -> str:
+    tokens = term_tokens()
+    target = os.path.relpath("reference/terms.md", os.path.dirname(src_uri) or ".").replace(os.sep, "/")
+    out, in_fence = [], False
+    for line in markdown.split("\n"):
+        if FENCE.match(line.lstrip()):
+            in_fence = not in_fence
+            out.append(line)
+            continue
+        if in_fence or line.lstrip().startswith("#"):
+            out.append(line)
+            continue
+        out.append(INLINE.sub(lambda m: f"[`{m.group(1)}`]({target}#{tokens[m.group(1)]})"
+                              if m.group(1) in tokens else m.group(0), line))
+    return "\n".join(out)
+
+
+_refs_hook = on_page_markdown
+
+
+def on_page_markdown(markdown, page, config, files):  # noqa: F811 - wraps the citation hook
+    if page.file.src_uri != "reference/terms.md":
+        markdown = link_terms(markdown, page.file.src_uri)
+    return _refs_hook(markdown, page, config, files)

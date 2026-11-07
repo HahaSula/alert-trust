@@ -9,7 +9,7 @@ architecture: architecture/victorialogs.md
 role: Log 的儲存與查詢。Log rule 由 vmalert 評估，狀態寫到 VM，所以 log 告警也依賴 VM。
 
 silent_failures:
-  - text: Log rule 預設只查一個 interval 的視窗，log 延遲 L > D + E 時事件永遠不觸發。
+  - text: "Log rule 沒寫 `_time` 時，預設只查一個 group interval（E）長的視窗；log 延遲 L 超過 `eval_delay` + E 時事件永遠不觸發。"
     evidence: tested
     source: art-vm
     refs: [exp-vm-vl]

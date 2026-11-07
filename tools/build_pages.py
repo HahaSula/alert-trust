@@ -9,6 +9,7 @@ Each signal becomes a heading whose anchor is the signal id, so rule runbook_url
 from __future__ import annotations
 
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -47,6 +48,21 @@ def rule_link(ref: str) -> str:
     return f"[`{alert}`]({C.REPO_URL}/blob/main/{path})"
 
 
+_NAME = None
+
+
+def codeify(text: str, extra=()) -> str:
+    """Put backticks around metric names and glossary tokens so the hook can link them."""
+    global _NAME
+    if _NAME is None:
+        names = {tok for t in C.load_terms().values() for tok in t.get("tokens", [])}
+        names |= {m for c in C.load_components() for s in c.get("signals", []) for m in s.get("metrics", [])}
+        names = {n for n in names if re.fullmatch(r"[a-zA-Z_:][a-zA-Z0-9_:.-]*", n) and ("_" in n or n.startswith("-"))}
+        _NAME = re.compile(r"(?<![`\w.-])(" + "|".join(sorted(map(re.escape, names), key=len, reverse=True)) + r")(?![`\w])")
+    parts = re.split(r"(`[^`]*`)", str(text))
+    return "".join(p if p.startswith("`") else _NAME.sub(r"`\1`", p) for p in parts)
+
+
 def esc(text: str) -> str:
     return str(text).replace("|", "\\|").replace("\n", " ")
 
@@ -64,7 +80,7 @@ def component_page(card: dict, sources: dict, contracts: dict) -> str:
     if card.get("silent_failures"):
         out.append("## 會安靜壞掉的方式\n")
         for sf in card["silent_failures"]:
-            out.append(f"- {sf['text'].strip()} {ev(sf['evidence'])}{marks(sf)}")
+            out.append(f"- {codeify(sf['text'].strip())} {ev(sf['evidence'])}{marks(sf)}")
         out.append("")
 
     if card.get("contracts"):
@@ -91,7 +107,7 @@ def component_page(card: dict, sources: dict, contracts: dict) -> str:
         out.append(f"## {TIER_TITLE[tier]}\n")
         for s in group:
             out.append(f"### {s['question']} {{#{s['id']}}}\n")
-            rows = [("訊號", esc(s["signal"]))]
+            rows = [("訊號", esc(codeify(s["signal"])))]
             if s.get("metrics"):
                 rows.append(("Metric", "、".join(f"`{m}`" for m in s["metrics"])))
             where = C.EVALUATE_ON[s["evaluate_on"]]
@@ -101,7 +117,7 @@ def component_page(card: dict, sources: dict, contracts: dict) -> str:
             if s.get("applies_when"):
                 rows.append(("適用條件", esc(s["applies_when"])))
             if s.get("silent_failure"):
-                rows.append(("為什麼需要", esc(s["silent_failure"])))
+                rows.append(("為什麼需要", esc(codeify(s["silent_failure"]))))
             rows.append(("證據", f"{ev(s['evidence'])} {src(s['source'], sources)}{marks(s)}"))
             note = s["upstream"].get("note")
             rows.append(("上游規則", up(s["upstream"]["status"]) + (f" {esc(note)}" if note else "")))
@@ -160,6 +176,40 @@ def sources_page(sources: dict) -> str:
     return "\n".join(out)
 
 
+def terms_page(terms: dict) -> str:
+    kinds = {"config": "設定", "metric": "Metric"}
+    out = [GENERATED, "# 名詞：設定與 metric\n",
+           "文件裡的 interval、耗時、offset 各自指哪個設定、從哪個 metric 看實際值。"
+           "其他頁面用反引號寫出這些名稱時，會自動連到這裡。\n",
+           "| 名詞 | 符號 | 類型 | 適用 | 預設 |", "|---|---|---|---|---|"]
+    for key, t in terms.items():
+        out.append(f"| [{t['title']}](#{C.term_anchor(key)}) | {t.get('symbol', '')} | {kinds[t['kind']]} | "
+                   f"{'、'.join(t.get('systems', []))} | {esc(t.get('default', ''))} |")
+    out.append("")
+    for kind, title in (("config", "設定"), ("metric", "Metric")):
+        out.append(f"## {title}\n")
+        for key, t in terms.items():
+            if t["kind"] != kind:
+                continue
+            out.append(f"### {t['title']} {{#{C.term_anchor(key)}}}\n")
+            rows = []
+            if t.get("symbol"):
+                rows.append(("符號", f"`{t['symbol']}`，見[信任契約](../contracts.md)"))
+            rows.append(("名稱", "、".join(f"`{x}`" for x in t.get("tokens", [key]))))
+            rows.append(("在哪裡" if kind == "config" else "來源", esc(t.get("where", ""))))
+            if t.get("default"):
+                rows.append(("預設", esc(t["default"])))
+            for i, o in enumerate(t.get("observe", []) or []):
+                rows.append(("怎麼看" if i == 0 else "", esc(o)))
+            if t.get("note"):
+                rows.append(("注意", esc(t["note"])))
+            rows.append(("依據", "".join(f"[^{r}]" for r in t.get("refs", []))))
+            out.append("| | |\n|---|---|")
+            out += [f"| {k} | {v} |" for k, v in rows]
+            out.append("")
+    return "\n".join(out)
+
+
 def main() -> int:
     sources, contracts, cards = C.load_sources(), C.load_contracts(), C.load_components()
     comp_dir = os.path.join(C.ROOT, "docs", "components")
@@ -173,6 +223,8 @@ def main() -> int:
         f.write(index_page(cards))
     with open(os.path.join(ref_dir, "sources.md"), "w", encoding="utf-8") as f:
         f.write(sources_page(sources))
+    with open(os.path.join(ref_dir, "terms.md"), "w", encoding="utf-8") as f:
+        f.write(terms_page(C.load_terms()))
     print(f"wrote {len(cards)} component pages, index, sources")
     return 0
 

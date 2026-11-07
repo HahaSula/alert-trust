@@ -81,6 +81,15 @@ def load_refs(root: str = ROOT) -> dict:
     return out
 
 
+def load_terms(root: str = ROOT) -> dict:
+    path = os.path.join(root, "catalog", "terms.yaml")
+    return (_load(path) or {}).get("terms", {}) if os.path.exists(path) else {}
+
+
+def term_anchor(key: str) -> str:
+    return key.replace("_", "-").replace(".", "-")
+
+
 def load_contracts(root: str = ROOT) -> dict:
     return _load(os.path.join(root, "catalog", "contracts.yaml"))["contracts"]
 
