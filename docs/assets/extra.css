@@ -45,3 +45,60 @@
 .at-calc-out { margin-top: 1rem; }
 .at-table-wrap { overflow-x: auto; }
 .at-num { font-variant-numeric: tabular-nums; font-family: "IBM Plex Mono", monospace; }
+
+/* 圖：SVG 的顏色全部取自主題，淺色與深色都可讀 */
+.at-fig { margin: 1.2rem 0 .4rem; border: 1px solid var(--md-default-fg-color--lightest); border-radius: 6px;
+  padding: .8rem; background: var(--md-default-bg-color);
+  --f-fg: var(--md-default-fg-color); --f-muted: var(--md-default-fg-color--light);
+  --f-line: var(--md-default-fg-color--lighter); --f-bg: var(--md-default-bg-color);
+  --f-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace; }
+.at-fig-scroll { overflow-x: auto; }
+.at-fig svg { display: block; width: 100%; min-width: 760px; height: auto; color: var(--f-fg); }
+.md-typeset p.at-caption { color: var(--md-default-fg-color--light); font-size: .72rem; margin-top: .3rem; }
+/* Prometheus 架構圖 */
+.at-fig .box { fill: var(--f-bg); stroke: currentColor; stroke-width: 1.2; }
+.at-fig .box-hot { fill: var(--at-crit-bg); stroke: var(--at-crit); stroke-width: 1.6; }
+.at-fig .box-out { fill: none; stroke: var(--at-ok); stroke-width: 1.4; stroke-dasharray: 5 4; }
+.at-fig .t1 { font: 600 13px var(--f-body); fill: currentColor; }
+.at-fig .t2 { font: 400 11px var(--f-body); fill: var(--f-muted); }
+.at-fig .tl { font: 400 10.5px var(--f-body); fill: var(--f-muted); }
+.at-fig .ln { stroke: currentColor; stroke-width: 1.2; fill: none; }
+.at-fig .ln-out { stroke: var(--at-ok); stroke-width: 1.2; fill: none; stroke-dasharray: 5 4; }
+.at-fig .mk { fill: var(--at-accent); }
+.at-fig .mkt { font: 600 11px var(--f-mono); fill: var(--f-bg); }
+/* Alertmanager 架構圖 */
+.at-fig .hot { stroke: var(--at-crit); stroke-width: 2; }
+.at-fig .dim { fill: var(--f-muted); }
+/* Pending 分析的圖 */
+.at-fig .ax { stroke: var(--f-line); stroke-width: 1; }
+.at-fig .grid { stroke: var(--f-line); stroke-width: 1; stroke-dasharray: 2 4; }
+.at-fig .tk { fill: var(--f-muted); font-family: var(--f-mono); font-size: 11px; }
+.at-fig .lbl { fill: var(--f-fg); font-family: var(--f-body); font-size: 13px; }
+.at-fig .lbl-s { fill: var(--f-muted); font-family: var(--f-body); font-size: 12px; }
+.at-fig .lbl-b { fill: var(--f-fg); font-family: var(--f-body); font-size: 13px; font-weight: 700; }
+.at-fig .scrape { fill: var(--at-accent-bg); stroke: var(--at-accent); stroke-width: 1; }
+.at-fig .dot-vis { fill: var(--at-ok); }
+.at-fig .dot-inv { fill: var(--f-bg); stroke: var(--at-crit); stroke-width: 2; }
+.at-fig .dot-acc { fill: var(--at-accent); }
+.at-fig .commit { stroke: var(--at-accent); stroke-width: 2; }
+.at-fig .win-ok { fill: var(--at-ok-bg); stroke: var(--at-ok); stroke-width: 1.2; }
+.at-fig .win-bad { fill: var(--at-crit-bg); stroke: var(--at-crit); stroke-width: 1.2; }
+.at-fig .ts { stroke: var(--f-fg); stroke-width: 1.2; stroke-dasharray: 4 3; }
+.at-fig .t-ok { fill: var(--at-ok); font-family: var(--f-body); font-size: 12.5px; font-weight: 700; }
+.at-fig .t-bad { fill: var(--at-crit); font-family: var(--f-body); font-size: 12.5px; font-weight: 700; }
+.at-fig .t-warn { fill: var(--at-warn); font-family: var(--f-body); font-size: 12.5px; font-weight: 700; }
+.at-fig .b-pend { fill: var(--at-warn-bg); stroke: var(--at-warn); stroke-width: 1.2; }
+.at-fig .b-fire { fill: var(--at-crit-bg); stroke: var(--at-crit); stroke-width: 1.2; }
+.at-fig .b-node { fill: var(--f-bg); stroke: var(--f-line); stroke-width: 1.4; }
+.at-fig .b-node-acc { fill: var(--at-accent-bg); stroke: var(--at-accent); stroke-width: 1.4; }
+.at-fig .b-node-bad { fill: var(--at-crit-bg); stroke: var(--at-crit); stroke-width: 1.4; }
+.at-fig .b-node-ok { fill: var(--at-ok-bg); stroke: var(--at-ok); stroke-width: 1.4; }
+.at-fig .arrow { stroke: var(--f-muted); stroke-width: 1.5; fill: none; }
+.at-fig .arrow-bad { stroke: var(--at-crit); stroke-width: 1.5; fill: none; stroke-dasharray: 5 3; }
+.at-fig .arrow-ok { stroke: var(--at-ok); stroke-width: 1.5; fill: none; }
+.at-fig .ah { fill: var(--f-muted); }
+.at-fig .ah-bad { fill: var(--at-crit); }
+.at-fig .ah-ok { fill: var(--at-ok); }
+.at-fig .ok-mark { fill: var(--at-ok); }
+.at-fig .bad-mark { fill: var(--at-crit); }

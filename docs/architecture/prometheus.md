@@ -6,19 +6,10 @@ Prometheus 大部分工作是並行的，但每條路徑上都有單序的環節
 
 以 2.51.2 原始碼為準，並比對到 3.15.1。<span class="at-chip at-ev-code">讀碼</span>
 
-```mermaid
-flowchart LR
-  T[Target /metrics] -->|HTTP| S[Scrape loop<br>每個 target 一條]
-  S -->|commit| W[WAL<br>全域一把鎖]
-  W --> H[Head<br>記憶體]
-  H --> Q[查詢引擎<br>rule 與 API 共用 slot]
-  Q --> R[Rule group<br>group 內依序]
-  R -->|寫回 recording、ALERTS| W
-  R --> A[Alert 狀態<br>for、ActiveAt]
-  A -->|firing 才送| N[Notifier<br>單一 queue]
-  N -->|HTTP| AM[Alertmanager]
-  M[TSDB 維護<br>compaction、reload、retention] --> H
-```
+<!-- figure: prometheus-process -->
+
+**圖**　Prometheus 單一行程內的資料流。資料從 scrape 進入，rule 讀取後把結果寫回同一條路徑，firing 的 alert 再經 notifier 送出。紅框是實驗中最常讓 rule 失準、又不會報錯的兩個單序環節；綠色虛線是不依賴受測行程的外部觀察路徑。編號對應下方各段：1 scrape、2 WAL、3 rule group、4 查詢引擎、5 alert 狀態、6 notifier、7 TSDB 維護、8 Head。[^p-scrape-run][^p-wal-log][^p-group-eval][^p-engine-queue][^p-notifier-wait][^p-db-run][^exp-prom-silent][^exp-prom-cpu]
+{: .at-caption }
 
 ## 服務發現 {#service-discovery}
 
@@ -63,6 +54,12 @@ Series 表分 16384 個 stripe[^p-head-stripe]，每條 series 一把鎖，chunk
 | 併行上限 | `--query.max-concurrency`，預設 20[^p-maxconc] |
 | 卡住時影響誰 | Rule 和 API 都排隊 |
 
+
+<!-- figure: query-slots -->
+
+**圖**　一條 rule 的查詢要過兩次同一組 slot：解析完先釋放，執行時再搶一次。實驗中 `--query.timeout` 設 300 ms、只有 1 個 slot：在 ② 被佔住時 300 ms 回傳 context deadline exceeded；在 ① 被佔住 2 秒時不受 timeout 影響，2001 ms 後成功。② 失敗屬於查詢失敗，pending 狀態不變。[^p-engine-queue][^p-maxconc][^exp-pend]
+{: .at-caption }
+
 Grafana 的重查詢會讓 rule group 變慢，實驗中從幾秒變成 40 秒，scrape 不受影響。<span class="at-chip at-ev-tested">實測</span>[^exp-prom-query]
 
 ## Rule group {#rule-group}
@@ -76,6 +73,12 @@ Grafana 的重查詢會讓 rule group 變慢，實驗中從幾秒變成 40 秒�
 - 關鍵 alert 獨立成小 group。實驗中 CPU 降到 0.15 核時，獨立小 group 的偵測延遲不變，同一條 alert 放在重 group 延遲變近兩倍，還會漏事件。<span class="at-chip at-ev-tested">實測</span>[^exp-prom-cpu]
 - Alert 依賴 recording rule 時放同一個 group，順序在後。
 - `concurrent-rule-eval` 在 2.x 有依賴判斷問題（3.1 修正），不要當第一選擇。
+
+
+<!-- figure: rule-group-modes -->
+
+**圖**　Rule group 的三種執行情況。A：預設，group 內依序。B：2.55 起開 `concurrent-rule-eval`，K 個 slot 搶不到時不等，直接在 group 的 goroutine 裡跑，所以 K 不是硬上限。C：不同 group 各自一條 goroutine，起跑點依 hash 錯開。A、B 的時間與峰值是每條 rule 100 ms 時量到的數字，C 是示意。[^p-group-eval][^p255-max-concurrent][^p255-concurrency-ctrl][^exp-pend]
+{: .at-caption }
 
 相關契約：[Rule group 要在 interval 內跑完](../contracts.md#group-within-interval)。
 
@@ -92,6 +95,17 @@ Grafana 的重查詢會讓 rule group 變慢，實驗中從幾秒變成 40 秒�
 2.x 到 3.9：一條 queue、一條送出迴圈，每批最多 64 筆（3.4 起預設 256，可調）。同一批同時送給所有 Alertmanager，**等全部回應才送下一批**[^p-notifier-batch][^p-notifier-wait]，所以一台 Alertmanager 慢會拖累所有 alert；逾時預設 10 秒。3.10 起每台 Alertmanager 各一條 queue。[^p3-notifier-queue]
 
 送出的 alert 帶 `EndsAt = 評估時間 + 4 × max(resend-delay, E)`[^p-alert-validuntil][^p-resenddelay]，見[續送契約](../contracts.md#resend-endsat)。
+
+
+<!-- figure: notifier-queues -->
+
+**圖**　兩個版本的 notifier 結構。2.x 只有一條 queue，每批同時送給所有 Alertmanager，等最慢的回來才送下一批；3.10 起每台一條 queue，慢的只拖住自己。Batch 大小 2.x 固定 64，3.4 起可調、預設 256；每台的請求逾時預設 10 秒。[^p-notifier-batch][^p-notifier-wait][^p3-notifier-queue]
+{: .at-caption }
+
+<!-- figure: endsat-resend -->
+
+**圖**　Firing 之後每 1 分鐘續送一次，每次把 EndsAt 延到 4 分鐘後（`resend_delay` 1m、`evaluation_interval` 30s 時）。Prometheus 端的 alert 一直是 firing，但續送中斷超過 4 分鐘，Alertmanager 就發出 resolved，恢復後再發一次 firing。[^p-alert-validuntil][^p-needs-sending][^exp-prom-heartbeat]
+{: .at-caption }
 
 ## Alertmanager 的分組 {#alertmanager-dispatch}
 

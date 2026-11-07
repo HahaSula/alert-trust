@@ -598,5 +598,35 @@
   "v0.29.0",
   "config/config.go",
   "GroupInterval  *model.Duration"
+ ],
+ "p-extrapolated": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "promql/functions.go",
+  "func extrapolatedRate("
+ ],
+ "p-instantvalue": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "promql/functions.go",
+  "func instantValue("
+ ],
+ "p-needs-sending": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "rules/alerting.go",
+  "func (a *Alert) needsSending("
+ ],
+ "p255-max-concurrent": [
+  "prometheus/prometheus",
+  "v2.55.1",
+  "cmd/prometheus/main.go",
+  "rules.max-concurrent-evals"
+ ],
+ "p255-concurrency-ctrl": [
+  "prometheus/prometheus",
+  "v2.55.1",
+  "rules/group.go",
+  "concurrencyController RuleConcurrencyController"
  ]
 }

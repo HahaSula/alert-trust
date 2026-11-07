@@ -1,0 +1,56 @@
+<svg viewBox="0 0 900 380" role="img" aria-label="Timeline of scrapes every 120 seconds taking 100 seconds, and three rule evaluations with different windows">
+      <g>
+        <line x1="60" y1="330" x2="860" y2="330" class="ax"/>
+        <line x1="60" y1="30" x2="60" y2="330" class="grid"/>
+        <line x1="160" y1="30" x2="160" y2="330" class="grid"/>
+        <line x1="260" y1="30" x2="260" y2="330" class="grid"/>
+        <line x1="360" y1="30" x2="360" y2="330" class="grid"/>
+        <line x1="460" y1="30" x2="460" y2="330" class="grid"/>
+        <line x1="560" y1="30" x2="560" y2="330" class="grid"/>
+        <line x1="660" y1="30" x2="660" y2="330" class="grid"/>
+        <line x1="760" y1="30" x2="760" y2="330" class="grid"/>
+        <line x1="860" y1="30" x2="860" y2="330" class="grid"/>
+        <text x="60" y="348" text-anchor="middle" class="tk">0s</text>
+        <text x="160" y="348" text-anchor="middle" class="tk">60</text>
+        <text x="260" y="348" text-anchor="middle" class="tk">120</text>
+        <text x="360" y="348" text-anchor="middle" class="tk">180</text>
+        <text x="460" y="348" text-anchor="middle" class="tk">240</text>
+        <text x="560" y="348" text-anchor="middle" class="tk">300</text>
+        <text x="660" y="348" text-anchor="middle" class="tk">360</text>
+        <text x="760" y="348" text-anchor="middle" class="tk">420</text>
+        <text x="860" y="348" text-anchor="middle" class="tk">480</text>
+        <text x="460" y="370" text-anchor="middle" class="lbl-s">牆鐘時間（秒）</text>
+      </g>
+      <text x="60" y="22" class="lbl-b">Scrape：I = 120s，d ≈ 100s（從開始到 commit）</text>
+      <rect x="60" y="40" width="166.7" height="18" rx="3" class="scrape"/>
+      <rect x="260" y="40" width="166.7" height="18" rx="3" class="scrape"/>
+      <rect x="460" y="40" width="166.7" height="18" rx="3" class="scrape"/>
+      <rect x="660" y="40" width="166.7" height="18" rx="3" class="scrape"/>
+      <line x1="226.7" y1="34" x2="226.7" y2="64" class="commit"/>
+      <line x1="426.7" y1="34" x2="426.7" y2="64" class="commit"/>
+      <line x1="626.7" y1="34" x2="626.7" y2="64" class="commit"/>
+      <line x1="826.7" y1="34" x2="826.7" y2="64" class="commit"/>
+      <circle cx="60" cy="49" r="5" class="dot-acc"/>
+      <circle cx="260" cy="49" r="5" class="dot-acc"/>
+      <circle cx="460" cy="49" r="5" class="dot-acc"/>
+      <circle cx="660" cy="49" r="5" class="dot-acc"/>
+      <text x="268" y="80" class="lbl-s">● sample 時間戳 = scrape 開始　｜ commit 後才查得到</text>
+      <line x1="726.7" y1="96" x2="726.7" y2="330" class="ts"/>
+      <text x="726.7" y="92" text-anchor="middle" class="tk">ts=400</text>
+      <rect x="226.7" y="110" width="500" height="34" rx="4" class="win-ok"/>
+      <circle cx="260" cy="127" r="6" class="dot-vis"/>
+      <circle cx="460" cy="127" r="6" class="dot-vis"/>
+      <circle cx="660" cy="127" r="6" class="dot-inv"/>
+      <text x="236" y="160" class="t-ok">A · offset 0，窗口 (100, 400]：看得到 120、240 兩點 → rate 有值</text>
+      <line x1="776.7" y1="96" x2="776.7" y2="330" class="ts"/>
+      <text x="790" y="92" class="tk">ts=430</text>
+      <rect x="276.7" y="180" width="500" height="34" rx="4" class="win-bad"/>
+      <circle cx="460" cy="197" r="6" class="dot-vis"/>
+      <circle cx="660" cy="197" r="6" class="dot-inv"/>
+      <text x="286" y="230" class="t-bad">B · offset 0，窗口 (130, 430]：360 那點還沒 commit，只剩 1 點 → rate 為空</text>
+      <rect x="76.7" y="252" width="500" height="34" rx="4" class="win-ok"/>
+      <circle cx="260" cy="269" r="6" class="dot-vis"/>
+      <circle cx="460" cy="269" r="6" class="dot-vis"/>
+      <path d="M576.7 269 H770" class="arrow-ok" stroke-dasharray="4 3"/>
+      <text x="86" y="304" class="t-ok">C · 同一個 ts=430，offset 2m，窗口 (10, 310]：兩點都已 commit → rate 有值</text>
+    </svg>

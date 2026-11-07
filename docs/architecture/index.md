@@ -4,6 +4,15 @@
 
 各元件的細節在它自己的頁面，這頁只做對照。
 
+## 一條 alert 經過的階段
+
+以 Prometheus 為例，一條 alert 從 scrape 到 Alertmanager 要經過六段，每一段都有自己讓 alert 失準的方式，而且大多不會報錯。
+
+<!-- figure: alert-pipeline -->
+
+**圖**　Alert 管線，以及每一段可能讓 alert 失準的方式。最常見的根因在第一段：scrape 耗時超過 `scrape_interval`，後面每一段都跟著出錯。[^p-scrape-run][^p-scrape-report][^p-alert-delete][^p-notifier-batch][^p-alert-validuntil]
+{: .at-caption }
+
 ## 單序點對照
 
 | 元件 | 並行的單位 | 單序的地方 | 卡住時影響誰 | 詳細 |

@@ -63,6 +63,24 @@ Sample 帶的是 scrape 開始的時間，要等寫入完成才查得到。Rule 
 
 2.51 沒有 `query_offset`，要把 `offset` 寫在每個 selector 上，實驗確認有效。[^exp-prom-silent]
 
+
+<!-- figure: scrape-window-timeline -->
+
+**圖**　實際間隔 I = 120 秒、scrape 耗時 d ≈ 100 秒時（實驗用的條件）。綠點是 rule 執行當下已寫入的 sample，空心紅點是時間戳在視窗內但還沒寫入的 sample。Evaluation 落在 scrape 開始後 0–60 秒（A）看得到 2 點；60–100 秒（B）只剩 1 點，`rate` 回傳空；加上 2 分鐘 offset（C）後，視窗移到已寫入的區段。[^exp-prom-silent][^exp-prom-range][^p-scrape-report]
+{: .at-caption }
+
+<!-- figure: pending-reset -->
+
+**圖**　`evaluation_interval` 30 秒、I = 120 秒時，看得到的 sample 數依「成立、成立、空、空」循環。每次空結果都把 pending 刪掉，`ActiveAt` 跟著重設；`for: 3m` 需要連續 7 次成立，永遠到不了。實驗中這條 alert 跑 25 分鐘重置 9 次，從未 firing。[^p-alert-delete][^exp-prom-silent]
+{: .at-caption }
+
+**換成 `irate` 沒有用。**兩個函式都至少要 2 個 sample，視窗內只剩 1 點時一樣回傳空。差別只在有值時怎麼算：
+
+<!-- figure: rate-vs-irate -->
+
+**圖**　同一個視窗裡 `rate` 與 `irate` 用到的範圍。`rate` 的外推門檻是平均間隔的 1.1 倍，最後一點離視窗終點太遠時只外推半個間隔，所以被系統性算低。`irate` 只用最後兩點、不外推，不會低估，但只反映最後一個間隔，雜訊大。能同時解決空結果、低估、事後對不上的是查詢 offset。[^p-extrapolated][^p-instantvalue]
+{: .at-caption }
+
 架構：[Scrape loop](architecture/prometheus.md#scrape-loop)、[Alert 狀態](architecture/prometheus.md#alert-state)。
 
 ### vmalert：視窗要涵蓋資料延遲 {#vm-range-window}

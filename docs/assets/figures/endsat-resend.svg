@@ -1,0 +1,34 @@
+<svg viewBox="0 0 900 230" role="img" aria-label="Resend and EndsAt timeline; a gap longer than 4 minutes resolves the alert in Alertmanager">
+      <line x1="60" y1="180" x2="860" y2="180" class="ax"/>
+      <g class="tk">
+        <text x="60" y="198" text-anchor="middle">0m</text><text x="140" y="198" text-anchor="middle">1</text>
+        <text x="220" y="198" text-anchor="middle">2</text><text x="300" y="198" text-anchor="middle">3</text>
+        <text x="380" y="198" text-anchor="middle">4</text><text x="460" y="198" text-anchor="middle">5</text>
+        <text x="540" y="198" text-anchor="middle">6</text><text x="620" y="198" text-anchor="middle">7</text>
+        <text x="700" y="198" text-anchor="middle">8</text><text x="780" y="198" text-anchor="middle">9</text>
+        <text x="860" y="198" text-anchor="middle">10</text>
+      </g>
+      <text x="20" y="24" class="lbl-b">Firing 後每 1 分鐘續送，每次把 EndsAt 延到 +4 分鐘</text>
+      <text x="20" y="58" class="lbl-s">送出</text>
+      <circle cx="60" cy="54" r="6" class="dot-acc"/>
+      <circle cx="140" cy="54" r="6" class="dot-acc"/>
+      <circle cx="220" cy="54" r="6" class="dot-inv"/>
+      <circle cx="300" cy="54" r="6" class="dot-inv"/>
+      <circle cx="380" cy="54" r="6" class="dot-inv"/>
+      <circle cx="460" cy="54" r="6" class="dot-inv"/>
+      <circle cx="540" cy="54" r="6" class="dot-inv"/>
+      <circle cx="620" cy="54" r="6" class="dot-acc"/>
+      <circle cx="700" cy="54" r="6" class="dot-acc"/>
+      <text x="380" y="40" text-anchor="middle" class="t-bad">送不出去（queue 丟棄 / AM 逾時）</text>
+      <text x="20" y="98" class="lbl-s">EndsAt</text>
+      <rect x="140" y="86" width="320" height="20" rx="3" class="b-fire"/>
+      <text x="300" y="101" text-anchor="middle" class="lbl-s">最後一次成功送出時 EndsAt = 1m + 4m</text>
+      <text x="20" y="142" class="lbl-s">AM 狀態</text>
+      <rect x="60" y="130" width="400" height="22" rx="3" class="b-fire"/>
+      <text x="260" y="146" text-anchor="middle" class="lbl">firing</text>
+      <rect x="460" y="130" width="160" height="22" rx="3" class="win-ok"/>
+      <text x="540" y="146" text-anchor="middle" class="t-ok">resolved（自動）</text>
+      <rect x="620" y="130" width="240" height="22" rx="3" class="b-fire"/>
+      <text x="740" y="146" text-anchor="middle" class="lbl">firing（重新通知）</text>
+      <text x="460" y="222" text-anchor="middle" class="lbl-s">分鐘</text>
+    </svg>

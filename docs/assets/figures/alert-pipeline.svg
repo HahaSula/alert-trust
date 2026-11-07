@@ -1,0 +1,50 @@
+<svg viewBox="0 0 900 250" role="img" aria-label="Pipeline: scrape, TSDB, rule eval, alert state, notifier queue, Alertmanager">
+      <defs>
+        <marker id="ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+      </defs>
+      <g>
+        <rect x="10" y="40" width="130" height="70" rx="8" class="b-node-bad"/>
+        <text x="75" y="68" text-anchor="middle" class="lbl-b">Scrape</text>
+        <text x="75" y="88" text-anchor="middle" class="lbl-s">HTTP + parse + append</text>
+        <rect x="160" y="40" width="120" height="70" rx="8" class="b-node"/>
+        <text x="220" y="68" text-anchor="middle" class="lbl-b">TSDB commit</text>
+        <text x="220" y="88" text-anchor="middle" class="lbl-s">此後才查得到</text>
+        <rect x="300" y="40" width="130" height="70" rx="8" class="b-node"/>
+        <text x="365" y="68" text-anchor="middle" class="lbl-b">Rule eval</text>
+        <text x="365" y="88" text-anchor="middle" class="lbl-s">query @ ts − O</text>
+        <rect x="450" y="40" width="130" height="70" rx="8" class="b-node"/>
+        <text x="515" y="68" text-anchor="middle" class="lbl-b">Alert 狀態</text>
+        <text x="515" y="88" text-anchor="middle" class="lbl-s">pending → firing</text>
+        <rect x="600" y="40" width="140" height="70" rx="8" class="b-node-acc"/>
+        <text x="670" y="68" text-anchor="middle" class="lbl-b">Notifier queue</text>
+        <text x="670" y="88" text-anchor="middle" class="lbl-s">cap 10000 · batch</text>
+        <rect x="760" y="40" width="130" height="70" rx="8" class="b-node"/>
+        <text x="825" y="68" text-anchor="middle" class="lbl-b">Alertmanager</text>
+        <text x="825" y="88" text-anchor="middle" class="lbl-s">POST /api/v2/alerts</text>
+      </g>
+      <path d="M140 75 H156" class="arrow" marker-end="url(#ah1)"/>
+      <path d="M280 75 H296" class="arrow" marker-end="url(#ah1)"/>
+      <path d="M430 75 H446" class="arrow" marker-end="url(#ah1)"/>
+      <path d="M580 75 H596" class="arrow" marker-end="url(#ah1)"/>
+      <path d="M740 75 H756" class="arrow" marker-end="url(#ah1)"/>
+      <text x="75" y="140" text-anchor="middle" class="t-bad">最常見的根因</text>
+      <text x="75" y="160" text-anchor="middle" class="lbl-s">d 超過 interval</text>
+      <text x="75" y="176" text-anchor="middle" class="lbl-s">tick 被丟掉</text>
+      <text x="220" y="140" text-anchor="middle" class="t-warn">延遲可見</text>
+      <text x="220" y="160" text-anchor="middle" class="lbl-s">時間戳 = scrape 開始</text>
+      <text x="220" y="176" text-anchor="middle" class="lbl-s">可見時間 = 開始 + d</text>
+      <text x="365" y="140" text-anchor="middle" class="t-warn">空結果</text>
+      <text x="365" y="160" text-anchor="middle" class="lbl-s">窗口內 &lt; 2 個 sample</text>
+      <text x="365" y="176" text-anchor="middle" class="lbl-s">rate() 回傳空</text>
+      <text x="515" y="140" text-anchor="middle" class="t-bad">pending 被刪除</text>
+      <text x="515" y="160" text-anchor="middle" class="lbl-s">一次空結果</text>
+      <text x="515" y="176" text-anchor="middle" class="lbl-s">ActiveAt 重設</text>
+      <text x="670" y="140" text-anchor="middle" class="t-warn">滿了丟最舊的</text>
+      <text x="670" y="160" text-anchor="middle" class="lbl-s">pending 不會送出</text>
+      <text x="670" y="176" text-anchor="middle" class="lbl-s">每 AM timeout 10s</text>
+      <text x="825" y="140" text-anchor="middle" class="t-warn">EndsAt 到期</text>
+      <text x="825" y="160" text-anchor="middle" class="lbl-s">ts + 4×max(1m, E)</text>
+      <text x="825" y="176" text-anchor="middle" class="lbl-s">沒續送就自動 resolve</text>
+      <line x1="10" y1="205" x2="890" y2="205" class="ax"/>
+      <text x="10" y="228" class="lbl-s">每個階段下方是它可能讓 alert 失準的方式。</text>
+    </svg>

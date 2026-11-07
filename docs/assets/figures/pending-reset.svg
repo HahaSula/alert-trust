@@ -1,0 +1,47 @@
+<svg viewBox="0 0 900 300" role="img" aria-label="Evaluation sequence every 30 seconds with pattern ok ok empty empty, pending resets and never reaches 3 minutes">
+      <text x="20" y="22" class="lbl-b">每 30 秒一次 evaluation，實際間隔 I = 120s，for: 3m（需連續 7 次成立）</text>
+      <line x1="40" y1="250" x2="880" y2="250" class="ax"/>
+      <g class="tk">
+        <text x="70" y="270" text-anchor="middle">0</text>
+        <text x="130" y="270" text-anchor="middle">30</text>
+        <text x="190" y="270" text-anchor="middle">60</text>
+        <text x="250" y="270" text-anchor="middle">90</text>
+        <text x="310" y="270" text-anchor="middle">120</text>
+        <text x="370" y="270" text-anchor="middle">150</text>
+        <text x="430" y="270" text-anchor="middle">180</text>
+        <text x="490" y="270" text-anchor="middle">210</text>
+        <text x="550" y="270" text-anchor="middle">240</text>
+        <text x="610" y="270" text-anchor="middle">270</text>
+        <text x="670" y="270" text-anchor="middle">300</text>
+        <text x="730" y="270" text-anchor="middle">330</text>
+        <text x="790" y="270" text-anchor="middle">360</text>
+      </g>
+      <text x="460" y="292" text-anchor="middle" class="lbl-s">evaluation 時間（秒）</text>
+      <text x="20" y="62" class="lbl-s">rate 結果</text>
+      <circle cx="70" cy="80" r="11" class="ok-mark"/><circle cx="130" cy="80" r="11" class="ok-mark"/>
+      <circle cx="190" cy="80" r="11" class="bad-mark"/><circle cx="250" cy="80" r="11" class="bad-mark"/>
+      <circle cx="310" cy="80" r="11" class="ok-mark"/><circle cx="370" cy="80" r="11" class="ok-mark"/>
+      <circle cx="430" cy="80" r="11" class="bad-mark"/><circle cx="490" cy="80" r="11" class="bad-mark"/>
+      <circle cx="550" cy="80" r="11" class="ok-mark"/><circle cx="610" cy="80" r="11" class="ok-mark"/>
+      <circle cx="670" cy="80" r="11" class="bad-mark"/><circle cx="730" cy="80" r="11" class="bad-mark"/>
+      <circle cx="790" cy="80" r="11" class="ok-mark"/>
+      <text x="840" y="72" class="t-ok">● &gt; A</text>
+      <text x="840" y="92" class="t-bad">● 空</text>
+      <text x="20" y="128" class="lbl-s">ALERTS pending</text>
+      <rect x="64" y="140" width="72" height="26" rx="4" class="b-pend"/>
+      <rect x="304" y="140" width="72" height="26" rx="4" class="b-pend"/>
+      <rect x="544" y="140" width="72" height="26" rx="4" class="b-pend"/>
+      <rect x="784" y="140" width="40" height="26" rx="4" class="b-pend"/>
+      <text x="100" y="158" text-anchor="middle" class="tk">30s</text>
+      <text x="340" y="158" text-anchor="middle" class="tk">30s</text>
+      <text x="580" y="158" text-anchor="middle" class="tk">30s</text>
+      <text x="20" y="200" class="lbl-s">ActiveAt</text>
+      <text x="70" y="206" text-anchor="middle" class="t-warn">0</text>
+      <text x="190" y="206" text-anchor="middle" class="t-bad">刪除</text>
+      <text x="310" y="206" text-anchor="middle" class="t-warn">120</text>
+      <text x="430" y="206" text-anchor="middle" class="t-bad">刪除</text>
+      <text x="550" y="206" text-anchor="middle" class="t-warn">240</text>
+      <text x="670" y="206" text-anchor="middle" class="t-bad">刪除</text>
+      <text x="790" y="206" text-anchor="middle" class="t-warn">360</text>
+      <text x="70" y="236" class="lbl-s">pending 最長只撐 30 秒，離 for: 3m 的 180 秒很遠；ALERTS_FOR_STATE 的值每 2 分鐘換一次。</text>
+    </svg>

@@ -4,16 +4,10 @@ Alertmanager 是單一行程，負責把 alert 分組、決定要不要通知，
 
 以 0.27.0、0.29.0 原始碼為準，並比對到 0.34.2。<span class="at-chip at-ev-code">讀碼</span>
 
-```mermaid
-flowchart LR
-  P[Prometheus／vmalert<br>每台都送] -->|POST /api/v2/alerts| ST[Alert store<br>全域一把鎖]
-  ST --> D[Dispatcher<br>比對路由樹]
-  ST --> IN[Inhibitor]
-  D --> G[Aggregation group<br>每個一條 goroutine]
-  G -->|group_wait、group_interval| PL[通知流程<br>inhibit → silence → dedup → retry]
-  PL --> R[接收端]
-  PL --> NF[nflog<br>記錄送過什麼]
-```
+<!-- figure: alertmanager-process -->
+
+**圖**　Alert 從 ruler 進入 API 與記憶體裡的 alert store，經 dispatcher 分組，每個 aggregation group 定期 flush 進通知流程，再送到接收端。實線是資料流，虛線是查詢。紅框的 alert store 是全域瓶頸：寫入時持鎖送進每個訂閱者的 channel。[^am-mem-put][^am-mem-chan][^am-aggr-run][^am-pipeline]
+{: .at-caption }
 
 ## Alert store {#alert-store}
 

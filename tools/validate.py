@@ -157,6 +157,9 @@ def check_refs(components: list[dict], contracts: dict, root: str) -> tuple[list
             if n.endswith(".md"):
                 path = os.path.join(dirpath, n)
                 text = open(path, encoding="utf-8").read()
+                for fig in re.findall(r"^<!-- figure: ([a-z0-9-]+) -->$", text, re.M):
+                    if not os.path.exists(os.path.join(docs, "assets", "figures", fig + ".svg")):
+                        errors.append(f"{os.path.relpath(path, root)}: 圖 {fig} 不存在")
                 for m in DOC_MARK.finditer(text):
                     if m.group(1) not in refs and f"[^{m.group(1)}]:" not in text:
                         errors.append(f"{os.path.relpath(path, root)}: 參考 [^{m.group(1)}] 不存在")

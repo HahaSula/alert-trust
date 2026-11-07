@@ -92,3 +92,8 @@ refs:
     kind: experiment
     title: "Prometheus 實驗：kube-prometheus-stack 57.2 上的驗證"
     url: "https://github.com/HahaSula/prometheus-selfcheck-skills/blob/b8601c502454dc382691ff5dbd4a9ecff9532a24/EVIDENCE.md?plain=1#L145"
+  exp-pend:
+    kind: experiment
+    title: "Pending 抖動分析：rule 並行與查詢 slot 的實驗（2.55.1、3.15.1）"
+    visibility: private
+    note: "原始報告含環境資訊，整理後公開"

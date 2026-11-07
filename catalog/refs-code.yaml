@@ -701,3 +701,38 @@ refs:
     file: "config/config.go"
     line: 902
     url: "https://github.com/prometheus/alertmanager/blob/v0.29.0/config/config.go#L902"
+  p-extrapolated:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "promql/functions.go"
+    line: 70
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/promql/functions.go#L70"
+  p-instantvalue:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "promql/functions.go"
+    line: 257
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/promql/functions.go#L257"
+  p-needs-sending:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "rules/alerting.go"
+    line: 94
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/rules/alerting.go#L94"
+  p255-max-concurrent:
+    kind: code
+    project: "Prometheus"
+    version: "v2.55.1"
+    file: "cmd/prometheus/main.go"
+    line: 460
+    url: "https://github.com/prometheus/prometheus/blob/v2.55.1/cmd/prometheus/main.go#L460"
+  p255-concurrency-ctrl:
+    kind: code
+    project: "Prometheus"
+    version: "v2.55.1"
+    file: "rules/group.go"
+    line: 77
+    url: "https://github.com/prometheus/prometheus/blob/v2.55.1/rules/group.go#L77"

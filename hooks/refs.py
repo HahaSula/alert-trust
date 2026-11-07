@@ -83,3 +83,23 @@ def on_page_markdown(markdown, page, config, files):  # noqa: F811 - wraps the c
     if page.file.src_uri != "reference/terms.md":
         markdown = link_terms(markdown, page.file.src_uri)
     return _refs_hook(markdown, page, config, files)
+
+
+# ---------- inline figures ----------
+FIGURE = re.compile(r"^<!-- figure: ([a-z0-9-]+) -->$", re.M)
+
+
+def inline_figures(markdown: str) -> str:
+    def repl(m):
+        path = os.path.join(ROOT, "docs", "assets", "figures", m.group(1) + ".svg")
+        with open(path, encoding="utf-8") as f:
+            svg = "\n".join(l for l in f.read().split("\n") if l.strip())
+        return f'<figure class="at-fig" markdown="0"><div class="at-fig-scroll">\n{svg}\n</div></figure>'
+    return FIGURE.sub(repl, markdown)
+
+
+_terms_hook = on_page_markdown
+
+
+def on_page_markdown(markdown, page, config, files):  # noqa: F811 - adds figures before the other hooks
+    return _terms_hook(inline_figures(markdown), page, config, files)

@@ -1,0 +1,40 @@
+<svg viewBox="0 0 900 252" role="img" aria-label="Each group goroutine passes a rule through an optional concurrency slot, then a parse gate with no deadline, then an execution gate counted against query timeout. Both gates share query max concurrency with HTTP API queries">
+      <defs>
+        <marker id="ah7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+      </defs>
+      <rect x="10" y="20" width="150" height="76" rx="8" class="b-node"/>
+      <text x="85" y="46" text-anchor="middle" class="lbl-b">group goroutine</text>
+      <text x="85" y="66" text-anchor="middle" class="lbl-s">每個 group 一個</text>
+      <text x="85" y="84" text-anchor="middle" class="lbl-s">數量無上限</text>
+      <rect x="196" y="20" width="170" height="76" rx="8" class="b-node"/>
+      <text x="281" y="46" text-anchor="middle" class="lbl-b">併行 slot（K）</text>
+      <text x="281" y="66" text-anchor="middle" class="lbl-s">開 flag 才有，全域共用</text>
+      <text x="281" y="84" text-anchor="middle" class="lbl-s">搶不到就直接跑，不等</text>
+      <rect x="402" y="20" width="170" height="76" rx="8" class="b-node-acc"/>
+      <text x="487" y="46" text-anchor="middle" class="lbl-b">Gate ① 解析</text>
+      <text x="487" y="66" text-anchor="middle" class="lbl-s">NewInstantQuery</text>
+      <text x="487" y="84" text-anchor="middle" class="t-warn">rule 的 ctx 無 deadline</text>
+      <rect x="608" y="20" width="170" height="76" rx="8" class="b-node-acc"/>
+      <text x="693" y="46" text-anchor="middle" class="lbl-b">Gate ② 執行</text>
+      <text x="693" y="66" text-anchor="middle" class="lbl-s">Exec</text>
+      <text x="693" y="84" text-anchor="middle" class="t-bad">計入 --query.timeout</text>
+      <rect x="810" y="20" width="80" height="76" rx="8" class="b-node"/>
+      <text x="850" y="52" text-anchor="middle" class="lbl-b">PromQL</text>
+      <text x="850" y="72" text-anchor="middle" class="lbl-s">求值</text>
+      <path d="M160 58 H192" class="arrow" marker-end="url(#ah7)"/>
+      <path d="M366 58 H398" class="arrow" marker-end="url(#ah7)"/>
+      <path d="M572 58 H604" class="arrow" marker-end="url(#ah7)"/>
+      <path d="M778 58 H806" class="arrow" marker-end="url(#ah7)"/>
+      <rect x="402" y="146" width="376" height="40" rx="8" class="b-node-bad"/>
+      <text x="590" y="171" text-anchor="middle" class="lbl-b">--query.max-concurrency（預設 20）</text>
+      <path d="M487 146 V100" class="arrow" marker-end="url(#ah7)"/>
+      <path d="M693 146 V100" class="arrow" marker-end="url(#ah7)"/>
+      <text x="499" y="128" class="lbl-s">佔 slot</text>
+      <text x="705" y="128" class="lbl-s">佔 slot</text>
+      <rect x="196" y="146" width="170" height="40" rx="8" class="b-node"/>
+      <text x="281" y="171" text-anchor="middle" class="lbl-b">HTTP API 查詢</text>
+      <path d="M366 166 H398" class="arrow" marker-end="url(#ah7)"/>
+      <text x="382" y="208" text-anchor="middle" class="lbl-s">Grafana 查得太多，也會佔用 rule 的 slot</text>
+      <text x="402" y="238" class="lbl-s">① 滿了：一直等，T<tspan baseline-shift="sub" font-size="9">eval</tspan> 變長，可能變成 missed</text>
+      <text x="690" y="238" class="lbl-s">② 滿了：逾時後 rule 失敗</text>
+    </svg>

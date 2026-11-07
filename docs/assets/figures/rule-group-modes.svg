@@ -1,0 +1,45 @@
+<svg viewBox="0 0 900 362" role="img" aria-label="Three execution modes: one group runs eight rules one after another; with concurrent rule evaluation five rules run at once and then three; three groups each run in their own goroutine at different phases and overlap">
+      <text x="20" y="20" class="lbl-b">A · 單一 group，預設</text>
+      <text x="20" y="47" class="lbl-s">group goroutine</text>
+      <g class="tk" text-anchor="middle">
+        <rect x="150" y="32" width="78" height="22" rx="3" class="b-node-acc"/><text x="189" y="47">r1</text>
+        <rect x="230" y="32" width="78" height="22" rx="3" class="b-node-acc"/><text x="269" y="47">r2</text>
+        <rect x="310" y="32" width="78" height="22" rx="3" class="b-node-acc"/><text x="349" y="47">r3</text>
+        <rect x="390" y="32" width="78" height="22" rx="3" class="b-node-acc"/><text x="429" y="47">r4</text>
+        <rect x="470" y="32" width="78" height="22" rx="3" class="b-node-acc"/><text x="509" y="47">r5</text>
+        <rect x="550" y="32" width="78" height="22" rx="3" class="b-node-acc"/><text x="589" y="47">r6</text>
+        <rect x="630" y="32" width="78" height="22" rx="3" class="b-node-acc"/><text x="669" y="47">r7</text>
+        <rect x="710" y="32" width="78" height="22" rx="3" class="b-node-acc"/><text x="749" y="47">r8</text>
+      </g>
+      <text x="798" y="47" class="lbl-s">804 ms，峰值 1</text>
+      <text x="20" y="84" class="lbl-b">B · 單一 group，開 concurrent-rule-eval，K = 4</text>
+      <text x="20" y="109" class="lbl-s">group goroutine</text>
+      <text x="20" y="157" class="lbl-s">另開 goroutine</text>
+      <g class="tk" text-anchor="middle">
+        <rect x="150" y="94" width="78" height="20" rx="3" class="b-node-acc"/><text x="189" y="108">r5</text>
+        <rect x="150" y="118" width="78" height="20" rx="3" class="b-node-ok"/><text x="189" y="132">r1</text>
+        <rect x="150" y="142" width="78" height="20" rx="3" class="b-node-ok"/><text x="189" y="156">r2</text>
+        <rect x="150" y="166" width="78" height="20" rx="3" class="b-node-ok"/><text x="189" y="180">r3</text>
+        <rect x="150" y="190" width="78" height="20" rx="3" class="b-node-ok"/><text x="189" y="204">r4</text>
+        <rect x="230" y="118" width="78" height="20" rx="3" class="b-node-ok"/><text x="269" y="132">r6</text>
+        <rect x="230" y="142" width="78" height="20" rx="3" class="b-node-ok"/><text x="269" y="156">r7</text>
+        <rect x="230" y="166" width="78" height="20" rx="3" class="b-node-ok"/><text x="269" y="180">r8</text>
+      </g>
+      <text x="330" y="132" class="lbl-s">201 ms，峰值 5（K + 1）</text>
+      <text x="330" y="156" class="lbl-s">r1–r4 搶到 slot，r5 搶不到也不等，直接在 group goroutine 裡跑。</text>
+      <text x="330" y="180" class="lbl-s">所以 K 不是硬上限。</text>
+      <text x="20" y="238" class="lbl-b">C · 三個 group，預設：各跑各的，起跑點由 hash(file, name) % E 決定</text>
+      <text x="20" y="267" class="lbl-s">g0 的 goroutine</text>
+      <text x="20" y="295" class="lbl-s">g1 的 goroutine</text>
+      <text x="20" y="323" class="lbl-s">g2 的 goroutine</text>
+      <g>
+        <rect x="150" y="252" width="58" height="20" rx="3" class="b-node-acc"/><rect x="210" y="252" width="58" height="20" rx="3" class="b-node-acc"/><rect x="270" y="252" width="58" height="20" rx="3" class="b-node-acc"/><rect x="330" y="252" width="58" height="20" rx="3" class="b-node-acc"/>
+        <rect x="470" y="252" width="58" height="20" rx="3" class="b-node-acc"/><rect x="530" y="252" width="58" height="20" rx="3" class="b-node-acc"/><rect x="590" y="252" width="58" height="20" rx="3" class="b-node-acc"/><rect x="650" y="252" width="58" height="20" rx="3" class="b-node-acc"/>
+        <rect x="210" y="280" width="58" height="20" rx="3" class="b-node-acc"/><rect x="270" y="280" width="58" height="20" rx="3" class="b-node-acc"/><rect x="330" y="280" width="58" height="20" rx="3" class="b-node-acc"/><rect x="390" y="280" width="58" height="20" rx="3" class="b-node-acc"/>
+        <rect x="530" y="280" width="58" height="20" rx="3" class="b-node-acc"/><rect x="590" y="280" width="58" height="20" rx="3" class="b-node-acc"/><rect x="650" y="280" width="58" height="20" rx="3" class="b-node-acc"/><rect x="710" y="280" width="58" height="20" rx="3" class="b-node-acc"/>
+        <rect x="330" y="308" width="58" height="20" rx="3" class="b-node-acc"/><rect x="390" y="308" width="58" height="20" rx="3" class="b-node-acc"/><rect x="450" y="308" width="58" height="20" rx="3" class="b-node-acc"/><rect x="510" y="308" width="58" height="20" rx="3" class="b-node-acc"/>
+        <rect x="650" y="308" width="58" height="20" rx="3" class="b-node-acc"/><rect x="710" y="308" width="58" height="20" rx="3" class="b-node-acc"/><rect x="770" y="308" width="58" height="20" rx="3" class="b-node-acc"/><rect x="830" y="308" width="58" height="20" rx="3" class="b-node-acc"/>
+      </g>
+      <rect x="327" y="247" width="64" height="86" rx="4" class="arrow-bad"/>
+      <text x="359" y="352" text-anchor="middle" class="t-bad">這段時間 3 條查詢同時跑</text>
+    </svg>
