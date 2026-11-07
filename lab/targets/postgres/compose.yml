@@ -1,0 +1,33 @@
+# postgres_exporter 信任實驗：一台 PostgreSQL、兩個 exporter（有／沒有 pg_monitor）、一台 Prometheus（scrape 5s）。
+# 執行：./run.sh（a～d）與 ./run2.sh（DB 故障的三種形態、權限對 stat_activity 的影響）；兩者結束都會 docker compose down -v。
+name: at-pg
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+    environment:
+      DATA_SOURCE_NAME: postgresql://exporter:exporter@postgres:5432/postgres?sslmode=disable
+    command:
+      - --collector.stat_statements
+      - --collector.stat_checkpointer
+      - --collector.database_wraparound
+    ports: ["127.0.0.1:19187:9187"]
+  exporter-nomon:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+    environment:
+      DATA_SOURCE_NAME: postgresql://nomon:nomon@postgres:5432/postgres?sslmode=disable
+  exporter-refused:
+    # 指向沒有在聽的 port：主機在、連線立即被拒
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+    environment:
+      DATA_SOURCE_NAME: postgresql://exporter:exporter@postgres:5433/postgres?sslmode=disable
+  prometheus:
+    image: prom/prometheus:v3.13.5
+    ports: ["127.0.0.1:19190:9090"]
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro

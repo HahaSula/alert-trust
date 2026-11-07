@@ -1,0 +1,11 @@
+global:
+  scrape_interval: 5s
+  scrape_timeout: 4s
+  evaluation_interval: 5s
+scrape_configs:
+  - job_name: postgres
+    static_configs: [{ targets: ["exporter:9187"] }]
+  - job_name: postgres-nomon
+    static_configs: [{ targets: ["exporter-nomon:9187"] }]
+  - job_name: postgres-refused
+    static_configs: [{ targets: ["exporter-refused:9187"] }]

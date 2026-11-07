@@ -1,0 +1,19 @@
+# 放在「獨立的」vmalert，不要設定 -rule.resendDelay，否則查詢中斷時 Watchdog 也不會斷。
+# 這些 alert 是「正常時 firing」，要在外部接收端設定「沒收到就告警」。
+groups:
+  - name: chain-canary
+    interval: 30s
+    rules:
+      - alert: Watchdog
+        expr: vector(1)
+        labels: { severity: none, component: vmalert, tier: "1" }
+        annotations:
+          summary: "送到外部 dead man's switch，停止抵達就要告警"
+          runbook_url: https://hahasula.github.io/alert-trust/components/vmalert/#watchdog
+      - alert: MetricsFresh
+        expr: time() - max(timestamp(up{job="my-job"})) < 120
+        for: 1m
+        labels: { severity: none, component: vmagent, tier: "1" }
+        annotations:
+          summary: "my-job 的資料還在流入；停止抵達代表 vmagent、vminsert 或儲存斷了"
+          runbook_url: https://hahasula.github.io/alert-trust/components/vmagent/#job-freshness

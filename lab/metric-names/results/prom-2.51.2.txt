@@ -1,0 +1,2 @@
+42 found, 1 missing, 9 external
+MISSING tier 1 vmalert#rule-errors: vmalert_recording_rules_errors_total

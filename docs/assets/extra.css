@@ -1,0 +1,47 @@
+/* alert-trust：在 Material 的配色之上加證據與分級的標籤，顏色跟著主題切換 */
+:root {
+  --at-crit: #b3261e; --at-crit-bg: #fbe9e7;
+  --at-ok: #1d6f4f; --at-ok-bg: #e3f3ec;
+  --at-info: #2a5a8c; --at-info-bg: #e5eef7;
+  --at-warn: #8a5a00; --at-warn-bg: #f8efd9;
+  --at-mute: #59607a; --at-mute-bg: #eaecf3;
+  --at-accent: #3d4f9e; --at-accent-bg: #e6e9f6;
+}
+[data-md-color-scheme="slate"] {
+  --at-crit: #f28b82; --at-crit-bg: #3a1e1c;
+  --at-ok: #6fcfa5; --at-ok-bg: #16322a;
+  --at-info: #8dbbe8; --at-info-bg: #182c40;
+  --at-warn: #e3bb62; --at-warn-bg: #352b13;
+  --at-mute: #9ba1b8; --at-mute-bg: #232634;
+  --at-accent: #95a6f0; --at-accent-bg: #232945;
+}
+.md-typeset { font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif; }
+.md-typeset code, .md-typeset pre { font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace; }
+
+.at-chip { display: inline-block; font-size: .72em; font-weight: 600; line-height: 1.5; padding: 0 .55em;
+  border-radius: 3px; white-space: nowrap; vertical-align: .08em; }
+.at-ev-tested, .at-up-yes, .at-st-stable, .at-res-ok { background: var(--at-ok-bg); color: var(--at-ok); }
+.at-ev-code { background: var(--at-info-bg); color: var(--at-info); }
+.at-ev-upstream { background: var(--at-accent-bg); color: var(--at-accent); }
+.at-ev-inferred, .at-up-partial, .at-st-draft, .at-res-warn { background: var(--at-warn-bg); color: var(--at-warn); }
+.at-up-no, .at-res-bad { background: var(--at-crit-bg); color: var(--at-crit); }
+.at-res-na { background: var(--at-mute-bg); color: var(--at-mute); }
+.at-t1 { background: var(--at-crit-bg); color: var(--at-crit); font-family: "IBM Plex Mono", monospace; }
+.at-t2 { background: var(--at-warn-bg); color: var(--at-warn); font-family: "IBM Plex Mono", monospace; }
+.at-t3 { background: var(--at-mute-bg); color: var(--at-mute); font-family: "IBM Plex Mono", monospace; }
+
+/* 計算器 */
+.at-calc { border: 1px solid var(--md-default-fg-color--lightest); border-radius: 6px; padding: 1rem; margin: 1rem 0; }
+.at-calc fieldset.at-mode { border: 0; padding: 0; margin: 0 0 .8rem; display: flex; gap: 1.2rem; flex-wrap: wrap; }
+.at-calc fieldset.at-mode legend { font-weight: 600; margin-right: .6rem; float: left; }
+.at-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: .7rem 1rem; }
+.at-grid[hidden] { display: none; }
+.at-grid label { display: flex; flex-direction: column; gap: .25rem; font-size: .75rem; color: var(--md-default-fg-color--light); min-width: 0; }
+.at-grid label.at-wide { grid-column: 1 / -1; }
+.at-grid input, .at-grid textarea { font: .8rem "IBM Plex Mono", ui-monospace, monospace; padding: .35rem .5rem;
+  border: 1px solid var(--md-default-fg-color--lighter); border-radius: 4px;
+  background: var(--md-default-bg-color); color: var(--md-default-fg-color); min-width: 0; }
+.at-grid input:focus-visible, .at-grid textarea:focus-visible { outline: 2px solid var(--at-accent); outline-offset: 1px; }
+.at-calc-out { margin-top: 1rem; }
+.at-table-wrap { overflow-x: auto; }
+.at-num { font-variant-numeric: tabular-nums; font-family: "IBM Plex Mono", monospace; }

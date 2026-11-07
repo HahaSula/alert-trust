@@ -1,0 +1,39 @@
+# mysqld_exporter 目標卡新增的來源。共用的 mysqld-mixin、mysqld-exporter-src、awesome 在 catalog/sources.yaml。
+sources:
+  art-mysql:
+    title: mysqld_exporter 輕量實驗（MariaDB 11.4）
+    kind: experiment
+    visibility: public
+    url: https://github.com/HahaSula/alert-trust/tree/main/lab/targets/mysql
+    checked: "2026-11-08, mariadb:11.4、prom/mysqld-exporter:v0.21.0、prom/prometheus:v3.13.5"
+    note: 正常、停資料庫、停 exporter、收回權限四個情境；結果在 results/
+  mysqld-exporter-readme:
+    title: mysqld_exporter README（權限、多 target、collector 旗標）
+    kind: upstream-doc
+    visibility: public
+    url: https://github.com/prometheus/mysqld_exporter/blob/main/README.md
+    checked: "2026-11-08, main（v0.21.0）"
+  mysqld-exporter-main:
+    title: mysqld_exporter.go 與 probe.go（timeout-offset、/probe）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/prometheus/mysqld_exporter/blob/main/probe.go
+    checked: "2026-11-08, main（v0.21.0）"
+    note: getScrapeTimeoutSeconds 在 mysqld_exporter.go；預設 offset 0.25s
+  mysqld-exporter-slave-status:
+    title: mysqld_exporter collector/slave_status.go
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/prometheus/mysqld_exporter/blob/main/collector/slave_status.go
+    checked: "2026-11-08, main（v0.21.0）"
+    note: 依序試 SHOW ALL SLAVES STATUS、SHOW SLAVE STATUS、SHOW REPLICA STATUS；metric 名稱直接取欄位名
+  mysql-84-removed:
+    title: MySQL 8.4 移除的功能（SHOW SLAVE STATUS 等）
+    kind: upstream-doc
+    visibility: public
+    url: https://dev.mysql.com/doc/refman/8.4/en/mysql-nutshell.html
+  mariadb-replica-monitor:
+    title: MariaDB SHOW REPLICA STATUS 與 REPLICA MONITOR 權限
+    kind: upstream-doc
+    visibility: public
+    url: https://mariadb.com/docs/server/reference/sql-statements/administrative-sql-statements/show/show-replica-status

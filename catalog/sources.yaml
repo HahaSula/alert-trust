@@ -1,0 +1,96 @@
+# 目錄引用的來源。每個 signal、contract、silent_failure 用 source 的 key 指向這裡。
+# visibility: public 代表任何人都能打開；private 代表尚未整理成公開報告，網站只顯示名稱。
+sources:
+  # 自己的實驗與分析
+  art-prom:
+    title: Prometheus Rule 信任邊際
+    kind: experiment
+    visibility: private
+    note: 待去除環境資訊後整理到 docs/reports/
+  art-vm:
+    title: VictoriaMetrics Rule 信任邊際
+    kind: experiment
+    visibility: private
+    note: 待去除環境資訊後整理到 docs/reports/
+  art-am:
+    title: Alertmanager 監控指南
+    kind: experiment
+    visibility: private
+    note: 待去除環境資訊後整理到 docs/reports/
+  selfcheck:
+    title: prometheus-selfcheck-skills（前身）
+    kind: experiment
+    visibility: public
+    url: https://github.com/HahaSula/prometheus-selfcheck-skills
+    note: EVIDENCE.md 有實驗數據
+
+  # 上游官方
+  prom-docs-alerting:
+    title: Prometheus 告警實務：Metamonitoring
+    kind: upstream-doc
+    visibility: public
+    url: https://github.com/prometheus/docs/blob/main/docs/practices/alerting.md
+  prom-mixin:
+    title: Prometheus mixin alerts
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/prometheus/prometheus/blob/main/documentation/prometheus-mixin/alerts.libsonnet
+    checked: "2026-11-07, main（最新正式版 v3.16.0）"
+  am-mixin:
+    title: Alertmanager mixin alerts
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/prometheus/alertmanager/blob/main/doc/alertmanager-mixin/alerts.libsonnet
+    checked: "2026-11-07, main（v0.34.2）"
+  kps:
+    title: kube-prometheus-stack 預設規則
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack/templates/prometheus/rules-1.14
+    note: 等於 Prometheus 與 Alertmanager mixin，再加上 Watchdog、TargetDown
+  vm-rules:
+    title: VictoriaMetrics 官方規則
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/VictoriaMetrics/VictoriaMetrics/tree/master/deployment/docker/rules
+    checked: "2026-11-07, master（v1.155.0）"
+  vl-rules:
+    title: VictoriaLogs 官方規則
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/VictoriaMetrics/VictoriaLogs/tree/master/deployment/docker/rules
+    checked: 2026-11-07, master
+  vm-multiregional:
+    title: VictoriaMetrics 多區域部署指南
+    kind: upstream-doc
+    visibility: public
+    url: https://github.com/VictoriaMetrics/VictoriaMetrics/blob/master/docs/guides/multi-regional-setup-dedicated-regions/README.md
+  mysqld-mixin:
+    title: mysqld-mixin
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/prometheus/mysqld_exporter/tree/main/mysqld-mixin
+    checked: "2026-11-07, main（v0.21.0）"
+  mysqld-exporter-src:
+    title: mysqld_exporter collector/exporter.go
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/prometheus/mysqld_exporter/blob/main/collector/exporter.go
+
+  # 社群與工具
+  awesome:
+    title: awesome-prometheus-alerts
+    kind: community-rules
+    visibility: public
+    url: https://github.com/samber/awesome-prometheus-alerts
+  pint:
+    title: cloudflare/pint
+    kind: tool
+    visibility: public
+    url: https://github.com/cloudflare/pint
+    note: 單條 rule 的 linter；promql/series 與本專案的「規則在但沒資料」相同概念
+  monitoring-mixins:
+    title: Monitoring Mixins
+    kind: community-doc
+    visibility: public
+    url: https://github.com/monitoring-mixins/docs

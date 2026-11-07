@@ -1,0 +1,32 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  catalog:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pyyaml==6.0.2
+      - name: Validate catalog and links
+        run: python3 tools/validate.py
+      - name: Unit tests
+        run: python3 -m unittest discover -s tests -v
+      - name: promtool check rules (2.51.2 and 3.13.5)
+        run: |
+          for v in v2.51.2 v3.13.5; do
+            docker run --rm -v "$PWD/rules:/rules:ro" --entrypoint promtool prom/prometheus:$v \
+              check rules $(cd rules && ls prometheus/*.yml alertmanager/*.yml victoriametrics/meta.yml victoriametrics/canary.yml targets/*.yml 2>/dev/null | sed 's|^|/rules/|')
+          done
+      - name: vmalert -dryRun
+        run: |
+          docker run --rm -v "$PWD/rules:/rules:ro" victoriametrics/vmalert:v1.155.0 -dryRun \
+            -rule=/rules/victoriametrics/meta.yml -rule=/rules/victoriametrics/canary.yml \
+            -rule=/rules/victoriametrics/canary-logs.yml -rule.defaultRuleType=prometheus

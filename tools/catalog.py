@@ -1,0 +1,90 @@
+"""Load the alert-trust catalog. Requires PyYAML."""
+from __future__ import annotations
+
+import glob
+import os
+import re
+
+import yaml
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SITE_URL = "https://hahasula.github.io/alert-trust"
+REPO_URL = "https://github.com/HahaSula/alert-trust"
+
+TIERS = {1, 2, 3}
+EVIDENCE = {"tested": "實測", "code": "讀碼", "upstream": "上游", "inferred": "推論"}
+UPSTREAM = {"yes": "有", "partial": "部分", "no": "無"}
+EVALUATE_ON = {
+    "self": "被監控的元件自己",
+    "observer": "外部觀察者",
+    "federate": "外部觀察者（經 /federate）",
+    "dedicated": "獨立的 ruler",
+    "external": "外部服務",
+    "inventory": "盤點時檢查",
+    "interview": "問架構",
+}
+KINDS = {"infra", "target", "architecture"}
+STATUS = {"stable", "draft"}
+ID_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+COMPONENT_ID_RE = re.compile(r"^[a-z0-9_]+$")
+
+
+def _load(path: str):
+    with open(path, encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def load_sources(root: str = ROOT) -> dict:
+    """catalog/sources.yaml plus catalog/sources.d/*.yaml (one file per target keeps edits apart)."""
+    out = dict(_load(os.path.join(root, "catalog", "sources.yaml"))["sources"])
+    for path in sorted(glob.glob(os.path.join(root, "catalog", "sources.d", "*.yaml"))):
+        for key, val in ((_load(path) or {}).get("sources") or {}).items():
+            if key in out:
+                raise ValueError(f"{path}: source key {key!r} 重複")
+            out[key] = val
+    return out
+
+
+def load_contracts(root: str = ROOT) -> dict:
+    return _load(os.path.join(root, "catalog", "contracts.yaml"))["contracts"]
+
+
+def component_files(root: str = ROOT) -> list[str]:
+    files = glob.glob(os.path.join(root, "catalog", "components", "*.yaml"))
+    files += glob.glob(os.path.join(root, "catalog", "targets", "*.yaml"))
+    return sorted(files)
+
+
+def load_components(root: str = ROOT) -> list[dict]:
+    out = []
+    for path in component_files(root):
+        card = _load(path)
+        card["_path"] = os.path.relpath(path, root)
+        for s in card.get("signals", []):
+            up = s.get("upstream") or {}
+            # YAML 1.1 reads bare yes/no as booleans
+            if isinstance(up.get("status"), bool):
+                up["status"] = "yes" if up["status"] else "no"
+        out.append(card)
+    order = {"infra": 0, "architecture": 1, "target": 2}
+    return sorted(out, key=lambda c: (order.get(c.get("kind"), 9), c.get("_path")))
+
+
+def rule_files(root: str = ROOT) -> list[str]:
+    return sorted(glob.glob(os.path.join(root, "rules", "**", "*.yml"), recursive=True))
+
+
+def load_rules(root: str = ROOT) -> dict[str, dict]:
+    """Return {"rules/x/y.yml#Alert": rule} for every alerting rule."""
+    out = {}
+    for path in rule_files(root):
+        rel = os.path.relpath(path, root)
+        for group in (_load(path) or {}).get("groups", []):
+            for rule in group.get("rules", []):
+                if "alert" in rule:
+                    out[f"{rel}#{rule['alert']}"] = rule
+    return out
+
+
+def runbook_url(component_id: str, signal_id: str) -> str:
+    return f"{SITE_URL}/components/{component_id}/#{signal_id}"

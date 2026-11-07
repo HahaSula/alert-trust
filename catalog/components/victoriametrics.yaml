@@ -1,0 +1,104 @@
+id: victoriametrics
+name: VictoriaMetrics single／cluster
+kind: infra
+status: draft
+stages: [store, query]
+versions_checked: ["v1.155.0"]
+role: >-
+  儲存與查詢。Cluster 版多了「部分節點故障」這種狀態，預設回傳不完整的答案、HTTP 200。
+
+silent_failures:
+  - text: Cluster RF=1 時一台 vmstorage 掛掉會 partial response，increase 類的「數量太低」規則假觸發 9 分鐘。
+    evidence: tested
+    source: art-vm
+  - text: vmstorage 唯讀時 rule 不報錯；官方規則沒有引用 vm_storage_is_read_only。
+    evidence: tested
+    source: art-vm
+  - text: 官方文件寫的 denyPartialResponse 參數名稱沒有作用，vmselect 只認 deny_partial_response。
+    evidence: tested
+    source: art-vm
+  - text: 磁碟突然 0 byte 時切唯讀後仍會 panic。
+    evidence: tested
+    source: art-vm
+
+contracts: []
+
+signals:
+  - id: components-up
+    tier: 1
+    question: 每個元件活著嗎
+    signal: vminsert、vmselect、vmstorage（或 single）的 up
+    metrics: [up]
+    evaluate_on: observer
+    evidence: tested
+    source: art-vm
+    upstream: { status: partial, note: "實測 single 的 job 名稱不符，ServiceDown 從未觸發" }
+    rules: [rules/victoriametrics/meta.yml#MetaTargetDown]
+
+  - id: read-only
+    tier: 1
+    question: 還能寫入嗎
+    signal: max(vm_storage_is_read_only) == 1
+    metrics: [vm_storage_is_read_only]
+    evaluate_on: observer
+    evidence: tested
+    source: art-vm
+    upstream: { status: no, note: "只有 3 天預測" }
+    rules: [rules/victoriametrics/meta.yml#MetaStorageReadOnly]
+
+  - id: partial-results
+    tier: 1
+    question: 查詢結果完整嗎
+    signal: sum(rate(vm_partial_results_total[2m])) > 0
+    metrics: [vm_partial_results_total]
+    evaluate_on: observer
+    evidence: tested
+    source: art-vm
+    upstream: { status: no }
+    applies_when: cluster
+    rules: [rules/victoriametrics/meta.yml#MetaPartialResponses]
+
+  - id: storage-reachable
+    tier: 1
+    question: vmstorage 連得到嗎
+    signal: min(vm_rpc_vmstorage_is_reachable) == 0
+    metrics: [vm_rpc_vmstorage_is_reachable]
+    evaluate_on: observer
+    evidence: tested
+    source: art-vm
+    upstream: { status: partial, note: "RPCErrors 看錯誤數" }
+    applies_when: cluster
+    rules: [rules/victoriametrics/meta.yml#MetaStorageUnreachable]
+
+  - id: disk-space
+    tier: 1
+    question: 磁碟夠嗎
+    signal: DiskRunsOutOfSpace
+    metrics: [vm_free_disk_space_bytes, vm_data_size_bytes]
+    evaluate_on: observer
+    evidence: upstream
+    source: vm-rules
+    upstream: { status: yes }
+    rules: []
+
+  - id: query-saturation
+    tier: 2
+    question: 查詢飽和了嗎
+    signal: vm_concurrent_select_limit_timeout_total 增加
+    metrics: [vm_concurrent_select_limit_timeout_total]
+    evaluate_on: observer
+    evidence: tested
+    source: art-vm
+    upstream: { status: yes }
+    rules: []
+
+  - id: rows-dropped
+    tier: 2
+    question: 資料被丟掉了嗎
+    signal: vm_rows_ignored_total、vm_rpc_rows_dropped_on_overload_total、series limit 丟棄數
+    metrics: [vm_rows_ignored_total, vm_rpc_rows_dropped_on_overload_total]
+    evaluate_on: observer
+    evidence: code
+    source: art-vm
+    upstream: { status: partial }
+    rules: []

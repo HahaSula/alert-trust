@@ -1,0 +1,69 @@
+site_name: alert-trust
+site_description: Monitor of monitor 元件目錄與 rule 信任契約
+site_url: https://hahasula.github.io/alert-trust/
+repo_url: https://github.com/HahaSula/alert-trust
+repo_name: HahaSula/alert-trust
+edit_uri: edit/main/docs/
+strict: true
+
+theme:
+  name: material
+  language: zh-TW
+  font: false
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle: { icon: material/weather-night, name: 切換成深色 }
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle: { icon: material/weather-sunny, name: 切換成淺色 }
+  features:
+    - navigation.sections
+    - navigation.top
+    - toc.follow
+    - content.code.copy
+    - search.highlight
+
+extra_css:
+  - https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&display=swap
+  - assets/extra.css
+extra_javascript:
+  - assets/calculator.js
+
+markdown_extensions:
+  - attr_list
+  - md_in_html
+  - tables
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - 首頁: index.md
+  - 共同模型: model.md
+  - 元件卡:
+      - components/index.md
+      - Prometheus: components/prometheus.md
+      - Alertmanager: components/alertmanager.md
+      - vmalert: components/vmalert.md
+      - vmagent: components/vmagent.md
+      - VictoriaMetrics: components/victoriametrics.md
+      - VictoriaLogs: components/victorialogs.md
+      - 外部觀察者: components/observer.md
+      - Target：MySQL／MariaDB: components/mysqld_exporter.md
+      - Target：PostgreSQL: components/postgres_exporter.md
+  - 寫 rule:
+      - 信任契約: contracts.md
+      - 契約計算器: tools/calculator.md
+      - Prometheus 架構: architecture/prometheus.md
+  - 實驗報告: reports/index.md
+  - 來源: reference/sources.md

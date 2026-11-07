@@ -1,0 +1,24 @@
+# Canary 範本，放在受測的 Prometheus。把 M、my-job 換成實際值，每個關鍵 job 一組。
+# 這些 alert 是「正常時 firing」，要在外部接收端設定「沒收到就告警」。
+groups:
+  - name: canary               # 獨立小 group：不要和昂貴的 recording rule 放一起
+    rules:
+      - alert: Watchdog        # L0：不依賴資料，只證明評估 → Alertmanager → 接收端活著
+        expr: vector(1)
+        labels: { severity: none, component: prometheus, tier: "1", scope: pipeline }
+        annotations:
+          summary: "送到外部 dead man's switch，停止抵達就要告警"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#watchdog
+      - alert: DataHeartbeatMyJob   # L1：scrape → TSDB → 查詢有新資料時才會 firing
+        expr: time() - max(timestamp(M{job="my-job"})) < 300
+        labels: { severity: none, component: prometheus, tier: "1", scope: pipeline }
+        annotations:
+          summary: "my-job 的資料管線活著；停止抵達代表 scrape、寫入或查詢斷了"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#job-freshness
+      - alert: KnownTrueCanary # L2：已知成立的條件，帶 for；crash loop 時只有這種 canary 會斷
+        expr: rate(M{job="my-job"}[10m]) >= 0
+        for: 5m
+        labels: { severity: none, component: prometheus, tier: "1", scope: pipeline }
+        annotations:
+          summary: "帶 for 的判斷能成立；停止抵達代表 for 在重置或行程在重啟"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#known-true-canary

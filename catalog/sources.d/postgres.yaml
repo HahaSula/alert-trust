@@ -1,0 +1,71 @@
+# postgres_exporter 卡引用的來源。key 一律以 pg- 開頭，避免和其他 target 衝突。
+sources:
+  pg-lab:
+    title: postgres_exporter 信任實驗（lab/targets/postgres）
+    kind: experiment
+    visibility: public
+    url: https://github.com/HahaSula/alert-trust/tree/main/lab/targets/postgres
+    checked: "2026-11-08, exporter v0.20.1, PostgreSQL 16, Prometheus v3.13.5"
+    note: results/summary.txt 是摘要，run.txt 與 run2.txt 是原始輸出
+  pg-exporter-collector:
+    title: postgres_exporter collector/collector.go（pg_scrape_collector_*、每次 scrape 開新連線）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/collector.go
+    checked: "2026-11-08, v0.20.1"
+  pg-exporter-legacy:
+    title: postgres_exporter exporter/（pg_up、pg_exporter_*、queries.yaml、auto-discover）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/exporter/postgres_exporter.go
+    checked: "2026-11-08, v0.20.1"
+    note: pg_up 的判斷在 scrape()，連線重用在 server.go 的 GetServer，自訂查詢失敗在 namespace.go
+  pg-exporter-probe:
+    title: postgres_exporter /probe（multi-target）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/cmd/postgres_exporter/probe.go
+    checked: "2026-11-08, v0.20.1"
+    note: 程式內註明 TODO Timeout；collector/probe.go 用 context.TODO()，沒有收集逾時
+  pg-exporter-replication:
+    title: postgres_exporter collector/pg_replication.go
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_replication.go
+    checked: "2026-11-08, v0.20.1"
+    note: receive_lsn 等於 replay_lsn 時 lag 直接回 0
+  pg-exporter-collectors:
+    title: postgres_exporter collector 目錄（預設開關、版本分支）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/prometheus-community/postgres_exporter/tree/v0.20.1/collector
+    checked: "2026-11-08, v0.20.1"
+    note: pg_stat_bgwriter.go 在 17 以上不再輸出 checkpoint 欄位；pg_stat_checkpointer、database_wraparound、stat_wal_receiver、postmaster、stat_statements 預設關閉
+  pg-exporter-readme:
+    title: postgres_exporter README
+    kind: upstream-doc
+    visibility: public
+    url: https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/README.md
+    checked: "2026-11-08, v0.20.1"
+  pg-mixin:
+    title: postgres_mixin alerts
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/postgres_mixin/alerts/postgres.libsonnet
+    checked: "2026-11-08, v0.20.1"
+  pg-awesome:
+    title: awesome-prometheus-alerts PostgreSQL（postgres-exporter）
+    kind: community-rules
+    visibility: public
+    url: https://github.com/samber/awesome-prometheus-alerts/blob/master/_data/rules.yml
+    checked: "2026-11-08, master dff32bd"
+  pg-docs-roles:
+    title: PostgreSQL 文件：Predefined Roles（pg_monitor、pg_use_reserved_connections）
+    kind: upstream-doc
+    visibility: public
+    url: https://www.postgresql.org/docs/current/predefined-roles.html
+  pg-docs-wraparound:
+    title: PostgreSQL 文件：Preventing Transaction ID Wraparound Failures
+    kind: upstream-doc
+    visibility: public
+    url: https://www.postgresql.org/docs/current/routine-vacuuming.html#VACUUM-FOR-WRAPAROUND

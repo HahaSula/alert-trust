@@ -1,0 +1,14 @@
+# 只放在 datasource 為 VictoriaLogs 的 vmalert；flow:canary 換成你的 canary log 流。
+# 視窗依實驗結果調整，這個確切表達式尚未實跑。用 vmalert -dryRun 檢查，不能用 promtool。
+groups:
+  - name: chain-canary-logs
+    type: vlogs
+    interval: 30s
+    rules:
+      - alert: LogsFresh
+        expr: '_time:2m flow:canary | stats count() c | filter c:>0'
+        for: 2m
+        labels: { severity: none, component: victorialogs, tier: "1" }
+        annotations:
+          summary: "Canary log 流還查得到；停止抵達代表 vlagent、vlinsert、唯讀或 vlselect 有問題"
+          runbook_url: https://hahasula.github.io/alert-trust/components/victorialogs/#log-freshness

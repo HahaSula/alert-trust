@@ -1,0 +1,78 @@
+id: vmagent
+name: vmagent
+kind: infra
+status: draft
+stages: [collect]
+versions_checked: ["v1.155.0"]
+role: 採集並寫入 VM，中間有磁碟 buffer。它壞掉時 rule 只看到資料變舊，不會報錯。
+
+silent_failures:
+  - text: 掛掉後 rule 不報錯，條件型 alert 繼續 firing 約 6 分鐘才 resolved。
+    evidence: tested
+    source: art-vm
+  - text: 恢復後資料補回，圖看起來沒有缺口，但 rule 不補判。
+    evidence: tested
+    source: art-vm
+  - text: vmagent_remotewrite_pending_data_bytes 在低流量時量到 0，不能單靠它。
+    evidence: tested
+    source: art-vm
+
+contracts: [scrape-within-interval]
+
+signals:
+  - id: vmagent-down
+    tier: 1
+    question: 行程活著嗎
+    signal: up == 0
+    metrics: [up]
+    evaluate_on: observer
+    evidence: tested
+    source: art-vm
+    upstream: { status: partial, note: "依 job 名稱比對" }
+    rules: [rules/victoriametrics/meta.yml#MetaTargetDown]
+
+  - id: job-freshness
+    tier: 1
+    question: 每個關鍵 job 都有新資料嗎
+    signal: time() - max(timestamp(up{job="X"})) < 120，for 1m，正常時 firing，由外部判斷沒收到
+    metrics: [up]
+    evaluate_on: self
+    judged_by: external
+    evidence: tested
+    source: art-vm
+    upstream: { status: no }
+    rules: [rules/victoriametrics/canary.yml#MetricsFresh]
+
+  - id: data-dropped
+    tier: 1
+    question: 有沒有丟資料
+    signal: persistent queue 或 remote write 丟棄數增加
+    metrics: [vm_persistentqueue_bytes_dropped_total, vmagent_remotewrite_packets_dropped_total]
+    evaluate_on: observer
+    evidence: upstream
+    source: vm-rules
+    upstream: { status: yes }
+    rules: []
+
+  - id: remote-write-retries
+    tier: 1
+    question: 寫得出去嗎
+    signal: rate(vmagent_remotewrite_retries_count_total[5m]) > 0
+    metrics: [vmagent_remotewrite_retries_count_total]
+    evaluate_on: observer
+    evidence: upstream
+    source: vm-rules
+    upstream: { status: yes }
+    rules: []
+
+  - id: scrape-health
+    tier: 2
+    question: Scrape 正常嗎
+    signal: scrapes_failed、scrape pool 沒有 target、scrape 耗時 ÷ interval
+    metrics: [vm_promscrape_scrapes_failed_total, vm_promscrape_scrape_pool_targets, scrape_duration_seconds]
+    evaluate_on: observer
+    evidence: upstream
+    source: vm-rules
+    upstream: { status: partial, note: "沒有耗時比值" }
+    rules: []
+    contract: scrape-within-interval

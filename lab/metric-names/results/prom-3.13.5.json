@@ -1,0 +1,212 @@
+[
+ {
+  "component": "prometheus",
+  "signal": "prometheus-down",
+  "tier": 1,
+  "metric": "up",
+  "status": "external"
+ },
+ {
+  "component": "prometheus",
+  "signal": "job-freshness",
+  "tier": 1,
+  "metric": "up",
+  "status": "external"
+ },
+ {
+  "component": "prometheus",
+  "signal": "rule-group-ratio",
+  "tier": 1,
+  "metric": "prometheus_rule_group_last_duration_seconds",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "rule-group-ratio",
+  "tier": 1,
+  "metric": "prometheus_rule_group_interval_seconds",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "rule-group-ratio",
+  "tier": 1,
+  "metric": "prometheus_rule_group_iterations_missed_total",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "rule-group-ratio",
+  "tier": 1,
+  "metric": "prometheus_rule_group_last_evaluation_timestamp_seconds",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "rule-failures",
+  "tier": 1,
+  "metric": "prometheus_rule_evaluation_failures_total",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "notify-to-alertmanager",
+  "tier": 1,
+  "metric": "prometheus_notifications_errors_total",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "notify-to-alertmanager",
+  "tier": 1,
+  "metric": "prometheus_notifications_dropped_total",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "notify-to-alertmanager",
+  "tier": 1,
+  "metric": "prometheus_notifications_alertmanagers_discovered",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "wal-write-failed",
+  "tier": 1,
+  "metric": "prometheus_tsdb_wal_writes_failed_total",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "crash-loop",
+  "tier": 1,
+  "metric": "process_start_time_seconds",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "for-reset",
+  "tier": 2,
+  "metric": "ALERTS_FOR_STATE",
+  "status": "external"
+ },
+ {
+  "component": "prometheus",
+  "signal": "scrape-ratio",
+  "tier": 2,
+  "metric": "scrape_duration_seconds",
+  "status": "external"
+ },
+ {
+  "component": "prometheus",
+  "signal": "scrape-ratio",
+  "tier": 2,
+  "metric": "prometheus_target_interval_length_seconds",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "query-slots",
+  "tier": 2,
+  "metric": "prometheus_engine_queries",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "query-slots",
+  "tier": 2,
+  "metric": "prometheus_engine_queries_concurrent_max",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "query-slots",
+  "tier": 2,
+  "metric": "prometheus_engine_query_duration_seconds",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "tsdb-maintenance",
+  "tier": 2,
+  "metric": "prometheus_tsdb_compactions_failed_total",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "tsdb-maintenance",
+  "tier": 2,
+  "metric": "prometheus_tsdb_checkpoint_creations_failed_total",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "tsdb-maintenance",
+  "tier": 2,
+  "metric": "prometheus_tsdb_reloads_total",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "tsdb-maintenance",
+  "tier": 2,
+  "metric": "prometheus_tsdb_head_max_time_seconds",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "tsdb-maintenance",
+  "tier": 2,
+  "metric": "prometheus_tsdb_head_min_time_seconds",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "memory-limit",
+  "tier": 2,
+  "metric": "container_memory_working_set_bytes",
+  "status": "external"
+ },
+ {
+  "component": "prometheus",
+  "signal": "memory-limit",
+  "tier": 2,
+  "metric": "kube_pod_container_resource_limits",
+  "status": "external"
+ },
+ {
+  "component": "prometheus",
+  "signal": "root-cause",
+  "tier": 3,
+  "metric": "prometheus_tsdb_lowest_timestamp_seconds",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "root-cause",
+  "tier": 3,
+  "metric": "prometheus_tsdb_retention_limit_seconds",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "root-cause",
+  "tier": 3,
+  "metric": "prometheus_tsdb_wal_fsync_duration_seconds",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "root-cause",
+  "tier": 3,
+  "metric": "prometheus_tsdb_wal_corruptions_total",
+  "status": "found"
+ },
+ {
+  "component": "prometheus",
+  "signal": "root-cause",
+  "tier": 3,
+  "metric": "prometheus_config_last_reload_successful",
+  "status": "found"
+ }
+]

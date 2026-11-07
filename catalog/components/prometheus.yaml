@@ -1,0 +1,246 @@
+id: prometheus
+name: Prometheus
+kind: infra
+status: stable
+stages: [collect, store, query, evaluate, notify]
+versions_checked: ["2.51.2", "2.55.1", "3.13.5", "3.15.1"]
+role: >-
+  採集、儲存、查詢、評估、送出通知都在同一個行程，共用 CPU、記憶體與磁碟。
+  一個資源出問題，負責偵測的部分會一起受影響，所以它不能只監控自己。
+architecture: architecture/prometheus.md
+
+silent_failures:
+  - text: Scrape 比 interval 慢時，for 反覆重置、alert 永遠不 firing；失敗計數為 0，up 為 1。
+    evidence: tested
+    source: art-prom
+  - text: Rule group 耗時超過 interval 時跳過 evaluation，rule 的 health 仍是 ok。
+    evidence: tested
+    source: art-prom
+  - text: 磁碟寫滿再釋放空間後，寫入看似恢復，WAL 已留下半筆紀錄，要到下一次 checkpoint 才失敗。
+    evidence: tested
+    source: art-prom
+  - text: 可用空間被 compaction 用完時 reload 停止，retention 不再執行。
+    evidence: tested
+    source: art-prom
+  - text: Crash loop 時 vector(1) 與不帶 for 的 heartbeat 每次啟動都立刻恢復。
+    evidence: tested
+    source: art-prom
+
+contracts:
+  - scrape-within-interval
+  - range-window
+  - group-within-interval
+  - lookback
+  - resend-endsat
+
+signals:
+  - id: prometheus-down
+    tier: 1
+    question: 行程活著嗎
+    signal: 'up{job="prometheus"} == 0，加上 absent(up{job="prometheus"})'
+    metrics: [up]
+    evaluate_on: observer
+    evidence: tested
+    source: art-prom
+    upstream: { status: no, note: "mixin 預設由外部負責，沒有提供規則" }
+    rules: [rules/prometheus/meta.yml#PrometheusDown, rules/prometheus/meta.yml#PrometheusMissing]
+
+  - id: watchdog
+    tier: 1
+    question: 評估 → 通知 → 接收端整條活著嗎
+    signal: Watchdog（vector(1)）走專屬短週期路由送到外部 dead man's switch
+    metrics: []
+    evaluate_on: self
+    judged_by: external
+    evidence: tested
+    source: art-prom
+    upstream: { status: partial, note: "kps 有 Watchdog；路由與外部接收端要自己確認" }
+    rules: [rules/prometheus/canary.yml#Watchdog]
+
+  - id: job-freshness
+    tier: 1
+    question: 每個關鍵 job 都有新資料嗎
+    signal: 每個關鍵 job 一條 heartbeat：up{job="X"} == 0 加上 absent，或 time() - max(timestamp(M{job="X"}))
+    metrics: [up]
+    evaluate_on: self
+    judged_by: external
+    evidence: tested
+    source: art-prom
+    upstream: { status: no, note: "awesome 只有 Prometheus 自己的 job missing" }
+    rules: [rules/prometheus/canary.yml#DataHeartbeatMyJob]
+
+  - id: known-true-canary
+    tier: 1
+    question: 依賴真實資料的判斷會成立嗎
+    signal: 已知成立、帶 for 的 canary，放在和真實 rule 相同負載的 group
+    metrics: []
+    evaluate_on: self
+    judged_by: external
+    evidence: tested
+    source: art-prom
+    upstream: { status: no }
+    rules: [rules/prometheus/canary.yml#KnownTrueCanary]
+
+  - id: rule-group-ratio
+    tier: 1
+    question: Rule group 跑得完嗎
+    signal: prometheus_rule_group_last_duration_seconds / prometheus_rule_group_interval_seconds > 0.8，以及 iterations_missed
+    metrics:
+      - prometheus_rule_group_last_duration_seconds
+      - prometheus_rule_group_interval_seconds
+      - prometheus_rule_group_iterations_missed_total
+      - prometheus_rule_group_last_evaluation_timestamp_seconds
+    evaluate_on: observer
+    evidence: tested
+    source: art-prom
+    upstream: { status: partial, note: "mixin 只有 missed；awesome 比值超過 1 才響，這時已經開始跳過" }
+    rules:
+      - rules/prometheus/meta.yml#RuleGroupNearInterval
+      - rules/prometheus/meta.yml#RuleGroupMissingEvaluations
+      - rules/prometheus/meta.yml#RuleGroupStale
+    contract: group-within-interval
+
+  - id: rule-failures
+    tier: 1
+    question: Rule 有沒有評估失敗
+    signal: prometheus_rule_evaluation_failures_total 增加
+    metrics: [prometheus_rule_evaluation_failures_total]
+    evaluate_on: observer
+    evidence: tested
+    source: art-prom
+    upstream: { status: yes }
+    rules: [rules/prometheus/meta.yml#RuleEvaluationFailures]
+
+  - id: notify-to-alertmanager
+    tier: 1
+    question: 送得到 Alertmanager 嗎
+    signal: notifications_errors_total、dropped_total 增加，或 alertmanagers_discovered < 1
+    metrics:
+      - prometheus_notifications_errors_total
+      - prometheus_notifications_dropped_total
+      - prometheus_notifications_alertmanagers_discovered
+    evaluate_on: observer
+    evidence: tested
+    source: art-prom
+    upstream: { status: yes }
+    rules:
+      - rules/prometheus/meta.yml#NotificationsFailing
+      - rules/prometheus/meta.yml#NotificationsDropped
+      - rules/prometheus/meta.yml#NoAlertmanagerDiscovered
+    contract: resend-endsat
+
+  - id: wal-write-failed
+    tier: 1
+    question: 資料和 rule 結果寫得進去嗎
+    signal: prometheus_tsdb_wal_writes_failed_total 增加
+    metrics: [prometheus_tsdb_wal_writes_failed_total]
+    evaluate_on: observer
+    silent_failure: 磁碟寫滿時 Watchdog 不受影響
+    evidence: tested
+    source: art-prom
+    upstream: { status: no, note: "mixin 與 awesome 都沒有" }
+    rules: [rules/prometheus/meta.yml#WALWriteFailed]
+
+  - id: crash-loop
+    tier: 1
+    question: 有沒有反覆重啟
+    signal: changes(process_start_time_seconds[15m]) > 2
+    metrics: [process_start_time_seconds]
+    evaluate_on: observer
+    evidence: tested
+    source: art-prom
+    upstream: { status: partial, note: "mixin 只有 HA group 版；awesome 有" }
+    rules: [rules/prometheus/meta.yml#PrometheusCrashLooping]
+
+  - id: for-reset
+    tier: 2
+    question: Alert 的 for 有沒有反覆重置
+    signal: changes(ALERTS_FOR_STATE[1h])
+    metrics: [ALERTS_FOR_STATE]
+    evaluate_on: federate
+    silent_failure: Rule 沒報錯但永遠無法 firing 時，只有這個訊號會動
+    evidence: tested
+    source: art-prom
+    upstream: { status: no }
+    rules: [rules/prometheus/meta.yml#AlertForTimerResetting]
+    contract: range-window
+
+  - id: scrape-ratio
+    tier: 2
+    question: Scrape 接近 interval 了嗎
+    signal: scrape_duration_seconds ÷ interval；prometheus_target_interval_length_seconds
+    metrics: [scrape_duration_seconds, prometheus_target_interval_length_seconds]
+    evaluate_on: federate
+    evidence: tested
+    source: art-prom
+    upstream: { status: partial, note: "awesome 用 interval_length 的 p90/p50 比值" }
+    rules:
+      - rules/prometheus/meta.yml#ScrapeSlowerThanInterval
+      - rules/prometheus/meta.yml#ScrapeIntervalStretched
+    contract: scrape-within-interval
+
+  - id: query-slots
+    tier: 2
+    question: 查詢 slot 滿了嗎
+    signal: prometheus_engine_queries / prometheus_engine_queries_concurrent_max；queue_time
+    metrics:
+      - prometheus_engine_queries
+      - prometheus_engine_queries_concurrent_max
+      - prometheus_engine_query_duration_seconds
+    evaluate_on: observer
+    evidence: tested
+    source: art-prom
+    upstream: { status: yes, note: "mixin PrometheusHighQueryLoad" }
+    rules: [rules/prometheus/meta.yml#QueryQueueing]
+
+  - id: tsdb-maintenance
+    tier: 2
+    question: TSDB 維護停了嗎
+    signal: compaction 或 checkpoint 失敗、reloads_total 停止增加、Head 未落成 block
+    metrics:
+      - prometheus_tsdb_compactions_failed_total
+      - prometheus_tsdb_checkpoint_creations_failed_total
+      - prometheus_tsdb_reloads_total
+      - prometheus_tsdb_head_max_time_seconds
+      - prometheus_tsdb_head_min_time_seconds
+    evaluate_on: observer
+    evidence: tested
+    source: art-prom
+    upstream: { status: partial, note: "mixin 只有「失敗」，沒有「停止」" }
+    rules:
+      - rules/prometheus/meta.yml#WALCheckpointFailing
+      - rules/prometheus/meta.yml#CompactionFailing
+      - rules/prometheus/meta.yml#BlockReloadStalled
+      - rules/prometheus/meta.yml#HeadNotCompacting
+
+  - id: memory-limit
+    tier: 2
+    question: 記憶體接近 limit 了嗎
+    signal: container working set ÷ memory limit > 0.8（cAdvisor 加 kube-state-metrics）
+    metrics: [container_memory_working_set_bytes, kube_pod_container_resource_limits]
+    evaluate_on: observer
+    evidence: tested
+    source: art-prom
+    upstream: { status: no }
+    rules: [rules/prometheus/meta.yml#PrometheusMemoryNearLimit]
+
+  - id: root-cause
+    tier: 3
+    question: 根因與容量
+    signal: Retention 落後、WAL fsync、WAL 啟動修復、CPU throttling、設定 reload
+    metrics:
+      - prometheus_tsdb_lowest_timestamp_seconds
+      - prometheus_tsdb_retention_limit_seconds
+      - prometheus_tsdb_wal_fsync_duration_seconds
+      - prometheus_tsdb_wal_corruptions_total
+      - prometheus_config_last_reload_successful
+    evaluate_on: observer
+    evidence: tested
+    source: art-prom
+    upstream: { status: partial }
+    rules:
+      - rules/prometheus/meta.yml#RetentionBehind
+      - rules/prometheus/meta.yml#WALFsyncSlow
+      - rules/prometheus/meta.yml#WALRepairedAtStartup
+      - rules/prometheus/meta.yml#PrometheusCPUThrottled
+      - rules/prometheus/meta.yml#PrometheusConfigReloadFailed

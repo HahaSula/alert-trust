@@ -1,0 +1,128 @@
+id: vmalert
+name: vmalert
+kind: infra
+status: draft
+stages: [evaluate]
+versions_checked: ["v1.155.0"]
+role: >-
+  獨立的評估行程，依賴都走網路：從 VM 或 VL 查詢、把狀態寫回 VM、通知送 Alertmanager。
+  不跟儲存搶 CPU，但每條網路路徑都可能失效。
+
+silent_failures:
+  - text: 查詢失敗時不續送通知，約 2 分鐘後 Alertmanager 把所有 alert 標成 resolved，連 Watchdog 也一樣。
+    evidence: tested
+    source: art-vm
+  - text: 寫入路徑故障時不報錯，條件型 alert 還會繼續 firing 約 6 分鐘（-datasource.queryStep 5m）。
+    evidence: tested
+    source: art-vm
+  - text: 查詢飽和（429）時 vmalert_iteration_missed_total 仍是 0。
+    evidence: tested
+    source: art-vm
+  - text: Operator 的兩個 selector 都沒設時一條 rule 都不選，也沒有錯誤。
+    evidence: code
+    source: art-vm
+
+contracts: [vm-range-window, resend-endsat, group-within-interval, vl-log-delay]
+
+signals:
+  - id: vmalert-down
+    tier: 1
+    question: 行程活著嗎
+    signal: up{job=~".*vmalert.*"} == 0
+    metrics: [up]
+    evaluate_on: observer
+    evidence: tested
+    source: art-vm
+    upstream: { status: partial, note: "ServiceDown 依 job 名稱比對" }
+    rules: [rules/victoriametrics/meta.yml#MetaTargetDown]
+
+  - id: watchdog
+    tier: 1
+    question: 通知鏈活著嗎
+    signal: Watchdog 放在獨立的 vmalert，不設 -rule.resendDelay
+    metrics: []
+    evaluate_on: dedicated
+    judged_by: external
+    evidence: tested
+    source: art-vm
+    upstream: { status: no }
+    rules: [rules/victoriametrics/canary.yml#Watchdog]
+    contract: resend-endsat
+
+  - id: rule-errors
+    tier: 1
+    question: 查詢有沒有失敗
+    signal: rate(vmalert_alerting_rules_errors_total[2m]) > 0；有 recording rule 時再加 vmalert_recording_rules_errors_total（逐條 rule 產生，沒有 recording rule 就不存在）
+    metrics: [vmalert_alerting_rules_errors_total]
+    evaluate_on: observer
+    evidence: tested
+    source: art-vm
+    upstream: { status: partial, note: "官方 for 5m，實測 +370s 才響" }
+    rules: [rules/victoriametrics/meta.yml#MetaRuleErrors]
+
+  - id: notifier-errors
+    tier: 1
+    question: 送得到 Alertmanager 嗎
+    signal: vmalert_alerts_send_errors_total 增加
+    metrics: [vmalert_alerts_send_errors_total]
+    evaluate_on: observer
+    evidence: tested
+    source: art-vm
+    upstream: { status: yes }
+    rules: [rules/victoriametrics/meta.yml#MetaNotifierErrors]
+
+  - id: rules-loaded
+    tier: 1
+    question: Rule 真的有載入嗎
+    signal: 預期 rule 數對照 /api/v1/rules；vmalert_alerting_rules_last_evaluation_samples
+    metrics: [vmalert_alerting_rules_last_evaluation_samples]
+    evaluate_on: inventory
+    evidence: code
+    source: art-vm
+    upstream: { status: partial, note: "RecordingRulesNoData 只管 recording rule" }
+    rules: []
+
+  - id: state-write
+    tier: 1
+    question: 狀態寫得回去嗎
+    signal: vmalert_remotewrite_errors_total、dropped_rows 增加
+    metrics: [vmalert_remotewrite_errors_total, vmalert_remotewrite_dropped_rows_total]
+    evaluate_on: observer
+    evidence: tested
+    source: art-vm
+    upstream: { status: yes }
+    rules: [rules/victoriametrics/meta.yml#MetaNoRuleWrites]
+
+  - id: group-ratio
+    tier: 2
+    question: Group 跑得完嗎
+    signal: vmalert_iteration_duration_seconds ÷ interval；iteration_missed
+    metrics: [vmalert_iteration_duration_seconds, vmalert_iteration_missed_total]
+    evaluate_on: observer
+    evidence: tested
+    source: art-vm
+    upstream: { status: partial, note: "只有 missed" }
+    rules: [rules/victoriametrics/meta.yml#MetaGroupSlow]
+    contract: group-within-interval
+
+  - id: resolve-settings
+    tier: 2
+    question: 假 resolved 的設定對嗎
+    signal: flag{name="rule.resendDelay"}、rule.maxResolveDuration、notifier.blackhole
+    metrics: [flag]
+    evaluate_on: inventory
+    evidence: code
+    source: art-vm
+    upstream: { status: no }
+    rules: []
+
+  - id: config-reload
+    tier: 2
+    question: 新設定生效了嗎
+    signal: vmalert_config_last_reload_successful != 1
+    metrics: [vmalert_config_last_reload_successful]
+    evaluate_on: observer
+    evidence: upstream
+    source: vm-rules
+    upstream: { status: yes }
+    rules: []

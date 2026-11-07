@@ -1,0 +1,100 @@
+id: observer
+name: 外部觀察者與 dead man's switch
+kind: architecture
+status: draft
+stages: [meta]
+versions_checked: []
+role: >-
+  這張卡檢查架構性質，不是 metric。其他卡標「observer」的訊號都在這裡評估，
+  所以這裡的條件不成立，前面的卡就都不算數。
+
+silent_failures:
+  - text: Prometheus 停機後 Alertmanager 仍重送 Watchdog 到 EndsAt，停機 3 分鐘內外部還收得到。
+    evidence: tested
+    source: art-prom
+  - text: 存活探測（/-/healthy、/-/ready）在 8 種故障裡只明確抓到 2 種。
+    evidence: tested
+    source: selfcheck
+
+contracts: [deadman-wait]
+
+signals:
+  - id: failure-domain
+    tier: 1
+    question: 跟被監控對象在不同故障域嗎
+    signal: 不同節點、儲存、叢集；不寫入被監控的 VM 或 VL
+    metrics: []
+    evaluate_on: interview
+    evidence: code
+    source: vm-multiregional
+    upstream: { status: no }
+    rules: []
+
+  - id: separate-alert-path
+    tier: 1
+    question: 告警是否不經過被監控的 Alertmanager
+    signal: meta 的 alerting 設定指向另一台 Alertmanager 或直接送外部
+    metrics: []
+    evaluate_on: interview
+    evidence: tested
+    source: art-prom
+    upstream: { status: no }
+    rules: []
+
+  - id: own-deadman
+    tier: 1
+    question: Meta 自己也有 dead man's switch 嗎
+    signal: meta 的 Watchdog 送到外部接收端
+    metrics: []
+    evaluate_on: interview
+    evidence: inferred
+    source: art-vm
+    upstream: { status: no }
+    rules: []
+
+  - id: scrapes-all-infra
+    tier: 1
+    question: 抓得到每個 infra 元件的 /metrics 嗎
+    signal: 每個元件在 meta 上都有 up series
+    metrics: [up]
+    evaluate_on: observer
+    evidence: tested
+    source: art-prom
+    upstream: { status: no }
+    rules: []
+
+  - id: deadman-wait
+    tier: 1
+    question: DMS 的等待時間算過嗎
+    signal: 等待 > 4 × max(resend, E) + repeat_interval + group_interval；要更快就靠外部 up
+    metrics: []
+    evaluate_on: interview
+    evidence: tested
+    source: art-prom
+    upstream: { status: no }
+    rules: []
+    contract: deadman-wait
+
+  - id: federation
+    tier: 2
+    question: Prometheus 的 up、scrape_duration、ALERTS_FOR_STATE 有 federate 過來嗎
+    signal: meta 上查得到這些 series（它們不在 /metrics）
+    metrics: [up, scrape_duration_seconds, ALERTS_FOR_STATE]
+    evaluate_on: observer
+    evidence: code
+    source: art-prom
+    upstream: { status: no }
+    applies_when: prometheus in env
+    rules: []
+
+  - id: k8s-sources
+    tier: 2
+    question: K8s 有 cAdvisor、kube-state-metrics、PVC 用量嗎
+    signal: meta 上查得到 container_*、kube_pod_*、kubelet_volume_stats_*
+    metrics: [container_memory_working_set_bytes, kube_pod_container_resource_limits, kubelet_volume_stats_available_bytes]
+    evaluate_on: observer
+    evidence: tested
+    source: art-prom
+    upstream: { status: no }
+    applies_when: kubernetes
+    rules: []

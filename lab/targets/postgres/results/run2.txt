@@ -1,0 +1,46 @@
+## d2) 連線立即被拒（exporter-refused 指向 5433）
+  up{job=~"postgres.*"}                                                       -> 3 series: postgres-nomon=1 postgres=1 postgres-refused=1
+  pg_up                                                                       -> 3 series: postgres-nomon=1 postgres=1 postgres-refused=0
+  pg_up == 0                                                                  -> 1 series: postgres-refused=0
+  pg_exporter_last_scrape_error                                               -> 3 series: postgres-nomon=0 postgres=0 postgres-refused=1
+  scrape_duration_seconds{job=~"postgres.*"}                                  -> 3 series: postgres-nomon=0.039308513 postgres=0.039250617 postgres-refused=1.002950263
+  count by (job) (pg_scrape_collector_success)                                -> 2 series: postgres-nomon=15 postgres=18
+
+## e) 長交易可見性（superuser 開一個 idle in transaction 的交易）
+  max by (job) (pg_stat_activity_max_tx_duration)                             -> 2 series: postgres-nomon=0 postgres=20.903768
+  sum by (job) (pg_stat_activity_count{state="active"})                       -> 2 series: postgres-nomon=0 postgres=1
+
+## f) exporter 使用者被改成 NOLOGIN（認證失敗，連線很快被拒）
+  直接抓 exporter /metrics: 200 0.006936s
+  up{job=~"postgres.*"}                                                       -> 3 series: postgres-nomon=1 postgres=1 postgres-refused=1
+  pg_up                                                                       -> 3 series: postgres-nomon=1 postgres=1 postgres-refused=0
+  pg_up == 0                                                                  -> 1 series: postgres-refused=0
+  pg_exporter_last_scrape_error                                               -> 3 series: postgres-nomon=0 postgres=0 postgres-refused=1
+  scrape_duration_seconds{job=~"postgres.*"}                                  -> 3 series: postgres-nomon=0.03805443 postgres=0.005991532 postgres-refused=1.003491512
+  count by (job) (pg_scrape_collector_success)                                -> 1 series: postgres-nomon=15
+  中斷 exporter 既有的連線（pg_terminate_backend）後：
+1
+  up{job=~"postgres.*"}                                                       -> 3 series: postgres-nomon=1 postgres=1 postgres-refused=1
+  pg_up                                                                       -> 3 series: postgres-nomon=1 postgres=0 postgres-refused=0
+  pg_up == 0                                                                  -> 2 series: postgres=0 postgres-refused=0
+  pg_exporter_last_scrape_error                                               -> 3 series: postgres-nomon=0 postgres=1 postgres-refused=1
+  scrape_duration_seconds{job=~"postgres.*"}                                  -> 3 series: postgres-nomon=0.038200038 postgres=1.005616421 postgres-refused=1.002672737
+  count by (job) (pg_scrape_collector_success)                                -> 1 series: postgres-nomon=15
+
+## g) docker pause postgres（TCP 不回應）
+  直接抓 exporter /metrics: 000 30.001586s
+  up{job=~"postgres.*"}                                                       -> 3 series: postgres-nomon=0 postgres=0 postgres-refused=1
+  pg_up                                                                       -> 1 series: postgres-refused=0
+  pg_up == 0                                                                  -> 1 series: postgres-refused=0
+  pg_exporter_last_scrape_error                                               -> 1 series: postgres-refused=1
+  scrape_duration_seconds{job=~"postgres.*"}                                  -> 3 series: postgres-nomon=4.000885224 postgres=4.001094714 postgres-refused=1.006461743
+  count by (job) (pg_scrape_collector_success)                                -> 0 series: 
+
+## h) docker stop postgres（主機名稱解析失敗）
+  直接抓 exporter /metrics: 200 16.763626s
+  up{job=~"postgres.*"}                                                       -> 3 series: postgres-nomon=0 postgres=0 postgres-refused=0
+  pg_up                                                                       -> 0 series: 
+  pg_up == 0                                                                  -> 0 series: 
+  pg_exporter_last_scrape_error                                               -> 0 series: 
+  scrape_duration_seconds{job=~"postgres.*"}                                  -> 3 series: postgres-nomon=4.000974366 postgres=4.000878921 postgres-refused=4.001130943
+  count by (job) (pg_scrape_collector_success)                                -> 0 series: 

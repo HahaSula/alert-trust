@@ -1,0 +1,29 @@
+# 輕量 lab：確認目錄引用的 metric 名稱真的存在，並讓規則在真實的 ruler 上載入一次。
+# 約 4 個小容器、跑 1 分鐘；不做負載測試。
+name: alert-trust-metric-names
+services:
+  prom251:
+    image: prom/prometheus:v2.51.2
+    command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.path=/prometheus]
+    volumes: [./prometheus.yml:/etc/prometheus/prometheus.yml:ro, ../../rules:/rules:ro]
+    ports: ["19091:9090"]
+  prom313:
+    image: prom/prometheus:v3.13.5
+    command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.path=/prometheus]
+    volumes: [./prometheus.yml:/etc/prometheus/prometheus.yml:ro, ../../rules:/rules:ro]
+    ports: ["19092:9090"]
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    command: [--config.file=/etc/alertmanager/alertmanager.yml]
+    volumes: [./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro]
+    ports: ["19093:9093"]
+  vmalert:
+    image: victoriametrics/vmalert:v1.155.0
+    command:
+      - -datasource.url=http://prom313:9090
+      - -notifier.url=http://alertmanager:9093
+      - -rule=/rules/victoriametrics/meta.yml
+      - -rule=/rules/victoriametrics/canary.yml
+      - -evaluationInterval=15s
+    volumes: [../../rules:/rules:ro]
+    ports: ["19880:8880"]

@@ -1,0 +1,200 @@
+# Prometheus 的 meta 規則。放在外部觀察者（meta Prometheus）上評估。
+# 門檻以 scrape 與 evaluation 30s 為基準，請依環境調整：25 與 40 秒、job=~".*prometheus"、container="prometheus"。
+# scope=target、alert 的 series 不在 /metrics，meta 要用 /federate 才拿得到（見 components/observer）。
+# runbook_url 指向 alert-trust 網站上對應訊號的段落。
+groups:
+  - name: prometheus-liveness
+    rules:
+      - alert: PrometheusDown
+        expr: up{job=~".*prometheus.*"} == 0
+        for: 1m
+        labels: { severity: critical, component: prometheus, tier: "1", scope: prometheus }
+        annotations:
+          summary: "Prometheus /metrics 抓不到；dead man's switch 要等 EndsAt 過後才會響"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#prometheus-down
+      - alert: PrometheusMissing
+        expr: absent(up{job=~".*prometheus.*"})
+        for: 5m
+        labels: { severity: critical, component: prometheus, tier: "1", scope: prometheus }
+        annotations:
+          summary: "完全沒有 Prometheus 的 target，服務發現或 job 名稱可能錯了"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#prometheus-down
+      - alert: PrometheusCrashLooping
+        expr: changes(process_start_time_seconds{job=~".*prometheus.*"}[15m]) > 2
+        labels: { severity: critical, component: prometheus, tier: "1", scope: prometheus }
+        annotations:
+          summary: "15 分鐘內重啟超過 2 次；Watchdog 與不帶 for 的 heartbeat 看不出來"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#crash-loop
+
+  - name: prometheus-rules
+    rules:
+      - alert: RuleGroupNearInterval
+        expr: |
+          prometheus_rule_group_last_duration_seconds
+            > 0.8 * prometheus_rule_group_interval_seconds
+        for: 10m
+        labels: { severity: warning, component: prometheus, tier: "1", scope: rule_group }
+        annotations:
+          summary: "Rule group 耗時超過 interval 的 80%；比值超過 1 就開始跳過 evaluation"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#rule-group-ratio
+      - alert: RuleGroupMissingEvaluations
+        expr: increase(prometheus_rule_group_iterations_missed_total[10m]) > 0
+        labels: { severity: critical, component: prometheus, tier: "1", scope: rule_group }
+        annotations:
+          summary: "Rule group 已跳過 evaluation，偵測延遲增加"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#rule-group-ratio
+      - alert: RuleGroupStale
+        expr: |
+          time() - prometheus_rule_group_last_evaluation_timestamp_seconds
+            > 3 * prometheus_rule_group_interval_seconds
+        for: 2m
+        labels: { severity: critical, component: prometheus, tier: "1", scope: rule_group }
+        annotations:
+          summary: "Rule group 超過 3 個 interval 沒有完成 evaluation"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#rule-group-ratio
+      - alert: RuleEvaluationFailures
+        expr: increase(prometheus_rule_evaluation_failures_total[10m]) > 0
+        labels: { severity: critical, component: prometheus, tier: "1", scope: rule_group }
+        annotations:
+          summary: "Rule 查詢或寫入失敗，請查 /api/v1/rules 的 lastError"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#rule-failures
+      - alert: AlertForTimerResetting
+        expr: changes(ALERTS_FOR_STATE{alertname!~"Watchdog|Meta.*"}[1h]) > 3
+        labels: { severity: warning, component: prometheus, tier: "2", scope: alert }
+        annotations:
+          summary: "Alert 的 for 計時反覆重置，條件可能成立卻無法 firing；先排除剛重啟"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#for-reset
+      - alert: QueryQueueing
+        expr: prometheus_engine_query_duration_seconds{slice="queue_time",quantile="0.9"} > 1
+        for: 5m
+        labels: { severity: warning, component: prometheus, tier: "2", scope: prometheus }
+        annotations:
+          summary: "查詢在排隊，rule 與 API 共用同一組 slot"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#query-slots
+
+  - name: prometheus-scrape
+    rules:
+      - alert: ScrapeSlowerThanInterval
+        expr: max by (job, instance) (scrape_duration_seconds) > 25
+        for: 10m
+        labels: { severity: warning, component: prometheus, tier: "2", scope: target }
+        annotations:
+          summary: "Scrape 耗時接近 30s interval，實際間隔即將拉長"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#scrape-ratio
+      - alert: ScrapeIntervalStretched
+        expr: prometheus_target_interval_length_seconds{interval="30s",quantile="0.9"} > 40
+        for: 5m
+        labels: { severity: critical, component: prometheus, tier: "2", scope: scrape_interval }
+        annotations:
+          summary: "實際 scrape 間隔明顯大於設定值，rate 視窗內樣本變少"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#scrape-ratio
+
+  - name: prometheus-notify
+    rules:
+      - alert: NotificationsFailing
+        expr: rate(prometheus_notifications_errors_total[5m]) > 0
+        for: 5m
+        labels: { severity: critical, component: prometheus, tier: "1", scope: prometheus }
+        annotations:
+          summary: "送往 Alertmanager 失敗"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#notify-to-alertmanager
+      - alert: NotificationsDropped
+        expr: increase(prometheus_notifications_dropped_total[10m]) > 0
+        labels: { severity: critical, component: prometheus, tier: "1", scope: prometheus }
+        annotations:
+          summary: "通知已被丟棄"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#notify-to-alertmanager
+      - alert: NoAlertmanagerDiscovered
+        expr: prometheus_notifications_alertmanagers_discovered < 1
+        for: 5m
+        labels: { severity: critical, component: prometheus, tier: "1", scope: prometheus }
+        annotations:
+          summary: "沒有可用的 Alertmanager"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#notify-to-alertmanager
+
+  - name: prometheus-storage
+    rules:
+      - alert: WALWriteFailed
+        expr: increase(prometheus_tsdb_wal_writes_failed_total[15m]) > 0
+        labels: { severity: critical, component: prometheus, tier: "1", scope: prometheus }
+        annotations:
+          summary: "WAL 寫入失敗，新資料與 rule 結果無法寫入"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#wal-write-failed
+      - alert: WALCheckpointFailing
+        expr: increase(prometheus_tsdb_checkpoint_creations_failed_total[6h]) > 0
+        labels: { severity: critical, component: prometheus, tier: "2", scope: prometheus }
+        annotations:
+          summary: "Checkpoint 失敗，WAL 無法截斷；磁碟滿過之後這是唯一訊號"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#tsdb-maintenance
+      - alert: CompactionFailing
+        expr: increase(prometheus_tsdb_compactions_failed_total[3h]) > 0
+        labels: { severity: warning, component: prometheus, tier: "2", scope: prometheus }
+        annotations:
+          summary: "Compaction 失敗；可用空間不足時比 WAL 失敗更早出現"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#tsdb-maintenance
+      - alert: BlockReloadStalled
+        expr: increase(prometheus_tsdb_reloads_total[15m]) == 0
+        for: 5m
+        labels: { severity: critical, component: prometheus, tier: "2", scope: prometheus }
+        annotations:
+          summary: "Reload 停止，retention 沒有執行機會"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#tsdb-maintenance
+      - alert: HeadNotCompacting
+        expr: prometheus_tsdb_head_max_time_seconds - prometheus_tsdb_head_min_time_seconds > 4 * 3600
+        for: 30m
+        labels: { severity: critical, component: prometheus, tier: "2", scope: prometheus }
+        annotations:
+          summary: "Head 超過 4 小時未落成 block（以預設 2h block range 計算）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#tsdb-maintenance
+      - alert: RetentionBehind
+        expr: |
+          (time() - prometheus_tsdb_lowest_timestamp_seconds)
+            > prometheus_tsdb_retention_limit_seconds * 1.1 + 6 * 3600
+          and prometheus_tsdb_retention_limit_seconds > 0
+        for: 1h
+        labels: { severity: critical, component: prometheus, tier: "3", scope: prometheus }
+        annotations:
+          summary: "最舊資料已超過 retention，加上 10% 與 6 小時緩衝"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#root-cause
+      - alert: WALFsyncSlow
+        expr: prometheus_tsdb_wal_fsync_duration_seconds{quantile="0.99"} > 1
+        for: 10m
+        labels: { severity: warning, component: prometheus, tier: "3", scope: prometheus }
+        annotations:
+          summary: "WAL fsync 變慢，compaction 與 retention 會先受影響"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#root-cause
+      - alert: WALRepairedAtStartup
+        expr: prometheus_tsdb_wal_corruptions_total > 0
+        labels: { severity: warning, component: prometheus, tier: "3", scope: prometheus }
+        annotations:
+          summary: "本次啟動修復過 WAL，修復點之後的資料已遺失"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#root-cause
+      - alert: PrometheusConfigReloadFailed
+        expr: prometheus_config_last_reload_successful == 0
+        for: 10m
+        labels: { severity: warning, component: prometheus, tier: "3", scope: prometheus }
+        annotations:
+          summary: "新設定或 rule 沒有生效，仍在跑舊設定"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#root-cause
+
+  - name: prometheus-resources        # K8s，需要 cAdvisor 與 kube-state-metrics
+    rules:
+      - alert: PrometheusCPUThrottled
+        expr: |
+          rate(container_cpu_cfs_throttled_periods_total{container="prometheus"}[5m])
+            / rate(container_cpu_cfs_periods_total{container="prometheus"}[5m]) > 0.25
+        for: 10m
+        labels: { severity: warning, component: prometheus, tier: "3", scope: container }
+        annotations:
+          summary: "Prometheus 容器被 CPU throttling；2.x 先確認 GOMAXPROCS 是否對齊 limit"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#root-cause
+      - alert: PrometheusMemoryNearLimit
+        expr: |
+          container_memory_working_set_bytes{container="prometheus"}
+            / on (namespace, pod, container) group_left
+          kube_pod_container_resource_limits{container="prometheus",resource="memory"} > 0.8
+        for: 5m
+        labels: { severity: warning, component: prometheus, tier: "2", scope: container }
+        annotations:
+          summary: "Working set 接近 limit，重啟 replay 時可能 OOM"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#memory-limit

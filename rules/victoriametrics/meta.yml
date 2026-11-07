@@ -1,0 +1,83 @@
+# VM 系列（vmalert、vmagent、VM、VL）的 meta 規則，放在獨立的 meta vmalert 或 meta Prometheus。
+# 已在 vmalert v1.155.0 載入；門檻以 30s 間隔的小型環境為準。請同時載入官方規則（見 catalog/sources.yaml 的 vm-rules）。
+groups:
+  - name: vm-meta
+    interval: 15s
+    rules:
+      - alert: MetaTargetDown
+        expr: up == 0
+        for: 30s
+        labels: { severity: critical, tier: "1" }
+        annotations:
+          summary: "元件停止回應；官方 ServiceDown 依 job 名稱比對，名稱不符時不會響"
+          runbook_url: https://hahasula.github.io/alert-trust/components/victoriametrics/#components-up
+      - alert: MetaRuleErrors
+        expr: sum by (job, group) (rate(vmalert_alerting_rules_errors_total[2m])) > 0
+        for: 30s
+        labels: { severity: critical, component: vmalert, tier: "1" }
+        annotations:
+          summary: "Rule 查詢失敗；查詢失敗期間 alert 會在約 2 分鐘後被標成 resolved"
+          runbook_url: https://hahasula.github.io/alert-trust/components/vmalert/#rule-errors
+      - alert: MetaPartialResponses
+        expr: sum(rate(vm_partial_results_total[2m])) > 0
+        for: 30s
+        labels: { severity: critical, component: victoriametrics, tier: "1" }
+        annotations:
+          summary: "VM cluster 回傳不完整結果，聚合 alert 可能假觸發或假恢復"
+          runbook_url: https://hahasula.github.io/alert-trust/components/victoriametrics/#partial-results
+      - alert: MetaStorageUnreachable
+        expr: min(vm_rpc_vmstorage_is_reachable) == 0
+        for: 30s
+        labels: { severity: critical, component: victoriametrics, tier: "1" }
+        annotations:
+          summary: "有 vmstorage 連不到"
+          runbook_url: https://hahasula.github.io/alert-trust/components/victoriametrics/#storage-reachable
+      - alert: MetaVLStorageUnreachable
+        expr: min(vl_insert_remote_is_reachable) == 0
+        for: 30s
+        labels: { severity: critical, component: victorialogs, tier: "1" }
+        annotations:
+          summary: "有 vlstorage 連不到；VL cluster 預設回 502，log rule 會全部 ERR"
+          runbook_url: https://hahasula.github.io/alert-trust/components/victorialogs/#storage-reachable
+      - alert: MetaStorageReadOnly
+        expr: max(vm_storage_is_read_only) == 1
+        for: 15s
+        labels: { severity: critical, component: victoriametrics, tier: "1" }
+        annotations:
+          summary: "vmstorage 唯讀；rule 不會報錯，官方規則也沒有對應告警"
+          runbook_url: https://hahasula.github.io/alert-trust/components/victoriametrics/#read-only
+      - alert: MetaVLReadOnly
+        expr: max(vl_storage_is_read_only) == 1
+        for: 15s
+        labels: { severity: critical, component: victorialogs, tier: "1" }
+        annotations:
+          summary: "vlstorage 唯讀；ingestion 仍回 200，新 log 查不到"
+          runbook_url: https://hahasula.github.io/alert-trust/components/victorialogs/#read-only
+      - alert: MetaNotifierErrors
+        expr: sum(rate(vmalert_alerts_send_errors_total[2m])) > 0
+        for: 30s
+        labels: { severity: critical, component: vmalert, tier: "1" }
+        annotations:
+          summary: "vmalert 送往 Alertmanager 失敗"
+          runbook_url: https://hahasula.github.io/alert-trust/components/vmalert/#notifier-errors
+      - alert: MetaNoRuleWrites
+        expr: sum(rate(vmalert_remotewrite_errors_total[2m])) > 0
+        for: 30s
+        labels: { severity: critical, component: vmalert, tier: "1" }
+        annotations:
+          summary: "vmalert 狀態或 recording 結果寫不回去；重啟後 for 會從頭算"
+          runbook_url: https://hahasula.github.io/alert-trust/components/vmalert/#state-write
+      - alert: MetaGroupSlow
+        expr: max(vmalert_iteration_duration_seconds{quantile="0.9"}) > 24
+        for: 30s
+        labels: { severity: warning, component: vmalert, tier: "2" }
+        annotations:
+          summary: "Group 耗時超過 interval 的 80%（這裡 interval 是 30s）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/vmalert/#group-ratio
+      - alert: MetaVLAgentBacklog
+        expr: sum(vlagent_remotewrite_pending_data_bytes) > 1000
+        for: 30s
+        labels: { severity: warning, component: victorialogs, tier: "2" }
+        annotations:
+          summary: "vlagent 有資料堆積，下游可能寫不進去"
+          runbook_url: https://hahasula.github.io/alert-trust/components/victorialogs/#vlagent-backlog

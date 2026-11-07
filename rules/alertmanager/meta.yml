@@ -1,0 +1,97 @@
+# Alertmanager 的 meta 規則，放在外部觀察者，通知不要經過被監控的 Alertmanager。
+# 視窗以 group_interval 30m 計算（[1h] = 2 倍）；有更長的 group_interval 時一起拉長。
+# cluster、job 的 label 請對齊實際環境。
+groups:
+  - name: alertmanager-delivery
+    rules:
+      - alert: AlertmanagerNotificationsFailing
+        expr: sum by (cluster, instance, integration) (increase(alertmanager_notifications_failed_total{reason!="contextCanceled"}[1h])) > 0
+        labels: { severity: critical, component: alertmanager, tier: "1" }
+        annotations:
+          summary: "至少一輪通知完全失敗；視窗是 group_interval 的 2 倍"
+          runbook_url: https://hahasula.github.io/alert-trust/components/alertmanager/#delivery-failing
+      - alert: AlertmanagerAllInstancesFailing
+        expr: |
+          min by (cluster, integration) (
+            sum by (cluster, instance, integration) (increase(alertmanager_notifications_failed_total{reason!="contextCanceled"}[1h]))
+          ) > 0
+        labels: { severity: critical, component: alertmanager, tier: "1" }
+        annotations:
+          summary: "叢集內每個實例都有失敗，通知很可能完全送不出去"
+          runbook_url: https://hahasula.github.io/alert-trust/components/alertmanager/#delivery-failing
+      - alert: AlertmanagerNotificationAttemptsFailing
+        expr: increase(alertmanager_notification_requests_failed_total[15m]) > 0
+        for: 5m
+        labels: { severity: warning, component: alertmanager, tier: "2" }
+        annotations:
+          summary: "重試中的早期訊號，不必等整輪 flush 結束"
+          runbook_url: https://hahasula.github.io/alert-trust/components/alertmanager/#attempts-failing
+
+  - name: alertmanager-availability
+    rules:
+      - alert: AlertmanagerScrapeDown
+        expr: up{job=~".*alertmanager.*"} == 0
+        for: 5m
+        labels: { severity: critical, component: alertmanager, tier: "1" }
+        annotations:
+          summary: "/metrics 抓不到，行程可能停機或卡住"
+          runbook_url: https://hahasula.github.io/alert-trust/components/alertmanager/#alertmanager-down
+      - alert: AlertmanagerScrapeMissing
+        expr: absent(up{job=~".*alertmanager.*"})
+        for: 10m
+        labels: { severity: critical, component: alertmanager, tier: "1" }
+        annotations:
+          summary: "完全沒有 Alertmanager 的 target，服務發現或 job 名稱可能錯了"
+          runbook_url: https://hahasula.github.io/alert-trust/components/alertmanager/#alertmanager-down
+      - alert: AlertmanagerCrashLooping
+        expr: changes(process_start_time_seconds{job=~".*alertmanager.*"}[15m]) > 2
+        labels: { severity: critical, component: alertmanager, tier: "2" }
+        annotations:
+          summary: "15 分鐘內重啟超過 2 次；存活探測多半看不出來"
+          runbook_url: https://hahasula.github.io/alert-trust/components/alertmanager/#crash-loop
+      - alert: AlertmanagerClusterFailedPeers
+        expr: max_over_time(alertmanager_cluster_failed_peers[5m]) > 0
+        for: 15m
+        labels: { severity: warning, component: alertmanager, tier: "2" }
+        annotations:
+          summary: "有 peer 失聯，可能重複通知或失去備援"
+          runbook_url: https://hahasula.github.io/alert-trust/components/alertmanager/#cluster-health
+      - alert: AlertmanagerMembersInconsistent
+        expr: |
+          max_over_time(alertmanager_cluster_members[5m])
+            < on (cluster) group_left
+          count by (cluster) (max_over_time(alertmanager_cluster_members[5m]))
+        for: 15m
+        labels: { severity: critical, component: alertmanager, tier: "2" }
+        annotations:
+          summary: "活著的實例彼此看不到，叢集可能已分裂；peer 停機要看 FailedPeers"
+          runbook_url: https://hahasula.github.io/alert-trust/components/alertmanager/#cluster-health
+
+  - name: alertmanager-state
+    rules:
+      - alert: AlertmanagerConfigReloadFailed
+        expr: max_over_time(alertmanager_config_last_reload_successful[5m]) == 0
+        for: 10m
+        labels: { severity: critical, component: alertmanager, tier: "1" }
+        annotations:
+          summary: "新設定沒有生效，仍在跑舊設定"
+          runbook_url: https://hahasula.github.io/alert-trust/components/alertmanager/#config-reload
+      - alert: AlertmanagerConfigInconsistent
+        expr: count by (cluster) (count_values by (cluster) ("config_hash", alertmanager_config_hash)) != 1
+        for: 20m
+        labels: { severity: critical, component: alertmanager, tier: "2" }
+        annotations:
+          summary: "同一叢集的實例設定不一致"
+          runbook_url: https://hahasula.github.io/alert-trust/components/alertmanager/#cluster-health
+      - alert: AlertmanagerStateSnapshotFailing
+        expr: increase(alertmanager_nflog_maintenance_errors_total[1h]) > 0 or increase(alertmanager_silences_maintenance_errors_total[1h]) > 0
+        labels: { severity: warning, component: alertmanager, tier: "3" }
+        annotations:
+          summary: "nflog 或 silence 落盤失敗，重啟可能遺失狀態"
+          runbook_url: https://hahasula.github.io/alert-trust/components/alertmanager/#state-persistence
+      - alert: AlertmanagerInvalidAlerts
+        expr: increase(alertmanager_alerts_invalid_total[1h]) > 0
+        labels: { severity: warning, component: alertmanager, tier: "3" }
+        annotations:
+          summary: "收到無效 alert，Prometheus 端會看到 400"
+          runbook_url: https://hahasula.github.io/alert-trust/components/alertmanager/#state-persistence

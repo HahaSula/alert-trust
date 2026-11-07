@@ -1,0 +1,3 @@
+40 rules loaded, unhealthy: 0
+40 rules loaded, unhealthy: 0
+vmalert: 13 rules loaded, unhealthy: 0

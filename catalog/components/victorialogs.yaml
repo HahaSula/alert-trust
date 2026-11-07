@@ -1,0 +1,93 @@
+id: victorialogs
+name: VictoriaLogs＋vlagent
+kind: infra
+status: draft
+stages: [collect, store, query]
+versions_checked: ["v1.53.0"]
+role: Log 的儲存與查詢。Log rule 由 vmalert 評估，狀態寫到 VM，所以 log 告警也依賴 VM。
+
+silent_failures:
+  - text: Log rule 預設只查一個 interval 的視窗，log 延遲 L > D + E 時事件永遠不觸發。
+    evidence: tested
+    source: art-vm
+  - text: "* | stats count() 在沒有 log 時仍回傳 0，不能當 canary。"
+    evidence: tested
+    source: art-vm
+  - text: Content-Type 錯時 ingestion 回 200，實際沒有收進資料。
+    evidence: tested
+    source: art-vm
+  - text: Cluster 缺節點時預設回 502，所有 log rule 變 ERR，接著假 resolved。
+    evidence: tested
+    source: art-vm
+
+contracts: [vl-log-delay]
+
+signals:
+  - id: components-up
+    tier: 1
+    question: 行程活著嗎
+    signal: up == 0
+    metrics: [up]
+    evaluate_on: observer
+    evidence: tested
+    source: art-vm
+    upstream: { status: partial, note: "依 job 名稱比對" }
+    rules: [rules/victoriametrics/meta.yml#MetaTargetDown]
+
+  - id: log-freshness
+    tier: 1
+    question: Log 有新資料嗎
+    signal: "固定送 canary log 流；_time:2m flow:canary | stats count() c | filter c:>0，帶 for"
+    metrics: []
+    evaluate_on: self
+    judged_by: external
+    evidence: tested
+    source: art-vm
+    upstream: { status: no }
+    rules: [rules/victoriametrics/canary-logs.yml#LogsFresh]
+    contract: vl-log-delay
+
+  - id: read-only
+    tier: 1
+    question: 還能寫入嗎
+    signal: max(vl_storage_is_read_only) == 1
+    metrics: [vl_storage_is_read_only]
+    evaluate_on: observer
+    evidence: tested
+    source: art-vm
+    upstream: { status: no }
+    rules: [rules/victoriametrics/meta.yml#MetaVLReadOnly]
+
+  - id: ingested
+    tier: 1
+    question: 真的有收進去嗎
+    signal: rate(vl_rows_ingested_total[5m]) 對照 shipper 送出量
+    metrics: [vl_rows_ingested_total]
+    evaluate_on: observer
+    evidence: tested
+    source: art-vm
+    upstream: { status: no, note: "官方只看 dropped" }
+    rules: []
+
+  - id: storage-reachable
+    tier: 1
+    question: vlstorage 連得到嗎
+    signal: min(vl_insert_remote_is_reachable) == 0
+    metrics: [vl_insert_remote_is_reachable]
+    evaluate_on: observer
+    evidence: tested
+    source: art-vm
+    upstream: { status: no }
+    applies_when: cluster
+    rules: [rules/victoriametrics/meta.yml#MetaVLStorageUnreachable]
+
+  - id: vlagent-backlog
+    tier: 2
+    question: vlagent 堆積或丟資料嗎
+    signal: vlagent_remotewrite_pending_data_bytes、dropped
+    metrics: [vlagent_remotewrite_pending_data_bytes]
+    evaluate_on: observer
+    evidence: tested
+    source: art-vm
+    upstream: { status: yes }
+    rules: [rules/victoriametrics/meta.yml#MetaVLAgentBacklog]

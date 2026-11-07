@@ -1,0 +1,82 @@
+## a) 正常（2026-11-08T00:24:53+08:00）
+  up{job=~"postgres.*"}                                                       -> 2 series: postgres=1 postgres-nomon=1
+  pg_up                                                                       -> 2 series: postgres=1 postgres-nomon=1
+  pg_up == 0                                                                  -> 0 series: 
+  up{job="postgres"} == 0                                                     -> 0 series: 
+  absent(up{job="postgres"})                                                  -> 0 series: 
+  pg_exporter_last_scrape_error                                               -> 2 series: postgres=0 postgres-nomon=0
+  pg_scrape_collector_success == 0                                            -> 2 series: postgres/stat_statements=0 postgres-nomon/wal=0
+  count by (job) (pg_scrape_collector_success)                                -> 2 series: postgres=18 postgres-nomon=15
+  count by (job) ({__name__=~"pg_.+"})                                        -> 2 series: postgres=507 postgres-nomon=493
+  pg_replication_lag_seconds                                                  -> 2 series: postgres=0 postgres-nomon=0
+  meta metric names (job=postgres):
+    pg_exporter_last_scrape_duration_seconds pg_exporter_last_scrape_error pg_exporter_scrapes_total pg_scrape_collector_duration_seconds pg_scrape_collector_success pg_up scrape_duration_seconds scrape_samples_post_metric_relabeling scrape_samples_scraped scrape_series_added up
+  collectors with success per job:
+    postgres database 1
+    postgres database_wraparound 1
+    postgres locks 1
+    postgres replication 1
+    postgres replication_slots 1
+    postgres roles 1
+    postgres settings 1
+    postgres stat_activity 1
+    postgres stat_archiver 1
+    postgres stat_bgwriter 1
+    postgres stat_checkpointer 1
+    postgres stat_database 1
+    postgres stat_progress_vacuum 1
+    postgres stat_replication 1
+    postgres stat_statements 0
+    postgres stat_user_tables 1
+    postgres statio_user_tables 1
+    postgres wal 1
+    postgres-nomon database 1
+    postgres-nomon locks 1
+    postgres-nomon replication 1
+    postgres-nomon replication_slots 1
+    postgres-nomon roles 1
+    postgres-nomon settings 1
+    postgres-nomon stat_activity 1
+    postgres-nomon stat_archiver 1
+    postgres-nomon stat_bgwriter 1
+    postgres-nomon stat_database 1
+    postgres-nomon stat_progress_vacuum 1
+    postgres-nomon stat_replication 1
+    postgres-nomon stat_user_tables 1
+    postgres-nomon statio_user_tables 1
+    postgres-nomon wal 0
+  metric count per collector prefix, postgres vs postgres-nomon:
+    postgres 341 names
+    postgres-nomon 337 names
+  names only with pg_monitor:
+    pg_database_wraparound_age_datfrozenxid_seconds
+    pg_database_wraparound_age_datminmxid_seconds
+    pg_wal_segments
+    pg_wal_size_bytes
+  pg_stat_activity_count rows (nomon sees others' state?):
+  count by (job) (pg_stat_activity_count)                                     -> 2 series: postgres=19 postgres-nomon=18
+  count by (job) (pg_stat_activity_max_tx_duration)                           -> 2 series: postgres=19 postgres-nomon=18
+
+## b) 停 PostgreSQL（2026-11-08T00:24:53+08:00）
+  up{job=~"postgres.*"}                                                       -> 2 series: postgres=0 postgres-nomon=0
+  pg_up                                                                       -> 0 series: 
+  pg_up == 0                                                                  -> 0 series: 
+  up{job="postgres"} == 0                                                     -> 1 series: postgres=0
+  absent(up{job="postgres"})                                                  -> 0 series: 
+  pg_exporter_last_scrape_error                                               -> 0 series: 
+  pg_scrape_collector_success == 0                                            -> 0 series: 
+  count by (job) (pg_scrape_collector_success)                                -> 0 series: 
+  count by (job) ({__name__=~"pg_.+"})                                        -> 0 series: 
+  pg_replication_lag_seconds                                                  -> 0 series: 
+
+## c) PostgreSQL 恢復、停 exporter（2026-11-08T00:25:14+08:00）
+  up{job=~"postgres.*"}                                                       -> 2 series: postgres=0 postgres-nomon=1
+  pg_up                                                                       -> 1 series: postgres-nomon=1
+  pg_up == 0                                                                  -> 0 series: 
+  up{job="postgres"} == 0                                                     -> 1 series: postgres=0
+  absent(up{job="postgres"})                                                  -> 0 series: 
+  pg_exporter_last_scrape_error                                               -> 1 series: postgres-nomon=0
+  pg_scrape_collector_success == 0                                            -> 1 series: postgres-nomon/wal=0
+  count by (job) (pg_scrape_collector_success)                                -> 1 series: postgres-nomon=15
+  count by (job) ({__name__=~"pg_.+"})                                        -> 1 series: postgres-nomon=493
+  pg_replication_lag_seconds                                                  -> 1 series: postgres-nomon=0

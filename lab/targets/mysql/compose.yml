@@ -1,0 +1,32 @@
+# 輕量實驗：MariaDB + mysqld_exporter + Prometheus（scrape 5s）。
+# 執行：./run.sh；結束後會自動 docker compose down -v。
+name: at-mysql
+services:
+  mariadb:
+    image: mariadb:11.4
+    environment:
+      MARIADB_ROOT_PASSWORD: rootpw
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 3s
+      retries: 30
+  exporter:
+    image: prom/mysqld-exporter:v0.21.0
+    command:
+      - --mysqld.address=mariadb:3306
+      - --mysqld.username=exporter
+      - --collect.info_schema.processlist
+      - --collect.info_schema.innodb_metrics
+      - --collect.heartbeat
+    environment:
+      MYSQLD_EXPORTER_PASSWORD: exporterpw
+    depends_on:
+      mariadb: { condition: service_healthy }
+  prometheus:
+    image: prom/prometheus:v3.13.5
+    command: [--config.file=/etc/prometheus/prometheus.yml]
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports: ["127.0.0.1:19090:9090"]

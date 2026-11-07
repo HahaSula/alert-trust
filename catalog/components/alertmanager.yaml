@@ -1,0 +1,128 @@
+id: alertmanager
+name: Alertmanager
+kind: infra
+status: draft
+stages: [route]
+versions_checked: ["0.27.0", "0.29.0", "0.34.2"]
+role: >-
+  把所有 ruler 的 alert 分組、抑制，再送到接收端。所有 ruler 共用它，它一壞全部通知就一起斷。
+
+silent_failures:
+  - text: Receiver 全部失敗時 /-/healthy、/-/ready 仍回 200，這兩個端點是寫死的。
+    evidence: tested
+    source: art-am
+  - text: 0.27.0 在 SMTP 於 DATA 結尾拒收時記成成功，counter 為 0，log 沒有錯誤（0.28 修正）。
+    evidence: tested
+    source: art-am
+  - text: SMTP 不回應時整個 group 卡住，counter 不動，到 0.34.2 仍是如此。
+    evidence: tested
+    source: art-am
+  - text: 失敗要整輪 flush 結束才計數；group_interval 30m 時 rate[5m] 寫法完全抓不到。
+    evidence: tested
+    source: art-am
+
+contracts: [am-failure-window, deadman-wait]
+
+signals:
+  - id: alertmanager-down
+    tier: 1
+    question: 行程活著嗎
+    signal: up == 0，加上 absent(up{job=~".*alertmanager.*"})
+    metrics: [up]
+    evaluate_on: observer
+    evidence: tested
+    source: art-am
+    upstream: { status: partial, note: "mixin 只有 ClusterDown 的比例" }
+    rules:
+      - rules/alertmanager/meta.yml#AlertmanagerScrapeDown
+      - rules/alertmanager/meta.yml#AlertmanagerScrapeMissing
+
+  - id: delivery-failing
+    tier: 1
+    question: 通知送出去了嗎
+    signal: increase(alertmanager_notifications_failed_total{reason!="contextCanceled"}[2 × group_interval]) > 0
+    metrics: [alertmanager_notifications_failed_total]
+    evaluate_on: observer
+    evidence: tested
+    source: art-am
+    upstream: { status: partial, note: "mixin 用 rate[15m]，group_interval 長時會漏" }
+    rules:
+      - rules/alertmanager/meta.yml#AlertmanagerNotificationsFailing
+      - rules/alertmanager/meta.yml#AlertmanagerAllInstancesFailing
+    contract: am-failure-window
+
+  - id: end-to-end
+    tier: 1
+    question: 端到端真的收得到嗎
+    signal: Watchdog 專屬短週期路由送外部 DMS；email 走 canary 信箱，由外部程式檢查最新一封的時間
+    metrics: []
+    evaluate_on: external
+    evidence: tested
+    source: art-am
+    upstream: { status: no }
+    rules: []
+    contract: deadman-wait
+
+  - id: config-reload
+    tier: 1
+    question: 新設定生效了嗎
+    signal: alertmanager_config_last_reload_successful == 0
+    metrics: [alertmanager_config_last_reload_successful]
+    evaluate_on: observer
+    evidence: tested
+    source: art-am
+    upstream: { status: yes }
+    rules: [rules/alertmanager/meta.yml#AlertmanagerConfigReloadFailed]
+
+  - id: attempts-failing
+    tier: 2
+    question: 重試中的早期訊號
+    signal: alertmanager_notification_requests_failed_total 增加
+    metrics: [alertmanager_notification_requests_failed_total]
+    evaluate_on: observer
+    evidence: tested
+    source: art-am
+    upstream: { status: no }
+    rules: [rules/alertmanager/meta.yml#AlertmanagerNotificationAttemptsFailing]
+
+  - id: cluster-health
+    tier: 2
+    question: 叢集一致嗎
+    signal: cluster_failed_peers、成員數、config_hash
+    metrics: [alertmanager_cluster_failed_peers, alertmanager_cluster_members, alertmanager_config_hash]
+    evaluate_on: observer
+    evidence: tested
+    source: art-am
+    upstream: { status: yes }
+    applies_when: replicas > 1
+    rules:
+      - rules/alertmanager/meta.yml#AlertmanagerClusterFailedPeers
+      - rules/alertmanager/meta.yml#AlertmanagerMembersInconsistent
+      - rules/alertmanager/meta.yml#AlertmanagerConfigInconsistent
+
+  - id: crash-loop
+    tier: 2
+    question: 有沒有反覆重啟
+    signal: changes(process_start_time_seconds[15m]) > 2
+    metrics: [process_start_time_seconds]
+    evaluate_on: observer
+    evidence: tested
+    source: art-am
+    upstream: { status: yes }
+    rules: [rules/alertmanager/meta.yml#AlertmanagerCrashLooping]
+
+  - id: state-persistence
+    tier: 3
+    question: 狀態落盤與輸入正常嗎
+    signal: nflog／silence 落盤錯誤、無效 alert
+    metrics:
+      - alertmanager_nflog_maintenance_errors_total
+      - alertmanager_silences_maintenance_errors_total
+      - alertmanager_alerts_invalid_total
+    evaluate_on: observer
+    evidence: tested
+    source: art-am
+    upstream: { status: no }
+    rules:
+      - rules/alertmanager/meta.yml#AlertmanagerStateSnapshotFailing
+      - rules/alertmanager/meta.yml#AlertmanagerInvalidAlerts

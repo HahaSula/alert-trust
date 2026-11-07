@@ -1,0 +1,43 @@
+postgres_exporter 信任實驗結果摘要（2026-11-08）
+環境：postgres:16-alpine、postgres-exporter v0.20.1、prom/prometheus v3.13.5，scrape_interval 5s、scrape_timeout 4s。
+原始輸出：run.txt（a～c）、run2.txt（d2～h）、names-*.txt、*-errors.txt。
+
+a) 正常
+  - meta metric：up、scrape_*、pg_up、pg_exporter_last_scrape_error、pg_exporter_scrapes_total、
+    pg_exporter_last_scrape_duration_seconds、pg_scrape_collector_success、pg_scrape_collector_duration_seconds。
+  - 開了 --collector.stat_statements 但沒有裝 extension：pg_scrape_collector_success{collector="stat_statements"}=0，
+    pg_exporter_last_scrape_error 仍是 0（兩套錯誤指標互不相通）。
+  - 開了 --collector.stat_checkpointer 但 PostgreSQL 是 16：success=1，卻沒有任何 pg_stat_checkpointer_* metric。
+  - 沒有複本時 pg_stat_replication_*、pg_replication_slots_* 完全沒有 series；pg_replication_lag_seconds=0。
+  - mixin 用的 pg_replication_lag 這個名字不存在，只有 pg_replication_lag_seconds。
+
+b/h) docker stop postgres（主機名稱解析失敗）
+  - exporter 一次 /metrics 要 17～19 秒，超過 scrape_timeout，up=0。
+  - pg_up、pg_exporter_last_scrape_error、pg_scrape_collector_* 全部消失；pg_up == 0 回傳空。
+
+c) PostgreSQL 正常、停 exporter
+  - up{job="postgres"} == 0 會響；pg_up{job="postgres"} 消失，pg_up == 0 回傳空。
+
+d) exporter 使用者沒有 pg_monitor（exporter-nomon）
+  - 只有 wal collector 失敗（permission denied for function pg_ls_waldir），success=0。
+  - 其他 collector 都是 success=1。
+  e) superuser 開一個執行中的交易：
+     有 pg_monitor 的 exporter：pg_stat_activity_max_tx_duration=20.9、active=1
+     沒有 pg_monitor 的 exporter：max_tx_duration=0、active=0（看不到別人的 session，collector 仍回報成功）
+
+d2) 連線立即被拒（DSN 指向沒在聽的 port）
+  - up=1、pg_up=0、pg_exporter_last_scrape_error=1，scrape 約 1 秒；pg_scrape_collector_* 沒有 series。
+
+f) 執行中把 exporter 使用者改成 NOLOGIN
+  - pg_up 仍是 1、pg_exporter_last_scrape_error 仍是 0（舊的 exporter 重用既有連線）。
+  - pg_scrape_collector_* 全部消失（新架構每次 scrape 都開新連線）；pg_scrape_collector_success == 0 回傳空。
+  - pg_terminate_backend 中斷既有連線後，pg_up 才變 0。
+
+g) docker pause postgres（TCP 不回應）
+  - exporter /metrics 30 秒以上沒有回應（--collection-timeout 預設 1m），Prometheus 端 4 秒超時，up=0。
+  - pg_up 與所有 pg_* 消失。
+
+結論
+  - 只看 pg_up 的規則（mixin PostgreSQLDown、awesome Postgresql down）在 exporter 停機、DB 主機不回應時都不會響。
+  - pg_up=1 不代表 collector 有資料；要另外檢查 pg_scrape_collector_success 是否存在。
+  - collector success=1 不代表看得到資料（權限、版本、extension）。

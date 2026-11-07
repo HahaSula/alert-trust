@@ -1,0 +1,309 @@
+id: mysqld_exporter
+name: mysqld_exporter＋MariaDB/MySQL
+kind: target
+status: draft
+stages: [source]
+versions_checked: ["mysqld_exporter 0.21.0", "MariaDB 11.4"]
+role: >-
+  Exporter 有三層「活著」：Prometheus 抓得到 exporter（up）、exporter 連得到資料庫（mysql_up）、
+  每個 collector 的查詢成功（mysql_exporter_collector_success）。每一層壞掉時，下一層的 series 不是變 0，
+  而是整組消失，所以用 != 1 或 == 0 寫的規則會回傳空。
+  MySQL 與 MariaDB 用同一張卡；只適用其中一種、或只在 replication、Galera、/probe 模式下才有的訊號用 applies_when 標示。
+  規則範例在 rules/targets/mysql.yml，job="mysql" 是佔位符。
+
+silent_failures:
+  - text: >-
+      Exporter 停機時 mysql_up 這條 series 消失，mysql_up != 1（mixin MySQLDown）與 mysql_up == 0（awesome）
+      都回傳空，不會觸發；只有 up{job="mysql"} == 0 與 absent(mysql_up) 成立。
+    evidence: tested
+    source: art-mysql
+  - text: >-
+      資料庫停機時 up 仍是 1，mysql_up 變 0，但 mysql_exporter_collector_success 整組消失，
+      所以 collector_success == 0 在這時也不會響；mysql_* 只剩 mysql_up。
+    evidence: tested
+    source: art-mysql
+  - text: >-
+      資料庫主機停機時連線會一直等到 context 取消，scrape 耗時約等於 scrape_timeout 減 --timeout-offset（預設 0.25s），
+      實驗中 scrape_timeout 4s 時是 3.75s。
+    evidence: tested
+    source: art-mysql
+  - text: >-
+      --timeout-offset 大於等於 scrape_timeout 時 exporter 只記一行錯誤、不設期限；Prometheus 先逾時，up 變 0，
+      所有 mysql_* 消失，症狀從「資料庫停機」變成「exporter 停機」。
+    evidence: code
+    source: mysqld-exporter-main
+  - text: >-
+      收回 PROCESS 後 innodb_cmp、innodb_cmpmem、innodb_metrics 的 collector_success 變 0，相關 metric 消失
+      （實驗 1150 → 1060 條 series），awesome 的 history_len 規則回傳空；up 與 mysql_up 都是 1。
+      processlist collector 仍回報成功，但沒有 PROCESS 只看得到自己的連線，數字偏低。
+    evidence: tested
+    source: art-mysql
+  - text: >-
+      MariaDB 10.5.9 起 REPLICATION CLIENT 不足以執行 SHOW REPLICA STATUS，要另外給 SLAVE MONITOR；
+      缺少時 slave_status 的 collector_success 變 0，所有 mysql_slave_status_* 消失，replication 規則回傳空。
+    evidence: tested
+    source: art-mysql
+  - text: >-
+      MySQL 8.4 移除 SHOW SLAVE STATUS，exporter 改用 SHOW REPLICA STATUS，metric 名稱跟著欄位變成
+      mysql_slave_status_replica_io_running、seconds_behind_source。mixin 的 MySQLReplicationNotRunning、
+      instance:mysql_slave_lag_seconds 與 awesome 的 replication 規則都寫舊名稱，升版後回傳空。
+    evidence: code
+    source: mysqld-exporter-slave-status
+  - text: >-
+      SQL thread 停止時 Seconds_Behind_Master 是 NULL，exporter 解析失敗就不輸出，延遲規則回傳空；
+      非 replica 的節點 slave_status 成功但沒有任何 series，和「權限不足被吃掉」從 metric 上很難區分。
+    evidence: code
+    source: mysqld-exporter-slave-status
+  - text: >-
+      沒有啟用 Galera 的 MariaDB 也輸出 mysql_global_status_wsrep_ready=0，mixin 與 awesome 的
+      wsrep_ready != 1 會對每台普通 MariaDB 誤報；被誤報洗過之後，真正的 Galera 告警容易被靜音。
+    evidence: tested
+    source: art-mysql
+  - text: >-
+      Collector 的版本門檻高於資料庫版本時直接跳過，不輸出 collector_success；透過 collect[] 參數或改啟動旗標
+      少掉的 collector 也一樣，沒有任何失敗訊號。
+    evidence: code
+    source: mysqld-exporter-src
+  - text: >-
+      多 target 模式（/probe）下一台 exporter 掛掉，所有 target 的 up 同時變 0，看起來像所有資料庫一起壞；
+      /probe 的輸出不含 exporter 自己的 process 與 go 指標，要另外一個 job 抓 /metrics。
+    evidence: code
+    source: mysqld-exporter-main
+  - text: >-
+      每次 scrape 開新連線（預設最多 2 條）。兩台 HA Prometheus 同時抓，或多 target 併發時，
+      可能超過 README 建議的 MAX_USER_CONNECTIONS 3，mysql_up 間歇變 0，而且只在其中一台 Prometheus 上看得到。
+    evidence: inferred
+    source: mysqld-exporter-readme
+
+contracts:
+  - scrape-within-interval
+  - lookback
+
+signals:
+  - id: exporter-up
+    tier: 1
+    question: Exporter 抓得到嗎
+    signal: up{job="mysql"} == 0，加上 absent(up{job="mysql"})；不能只靠 mysql_up
+    metrics: [up]
+    evaluate_on: self
+    silent_failure: Exporter 停機時 mysql_up 消失，mixin 的 MySQLDown 不會響
+    evidence: tested
+    source: art-mysql
+    upstream: { status: no, note: "mixin 與 awesome 都只看 mysql_up；kps 的 TargetDown 只在用 kps 時有" }
+    rules: [rules/targets/mysql.yml#MySQLExporterDown, rules/targets/mysql.yml#MySQLExporterMissing]
+
+  - id: db-up
+    tier: 1
+    question: Exporter 連得到資料庫嗎
+    signal: mysql_up == 0（只代表連線與 ping 成功，不代表查詢或寫入可用）
+    metrics: [mysql_up]
+    evaluate_on: self
+    evidence: tested
+    source: art-mysql
+    upstream: { status: partial, note: "mixin 的 mysql_up != 1 與 awesome 的 mysql_up == 0 都有，但 exporter 停機時一起失效" }
+    rules: [rules/targets/mysql.yml#MySQLNotReachable]
+
+  - id: collector-success
+    tier: 1
+    question: 關鍵 collector 都成功嗎
+    signal: mysql_exporter_collector_success == 0；權限不足、表不存在（例如 heartbeat）時會變 0
+    metrics: [mysql_exporter_collector_success]
+    evaluate_on: self
+    silent_failure: 資料庫停機時整組消失；被跳過的 collector 不會出現
+    evidence: tested
+    source: art-mysql
+    upstream: { status: no, note: "mixin 與 awesome 都沒有" }
+    rules: [rules/targets/mysql.yml#MySQLCollectorFailed]
+
+  - id: replication-running
+    tier: 1
+    question: Replication thread 在跑嗎
+    signal: 新舊名稱一起比對：{__name__=~"mysql_slave_status_(slave|replica)_(io|sql)_running"} 取最小值 == 0
+    metrics:
+      - mysql_slave_status_slave_io_running
+      - mysql_slave_status_slave_sql_running
+      - mysql_slave_status_replica_io_running
+      - mysql_slave_status_replica_sql_running
+    evaluate_on: self
+    applies_when: replication
+    evidence: code
+    source: mysqld-exporter-slave-status
+    upstream: { status: partial, note: "mixin 與 awesome 只寫 slave_*，MySQL 8.4 的 replica_* 不會響" }
+    rules: [rules/targets/mysql.yml#MySQLReplicationNotRunning]
+
+  - id: replica-status-present
+    tier: 1
+    question: Replica 的狀態資料還在嗎
+    signal: 一小時前有 *_sql_running、現在沒有，且 mysql_up == 1；長期作法是用 role label 標出 replica，再用 absent
+    metrics: [mysql_slave_status_slave_sql_running, mysql_slave_status_replica_sql_running, mysql_up]
+    evaluate_on: self
+    applies_when: replication
+    silent_failure: 權限被收回、RESET REPLICA ALL、升版改名時，所有 replication 規則同時回傳空
+    evidence: tested
+    source: art-mysql
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLReplicaStatusMissing]
+
+  - id: probe-blast-radius
+    tier: 1
+    question: 多 target 模式下是 exporter 壞還是資料庫壞
+    signal: 同一個 job 超過一半的 up 同時是 0；另外用一個 job 抓 exporter 自己的 /metrics
+    metrics: [up]
+    evaluate_on: self
+    applies_when: multi-target probe
+    evidence: code
+    source: mysqld-exporter-main
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLProbeExporterDown]
+
+  - id: exporter-grants
+    tier: 1
+    question: Exporter 帳號的權限與連線上限夠嗎
+    signal: >-
+      SHOW GRANTS 要有 PROCESS、REPLICATION CLIENT、SELECT；MariaDB 10.5.9 起加 SLAVE MONITOR；
+      MAX_USER_CONNECTIONS ≥ max_open_connections ×（同時抓的 Prometheus 數 + /probe 併發數）。
+      密碼輪替要包含 exporter 的 .my.cnf 或環境變數
+    metrics: []
+    evaluate_on: inventory
+    evidence: tested
+    source: art-mysql
+    upstream: { status: partial, note: "README 列出權限與 MAX_USER_CONNECTIONS 建議，沒有對應的檢查或規則" }
+    rules: []
+
+  - id: collector-set
+    tier: 2
+    question: 回報的 collector 數量有沒有變少
+    signal: count(mysql_exporter_collector_success) 比一小時前少；搭配盤點每種資料庫應有的 collector 清單
+    metrics: [mysql_exporter_collector_success]
+    evaluate_on: self
+    evidence: code
+    source: mysqld-exporter-src
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLCollectorSetShrunk]
+
+  - id: scrape-budget
+    tier: 2
+    question: Scrape 來得及在 timeout 內完成嗎
+    signal: >-
+      scrape_duration_seconds 接近 scrape_timeout；各 collector 的 collector_duration_seconds。
+      exporter 用 X-Prometheus-Scrape-Timeout-Seconds 減 --timeout-offset 當期限；
+      --exporter.query_timeout 讓單一慢 collector 失敗而不拖垮其他 collector；lock_wait_timeout 預設 2 秒
+    metrics: [scrape_duration_seconds, mysql_exporter_collector_duration_seconds]
+    evaluate_on: self
+    evidence: tested
+    source: art-mysql
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLScrapeNearTimeout, rules/targets/mysql.yml#MySQLCollectorSlow]
+    contract: scrape-within-interval
+
+  - id: db-up-flapping
+    tier: 2
+    question: mysql_up 有沒有間歇掉下來
+    signal: changes(mysql_up[15m]) > 2；常見原因是連線數超過 MAX_USER_CONNECTIONS 或 max_connections
+    metrics: [mysql_up]
+    evaluate_on: self
+    evidence: inferred
+    source: mysqld-exporter-readme
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLUpFlapping]
+
+  - id: replication-lag
+    tier: 2
+    question: Replication 延遲量的是真的嗎
+    signal: >-
+      用 heartbeat 表（--collect.heartbeat，pt-heartbeat 格式）：now - stored > 30。
+      Seconds_Behind 在長交易時凍結、SQL thread 停止時消失，只當輔助。
+      heartbeat 在 primary 上也會變大，代表寫入程式停了
+    metrics:
+      - mysql_heartbeat_now_timestamp_seconds
+      - mysql_heartbeat_stored_timestamp_seconds
+      - mysql_slave_status_seconds_behind_master
+      - mysql_slave_status_seconds_behind_source
+      - mysql_slave_status_sql_delay
+    evaluate_on: self
+    applies_when: replication
+    evidence: code
+    source: mysqld-mixin
+    upstream: { status: partial, note: "mixin 有 MySQLHeartbeatLag 與 MySQLReplicationLag；後者只用 seconds_behind_master" }
+    rules: [rules/targets/mysql.yml#MySQLHeartbeatLag, rules/targets/mysql.yml#MySQLReplicationLag]
+
+  - id: primary-writable
+    tier: 2
+    question: Primary 寫得進去嗎
+    signal: >-
+      標成 primary 的節點 read_only == 1；mysql_up 只做 ping，真正的寫入要外部探測
+      （例如應用層或 heartbeat 寫入程式自己回報）
+    metrics: [mysql_global_variables_read_only]
+    evaluate_on: self
+    applies_when: replication
+    evidence: inferred
+    source: mysqld-exporter-src
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLPrimaryReadOnly]
+
+  - id: galera-state
+    tier: 3
+    question: Galera 節點可以服務嗎
+    signal: >-
+      wsrep_ready != 1 且 wsrep_on == 1；wsrep_local_state != 4 且沒有刻意 desync。
+      只有 MariaDB Galera 與 Percona XtraDB Cluster 有，MySQL 官方版沒有
+    metrics:
+      - mysql_global_status_wsrep_ready
+      - mysql_global_status_wsrep_local_state
+      - mysql_global_variables_wsrep_on
+      - mysql_global_variables_wsrep_desync
+    evaluate_on: self
+    applies_when: mariadb galera
+    evidence: tested
+    source: art-mysql
+    upstream: { status: partial, note: "mixin 與 awesome 有，但沒用 wsrep_on 過濾，普通 MariaDB 會誤報" }
+    rules: [rules/targets/mysql.yml#MySQLGaleraNotReady, rules/targets/mysql.yml#MySQLGaleraOutOfSync]
+
+  - id: connections
+    tier: 3
+    question: 連線數接近上限了嗎
+    signal: threads_connected / max_connections > 0.8；threads_running / max_connections > 0.6
+    metrics:
+      - mysql_global_status_threads_connected
+      - mysql_global_status_threads_running
+      - mysql_global_variables_max_connections
+    evaluate_on: self
+    evidence: upstream
+    source: awesome
+    upstream: { status: yes, note: "awesome 有兩條" }
+    rules: [rules/targets/mysql.yml#MySQLTooManyConnections, rules/targets/mysql.yml#MySQLHighThreadsRunning]
+
+  - id: innodb-pressure
+    tier: 3
+    question: InnoDB 在等磁碟或累積 undo 嗎
+    signal: rate(innodb_log_waits) > 10；rseg_history_len > 50000（要 innodb_metrics collector 與 PROCESS）
+    metrics:
+      - mysql_global_status_innodb_log_waits
+      - mysql_info_schema_innodb_metrics_transaction_trx_rseg_history_len
+    evaluate_on: self
+    evidence: upstream
+    source: awesome
+    upstream: { status: yes, note: "mixin 有 log waits；awesome 兩條都有" }
+    rules: [rules/targets/mysql.yml#MySQLInnoDBLogWaits, rules/targets/mysql.yml#MySQLInnoDBHistoryLength]
+
+  - id: slow-queries
+    tier: 3
+    question: 有新的慢查詢嗎
+    signal: increase(slow_queries[5m]) > 0；細節看 perf_schema.eventsstatements（預設關閉）
+    metrics: [mysql_global_status_slow_queries]
+    evaluate_on: self
+    evidence: upstream
+    source: awesome
+    upstream: { status: yes }
+    rules: [rules/targets/mysql.yml#MySQLSlowQueries]
+
+  - id: restarts
+    tier: 3
+    question: 資料庫重啟過或在救援模式嗎
+    signal: uptime < 300；innodb_force_recovery != 0
+    metrics: [mysql_global_status_uptime, mysql_global_variables_innodb_force_recovery]
+    evaluate_on: self
+    evidence: upstream
+    source: awesome
+    upstream: { status: yes, note: "awesome 用 uptime < 60，短於一個 scrape 週期加 for 時容易漏" }
+    rules: [rules/targets/mysql.yml#MySQLRestarted, rules/targets/mysql.yml#MySQLInnoDBForceRecovery]

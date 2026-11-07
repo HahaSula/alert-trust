@@ -1,0 +1,290 @@
+id: postgres_exporter
+name: postgres_exporter＋PostgreSQL
+kind: target
+status: draft
+stages: [source]
+versions_checked: ["0.20.1"]
+role: >-
+  Exporter 裡有兩套程式：舊的 exporter 套件產生 pg_up、pg_exporter_* 與 queries.yaml 自訂查詢，
+  新的 collector 套件產生大部分 pg_* 與 pg_scrape_collector_*。兩套各自連資料庫、各自記錯誤，互不相通。
+  「活著」因此有四層：Prometheus 抓得到 exporter（up）、舊連線還能用（pg_up）、新連線開得起來（collector 有結果）、
+  每個 collector 查得到該看的資料（權限、版本、extension）。任何一層壞掉，上一層都可能仍顯示正常。
+
+silent_failures:
+  - text: >-
+      只看 pg_up 的規則（mixin PostgreSQLDown 是 pg_up != 1，awesome 是 pg_up == 0）在 exporter 停機時不會響：
+      pg_up 這條 series 跟著消失，表達式回傳空。DB 主機不回應（TCP 沒回應、名稱解析失敗）時 exporter 一次 scrape 要 17～30 秒以上，
+      Prometheus 先超時，up=0、pg_up 也消失；只有連線立即被拒時才會看到 pg_up=0。
+    evidence: tested
+    source: pg-lab
+  - text: >-
+      執行中把 exporter 帳號改成 NOLOGIN（或換密碼、pg_hba 改掉）：pg_up 仍是 1、pg_exporter_last_scrape_error 仍是 0，
+      因為舊套件重用既有連線；新套件每次 scrape 開新連線失敗，所有 collector metric 連同 pg_scrape_collector_success 一起消失，
+      pg_scrape_collector_success == 0 回傳空。要等既有連線斷掉 pg_up 才變 0。
+    evidence: tested
+    source: pg-lab
+  - text: >-
+      Exporter 帳號沒有 pg_monitor 時，只有 wal collector 報錯；stat_activity collector 回報成功，
+      但看不到其他使用者的 session，執行中的長交易顯示為 max_tx_duration=0、active=0，長交易規則永遠不響。
+    evidence: tested
+    source: pg-lab
+  - text: >-
+      --collection-timeout 預設 1m，比一般 scrape_timeout 長；/probe 模式完全沒有收集逾時（程式內 TODO）。
+      DB 變慢時 Prometheus 先放棄整次 scrape，exporter 仍在跑查詢，下一次 scrape 又開新連線。
+    evidence: tested
+    source: pg-lab
+  - text: >-
+      PostgreSQL 17 把 checkpoint 欄位從 pg_stat_bgwriter 移到 pg_stat_checkpointer。exporter 在 17 以上不再輸出
+      pg_stat_bgwriter_checkpoints_*，而 stat_checkpointer collector 預設關閉；collector 回報成功，
+      mixin 與 awesome 的 TooManyCheckpointsRequested 回傳空。反過來在 17 以下打開 stat_checkpointer 也是 success=1、沒有資料。
+    evidence: code
+    source: pg-exporter-collectors
+  - text: >-
+      pg_replication_lag_seconds 在 receive_lsn 等於 replay_lsn 時直接回 0。複本的 WAL receiver 斷線後不再收到新 WAL，
+      兩者相等，lag 顯示 0；主庫完全沒有寫入時同樣是 0，而 pg_replication_last_replay_seconds 會一直變大。
+    evidence: code
+    source: pg-exporter-replication
+  - text: >-
+      mixin 的 PostgresReplicationLaggingMore1Hour 用 pg_replication_lag，這個名字在目前的 exporter 不存在（只有 pg_replication_lag_seconds），規則永遠回傳空。
+    evidence: tested
+    source: pg-lab
+  - text: >-
+      --auto-discover-databases（已棄用）下，只要有一個資料庫連得上 pg_up 就是 1；個別資料庫失敗只反映在整體的 pg_exporter_last_scrape_error。
+    evidence: code
+    source: pg-exporter-legacy
+  - text: >-
+      queries.yaml（已棄用）某個查詢失敗時，那組 metric 直接消失，沒有每個查詢的成功指標，只有整體 pg_exporter_last_scrape_error=1；
+      設了 cache_seconds 的查詢在快取期間重送舊值，時間戳卻是新的。
+    evidence: code
+    source: pg-exporter-legacy
+  - text: >-
+      連線額滿時 exporter 用一般帳號也連不進去，表現成 pg_up=0 或 collector 消失，像是資料庫停機；
+      superuser_reserved_connections 保留給 superuser，exporter 用不到。PostgreSQL 16 起可以用 reserved_connections 加 pg_use_reserved_connections 留位子給 exporter。
+    evidence: inferred
+    source: pg-docs-roles
+
+contracts: []
+
+signals:
+  - id: exporter-up
+    tier: 1
+    question: Exporter 抓得到嗎
+    signal: 'up{job="postgres"} == 0，加上 absent(up{job="postgres"})；DB 主機不回應時也會落在這裡'
+    metrics: [up]
+    evaluate_on: self
+    silent_failure: Exporter 停機時 pg_up 消失，只看 pg_up 的規則回傳空
+    evidence: tested
+    source: pg-lab
+    upstream: { status: no, note: "mixin 與 awesome 都只看 pg_up" }
+    rules: [rules/targets/postgres.yml#PostgresExporterDown, rules/targets/postgres.yml#PostgresExporterMissing]
+
+  - id: db-up
+    tier: 1
+    question: Exporter 連得到資料庫嗎
+    signal: pg_up == 0；只在連線被拒、認證失敗這類快速失敗時出現，要和 exporter-up 一起看
+    metrics: [pg_up]
+    evaluate_on: self
+    evidence: tested
+    source: pg-lab
+    upstream: { status: partial, note: "mixin 是 pg_up != 1、awesome 是 pg_up == 0；exporter 停機或 DB 主機不回應時兩條都回傳空" }
+    rules: [rules/targets/postgres.yml#PostgresDown]
+
+  - id: collectors-present
+    tier: 1
+    question: 新連線開得起來嗎
+    signal: up == 1 但 pg_scrape_collector_success 完全沒有 series
+    metrics: [up, pg_scrape_collector_success]
+    evaluate_on: self
+    silent_failure: 帳號被鎖或改密碼時 pg_up 仍是 1，collector 結果整批消失
+    evidence: tested
+    source: pg-lab
+    upstream: { status: no, note: "mixin 與 awesome 都沒有" }
+    rules: [rules/targets/postgres.yml#PostgresCollectorsMissing]
+
+  - id: collector-success
+    tier: 1
+    question: 每個 collector 都查得到嗎
+    signal: pg_scrape_collector_success == 0（依 collector label 區分）
+    metrics: [pg_scrape_collector_success]
+    evaluate_on: self
+    silent_failure: Collector 失敗時 pg_exporter_last_scrape_error 不會變 1
+    evidence: tested
+    source: pg-lab
+    upstream: { status: no, note: "mixin 與 awesome 都沒有 pg_scrape_collector_success" }
+    rules: [rules/targets/postgres.yml#PostgresCollectorFailed]
+
+  - id: legacy-scrape-error
+    tier: 1
+    question: 舊架構的查詢與自訂查詢都成功嗎
+    signal: pg_exporter_last_scrape_error == 1；用 queries.yaml 時加上 pg_exporter_user_queries_load_error == 1
+    metrics: [pg_exporter_last_scrape_error, pg_exporter_user_queries_load_error, pg_exporter_scrapes_total]
+    evaluate_on: self
+    evidence: tested
+    source: pg-lab
+    upstream: { status: partial, note: "mixin PostgresHasExporterErrors（for 30m）與 awesome 都有；只涵蓋舊架構，collector 失敗不會讓它變 1" }
+    rules:
+      - rules/targets/postgres.yml#PostgresExporterScrapeError
+      - rules/targets/postgres.yml#PostgresUserQueriesLoadError
+
+  - id: monitor-privilege
+    tier: 1
+    question: Exporter 帳號看得到別人的 session 嗎
+    signal: 盤點時確認帳號有 pg_monitor；平時用 wal collector 失敗當代理訊號（pg_ls_waldir 需要 pg_monitor）
+    metrics: [pg_scrape_collector_success]
+    evaluate_on: inventory
+    silent_failure: 沒有 pg_monitor 時 stat_activity 回報成功，長交易顯示為 0
+    evidence: tested
+    source: pg-lab
+    upstream: { status: no, note: "README 說要 GRANT pg_monitor，沒有任何規則檢查" }
+    rules: [rules/targets/postgres.yml#PostgresExporterLacksPgMonitor]
+
+  - id: scrape-budget
+    tier: 2
+    question: Scrape 來得及在 scrape_timeout 內完成嗎
+    signal: >-
+      scrape_duration_seconds 對照 scrape_timeout（80%）；pg_scrape_collector_duration_seconds 找出慢的 collector。
+      --collection-timeout 要設得比 scrape_timeout 短，否則 Prometheus 先放棄、exporter 繼續查
+    metrics: [scrape_duration_seconds, pg_scrape_collector_duration_seconds, pg_exporter_last_scrape_duration_seconds]
+    evaluate_on: self
+    evidence: tested
+    source: pg-lab
+    upstream: { status: no, note: "mixin 與 awesome 都沒有" }
+    rules: [rules/targets/postgres.yml#PostgresScrapeNearTimeout, rules/targets/postgres.yml#PostgresSlowCollector]
+
+  - id: series-volume
+    tier: 2
+    question: 有沒有一批 metric 安靜地消失
+    signal: scrape_samples_scraped 比一小時前少一半以上
+    metrics: [scrape_samples_scraped]
+    evaluate_on: self
+    evidence: inferred
+    source: pg-lab
+    upstream: { status: no }
+    rules: [rules/targets/postgres.yml#PostgresSamplesDropped]
+
+  - id: multi-target-probe
+    tier: 2
+    question: Multi-target exporter 本身活著嗎
+    signal: >-
+      exporter 自己的 /metrics 另設一個 job 做 up 與 absent；/probe 對每個 target 都回 200，up 只代表 exporter，
+      DB 狀態要看 pg_up 與 collectors-present。一台 exporter 掛掉，所有 target 同時消失
+    metrics: [up, pg_up]
+    evaluate_on: self
+    applies_when: multi-target probe
+    evidence: code
+    source: pg-exporter-probe
+    upstream: { status: no, note: "README 標為 BETA，沒有規則" }
+    rules: [rules/targets/postgres.yml#PostgresProbeExporterDown]
+
+  - id: version-semantics
+    tier: 2
+    question: 這個版本的 PostgreSQL 真的有輸出規則用到的 metric 嗎
+    signal: >-
+      pg_up == 1 但 checkpoint metric（bgwriter 或 checkpointer）都不存在；升級 PostgreSQL 大版本後重新盤點依賴的 metric 名稱
+    metrics: [pg_stat_bgwriter_checkpoints_timed_total, pg_stat_checkpointer_num_timed_total, pg_static]
+    evaluate_on: self
+    silent_failure: 17 以上 checkpoint 規則回傳空，collector 仍回報成功
+    evidence: code
+    source: pg-exporter-collectors
+    upstream: { status: no, note: "mixin 與 awesome 的 TooManyCheckpointsRequested 只用 pg_stat_bgwriter_checkpoints_*" }
+    rules: [rules/targets/postgres.yml#PostgresCheckpointMetricsMissing]
+
+  - id: replication-semantics
+    tier: 2
+    question: Replication 延遲量的是真的嗎
+    signal: >-
+      不要只看 pg_replication_lag_seconds（複本斷線時是 0）。複本端打開 --collector.stat_wal_receiver，
+      檢查 receiver 存在且 last_msg_receipt_time 夠新；主庫端看 pg_stat_replication 有沒有複本、pg_wal_lsn_diff 的位元組落後
+    metrics:
+      - pg_replication_lag_seconds
+      - pg_replication_is_replica
+      - pg_replication_last_replay_seconds
+      - pg_stat_wal_receiver_last_msg_receipt_time
+      - pg_stat_replication_pg_wal_lsn_diff
+    evaluate_on: self
+    applies_when: replica
+    evidence: code
+    source: pg-exporter-replication
+    upstream: { status: partial, note: "mixin 用不存在的 pg_replication_lag；awesome 用 pg_replication_lag_seconds > 5，複本斷線時是 0" }
+    rules:
+      - rules/targets/postgres.yml#PostgresStandbyWalReceiverMissing
+      - rules/targets/postgres.yml#PostgresWalReceiverStale
+      - rules/targets/postgres.yml#PostgresPrimaryWithoutStandby
+      - rules/targets/postgres.yml#PostgresReplicationLagBytes
+
+  - id: replication-slots
+    tier: 2
+    question: 有沒有沒人用的 replication slot 在累積 WAL
+    signal: pg_replication_slots_active == 0；搭配 safe_wal_size_bytes 看離 max_slot_wal_keep_size 還有多遠
+    metrics: [pg_replication_slots_active, pg_replication_slots_safe_wal_size_bytes, pg_replication_slots_wal_status]
+    evaluate_on: self
+    applies_when: replication slot
+    evidence: upstream
+    source: pg-mixin
+    upstream: { status: yes, note: "mixin 與 awesome 都有 slots_active == 0" }
+    rules: [rules/targets/postgres.yml#PostgresReplicationSlotInactive]
+
+  - id: wraparound
+    tier: 2
+    question: XID wraparound 還有多遠
+    signal: >-
+      pg_database_wraparound_age_datfrozenxid_seconds > 1e9（名稱是 seconds，實際是交易數；上限約 21 億）。
+      collector 預設關閉，沒打開時規則也要響
+    metrics: [pg_database_wraparound_age_datfrozenxid_seconds, pg_database_wraparound_age_datminmxid_seconds]
+    evaluate_on: self
+    evidence: code
+    source: pg-exporter-collectors
+    upstream: { status: no, note: "mixin 與 awesome 都沒有；awesome 的 low XID consumption 要自訂查詢 pg_txid_current" }
+    rules: [rules/targets/postgres.yml#PostgresXidWraparoundRisk, rules/targets/postgres.yml#PostgresWraparoundNotCollected]
+
+  - id: connection-headroom
+    tier: 2
+    question: 連線還有餘裕嗎（包括留給 exporter 的）
+    signal: >-
+      pg_stat_activity_count 加總對照 max_connections 減保留連線；額滿時 exporter 一起連不進去。
+      給 exporter 帳號設 CONNECTION LIMIT，16 以上可授予 pg_use_reserved_connections
+    metrics: [pg_stat_activity_count, pg_settings_max_connections, pg_settings_superuser_reserved_connections, pg_settings_reserved_connections]
+    evaluate_on: self
+    evidence: upstream
+    source: pg-mixin
+    upstream: { status: yes, note: "mixin 與 awesome 都有；都沒扣 16 起的 reserved_connections" }
+    rules: [rules/targets/postgres.yml#PostgresConnectionsNearLimit]
+
+  - id: pg-stat-statements
+    tier: 3
+    question: 查詢層級的統計收得到嗎
+    signal: >-
+      --collector.stat_statements 預設關閉；打開後需要 shared_preload_libraries 與 CREATE EXTENSION，
+      缺了會讓 pg_scrape_collector_success{collector="stat_statements"} 變 0（由 collector-success 抓）
+    metrics: [pg_stat_statements_calls_total, pg_stat_statements_seconds_total, pg_scrape_collector_success]
+    evaluate_on: inventory
+    applies_when: pg_stat_statements
+    evidence: tested
+    source: pg-lab
+    upstream: { status: no }
+    rules: []
+
+  - id: service-health
+    tier: 3
+    question: 服務本身與容量
+    signal: 長交易、deadlock、rollback 比例、dead tuple、重啟、主從角色改變
+    metrics:
+      - pg_stat_activity_max_tx_duration
+      - pg_stat_database_deadlocks
+      - pg_stat_database_xact_rollback
+      - pg_stat_database_xact_commit
+      - pg_stat_user_tables_n_dead_tup
+      - pg_stat_user_tables_n_live_tup
+      - pg_postmaster_start_time_seconds
+      - pg_replication_is_replica
+    evaluate_on: self
+    evidence: upstream
+    source: pg-awesome
+    upstream: { status: partial, note: "mixin 的 SlowQueries 對 gauge 取 rate、TablesNotVaccumed 拿 timestamp() 比 time() - 36000，實際上都不會響；awesome 的 restart、bloat、txid、invalid index 需要預設關閉的 collector 或自訂查詢" }
+    rules:
+      - rules/targets/postgres.yml#PostgresLongRunningTransaction
+      - rules/targets/postgres.yml#PostgresDeadlocks
+      - rules/targets/postgres.yml#PostgresHighRollbackRatio
+      - rules/targets/postgres.yml#PostgresTooManyDeadTuples
+      - rules/targets/postgres.yml#PostgresRestarted
+      - rules/targets/postgres.yml#PostgresRoleChanged
