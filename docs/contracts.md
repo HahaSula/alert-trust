@@ -90,3 +90,18 @@ vmalert 查詢時間會往前移 `D`（`eval_delay`），所以延遲 `L` 裡有
 DMS 等待 `> 4 × max(resend, E) + repeat_interval + group_interval`
 
 等待太短會誤報；ruler 停機後 Alertmanager 還會繼續重送 Watchdog 直到 `EndsAt`，所以 DMS 最快也要這段時間加上它自己的等待才會響。要更快偵測 ruler 停機，靠外部觀察者的 `up`。
+
+## Target（exporter）
+
+### Exporter 的查詢期限要比 scrape_timeout 短 {#exporter-deadline}
+
+`exporter 自己的查詢期限 < scrape_timeout < scrape_interval`
+
+Exporter 收到 scrape 後才去查服務。它自己的期限比 `scrape_timeout` 長時，Prometheus 先放棄，`up` 變 0、這個 target 的所有 series 消失，看起來像 exporter 掛了，exporter 端的查詢卻還在跑。
+
+| Exporter | 自己的期限 | 實驗 |
+|---|---|---|
+| mysqld_exporter | `X-Prometheus-Scrape-Timeout-Seconds` 減 `--timeout-offset`（預設 0.25s）；`--exporter.query_timeout` 限制單一 collector | 資料庫停機時 scrape 耗時 3.75s，等於 4s timeout 減 0.25s |
+| postgres_exporter | `--collection-timeout`，**預設 1m**；`/probe` 模式沒有逾時 | 資料庫主機不回應時一次 scrape 要 17–30 秒以上，Prometheus 4 秒就放棄 |
+
+所以 PostgreSQL 這類預設期限偏長的 exporter，要把期限設得比 `scrape_timeout` 短，並用 `scrape_duration_seconds > 0.8 × scrape_timeout` 預警。

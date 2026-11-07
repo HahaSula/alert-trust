@@ -29,9 +29,26 @@ ID_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 COMPONENT_ID_RE = re.compile(r"^[a-z0-9_]+$")
 
 
+class _StrictLoader(yaml.SafeLoader):
+    """SafeLoader that rejects duplicate keys instead of silently keeping the last one."""
+
+
+def _no_duplicates(loader, node, deep=False):
+    seen = set()
+    for key_node, _ in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        if key in seen:
+            raise ValueError(f"{node.start_mark.name}:{key_node.start_mark.line + 1}: 重複的 key {key!r}")
+        seen.add(key)
+    return loader.construct_mapping(node, deep=deep)
+
+
+_StrictLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _no_duplicates)
+
+
 def _load(path: str):
     with open(path, encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        return yaml.load(f, Loader=_StrictLoader)  # noqa: S506 - SafeLoader subclass
 
 
 def load_sources(root: str = ROOT) -> dict:

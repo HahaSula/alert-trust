@@ -29,6 +29,16 @@ groups:
         annotations:
           summary: "Exporter 活著但連不上資料庫（停機、密碼輪替、max_user_connections 用完）；collector_success 會整組消失"
           runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#db-up
+          absence_covered_by: "MySQLExporterDown, MySQLExporterMissing"
+      - alert: MySQLCollectorsMissing
+        expr: |
+          up{job="mysql"} == 1
+            unless on (job, instance) mysql_exporter_collector_success{job="mysql"}
+        for: 2m
+        labels: { severity: critical, component: mysqld_exporter, tier: "1" }
+        annotations:
+          summary: "Exporter 有回應卻沒有任何 collector 結果；MySQLCollectorFailed（== 0）在這時回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#collectors-present
       - alert: MySQLCollectorFailed
         expr: mysql_exporter_collector_success{job="mysql"} == 0
         for: 10m
@@ -36,6 +46,7 @@ groups:
         annotations:
           summary: "Collector {{ $labels.collector }} 一直失敗，它的 metric 已消失，依賴它的規則回傳空（常見原因：權限不足、表不存在）"
           runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#collector-success
+          absence_covered_by: "MySQLCollectorsMissing"
       - alert: MySQLProbeExporterDown
         expr: |
           count by (job) (up{job="mysql"} == 0)
@@ -142,6 +153,7 @@ groups:
         annotations:
           summary: "Galera 節點不接受讀寫；沒啟用 Galera 的 MariaDB 也有 wsrep_ready=0，所以要用 wsrep_on 過濾"
           runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#galera-state
+          absence_covered_by: "MySQLExporterDown, MySQLCollectorsMissing"
       - alert: MySQLGaleraOutOfSync
         expr: |
           mysql_global_status_wsrep_local_state{job="mysql"} != 4
@@ -151,6 +163,7 @@ groups:
         annotations:
           summary: "Galera 節點不在 Synced 狀態，也不是刻意 desync"
           runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#galera-state
+          absence_covered_by: "MySQLExporterDown, MySQLCollectorsMissing"
 
   - name: mysql-service
     rules:

@@ -111,6 +111,7 @@ groups:
         annotations:
           summary: "沒有可用的 Alertmanager"
           runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#notify-to-alertmanager
+          absence_covered_by: "PrometheusDown, PrometheusMissing"
 
   - name: prometheus-storage
     rules:
@@ -176,6 +177,7 @@ groups:
         annotations:
           summary: "新設定或 rule 沒有生效，仍在跑舊設定"
           runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#root-cause
+          absence_covered_by: "PrometheusDown, PrometheusMissing"
 
   - name: prometheus-resources        # K8s，需要 cAdvisor 與 kube-state-metrics
     rules:

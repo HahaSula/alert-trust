@@ -1,0 +1,29 @@
+# 每張 target 卡（kind: target）都要回答的問題。validate.py 會檢查每個 id 都在卡片的 signals 裡，
+# 或寫在卡片的 not_applicable（id: 理由）裡。
+# 依據：mysqld_exporter 與 postgres_exporter 的實驗都踩到同樣的盲點。
+required_signals:
+  - id: exporter-up
+    min_tier: 1
+    question: Exporter 抓得到嗎
+    why: Exporter 停機或卡住時，它自己輸出的 *_up 會整條消失，只看 *_up 的規則（上游 mixin 的 MySQLDown、PostgreSQLDown）回傳空，永遠不會響。要用 up == 0 加上 absent。
+  - id: db-up
+    min_tier: 1
+    question: Exporter 連得到它監控的服務嗎
+    why: up 只代表 Prometheus 抓得到 exporter；服務停機時 up 仍是 1。
+  - id: collectors-present
+    min_tier: 1
+    question: Exporter 有回應，collector 的結果還在嗎
+    why: 服務停機或帳號被鎖時，collector 的結果可能整組消失（不是變成 0），success == 0 的規則也回傳空。寫法是 up == 1 unless on(job, instance) <collector_success>。
+  - id: collector-success
+    min_tier: 1
+    question: 每個 collector 都成功嗎
+    why: 權限不足、表或 extension 不存在時，單一 collector 失敗，其他 metric 照常，依賴它的規則安靜地回傳空。
+  - id: scrape-budget
+    min_tier: 2
+    question: Scrape 來得及在 timeout 內完成嗎
+    why: Exporter 自己的查詢期限比 scrape_timeout 長時，Prometheus 先放棄，up 變 0、所有 series 消失，看起來像 exporter 掛了。
+    contract: exporter-deadline
+  - id: probe-blast-radius
+    min_tier: 2
+    question: 多 target 模式下，壞的是 exporter 還是服務
+    why: 一台 multi-target exporter 掛掉，它背後所有 target 同時消失。

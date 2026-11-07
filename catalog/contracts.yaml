@@ -54,3 +54,9 @@ contracts:
     violation: 等待太短會誤報；ruler 停機後 Alertmanager 仍會重送到 EndsAt
     evidence: tested
     source: art-prom
+  exporter-deadline:
+    applies_to: [target]
+    expr: "exporter 自己的查詢期限 < scrape_timeout < scrape_interval"
+    violation: Prometheus 先放棄，up 變 0、所有 series 消失，看起來像 exporter 掛了；exporter 端的查詢還在跑
+    evidence: tested
+    source: pg-lab

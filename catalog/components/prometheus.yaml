@@ -60,14 +60,21 @@ signals:
   - id: job-freshness
     tier: 1
     question: 每個關鍵 job 都有新資料嗎
-    signal: 每個關鍵 job 一條 heartbeat：up{job="X"} == 0 加上 absent，或 time() - max(timestamp(M{job="X"}))
+    signal: >-
+      每個關鍵 job（包括 mysql、postgres 這類 target job）都要有 up{job="X"} == 0 加上 absent(up{job="X"})，
+      再加一條 time() - max(timestamp(M{job="X"})) 的資料 heartbeat。不能只靠 exporter 自己的 *_up：
+      exporter 停機時它會整條消失
     metrics: [up]
     evaluate_on: self
     judged_by: external
+    silent_failure: mysqld_exporter 與 postgres_exporter 停機時，mysql_up == 0、pg_up == 0 都回傳空
     evidence: tested
     source: art-prom
-    upstream: { status: no, note: "awesome 只有 Prometheus 自己的 job missing" }
-    rules: [rules/prometheus/canary.yml#DataHeartbeatMyJob]
+    upstream: { status: no, note: "awesome 只有 Prometheus 自己的 job missing；DB mixin 只看 *_up" }
+    rules:
+      - rules/prometheus/canary.yml#DataHeartbeatMyJob
+      - rules/prometheus/targets.yml#TargetJobDown
+      - rules/prometheus/targets.yml#TargetJobMissing
 
   - id: known-true-canary
     tier: 1

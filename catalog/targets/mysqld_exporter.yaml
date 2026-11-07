@@ -78,6 +78,7 @@ silent_failures:
 contracts:
   - scrape-within-interval
   - lookback
+  - exporter-deadline
 
 signals:
   - id: exporter-up
@@ -102,6 +103,18 @@ signals:
     source: art-mysql
     upstream: { status: partial, note: "mixin 的 mysql_up != 1 與 awesome 的 mysql_up == 0 都有，但 exporter 停機時一起失效" }
     rules: [rules/targets/mysql.yml#MySQLNotReachable]
+
+  - id: collectors-present
+    tier: 1
+    question: Exporter 有回應，collector 的結果還在嗎
+    signal: up == 1 但 mysql_exporter_collector_success 完全沒有 series
+    metrics: [up, mysql_exporter_collector_success]
+    evaluate_on: self
+    silent_failure: 資料庫停機時 collector_success 整組消失（不是變 0），MySQLCollectorFailed（== 0）回傳空
+    evidence: tested
+    source: art-mysql
+    upstream: { status: no, note: "mixin 與 awesome 都沒有" }
+    rules: [rules/targets/mysql.yml#MySQLCollectorsMissing]
 
   - id: collector-success
     tier: 1
@@ -194,7 +207,7 @@ signals:
     source: art-mysql
     upstream: { status: no }
     rules: [rules/targets/mysql.yml#MySQLScrapeNearTimeout, rules/targets/mysql.yml#MySQLCollectorSlow]
-    contract: scrape-within-interval
+    contract: exporter-deadline
 
   - id: db-up-flapping
     tier: 2

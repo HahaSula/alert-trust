@@ -1,0 +1,22 @@
+# 每個關鍵 target job 的存活與存在，放在抓這些 target 的 Prometheus（或 federate 到外部觀察者）。
+# 把 critical-job-a、critical-job-b 換成實際的 job，例如 mysql、postgres。
+# 為什麼要另外寫：exporter 停機時它自己的 *_up（mysql_up、pg_up）會整條消失，
+# 只看 *_up 的規則回傳空；job 從服務發現消失時，連 up 都沒有，只有 absent 會成立。
+# absent 不能用 regex 一次涵蓋多個 job，每個關鍵 job 各寫一條 TargetJobMissing。
+groups:
+  - name: target-jobs
+    rules:
+      - alert: TargetJobDown
+        expr: up{job=~"critical-job-a|critical-job-b"} == 0
+        for: 2m
+        labels: { severity: critical, component: prometheus, tier: "1", scope: target }
+        annotations:
+          summary: "{{ $labels.job }} 的 {{ $labels.instance }} 抓不到；這時 exporter 自己的 *_up 會消失，依賴它的規則不會響"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#job-freshness
+      - alert: TargetJobMissing
+        expr: absent(up{job="critical-job-a"})
+        for: 5m
+        labels: { severity: critical, component: prometheus, tier: "1", scope: target }
+        annotations:
+          summary: "critical-job-a 完全沒有 target；服務發現或 job 名稱改了，這個 job 的所有規則都回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#job-freshness

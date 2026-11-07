@@ -31,6 +31,7 @@ groups:
         annotations:
           summary: "exporter 連不上 PostgreSQL（連線被拒、認證失敗、連線額滿）"
           runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#db-up
+          absence_covered_by: "PostgresExporterDown, PostgresExporterMissing"
       - alert: PostgresCollectorsMissing
         expr: |
           up{job="postgres"} == 1
@@ -47,6 +48,7 @@ groups:
         annotations:
           summary: "collector {{ $labels.collector }} 查詢失敗，它負責的 metric 已經消失"
           runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#collector-success
+          absence_covered_by: "PostgresCollectorsMissing"
       - alert: PostgresExporterScrapeError
         expr: pg_exporter_last_scrape_error{job="postgres"} == 1
         for: 5m
@@ -67,6 +69,7 @@ groups:
         annotations:
           summary: "wal collector 失敗，exporter 帳號很可能沒有 pg_monitor；這時 stat_activity 看不到別人的 session，卻回報成功"
           runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#monitor-privilege
+          absence_covered_by: "PostgresCollectorsMissing"
 
   - name: postgres-exporter-budget
     rules:
@@ -99,7 +102,7 @@ groups:
         labels: { severity: critical, component: postgres_exporter, tier: "2" }
         annotations:
           summary: "multi-target exporter 本身抓不到，它代理的所有資料庫一起失去監控"
-          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#multi-target-probe
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#probe-blast-radius
 
   - name: postgres-semantics
     rules:
@@ -152,6 +155,7 @@ groups:
         annotations:
           summary: "replication slot {{ $labels.slot_name }} 沒有人用，主庫的 WAL 會一直累積"
           runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#replication-slots
+          absence_covered_by: "PostgresCollectorsMissing"
       - alert: PostgresXidWraparoundRisk
         expr: pg_database_wraparound_age_datfrozenxid_seconds{job="postgres"} > 1e9
         for: 30m

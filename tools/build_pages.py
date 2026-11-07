@@ -129,6 +129,14 @@ def index_page(cards: list[dict]) -> str:
             status = chip("草稿" if c["status"] == "draft" else "穩定", f"st-{c['status']}")
             out.append(f"| [{c['name']}]({c['id']}.md) | {status} | {cnt[0]} | {cnt[1]} | {cnt[2]} | {gap} |")
         out.append("")
+    pattern_path = os.path.join(C.ROOT, "catalog", "target-pattern.yaml")
+    if os.path.exists(pattern_path):
+        out.append("## 每張 target 卡都要回答的問題\n")
+        out.append("任何 exporter 都適用。`tools/validate.py` 會檢查每張 target 卡都有這些訊號，或寫明不適用的理由。\n")
+        out.append("| 訊號 | 問題 | 至少 | 為什麼 |\n|---|---|---|---|")
+        for r in C._load(pattern_path)["required_signals"]:
+            out.append(f"| `{r['id']}` | {esc(r['question'])} | {chip(str(r['min_tier']), 't' + str(r['min_tier']))} | {esc(r['why'])} |")
+        out.append("")
     return "\n".join(out)
 
 

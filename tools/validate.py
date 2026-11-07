@@ -118,6 +118,67 @@ def validate(root: str = C.ROOT) -> tuple[list[str], list[str]]:
         tier = (rule.get("labels") or {}).get("tier")
         if tier not in ("1", "2", "3"):
             errors.append(f"{ref}: labels.tier 要是字串 \"1\"、\"2\" 或 \"3\"")
+
+    errors += check_target_pattern(components, root)
+    presence_errors, presence_warnings = check_presence(rules)
+    errors += presence_errors
+    warnings += presence_warnings
+    return errors, warnings
+
+
+def check_target_pattern(components: list[dict], root: str) -> list[str]:
+    """Every target card answers the questions in catalog/target-pattern.yaml, or says why not."""
+    path = os.path.join(root, "catalog", "target-pattern.yaml")
+    if not os.path.exists(path):
+        return []
+    required = C._load(path)["required_signals"]
+    errors = []
+    for card in components:
+        if card.get("kind") != "target":
+            continue
+        by_id = {s["id"]: s for s in card.get("signals", [])}
+        na = card.get("not_applicable") or {}
+        for req in required:
+            rid = req["id"]
+            if rid in na:
+                if not str(na[rid]).strip():
+                    errors.append(f"{card['_path']}: not_applicable.{rid} 要寫理由")
+                continue
+            if rid not in by_id:
+                errors.append(f"{card['_path']}: 缺少 target 標準訊號 {rid}（{req['question']}），或在 not_applicable 寫理由")
+            elif by_id[rid].get("tier", 9) > req["min_tier"]:
+                errors.append(f"{card['_path']}#{rid}: 標準訊號至少要第 {req['min_tier']} 級")
+            elif req.get("contract") and by_id[rid].get("contract") != req["contract"]:
+                errors.append(f"{card['_path']}#{rid}: 要引用契約 {req['contract']}")
+    return errors
+
+
+# metric{...} == 0 / != 1 / < 1 written directly on a selector. When the series disappears the expression
+# returns nothing, so the alert cannot fire exactly when the source is gone.
+PRESENCE_RE = re.compile(
+    r"(?<![\w:\])])([a-zA-Z_:][a-zA-Z0-9_:]*)\s*(\{[^}]*\})?\s*(==\s*0|!=\s*1|<\s*1)(?![\d.])")
+PRESENCE_SKIP = {"up", "bool", "by", "on", "without", "ignoring", "group_left", "group_right", "offset"}
+
+
+def check_presence(rules: dict[str, dict]) -> tuple[list[str], list[str]]:
+    """Lint: a 'value is bad' rule needs a companion that fires when the series is missing."""
+    names = {ref.split("#", 1)[1] for ref in rules}
+    errors, warnings = [], []
+    for ref, rule in rules.items():
+        expr = str(rule.get("expr", ""))
+        hits = [m.group(1) for m in PRESENCE_RE.finditer(expr) if m.group(1) not in PRESENCE_SKIP]
+        if not hits:
+            continue
+        if re.search(r"\babsent(_over_time)?\s*\(|\bunless\b|\bor\b", expr):
+            continue
+        covered = (rule.get("annotations") or {}).get("absence_covered_by")
+        if not covered:
+            warnings.append(f"{ref}: {', '.join(sorted(set(hits)))} 消失時這條規則回傳空；"
+                            f"加上 absent／unless，或用 annotations.absence_covered_by 指出補位的規則")
+            continue
+        for alert in [a.strip() for a in str(covered).split(",") if a.strip()]:
+            if alert not in names:
+                errors.append(f"{ref}: absence_covered_by 指向不存在的規則 {alert}")
     return errors, warnings
 
 

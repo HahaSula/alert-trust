@@ -43,6 +43,44 @@ class CatalogTest(unittest.TestCase):
                 self.assertNotIn("](", build_pages.src(key, sources))
 
 
+class LintTest(unittest.TestCase):
+    def _rules(self, expr, **ann):
+        return {"rules/x.yml#A": {"alert": "A", "expr": expr, "annotations": ann},
+                "rules/x.yml#B": {"alert": "B", "expr": "up == 0", "annotations": {}}}
+
+    def test_presence_flags_bare_selector(self):
+        _, warnings = validate.check_presence(self._rules('mysql_up{job="mysql"} == 0'))
+        self.assertEqual(len(warnings), 1)
+
+    def test_presence_accepts_unless_absent_and_cover(self):
+        for expr in ('up == 1 unless on (job) mysql_exporter_collector_success',
+                     'mysql_up == 0 or absent(mysql_up)'):
+            self.assertEqual(validate.check_presence(self._rules(expr)), ([], []))
+        self.assertEqual(validate.check_presence(self._rules("mysql_up == 0", absence_covered_by="B")), ([], []))
+        errors, _ = validate.check_presence(self._rules("mysql_up == 0", absence_covered_by="Nope"))
+        self.assertEqual(len(errors), 1)
+
+    def test_presence_ignores_functions_and_up(self):
+        for expr in ("increase(x_total[15m]) == 0", "up == 0", "max_over_time(x[5m]) == 0", "x == 0.5"):
+            self.assertEqual(validate.check_presence(self._rules(expr)), ([], []), expr)
+
+    def test_target_pattern_requires_signals(self):
+        card = {"_path": "t.yaml", "kind": "target", "signals": [{"id": "exporter-up", "tier": 1}],
+                "not_applicable": {"probe-blast-radius": "單一 target"}}
+        errors = validate.check_target_pattern([card], ROOT)
+        missing = {e.split("缺少 target 標準訊號 ")[1].split("（")[0] for e in errors if "缺少" in e}
+        self.assertEqual(missing, {"db-up", "collectors-present", "collector-success", "scrape-budget"})
+
+    def test_duplicate_keys_rejected(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:
+            f.write("a: 1\na: 2\n")
+        try:
+            with self.assertRaises(ValueError):
+                C._load(f.name)
+        finally:
+            os.unlink(f.name)
+
+
 class CheckMetricsTest(unittest.TestCase):
     SAMPLE = "\n".join([
         "# HELP prometheus_rule_group_last_duration_seconds x",

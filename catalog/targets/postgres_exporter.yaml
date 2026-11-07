@@ -63,7 +63,7 @@ silent_failures:
     evidence: inferred
     source: pg-docs-roles
 
-contracts: []
+contracts: [exporter-deadline]
 
 signals:
   - id: exporter-up
@@ -150,6 +150,7 @@ signals:
     source: pg-lab
     upstream: { status: no, note: "mixin 與 awesome 都沒有" }
     rules: [rules/targets/postgres.yml#PostgresScrapeNearTimeout, rules/targets/postgres.yml#PostgresSlowCollector]
+    contract: exporter-deadline
 
   - id: series-volume
     tier: 2
@@ -162,7 +163,7 @@ signals:
     upstream: { status: no }
     rules: [rules/targets/postgres.yml#PostgresSamplesDropped]
 
-  - id: multi-target-probe
+  - id: probe-blast-radius
     tier: 2
     question: Multi-target exporter 本身活著嗎
     signal: >-
