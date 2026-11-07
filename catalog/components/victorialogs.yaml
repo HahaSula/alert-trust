@@ -1,24 +1,30 @@
 id: victorialogs
 name: VictoriaLogs＋vlagent
 kind: infra
+family: victoriametrics
 status: draft
 stages: [collect, store, query]
 versions_checked: ["v1.53.0"]
+architecture: architecture/victorialogs.md
 role: Log 的儲存與查詢。Log rule 由 vmalert 評估，狀態寫到 VM，所以 log 告警也依賴 VM。
 
 silent_failures:
   - text: Log rule 預設只查一個 interval 的視窗，log 延遲 L > D + E 時事件永遠不觸發。
     evidence: tested
     source: art-vm
+    refs: [exp-vm-vl]
   - text: "* | stats count() 在沒有 log 時仍回傳 0，不能當 canary。"
     evidence: tested
     source: art-vm
+    refs: [exp-vm-vl]
   - text: Content-Type 錯時 ingestion 回 200，實際沒有收進資料。
     evidence: tested
     source: art-vm
+    refs: [exp-vm-vl]
   - text: Cluster 缺節點時預設回 502，所有 log rule 變 ERR，接著假 resolved。
     evidence: tested
     source: art-vm
+    refs: [exp-vm-vl]
 
 contracts: [vl-log-delay]
 
@@ -31,6 +37,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-vm
+    refs: [exp-vm-vl]
     upstream: { status: partial, note: "依 job 名稱比對" }
     rules: [rules/victoriametrics/meta.yml#MetaTargetDown]
 
@@ -43,6 +50,7 @@ signals:
     judged_by: external
     evidence: tested
     source: art-vm
+    refs: [exp-vm-vl]
     upstream: { status: no }
     rules: [rules/victoriametrics/canary-logs.yml#LogsFresh]
     contract: vl-log-delay
@@ -55,6 +63,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-vm
+    refs: [exp-vm-vl]
     upstream: { status: no }
     rules: [rules/victoriametrics/meta.yml#MetaVLReadOnly]
 
@@ -66,6 +75,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-vm
+    refs: [exp-vm-vl]
     upstream: { status: no, note: "官方只看 dropped" }
     rules: []
 
@@ -77,6 +87,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-vm
+    refs: [exp-vm-vl]
     upstream: { status: no }
     applies_when: cluster
     rules: [rules/victoriametrics/meta.yml#MetaVLStorageUnreachable]
@@ -89,5 +100,6 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-vm
+    refs: [exp-vm-vl]
     upstream: { status: yes }
     rules: [rules/victoriametrics/meta.yml#MetaVLAgentBacklog]

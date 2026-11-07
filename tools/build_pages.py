@@ -15,7 +15,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import catalog as C  # noqa: E402
 
 TIER_TITLE = {1: "第 1 級：基本 monitor of monitor", 2: "第 2 級：接近極限的預警", 3: "第 3 級：根因與容量"}
-KIND_TITLE = {"infra": "監控元件", "architecture": "架構", "target": "Target"}
 GENERATED = "<!-- 由 tools/build_pages.py 產生，請改 catalog/ 下的 YAML -->\n"
 
 
@@ -38,6 +37,11 @@ def src(key: str, sources: dict) -> str:
     return f"{s['title']}（未公開）"
 
 
+def marks(item: dict) -> str:
+    """Footnote markers; hooks/refs.py appends the citations."""
+    return "".join(f"[^{k}]" for k in item.get("refs", []) or [])
+
+
 def rule_link(ref: str) -> str:
     path, alert = ref.split("#", 1)
     return f"[`{alert}`]({C.REPO_URL}/blob/main/{path})"
@@ -49,7 +53,7 @@ def esc(text: str) -> str:
 
 def component_page(card: dict, sources: dict, contracts: dict) -> str:
     out = [GENERATED, f"# {card['name']}\n"]
-    meta = [chip("草稿" if card["status"] == "draft" else "穩定", f"st-{card['status']}"), KIND_TITLE[card["kind"]]]
+    meta = [chip("草稿" if card["status"] == "draft" else "穩定", f"st-{card['status']}"), C.FAMILIES[card["family"]]]
     if card.get("versions_checked"):
         meta.append("驗證版本：" + "、".join(f"`{v}`" for v in card["versions_checked"]))
     out.append(" · ".join(meta) + "\n")
@@ -60,14 +64,14 @@ def component_page(card: dict, sources: dict, contracts: dict) -> str:
     if card.get("silent_failures"):
         out.append("## 會安靜壞掉的方式\n")
         for sf in card["silent_failures"]:
-            out.append(f"- {sf['text'].strip()} {ev(sf['evidence'])}")
+            out.append(f"- {sf['text'].strip()} {ev(sf['evidence'])}{marks(sf)}")
         out.append("")
 
     if card.get("contracts"):
         out.append("## 信任契約\n")
         for cid in card["contracts"]:
             c = contracts[cid]
-            out.append(f"- [`{c['expr']}`](../contracts.md#{cid})。違反時：{c['violation']}")
+            out.append(f"- [`{c['expr']}`](../contracts.md#{cid})。違反時：{c['violation']}{marks(c)}")
         out.append("")
 
     signals = card.get("signals", [])
@@ -98,7 +102,7 @@ def component_page(card: dict, sources: dict, contracts: dict) -> str:
                 rows.append(("適用條件", esc(s["applies_when"])))
             if s.get("silent_failure"):
                 rows.append(("為什麼需要", esc(s["silent_failure"])))
-            rows.append(("證據", f"{ev(s['evidence'])} {src(s['source'], sources)}"))
+            rows.append(("證據", f"{ev(s['evidence'])} {src(s['source'], sources)}{marks(s)}"))
             note = s["upstream"].get("note")
             rows.append(("上游規則", up(s["upstream"]["status"]) + (f" {esc(note)}" if note else "")))
             if s.get("contract"):
@@ -115,11 +119,11 @@ def component_page(card: dict, sources: dict, contracts: dict) -> str:
 def index_page(cards: list[dict]) -> str:
     out = [GENERATED, "# 元件卡\n",
            "每張卡回答同一個問題：這個元件壞掉時，誰會知道？第 1 級訊號是基本 monitor of monitor。\n"]
-    for kind in ("infra", "architecture", "target"):
-        group = [c for c in cards if c["kind"] == kind]
+    for fam, title in C.FAMILIES.items():
+        group = [c for c in cards if c.get("family") == fam]
         if not group:
             continue
-        out.append(f"## {KIND_TITLE[kind]}\n")
+        out.append(f"## {title}\n")
         out.append("| 卡片 | 狀態 | 第 1 級 | 第 2 級 | 第 3 級 | 上游沒有的第 1 級 |")
         out.append("|---|---|---|---|---|---|")
         for c in group:

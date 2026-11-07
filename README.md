@@ -58,9 +58,16 @@ docker run --rm -it -p 8000:8000 -v "$PWD":/docs squidfunk/mkdocs-material:9.5.3
 
 這個 repo 與網站是公開的。可以放的內容：可重現的 lab 實驗、版本比較、機制、通用規則範本。**不要放的內容**：特定環境的數字、主機名稱、拓撲、內部決策，以及你的 `env/*.yaml` 和對真實環境跑出來的報告。這些檔案已列在 `.gitignore`。
 
-## 證據與限制
+## 證據、參考與限制
 
-每個結論都標了證據：實測、讀碼、上游、推論。實驗都是小規模的單機 Docker，**驗證的是機制和訊號出現的順序**，門檻和時間不能直接套到大型環境。
+每個結論都標了證據等級（實測、讀碼、上游、推論），並附參考：
+
+- `catalog/refs-code.yaml`：釘在版本與行號的原始碼位置，由 `tools/gen_code_refs.py` 依 `catalog/refs-code.src.json` 產生，改版時重跑，找不到關鍵字就失敗。
+- `catalog/refs.yaml`：實驗結果的連結。
+- 頁面寫 `[^key]`，`hooks/refs.py` 在建置時補上註腳；元件卡用 `refs: [key]`。
+- `tools/validate.py` 會檢查每個參考都存在，並列出標了實測或讀碼卻沒有參考的項目（`--refs`）。
+
+實驗都是小規模的單機 Docker，**驗證的是機制和訊號出現的順序**，門檻和時間不能直接套到大型環境。
 
 前身是 [prometheus-selfcheck-skills](https://github.com/HahaSula/prometheus-selfcheck-skills)，只涵蓋 Prometheus 與 Alertmanager。
 

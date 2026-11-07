@@ -57,6 +57,10 @@ def validate(root: str = C.ROOT) -> tuple[list[str], list[str]]:
         if comp in seen_components:
             errors.append(f"{where}: id {comp!r} 重複")
         seen_components.add(comp)
+        if card.get("family") not in C.FAMILIES:
+            errors.append(f"{where}: family {card.get('family')!r} 要是 {', '.join(C.FAMILIES)} 之一")
+        if card.get("architecture") and not os.path.exists(os.path.join(root, "docs", card["architecture"])):
+            errors.append(f"{where}: architecture 頁 {card['architecture']} 不存在")
         if card.get("kind") not in C.KINDS:
             errors.append(f"{where}: kind {card.get('kind')!r} 無效")
         if card.get("status") not in C.STATUS:
@@ -120,10 +124,61 @@ def validate(root: str = C.ROOT) -> tuple[list[str], list[str]]:
             errors.append(f"{ref}: labels.tier 要是字串 \"1\"、\"2\" 或 \"3\"")
 
     errors += check_target_pattern(components, root)
+    ref_errors, missing_refs = check_refs(components, contracts, root)
+    errors += ref_errors
+    if missing_refs:
+        warnings.append(f"{len(missing_refs)} 個項目標了實測或讀碼，但還沒有 refs（用 --refs 列出）")
+    MISSING_REFS[:] = missing_refs
     presence_errors, presence_warnings = check_presence(rules)
     errors += presence_errors
     warnings += presence_warnings
     return errors, warnings
+
+
+MISSING_REFS: list[str] = []
+DOC_MARK = re.compile(r"\[\^([a-z0-9][a-z0-9-]*)\](?!:)")
+
+
+def check_refs(components: list[dict], contracts: dict, root: str) -> tuple[list[str], list[str]]:
+    """Every [^key] in docs and every refs: [key] in the catalog must resolve; list items that lack refs."""
+    refs = C.load_refs(root)
+    sources = C.load_sources(root)
+    errors, missing = [], []
+    for key, r in refs.items():
+        if r.get("kind") not in ("code", "experiment"):
+            errors.append(f"refs: {key} 的 kind 要是 code 或 experiment")
+        if r.get("kind") == "experiment" and not r.get("url") and r.get("visibility") != "private":
+            errors.append(f"refs: {key} 沒有 url，也沒有標 visibility: private")
+    docs = os.path.join(root, "docs")
+    for dirpath, _, names in os.walk(docs):
+        if os.path.relpath(dirpath, docs).startswith("components"):
+            continue  # generated from the catalog, checked below
+        for n in names:
+            if n.endswith(".md"):
+                path = os.path.join(dirpath, n)
+                text = open(path, encoding="utf-8").read()
+                for m in DOC_MARK.finditer(text):
+                    if m.group(1) not in refs and f"[^{m.group(1)}]:" not in text:
+                        errors.append(f"{os.path.relpath(path, root)}: 參考 [^{m.group(1)}] 不存在")
+
+    def check(where: str, item: dict) -> None:
+        for key in item.get("refs", []) or []:
+            if key not in refs:
+                errors.append(f"{where}: refs 裡的 {key} 不存在")
+        if item.get("evidence") in ("tested", "code") and not item.get("refs"):
+            src = sources.get(item.get("source"), {})
+            # code read from a public upstream file already has a file-level link
+            if not (item.get("evidence") == "code" and src.get("visibility") == "public" and src.get("url")):
+                missing.append(where)
+
+    for cid, c in contracts.items():
+        check(f"contracts.yaml#{cid}", c)
+    for card in components:
+        for i, sf in enumerate(card.get("silent_failures", [])):
+            check(f"{card['_path']}#silent_failures[{i}]", sf)
+        for s in card.get("signals", []):
+            check(f"{card['_path']}#{s['id']}", s)
+    return errors, missing
 
 
 def check_target_pattern(components: list[dict], root: str) -> list[str]:
@@ -185,12 +240,16 @@ def check_presence(rules: dict[str, dict]) -> tuple[list[str], list[str]]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--strict", action="store_true", help="警告也視為失敗")
+    ap.add_argument("--refs", action="store_true", help="列出還沒有 refs 的項目")
     a = ap.parse_args()
     errors, warnings = validate()
     for w in warnings:
         print(f"WARN  {w}")
     for e in errors:
         print(f"ERROR {e}")
+    if a.refs:
+        for m in MISSING_REFS:
+            print(f"NOREF {m}")
     comps = C.load_components()
     n_sig = sum(len(c.get("signals", [])) for c in comps)
     print(f"\n{len(comps)} 張卡、{n_sig} 個訊號、{len(C.load_rules())} 條規則；{len(errors)} 個錯誤、{len(warnings)} 個警告")

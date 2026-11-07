@@ -34,7 +34,11 @@ extra_css:
 extra_javascript:
   - assets/calculator.js
 
+hooks:
+  - hooks/refs.py
+
 markdown_extensions:
+  - footnotes
   - attr_list
   - md_in_html
   - tables
@@ -49,21 +53,33 @@ markdown_extensions:
 
 nav:
   - 首頁: index.md
-  - 共同模型: model.md
+  - 共同模型與檢查流程: model.md
   - 元件卡:
-      - components/index.md
-      - Prometheus: components/prometheus.md
-      - Alertmanager: components/alertmanager.md
-      - vmalert: components/vmalert.md
-      - vmagent: components/vmagent.md
-      - VictoriaMetrics: components/victoriametrics.md
-      - VictoriaLogs: components/victorialogs.md
-      - 外部觀察者: components/observer.md
-      - Target：MySQL／MariaDB: components/mysqld_exporter.md
-      - Target：PostgreSQL: components/postgres_exporter.md
+      - 總覽: components/index.md
+      - Prometheus 體系:
+          - Prometheus: components/prometheus.md
+      - VictoriaMetrics 體系:
+          - vmagent: components/vmagent.md
+          - VictoriaMetrics: components/victoriametrics.md
+          - VictoriaLogs: components/victorialogs.md
+          - vmalert: components/vmalert.md
+      - 共用：通知與外部觀察:
+          - Alertmanager: components/alertmanager.md
+          - 外部觀察者: components/observer.md
+      - Target：資料庫:
+          - MySQL／MariaDB: components/mysqld_exporter.md
+          - PostgreSQL: components/postgres_exporter.md
+  - 內部架構:
+      - 總覽：單序點對照: architecture/index.md
+      - Prometheus: architecture/prometheus.md
+      - vmagent: architecture/vmagent.md
+      - VictoriaMetrics: architecture/victoriametrics.md
+      - VictoriaLogs: architecture/victorialogs.md
+      - vmalert: architecture/vmalert.md
+      - Alertmanager: architecture/alertmanager.md
+      - 資料庫 exporter: architecture/exporters.md
   - 寫 rule:
       - 信任契約: contracts.md
       - 契約計算器: tools/calculator.md
-      - Prometheus 架構: architecture/prometheus.md
   - 實驗報告: reports/index.md
   - 來源: reference/sources.md

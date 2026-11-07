@@ -12,7 +12,8 @@ alert-trust 回答兩個問題：
 | 你想做的事 | 從這裡開始 |
 |---|---|
 | 拿某個元件當監控 infra，要知道最少該看什麼 | [元件卡](components/index.md)的第 1 級訊號 |
-| 寫 rule 前確認 range、offset、`for` 夠不夠 | [契約計算器](tools/calculator.md)、[Prometheus 架構](architecture/prometheus.md) |
+| 寫 rule 前確認 range、offset、`for` 夠不夠 | [信任契約](contracts.md)、[契約計算器](tools/calculator.md) |
+| 想知道某個元件內部哪裡會卡住 | [內部架構總覽](architecture/index.md) |
 | 收到告警，想知道它在保護什麼 | 告警的 `runbook_url` 會連到對應的訊號 |
 | 檢查自己的環境缺什麼 | [檢查流程](model.md#flow) |
 
@@ -26,8 +27,10 @@ alert-trust 回答兩個問題：
 
 alert-trust 疊在這些專案之上：它們回答「元件健康嗎」「這條 rule 語法對嗎」，alert-trust 回答「整條鏈有沒有人在看」「尖峰時還能不能信」。
 
-## 證據等級
+## 證據與參考
 
-每個結論都標了證據：<span class="at-chip at-ev-tested">實測</span> 故障注入實驗量到、<span class="at-chip at-ev-code">讀碼</span> 由原始碼或官方文件確認、<span class="at-chip at-ev-upstream">上游</span> 來自上游官方規則、<span class="at-chip at-ev-inferred">推論</span> 尚未單獨驗證。
+每個結論都附參考，點註腳就能看到依據：原始碼連到**釘在版本與行號**的位置，實驗連到結果檔。標「未公開」的實驗，原始報告還含有特定環境的資訊，整理後會公開。
+
+證據分四級：<span class="at-chip at-ev-tested">實測</span> 故障注入實驗量到、<span class="at-chip at-ev-code">讀碼</span> 由原始碼或官方文件確認、<span class="at-chip at-ev-upstream">上游</span> 來自上游官方規則、<span class="at-chip at-ev-inferred">推論</span> 尚未單獨驗證。
 
 實驗都是小規模的單機 Docker，**驗證的是機制和訊號出現的順序**，門檻和時間不能直接套到大型環境。

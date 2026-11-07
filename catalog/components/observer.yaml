@@ -1,6 +1,7 @@
 id: observer
 name: 外部觀察者與 dead man's switch
 kind: architecture
+family: shared
 status: draft
 stages: [meta]
 versions_checked: []
@@ -12,9 +13,11 @@ silent_failures:
   - text: Prometheus 停機後 Alertmanager 仍重送 Watchdog 到 EndsAt，停機 3 分鐘內外部還收得到。
     evidence: tested
     source: art-prom
+    refs: [exp-prom-heartbeat]
   - text: 存活探測（/-/healthy、/-/ready）在 8 種故障裡只明確抓到 2 種。
     evidence: tested
     source: selfcheck
+    refs: [exp-prom-blackbox]
 
 contracts: [deadman-wait]
 
@@ -38,6 +41,7 @@ signals:
     evaluate_on: interview
     evidence: tested
     source: art-prom
+    refs: [exp-prom-heartbeat]
     upstream: { status: no }
     rules: []
 
@@ -60,6 +64,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-prom
+    refs: [exp-prom-blackbox]
     upstream: { status: no }
     rules: []
 
@@ -71,6 +76,7 @@ signals:
     evaluate_on: interview
     evidence: tested
     source: art-prom
+    refs: [exp-prom-heartbeat, p-alert-validuntil]
     upstream: { status: no }
     rules: []
     contract: deadman-wait
@@ -83,6 +89,7 @@ signals:
     evaluate_on: observer
     evidence: code
     source: art-prom
+    refs: [p-scrape-report]
     upstream: { status: no }
     applies_when: prometheus in env
     rules: []
@@ -95,6 +102,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-prom
+    refs: [exp-prom-k8s]
     upstream: { status: no }
     applies_when: kubernetes
     rules: []

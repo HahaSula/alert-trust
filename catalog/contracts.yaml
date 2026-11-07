@@ -6,57 +6,67 @@ contracts:
     violation: Tick 被丟掉，實際間隔 I 拉長，視窗內樣本變少
     evidence: code
     source: art-prom
+    refs: [p-scrape-run, vmag-ticker]
   range-window:
     applies_to: [prometheus]
     expr: "沒有 offset：R ≥ (2+k)·I + d；O ≥ d：R ≥ (2+k)·I"
     violation: 視窗內不足 2 個可見 sample，rate 回傳空，pending 被刪除，for 歸零
     evidence: tested
     source: art-prom
+    refs: [exp-prom-range, exp-prom-silent]
   group-within-interval:
     applies_to: [prometheus, vmalert]
     expr: "T ≤ E（預警門檻 0.8）"
     violation: 跳過 evaluation，同 group 的 alert 全部變慢，短暫事件可能漏掉
     evidence: tested
     source: art-prom
+    refs: [exp-prom-cpu, p-group-missed, vma-missed]
   lookback:
     applies_to: [prometheus]
     expr: "I + d < lookback（預設 5m）"
     violation: 不用 range 的 selector（如 up == 0）間歇回傳空
     evidence: upstream
     source: art-prom
+    refs: [exp-vm-faults]
   resend-endsat:
     applies_to: [prometheus, vmalert]
     expr: "續送中斷 < 4 × max(resend, E)"
     violation: Alertmanager 在 EndsAt 自動 resolve，通知 firing／resolved 交替（假 resolved）
     evidence: tested
     source: art-vm
+    refs: [p-alert-validuntil, exp-vm-resend]
   vm-range-window:
     applies_to: [vmalert]
     expr: "R ≥ I + L − D"
     violation: 視窗內沒有可見 sample，查詢回空，for 永遠歸零
     evidence: tested
     source: art-vm
+    refs: [exp-vm-matrix]
   vl-log-delay:
     applies_to: [vmalert, victorialogs]
     expr: "L ≤ D 保證；L > D + E 必定漏"
     violation: Log 進來時視窗已過，事件永遠不觸發，事後卻查得到
     evidence: tested
     source: art-vm
+    refs: [exp-vm-vl]
   am-failure-window:
     applies_to: [alertmanager]
     expr: "告警視窗 ≥ 2 × 最大 group_interval"
     violation: 失敗要整輪 flush 結束才計數，短視窗永遠抓不到單一 group 的持續失敗
     evidence: tested
     source: art-am
+    refs: [exp-am-window]
   deadman-wait:
     applies_to: [observer, alertmanager]
     expr: "DMS 等待 > 4 × max(resend, E) + repeat_interval + group_interval"
     violation: 等待太短會誤報；ruler 停機後 Alertmanager 仍會重送到 EndsAt
     evidence: tested
     source: art-prom
+    refs: [exp-prom-heartbeat]
   exporter-deadline:
     applies_to: [target]
     expr: "exporter 自己的查詢期限 < scrape_timeout < scrape_interval"
     violation: Prometheus 先放棄，up 變 0、所有 series 消失，看起來像 exporter 掛了；exporter 端的查詢還在跑
     evidence: tested
     source: pg-lab
+    refs: [exp-pg, exp-mysql, pg-timeout, my-offset]

@@ -24,6 +24,12 @@ EVALUATE_ON = {
     "interview": "問架構",
 }
 KINDS = {"infra", "target", "architecture"}
+FAMILIES = {
+    "prometheus": "Prometheus 體系",
+    "victoriametrics": "VictoriaMetrics 體系",
+    "shared": "共用：通知與外部觀察",
+    "database": "Target：資料庫",
+}
 STATUS = {"stable", "draft"}
 ID_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 COMPONENT_ID_RE = re.compile(r"^[a-z0-9_]+$")
@@ -62,6 +68,19 @@ def load_sources(root: str = ROOT) -> dict:
     return out
 
 
+def load_refs(root: str = ROOT) -> dict:
+    """catalog/refs-code.yaml (generated, pinned source lines) plus catalog/refs.yaml (experiments)."""
+    out: dict = {}
+    for name in ("refs-code.yaml", "refs.yaml"):
+        path = os.path.join(root, "catalog", name)
+        if os.path.exists(path):
+            for key, val in ((_load(path) or {}).get("refs") or {}).items():
+                if key in out:
+                    raise ValueError(f"{path}: ref key {key!r} 重複")
+                out[key] = val
+    return out
+
+
 def load_contracts(root: str = ROOT) -> dict:
     return _load(os.path.join(root, "catalog", "contracts.yaml"))["contracts"]
 
@@ -83,8 +102,10 @@ def load_components(root: str = ROOT) -> list[dict]:
             if isinstance(up.get("status"), bool):
                 up["status"] = "yes" if up["status"] else "no"
         out.append(card)
-    order = {"infra": 0, "architecture": 1, "target": 2}
-    return sorted(out, key=lambda c: (order.get(c.get("kind"), 9), c.get("_path")))
+    fam = list(FAMILIES)
+    within = {"prometheus": 0, "vmagent": 0, "victoriametrics": 1, "victorialogs": 2, "vmalert": 3, "alertmanager": 0, "observer": 1}
+    return sorted(out, key=lambda c: (fam.index(c["family"]) if c.get("family") in fam else 9,
+                                      within.get(c.get("id"), 5), c.get("_path")))
 
 
 def rule_files(root: str = ROOT) -> list[str]:

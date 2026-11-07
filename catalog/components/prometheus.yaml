@@ -1,6 +1,7 @@
 id: prometheus
 name: Prometheus
 kind: infra
+family: prometheus
 status: stable
 stages: [collect, store, query, evaluate, notify]
 versions_checked: ["2.51.2", "2.55.1", "3.13.5", "3.15.1"]
@@ -13,18 +14,23 @@ silent_failures:
   - text: Scrape 比 interval 慢時，for 反覆重置、alert 永遠不 firing；失敗計數為 0，up 為 1。
     evidence: tested
     source: art-prom
+    refs: [exp-prom-silent, p-alert-delete]
   - text: Rule group 耗時超過 interval 時跳過 evaluation，rule 的 health 仍是 ok。
     evidence: tested
     source: art-prom
+    refs: [exp-prom-cpu, p-group-missed]
   - text: 磁碟寫滿再釋放空間後，寫入看似恢復，WAL 已留下半筆紀錄，要到下一次 checkpoint 才失敗。
     evidence: tested
     source: art-prom
+    refs: [exp-prom-storage]
   - text: 可用空間被 compaction 用完時 reload 停止，retention 不再執行。
     evidence: tested
     source: art-prom
+    refs: [exp-prom-storage, p-db-run]
   - text: Crash loop 時 vector(1) 與不帶 for 的 heartbeat 每次啟動都立刻恢復。
     evidence: tested
     source: art-prom
+    refs: [exp-prom-heartbeat]
 
 contracts:
   - scrape-within-interval
@@ -42,6 +48,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-prom
+    refs: [exp-prom-heartbeat]
     upstream: { status: no, note: "mixin 預設由外部負責，沒有提供規則" }
     rules: [rules/prometheus/meta.yml#PrometheusDown, rules/prometheus/meta.yml#PrometheusMissing]
 
@@ -54,6 +61,7 @@ signals:
     judged_by: external
     evidence: tested
     source: art-prom
+    refs: [exp-prom-heartbeat, p-alert-validuntil]
     upstream: { status: partial, note: "kps 有 Watchdog；路由與外部接收端要自己確認" }
     rules: [rules/prometheus/canary.yml#Watchdog]
 
@@ -70,6 +78,7 @@ signals:
     silent_failure: mysqld_exporter 與 postgres_exporter 停機時，mysql_up == 0、pg_up == 0 都回傳空
     evidence: tested
     source: art-prom
+    refs: [exp-prom-heartbeat, exp-mysql, exp-pg]
     upstream: { status: no, note: "awesome 只有 Prometheus 自己的 job missing；DB mixin 只看 *_up" }
     rules:
       - rules/prometheus/canary.yml#DataHeartbeatMyJob
@@ -85,6 +94,7 @@ signals:
     judged_by: external
     evidence: tested
     source: art-prom
+    refs: [exp-prom-heartbeat]
     upstream: { status: no }
     rules: [rules/prometheus/canary.yml#KnownTrueCanary]
 
@@ -100,6 +110,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-prom
+    refs: [exp-prom-cpu, p-group-missed]
     upstream: { status: partial, note: "mixin 只有 missed；awesome 比值超過 1 才響，這時已經開始跳過" }
     rules:
       - rules/prometheus/meta.yml#RuleGroupNearInterval
@@ -115,6 +126,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-prom
+    refs: [exp-prom-storage]
     upstream: { status: yes }
     rules: [rules/prometheus/meta.yml#RuleEvaluationFailures]
 
@@ -129,6 +141,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-prom
+    refs: [exp-prom-heartbeat, p-notifier-sendall]
     upstream: { status: yes }
     rules:
       - rules/prometheus/meta.yml#NotificationsFailing
@@ -145,6 +158,7 @@ signals:
     silent_failure: 磁碟寫滿時 Watchdog 不受影響
     evidence: tested
     source: art-prom
+    refs: [exp-prom-storage, p-wal-log]
     upstream: { status: no, note: "mixin 與 awesome 都沒有" }
     rules: [rules/prometheus/meta.yml#WALWriteFailed]
 
@@ -156,6 +170,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-prom
+    refs: [exp-prom-heartbeat, exp-prom-mem]
     upstream: { status: partial, note: "mixin 只有 HA group 版；awesome 有" }
     rules: [rules/prometheus/meta.yml#PrometheusCrashLooping]
 
@@ -168,6 +183,7 @@ signals:
     silent_failure: Rule 沒報錯但永遠無法 firing 時，只有這個訊號會動
     evidence: tested
     source: art-prom
+    refs: [exp-prom-silent, p-alert-delete]
     upstream: { status: no }
     rules: [rules/prometheus/meta.yml#AlertForTimerResetting]
     contract: range-window
@@ -180,6 +196,7 @@ signals:
     evaluate_on: federate
     evidence: tested
     source: art-prom
+    refs: [exp-prom-silent, p-scrape-run]
     upstream: { status: partial, note: "awesome 用 interval_length 的 p90/p50 比值" }
     rules:
       - rules/prometheus/meta.yml#ScrapeSlowerThanInterval
@@ -197,6 +214,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-prom
+    refs: [exp-prom-query, p-engine-queue]
     upstream: { status: yes, note: "mixin PrometheusHighQueryLoad" }
     rules: [rules/prometheus/meta.yml#QueryQueueing]
 
@@ -213,6 +231,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-prom
+    refs: [exp-prom-storage, p-db-run]
     upstream: { status: partial, note: "mixin 只有「失敗」，沒有「停止」" }
     rules:
       - rules/prometheus/meta.yml#WALCheckpointFailing
@@ -228,6 +247,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-prom
+    refs: [exp-prom-mem, exp-prom-k8s]
     upstream: { status: no }
     rules: [rules/prometheus/meta.yml#PrometheusMemoryNearLimit]
 
@@ -244,6 +264,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-prom
+    refs: [exp-prom-storage, exp-prom-cpu]
     upstream: { status: partial }
     rules:
       - rules/prometheus/meta.yml#RetentionBehind

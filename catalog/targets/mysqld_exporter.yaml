@@ -1,9 +1,11 @@
 id: mysqld_exporter
 name: mysqld_exporter＋MariaDB/MySQL
 kind: target
+family: database
 status: draft
 stages: [source]
 versions_checked: ["mysqld_exporter 0.21.0", "MariaDB 11.4"]
+architecture: architecture/exporters.md
 role: >-
   Exporter 有三層「活著」：Prometheus 抓得到 exporter（up）、exporter 連得到資料庫（mysql_up）、
   每個 collector 的查詢成功（mysql_exporter_collector_success）。每一層壞掉時，下一層的 series 不是變 0，
@@ -17,16 +19,19 @@ silent_failures:
       都回傳空，不會觸發；只有 up{job="mysql"} == 0 與 absent(mysql_up) 成立。
     evidence: tested
     source: art-mysql
+    refs: [exp-mysql]
   - text: >-
       資料庫停機時 up 仍是 1，mysql_up 變 0，但 mysql_exporter_collector_success 整組消失，
       所以 collector_success == 0 在這時也不會響；mysql_* 只剩 mysql_up。
     evidence: tested
     source: art-mysql
+    refs: [exp-mysql]
   - text: >-
       資料庫主機停機時連線會一直等到 context 取消，scrape 耗時約等於 scrape_timeout 減 --timeout-offset（預設 0.25s），
       實驗中 scrape_timeout 4s 時是 3.75s。
     evidence: tested
     source: art-mysql
+    refs: [exp-mysql]
   - text: >-
       --timeout-offset 大於等於 scrape_timeout 時 exporter 只記一行錯誤、不設期限；Prometheus 先逾時，up 變 0，
       所有 mysql_* 消失，症狀從「資料庫停機」變成「exporter 停機」。
@@ -38,11 +43,13 @@ silent_failures:
       processlist collector 仍回報成功，但沒有 PROCESS 只看得到自己的連線，數字偏低。
     evidence: tested
     source: art-mysql
+    refs: [exp-mysql]
   - text: >-
       MariaDB 10.5.9 起 REPLICATION CLIENT 不足以執行 SHOW REPLICA STATUS，要另外給 SLAVE MONITOR；
       缺少時 slave_status 的 collector_success 變 0，所有 mysql_slave_status_* 消失，replication 規則回傳空。
     evidence: tested
     source: art-mysql
+    refs: [exp-mysql]
   - text: >-
       MySQL 8.4 移除 SHOW SLAVE STATUS，exporter 改用 SHOW REPLICA STATUS，metric 名稱跟著欄位變成
       mysql_slave_status_replica_io_running、seconds_behind_source。mixin 的 MySQLReplicationNotRunning、
@@ -59,6 +66,7 @@ silent_failures:
       wsrep_ready != 1 會對每台普通 MariaDB 誤報；被誤報洗過之後，真正的 Galera 告警容易被靜音。
     evidence: tested
     source: art-mysql
+    refs: [exp-mysql]
   - text: >-
       Collector 的版本門檻高於資料庫版本時直接跳過，不輸出 collector_success；透過 collect[] 參數或改啟動旗標
       少掉的 collector 也一樣，沒有任何失敗訊號。
@@ -90,6 +98,7 @@ signals:
     silent_failure: Exporter 停機時 mysql_up 消失，mixin 的 MySQLDown 不會響
     evidence: tested
     source: art-mysql
+    refs: [exp-mysql]
     upstream: { status: no, note: "mixin 與 awesome 都只看 mysql_up；kps 的 TargetDown 只在用 kps 時有" }
     rules: [rules/targets/mysql.yml#MySQLExporterDown, rules/targets/mysql.yml#MySQLExporterMissing]
 
@@ -101,6 +110,7 @@ signals:
     evaluate_on: self
     evidence: tested
     source: art-mysql
+    refs: [exp-mysql]
     upstream: { status: partial, note: "mixin 的 mysql_up != 1 與 awesome 的 mysql_up == 0 都有，但 exporter 停機時一起失效" }
     rules: [rules/targets/mysql.yml#MySQLNotReachable]
 
@@ -113,6 +123,7 @@ signals:
     silent_failure: 資料庫停機時 collector_success 整組消失（不是變 0），MySQLCollectorFailed（== 0）回傳空
     evidence: tested
     source: art-mysql
+    refs: [exp-mysql]
     upstream: { status: no, note: "mixin 與 awesome 都沒有" }
     rules: [rules/targets/mysql.yml#MySQLCollectorsMissing]
 
@@ -125,6 +136,7 @@ signals:
     silent_failure: 資料庫停機時整組消失；被跳過的 collector 不會出現
     evidence: tested
     source: art-mysql
+    refs: [exp-mysql]
     upstream: { status: no, note: "mixin 與 awesome 都沒有" }
     rules: [rules/targets/mysql.yml#MySQLCollectorFailed]
 
@@ -154,6 +166,7 @@ signals:
     silent_failure: 權限被收回、RESET REPLICA ALL、升版改名時，所有 replication 規則同時回傳空
     evidence: tested
     source: art-mysql
+    refs: [exp-mysql]
     upstream: { status: no }
     rules: [rules/targets/mysql.yml#MySQLReplicaStatusMissing]
 
@@ -180,6 +193,7 @@ signals:
     evaluate_on: inventory
     evidence: tested
     source: art-mysql
+    refs: [exp-mysql]
     upstream: { status: partial, note: "README 列出權限與 MAX_USER_CONNECTIONS 建議，沒有對應的檢查或規則" }
     rules: []
 
@@ -205,6 +219,7 @@ signals:
     evaluate_on: self
     evidence: tested
     source: art-mysql
+    refs: [exp-mysql]
     upstream: { status: no }
     rules: [rules/targets/mysql.yml#MySQLScrapeNearTimeout, rules/targets/mysql.yml#MySQLCollectorSlow]
     contract: exporter-deadline
@@ -269,6 +284,7 @@ signals:
     applies_when: mariadb galera
     evidence: tested
     source: art-mysql
+    refs: [exp-mysql]
     upstream: { status: partial, note: "mixin 與 awesome 有，但沒用 wsrep_on 過濾，普通 MariaDB 會誤報" }
     rules: [rules/targets/mysql.yml#MySQLGaleraNotReady, rules/targets/mysql.yml#MySQLGaleraOutOfSync]
 

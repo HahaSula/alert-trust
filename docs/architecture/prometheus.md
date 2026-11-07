@@ -28,8 +28,8 @@ flowchart LR
 
 | 項目 | 行為 |
 |---|---|
-| 同一個 target 內 | **單序**：抓取、parse、relabel、append、commit 依序跑；沒跑完下一輪不會開始，tick 被丟掉 |
-| 不同 target 之間 | 並行，每個 target 一條 goroutine，用 offset 錯開 |
+| 同一個 target 內 | **單序**：抓取、parse、relabel、append、commit 依序跑；沒跑完下一輪不會開始，tick 被丟掉[^p-scrape-run][^p-scrape-report] |
+| 不同 target 之間 | 並行，每個 target 一條 goroutine，用 offset 錯開[^p-scrape-sync] |
 | 併行上限 | 沒有上限，受 CPU 限制 |
 | 卡住時影響誰 | 只影響該 target，除非搶 CPU、記憶體或 WAL |
 
@@ -42,38 +42,38 @@ flowchart LR
 
 ## WAL 寫入 {#wal}
 
-所有 scrape 和 rule 的 commit 都經過同一把鎖（`WL.Log`），全域單序。Segment 切換的 fsync 由另一條 goroutine 非同步執行，所以平常只寫 page cache，很快。
+所有 scrape 和 rule 的 commit 都經過同一把鎖（`WL.Log`），全域單序。[^p-wal-log]Segment 切換的 fsync 由另一條 goroutine 非同步執行，所以平常只寫 page cache，很快。
 
 - 卡住時影響**全部寫入**。
-- 磁碟寫滿時 scrape 和 rule 結果同時寫不進去，`prometheus_tsdb_wal_writes_failed_total` 增加。<span class="at-chip at-ev-tested">實測</span>
-- 寫滿再釋放空間後，WAL 可能留下半筆紀錄，下一次 checkpoint 才失敗。<span class="at-chip at-ev-tested">實測</span>
+- 磁碟寫滿時 scrape 和 rule 結果同時寫不進去，`prometheus_tsdb_wal_writes_failed_total` 增加。<span class="at-chip at-ev-tested">實測</span>[^exp-prom-storage]
+- 寫滿再釋放空間後，WAL 可能留下半筆紀錄，下一次 checkpoint 才失敗。<span class="at-chip at-ev-tested">實測</span>[^exp-prom-storage]
 
 ## Head {#head}
 
-Series 表分 16384 個 stripe，每條 series 一把鎖，chunk 落盤是單一背景佇列。只影響碰到相同 stripe 或 series 的操作。
+Series 表分 16384 個 stripe[^p-head-stripe]，每條 series 一把鎖，chunk 落盤是單一背景佇列。只影響碰到相同 stripe 或 series 的操作。
 
-重啟時要 replay WAL，**replay 期間 rule 不執行**，之後 `for` 小於 `--rules.alert.for-grace-period`（預設 10m）的 alert 還要重新計時。
+重啟時要 replay WAL，**replay 期間 rule 不執行**，之後 `for` 小於 `--rules.alert.for-grace-period`（預設 10m）的 alert 還要重新計時。[^p-forgrace]
 
 ## 查詢引擎 {#query-engine}
 
 | 項目 | 行為 |
 |---|---|
 | 一個查詢內 | 求值在同一條 goroutine |
-| 查詢之間 | 有上限的並行；**rule 和 API 搶同一組 slot**，解析與執行各搶一次 |
-| 併行上限 | `--query.max-concurrency`，預設 20 |
+| 查詢之間 | 有上限的並行；**rule 和 API 搶同一組 slot**，解析與執行各搶一次[^p-engine-queue] |
+| 併行上限 | `--query.max-concurrency`，預設 20[^p-maxconc] |
 | 卡住時影響誰 | Rule 和 API 都排隊 |
 
-Grafana 的重查詢會讓 rule group 變慢，實驗中從幾秒變成 40 秒，scrape 不受影響。<span class="at-chip at-ev-tested">實測</span>
+Grafana 的重查詢會讓 rule group 變慢，實驗中從幾秒變成 40 秒，scrape 不受影響。<span class="at-chip at-ev-tested">實測</span>[^exp-prom-query]
 
 ## Rule group {#rule-group}
 
 | 項目 | 行為 |
 |---|---|
-| 同一個 group 內 | **單序**：rule 依定義順序一條接一條跑，相鄰兩輪不重疊 |
+| 同一個 group 內 | **單序**：rule 依定義順序一條接一條跑，相鄰兩輪不重疊[^p-group-run][^p-group-eval] |
 | 不同 group 之間 | 並行，每個 group 一條 goroutine |
 | 卡住時影響誰 | 同 group 的所有 alert；不影響其他 group，除非搶查詢 slot |
 
-- 關鍵 alert 獨立成小 group。實驗中 CPU 降到 0.15 核時，獨立小 group 的偵測延遲不變，同一條 alert 放在重 group 延遲變近兩倍，還會漏事件。<span class="at-chip at-ev-tested">實測</span>
+- 關鍵 alert 獨立成小 group。實驗中 CPU 降到 0.15 核時，獨立小 group 的偵測延遲不變，同一條 alert 放在重 group 延遲變近兩倍，還會漏事件。<span class="at-chip at-ev-tested">實測</span>[^exp-prom-cpu]
 - Alert 依賴 recording rule 時放同一個 group，順序在後。
 - `concurrent-rule-eval` 在 2.x 有依賴判斷問題（3.1 修正），不要當第一選擇。
 
@@ -83,27 +83,27 @@ Grafana 的重查詢會讓 rule group 變慢，實驗中從幾秒變成 40 秒�
 
 在 group 的 goroutine 裡更新，存在記憶體，定期寫入 `ALERTS_FOR_STATE`。
 
-- **查詢回傳空結果時 pending 被刪除，`for` 重算。**
+- **查詢回傳空結果時 pending 被刪除，`for` 重算。**[^p-alert-delete]
 - 查詢失敗或 evaluation 被跳過時 pending **不會**被刪除。
-- 所以「rule 沒報錯但永遠無法 firing」只有 `changes(ALERTS_FOR_STATE[1h])` 看得出來。
+- 所以「rule 沒報錯但永遠無法 firing」只有 `changes(ALERTS_FOR_STATE[1h])` 看得出來。[^exp-prom-silent]
 
 ## Notifier {#notifier}
 
-2.x 到 3.9：一條 queue、一條送出迴圈，每批最多 64 筆（3.4 起預設 256，可調）。同一批同時送給所有 Alertmanager，**等全部回應才送下一批**，所以一台 Alertmanager 慢會拖累所有 alert；逾時預設 10 秒。3.10 起每台 Alertmanager 各一條 queue。
+2.x 到 3.9：一條 queue、一條送出迴圈，每批最多 64 筆（3.4 起預設 256，可調）。同一批同時送給所有 Alertmanager，**等全部回應才送下一批**[^p-notifier-batch][^p-notifier-wait]，所以一台 Alertmanager 慢會拖累所有 alert；逾時預設 10 秒。3.10 起每台 Alertmanager 各一條 queue。[^p3-notifier-queue]
 
-送出的 alert 帶 `EndsAt = 評估時間 + 4 × max(resend-delay, E)`，見[續送契約](../contracts.md#resend-endsat)。
+送出的 alert 帶 `EndsAt = 評估時間 + 4 × max(resend-delay, E)`[^p-alert-validuntil][^p-resenddelay]，見[續送契約](../contracts.md#resend-endsat)。
 
 ## Alertmanager 的分組 {#alertmanager-dispatch}
 
-每個 alert group 一條 goroutine，依 `group_interval` 依序送出；同 group 的多個 receiver 並行，失敗會重試。接收端慢只影響用到它的 group。細節見 [Alertmanager 元件卡](../components/alertmanager.md)。
+每個 alert group 一條 goroutine，依 `group_interval` 依序送出；同 group 的多個 receiver 並行，失敗會重試。接收端慢只影響用到它的 group。細節見 [Alertmanager 架構](alertmanager.md)。
 
 ## TSDB 維護 {#tsdb-maintenance}
 
-Reload、retention、head compaction、block compaction、WAL 截斷都在**同一條 goroutine**（`DB.run`）。
+Reload、retention、head compaction、block compaction、WAL 截斷都在**同一條 goroutine**（`DB.run`）。[^p-db-run]
 
 - Compaction 慢或失敗，retention 跟著延後或停止。
-- 可用空間被 compaction 用完時 reload 會停止，retention 不再執行；磁碟突然寫滿時 reload 反而正常，但沒有新 block，time retention 凍結。<span class="at-chip at-ev-tested">實測</span>
-- Reload timer 會被 compaction 訊號重置的問題到 3.13.5 仍在。<span class="at-chip at-ev-tested">實測</span>
+- 可用空間被 compaction 用完時 reload 會停止，retention 不再執行；磁碟突然寫滿時 reload 反而正常，但沒有新 block，time retention 凍結。<span class="at-chip at-ev-tested">實測</span>[^exp-prom-storage]
+- Reload timer 會被 compaction 訊號重置的問題到 3.13.5 仍在。<span class="at-chip at-ev-tested">實測</span>[^exp-prom-storage]
 
 ## 升級會改變這些嗎
 

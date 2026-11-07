@@ -1,0 +1,488 @@
+{
+ "p-scrape-run": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "scrape/scrape.go",
+  "func (sl *scrapeLoop) run("
+ ],
+ "p-scrape-report": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "scrape/scrape.go",
+  "func (sl *scrapeLoop) scrapeAndReport("
+ ],
+ "p-scrape-sync": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "scrape/scrape.go",
+  "func (sp *scrapePool) sync("
+ ],
+ "p-wal-log": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "tsdb/wlog/wlog.go",
+  "func (w *WL) Log("
+ ],
+ "p-head-stripe": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "tsdb/head.go",
+  "DefaultStripeSize ="
+ ],
+ "p-group-run": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "rules/group.go",
+  "func (g *Group) run("
+ ],
+ "p-group-eval": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "rules/group.go",
+  "func (g *Group) Eval("
+ ],
+ "p-group-missed": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "rules/group.go",
+  "if missed > 0"
+ ],
+ "p-alert-delete": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "rules/alerting.go",
+  "delete(r.active, fp)"
+ ],
+ "p-alert-validuntil": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "rules/alerting.go",
+  "4 * delta"
+ ],
+ "p-engine-queue": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "promql/engine.go",
+  "func (ng *Engine) queueActive("
+ ],
+ "p-maxconc": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "cmd/prometheus/main.go",
+  "query.max-concurrency"
+ ],
+ "p-resenddelay": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "cmd/prometheus/main.go",
+  "rules.alert.resend-delay"
+ ],
+ "p-forgrace": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "cmd/prometheus/main.go",
+  "rules.alert.for-grace-period"
+ ],
+ "p-notifier-batch": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "notifier/notifier.go",
+  "maxBatchSize = 64"
+ ],
+ "p-notifier-sendall": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "notifier/notifier.go",
+  "func (n *Manager) sendAll("
+ ],
+ "p-notifier-wait": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "notifier/notifier.go",
+  "wg.Wait()"
+ ],
+ "p-db-run": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "tsdb/db.go",
+  "func (db *DB) run("
+ ],
+ "p3-notifier-queue": [
+  "prometheus/prometheus",
+  "v3.13.5",
+  "notifier/alertmanagerset.go",
+  "sendLoops  map[string]*sendLoop"
+ ],
+ "am-mem-put": [
+  "prometheus/alertmanager",
+  "v0.29.0",
+  "provider/mem/mem.go",
+  "func (a *Alerts) Put("
+ ],
+ "am-mem-chan": [
+  "prometheus/alertmanager",
+  "v0.29.0",
+  "provider/mem/mem.go",
+  "alertChannelLength"
+ ],
+ "am-aggr-run": [
+  "prometheus/alertmanager",
+  "v0.29.0",
+  "dispatch/dispatch.go",
+  "func (ag *aggrGroup) run("
+ ],
+ "am-pipeline": [
+  "prometheus/alertmanager",
+  "v0.29.0",
+  "notify/notify.go",
+  "func (pb *PipelineBuilder) New("
+ ],
+ "am-fanout": [
+  "prometheus/alertmanager",
+  "v0.29.0",
+  "notify/notify.go",
+  "type FanoutStage"
+ ],
+ "am-dedup": [
+  "prometheus/alertmanager",
+  "v0.29.0",
+  "notify/notify.go",
+  "type DedupStage struct"
+ ],
+ "am-retry": [
+  "prometheus/alertmanager",
+  "v0.29.0",
+  "notify/notify.go",
+  "type RetryStage struct"
+ ],
+ "am-wait": [
+  "prometheus/alertmanager",
+  "v0.29.0",
+  "notify/notify.go",
+  "type WaitStage struct"
+ ],
+ "am-peertimeout": [
+  "prometheus/alertmanager",
+  "v0.29.0",
+  "cmd/alertmanager/main.go",
+  "cluster.peer-timeout"
+ ],
+ "am-healthy": [
+  "prometheus/alertmanager",
+  "v0.29.0",
+  "ui/web.go",
+  "/-/healthy"
+ ],
+ "am-reload": [
+  "prometheus/alertmanager",
+  "v0.29.0",
+  "cmd/alertmanager/main.go",
+  "configCoordinator.Subscribe("
+ ],
+ "vma-evaldelay": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "app/vmalert/rule/group.go",
+  "rule.evalDelay"
+ ],
+ "vma-conc-default": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "app/vmalert/rule/group.go",
+  "if g.Concurrency < 1"
+ ],
+ "vma-missed": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "app/vmalert/rule/group.go",
+  "missed := (offset / g.Interval) - 1"
+ ],
+ "vma-execconc": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "app/vmalert/rule/group.go",
+  "func (e *executor) execConcurrently("
+ ],
+ "vma-exec-send": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "app/vmalert/rule/group.go",
+  "notifierErr := notifier.Send("
+ ],
+ "vma-start": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "app/vmalert/rule/group.go",
+  "func (g *Group) Start("
+ ],
+ "vma-notify-send": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "app/vmalert/notifier/init.go",
+  "func Send("
+ ],
+ "vma-notify-timeout": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "app/vmalert/notifier/init.go",
+  "notifier.sendTimeout"
+ ],
+ "vma-resend": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "app/vmalert/rule/group.go",
+  "rule.resendDelay"
+ ],
+ "vma-rw-retry": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "app/vmalert/remotewrite/client.go",
+  "remoteWrite.retryMaxTime"
+ ],
+ "vma-rw-queue": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "app/vmalert/remotewrite/init.go",
+  "remoteWrite.maxQueueSize"
+ ],
+ "vma-querystep": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "app/vmalert/datasource/init.go",
+  "datasource.queryStep"
+ ],
+ "vma-rr-lookback": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "app/vmalert/rule/group.go",
+  "remoteRead.lookback"
+ ],
+ "vmag-run": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "lib/promscrape/scrapework.go",
+  "func (sw *scrapeWork) run("
+ ],
+ "vmag-randsleep": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "lib/promscrape/scrapework.go",
+  "randSleep = uint64("
+ ],
+ "vmag-ticker": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "lib/promscrape/scrapework.go",
+  "ticker = time.NewTicker(scrapeInterval)"
+ ],
+ "vmag-drift": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "lib/promscrape/scrapework.go",
+  "d/float64(scrapeInterval.Milliseconds()) > 0.1"
+ ],
+ "vmag-queues": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "app/vmagent/remotewrite/remotewrite.go",
+  "\"remoteWrite.queues\""
+ ],
+ "vmag-maxdisk": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "app/vmagent/remotewrite/remotewrite.go",
+  "\"remoteWrite.maxDiskUsagePerURL\""
+ ],
+ "vmag-nodisk": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "app/vmagent/remotewrite/remotewrite.go",
+  "\"remoteWrite.disableOnDiskQueue\""
+ ],
+ "vmi-rf": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0-cluster",
+  "app/vminsert/netstorage/netstorage.go",
+  "flag.Int(\"replicationFactor\""
+ ],
+ "vmi-reroute": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0-cluster",
+  "app/vminsert/netstorage/netstorage.go",
+  "\"disableRerouting\""
+ ],
+ "vmi-drop": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0-cluster",
+  "app/vminsert/netstorage/netstorage.go",
+  "\"dropSamplesOnOverload\""
+ ],
+ "vmi-reroute-unavail": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0-cluster",
+  "app/vminsert/netstorage/netstorage.go",
+  "\"disableReroutingOnUnavailable\""
+ ],
+ "vmi-rf-auto": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0-cluster",
+  "app/vminsert/netstorage/netstorage.go",
+  "disabling slowness rerouting"
+ ],
+ "vms-maxconc": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0-cluster",
+  "app/vmselect/main.go",
+  "func getDefaultMaxConcurrentRequests("
+ ],
+ "vms-queue": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0-cluster",
+  "app/vmselect/main.go",
+  "\"search.maxQueueDuration\""
+ ],
+ "vms-skipslow": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0-cluster",
+  "app/vmselect/netstorage/netstorage.go",
+  "\"search.skipSlowReplicas\""
+ ],
+ "vms-partial": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0-cluster",
+  "app/vmselect/netstorage/netstorage.go",
+  "isPartial"
+ ],
+ "vms-denypartial": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "lib/httputil/bool.go",
+  "func GetBool("
+ ],
+ "vms-latency": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0-cluster",
+  "app/vmselect/prometheus/prometheus.go",
+  "search.latencyOffset"
+ ],
+ "vst-minfree": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0-cluster",
+  "app/vmstorage/main.go",
+  "storage.minFreeDiskSpaceBytes"
+ ],
+ "vst-readonly": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "lib/storage/storage.go",
+  "s.isReadOnly.Store(freeSpaceBytes < freeDiskSpaceLimitBytes)"
+ ],
+ "my-pool-default": [
+  "prometheus/mysqld_exporter",
+  "v0.21.0",
+  "collector/exporter.go",
+  "maxOpenConns: 2"
+ ],
+ "my-newinstance": [
+  "prometheus/mysqld_exporter",
+  "v0.21.0",
+  "collector/exporter.go",
+  "instance, err := newInstance("
+ ],
+ "my-scrapers-go": [
+  "prometheus/mysqld_exporter",
+  "v0.21.0",
+  "collector/exporter.go",
+  "wg.Go(func() {"
+ ],
+ "my-up": [
+  "prometheus/mysqld_exporter",
+  "v0.21.0",
+  "collector/exporter.go",
+  "ch <- prometheus.MustNewConstMetric(mysqlUp"
+ ],
+ "my-offset": [
+  "prometheus/mysqld_exporter",
+  "v0.21.0",
+  "mysqld_exporter.go",
+  "\"timeout-offset\""
+ ],
+ "my-maxopen-flag": [
+  "prometheus/mysqld_exporter",
+  "v0.21.0",
+  "mysqld_exporter.go",
+  "\"exporter.max_open_connections\""
+ ],
+ "my-querytimeout": [
+  "prometheus/mysqld_exporter",
+  "v0.21.0",
+  "mysqld_exporter.go",
+  "\"exporter.query_timeout\""
+ ],
+ "pg-collect": [
+  "prometheus-community/postgres_exporter",
+  "v0.20.1",
+  "collector/collector.go",
+  "func (p PostgresCollector) Collect("
+ ],
+ "pg-timeout": [
+  "prometheus-community/postgres_exporter",
+  "v0.20.1",
+  "collector/collector.go",
+  "context.WithTimeout(context.Background(), p.CollectionTimeout)"
+ ],
+ "pg-goroutines": [
+  "prometheus-community/postgres_exporter",
+  "v0.20.1",
+  "collector/collector.go",
+  "go func(name string, c Collector) {"
+ ],
+ "pg-maxopen": [
+  "prometheus-community/postgres_exporter",
+  "v0.20.1",
+  "collector/instance.go",
+  "db.SetMaxOpenConns(1)"
+ ],
+ "pg-timeout-flag": [
+  "prometheus-community/postgres_exporter",
+  "v0.20.1",
+  "cmd/postgres_exporter/main.go",
+  "collection-timeout"
+ ],
+ "pg-probe": [
+  "prometheus-community/postgres_exporter",
+  "v0.20.1",
+  "cmd/postgres_exporter/probe.go",
+  "TODO"
+ ],
+ "op-vmalert-selector": [
+  "VictoriaMetrics/operator",
+  "v0.75.2",
+  "docs/resources/vmalert.md",
+  "are both undefined, nothing is selected"
+ ],
+ "vma-eval-samples": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "app/vmalert/rule/alerting.go",
+  "vmalert_alerting_rules_last_evaluation_samples"
+ ],
+ "vma-evalalign": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "app/vmalert/rule/group.go",
+  "if g.evalAlignment == nil || *g.evalAlignment"
+ ],
+ "p-lookback": [
+  "prometheus/prometheus",
+  "v2.51.2",
+  "cmd/prometheus/main.go",
+  "query.lookback-delta"
+ ],
+ "vm-metricsql-prev": [
+  "VictoriaMetrics/VictoriaMetrics",
+  "v1.155.0",
+  "docs/victoriametrics/MetricsQL.md",
+  "before the lookbehind window"
+ ]
+}

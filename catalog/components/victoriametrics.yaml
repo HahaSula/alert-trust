@@ -1,9 +1,11 @@
 id: victoriametrics
 name: VictoriaMetrics single／cluster
 kind: infra
+family: victoriametrics
 status: draft
 stages: [store, query]
 versions_checked: ["v1.155.0"]
+architecture: architecture/victoriametrics.md
 role: >-
   儲存與查詢。Cluster 版多了「部分節點故障」這種狀態，預設回傳不完整的答案、HTTP 200。
 
@@ -11,15 +13,19 @@ silent_failures:
   - text: Cluster RF=1 時一台 vmstorage 掛掉會 partial response，increase 類的「數量太低」規則假觸發 9 分鐘。
     evidence: tested
     source: art-vm
+    refs: [exp-vm-faults, vms-partial]
   - text: vmstorage 唯讀時 rule 不報錯；官方規則沒有引用 vm_storage_is_read_only。
     evidence: tested
     source: art-vm
+    refs: [exp-vm-faults, vst-readonly]
   - text: 官方文件寫的 denyPartialResponse 參數名稱沒有作用，vmselect 只認 deny_partial_response。
     evidence: tested
     source: art-vm
+    refs: [exp-vm-faults, vms-denypartial]
   - text: 磁碟突然 0 byte 時切唯讀後仍會 panic。
     evidence: tested
     source: art-vm
+    refs: [exp-vm-faults, vst-minfree]
 
 contracts: []
 
@@ -32,6 +38,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-vm
+    refs: [exp-vm-faults]
     upstream: { status: partial, note: "實測 single 的 job 名稱不符，ServiceDown 從未觸發" }
     rules: [rules/victoriametrics/meta.yml#MetaTargetDown]
 
@@ -43,6 +50,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-vm
+    refs: [exp-vm-faults, vst-readonly]
     upstream: { status: no, note: "只有 3 天預測" }
     rules: [rules/victoriametrics/meta.yml#MetaStorageReadOnly]
 
@@ -54,6 +62,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-vm
+    refs: [exp-vm-faults]
     upstream: { status: no }
     applies_when: cluster
     rules: [rules/victoriametrics/meta.yml#MetaPartialResponses]
@@ -66,6 +75,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-vm
+    refs: [exp-vm-faults]
     upstream: { status: partial, note: "RPCErrors 看錯誤數" }
     applies_when: cluster
     rules: [rules/victoriametrics/meta.yml#MetaStorageUnreachable]
@@ -89,6 +99,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-vm
+    refs: [exp-vm-faults, vms-queue]
     upstream: { status: yes }
     rules: []
 
@@ -100,5 +111,6 @@ signals:
     evaluate_on: observer
     evidence: code
     source: art-vm
+    refs: [vmi-drop]
     upstream: { status: partial }
     rules: []

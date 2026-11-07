@@ -1,0 +1,570 @@
+# 由 tools/gen_code_refs.py 依 catalog/refs-code.src.json 產生，不要手改。
+# 每一筆是釘在版本與行號的原始碼位置。
+refs:
+  p-scrape-run:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "scrape/scrape.go"
+    line: 1188
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/scrape/scrape.go#L1188"
+  p-scrape-report:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "scrape/scrape.go"
+    line: 1260
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/scrape/scrape.go#L1260"
+  p-scrape-sync:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "scrape/scrape.go"
+    line: 422
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/scrape/scrape.go#L422"
+  p-wal-log:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "tsdb/wlog/wlog.go"
+    line: 672
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/tsdb/wlog/wlog.go#L672"
+  p-head-stripe:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "tsdb/head.go"
+    line: 1796
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/tsdb/head.go#L1796"
+  p-group-run:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "rules/group.go"
+    line: 167
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/rules/group.go#L167"
+  p-group-eval:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "rules/group.go"
+    line: 436
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/rules/group.go#L436"
+  p-group-missed:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "rules/group.go"
+    line: 225
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/rules/group.go#L225"
+  p-alert-delete:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "rules/alerting.go"
+    line: 463
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/rules/alerting.go#L463"
+  p-alert-validuntil:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "rules/alerting.go"
+    line: 561
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/rules/alerting.go#L561"
+  p-engine-queue:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "promql/engine.go"
+    line: 659
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/promql/engine.go#L659"
+  p-maxconc:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "cmd/prometheus/main.go"
+    line: 441
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/cmd/prometheus/main.go#L441"
+  p-resenddelay:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "cmd/prometheus/main.go"
+    line: 417
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/cmd/prometheus/main.go#L417"
+  p-forgrace:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "cmd/prometheus/main.go"
+    line: 414
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/cmd/prometheus/main.go#L414"
+  p-notifier-batch:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "notifier/notifier.go"
+    line: 275
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/notifier/notifier.go#L275"
+  p-notifier-sendall:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "notifier/notifier.go"
+    line: 453
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/notifier/notifier.go#L453"
+  p-notifier-wait:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "notifier/notifier.go"
+    line: 564
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/notifier/notifier.go#L564"
+  p-db-run:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "tsdb/db.go"
+    line: 986
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/tsdb/db.go#L986"
+  p3-notifier-queue:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "notifier/alertmanagerset.go"
+    line: 45
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/notifier/alertmanagerset.go#L45"
+  am-mem-put:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.29.0"
+    file: "provider/mem/mem.go"
+    line: 219
+    url: "https://github.com/prometheus/alertmanager/blob/v0.29.0/provider/mem/mem.go#L219"
+  am-mem-chan:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.29.0"
+    file: "provider/mem/mem.go"
+    line: 30
+    url: "https://github.com/prometheus/alertmanager/blob/v0.29.0/provider/mem/mem.go#L30"
+  am-aggr-run:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.29.0"
+    file: "dispatch/dispatch.go"
+    line: 439
+    url: "https://github.com/prometheus/alertmanager/blob/v0.29.0/dispatch/dispatch.go#L439"
+  am-pipeline:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.29.0"
+    file: "notify/notify.go"
+    line: 396
+    url: "https://github.com/prometheus/alertmanager/blob/v0.29.0/notify/notify.go#L396"
+  am-fanout:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.29.0"
+    file: "notify/notify.go"
+    line: 489
+    url: "https://github.com/prometheus/alertmanager/blob/v0.29.0/notify/notify.go#L489"
+  am-dedup:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.29.0"
+    file: "notify/notify.go"
+    line: 611
+    url: "https://github.com/prometheus/alertmanager/blob/v0.29.0/notify/notify.go#L611"
+  am-retry:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.29.0"
+    file: "notify/notify.go"
+    line: 754
+    url: "https://github.com/prometheus/alertmanager/blob/v0.29.0/notify/notify.go#L754"
+  am-wait:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.29.0"
+    file: "notify/notify.go"
+    line: 588
+    url: "https://github.com/prometheus/alertmanager/blob/v0.29.0/notify/notify.go#L588"
+  am-peertimeout:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.29.0"
+    file: "cmd/alertmanager/main.go"
+    line: 168
+    url: "https://github.com/prometheus/alertmanager/blob/v0.29.0/cmd/alertmanager/main.go#L168"
+  am-healthy:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.29.0"
+    file: "ui/web.go"
+    line: 75
+    url: "https://github.com/prometheus/alertmanager/blob/v0.29.0/ui/web.go#L75"
+  am-reload:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.29.0"
+    file: "cmd/alertmanager/main.go"
+    line: 418
+    url: "https://github.com/prometheus/alertmanager/blob/v0.29.0/cmd/alertmanager/main.go#L418"
+  vma-evaldelay:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/group.go"
+    line: 38
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/group.go#L38"
+  vma-conc-default:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/group.go"
+    line: 146
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/group.go#L146"
+  vma-missed:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/group.go"
+    line: 475
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/group.go#L475"
+  vma-execconc:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/group.go"
+    line: 735
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/group.go#L735"
+  vma-exec-send:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/group.go"
+    line: 810
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/group.go#L810"
+  vma-start:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/group.go"
+    line: 332
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/group.go#L332"
+  vma-notify-send:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/notifier/init.go"
+    line: 287
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/notifier/init.go#L287"
+  vma-notify-timeout:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/notifier/init.go"
+    line: 66
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/notifier/init.go#L66"
+  vma-resend:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/group.go"
+    line: 35
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/group.go#L35"
+  vma-rw-retry:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/remotewrite/client.go"
+    line: 47
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/remotewrite/client.go#L47"
+  vma-rw-queue:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/remotewrite/init.go"
+    line: 39
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/remotewrite/init.go#L39"
+  vma-querystep:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/datasource/init.go"
+    line: 52
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/datasource/init.go#L52"
+  vma-rr-lookback:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/group.go"
+    line: 42
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/group.go#L42"
+  vmag-run:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "lib/promscrape/scrapework.go"
+    line: 284
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/lib/promscrape/scrapework.go#L284"
+  vmag-randsleep:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "lib/promscrape/scrapework.go"
+    line: 310
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/lib/promscrape/scrapework.go#L310"
+  vmag-ticker:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "lib/promscrape/scrapework.go"
+    line: 333
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/lib/promscrape/scrapework.go#L333"
+  vmag-drift:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "lib/promscrape/scrapework.go"
+    line: 373
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/lib/promscrape/scrapework.go#L373"
+  vmag-queues:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmagent/remotewrite/remotewrite.go"
+    line: 66
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmagent/remotewrite/remotewrite.go#L66"
+  vmag-maxdisk:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmagent/remotewrite/remotewrite.go"
+    line: 75
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmagent/remotewrite/remotewrite.go#L75"
+  vmag-nodisk:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmagent/remotewrite/remotewrite.go"
+    line: 103
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmagent/remotewrite/remotewrite.go#L103"
+  vmi-rf:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0-cluster"
+    file: "app/vminsert/netstorage/netstorage.go"
+    line: 31
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0-cluster/app/vminsert/netstorage/netstorage.go#L31"
+  vmi-reroute:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0-cluster"
+    file: "app/vminsert/netstorage/netstorage.go"
+    line: 34
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0-cluster/app/vminsert/netstorage/netstorage.go#L34"
+  vmi-drop:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0-cluster"
+    file: "app/vminsert/netstorage/netstorage.go"
+    line: 35
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0-cluster/app/vminsert/netstorage/netstorage.go#L35"
+  vmi-reroute-unavail:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0-cluster"
+    file: "app/vminsert/netstorage/netstorage.go"
+    line: 42
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0-cluster/app/vminsert/netstorage/netstorage.go#L42"
+  vmi-rf-auto:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0-cluster"
+    file: "app/vminsert/netstorage/netstorage.go"
+    line: 525
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0-cluster/app/vminsert/netstorage/netstorage.go#L525"
+  vms-maxconc:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0-cluster"
+    file: "app/vmselect/main.go"
+    line: 86
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0-cluster/app/vmselect/main.go#L86"
+  vms-queue:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0-cluster"
+    file: "app/vmselect/main.go"
+    line: 58
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0-cluster/app/vmselect/main.go#L58"
+  vms-skipslow:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0-cluster"
+    file: "app/vmselect/netstorage/netstorage.go"
+    line: 52
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0-cluster/app/vmselect/netstorage/netstorage.go#L52"
+  vms-partial:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0-cluster"
+    file: "app/vmselect/netstorage/netstorage.go"
+    line: 953
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0-cluster/app/vmselect/netstorage/netstorage.go#L953"
+  vms-denypartial:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "lib/httputil/bool.go"
+    line: 9
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/lib/httputil/bool.go#L9"
+  vms-latency:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0-cluster"
+    file: "app/vmselect/prometheus/prometheus.go"
+    line: 44
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0-cluster/app/vmselect/prometheus/prometheus.go#L44"
+  vst-minfree:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0-cluster"
+    file: "app/vmstorage/main.go"
+    line: 103
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0-cluster/app/vmstorage/main.go#L103"
+  vst-readonly:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "lib/storage/storage.go"
+    line: 288
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/lib/storage/storage.go#L288"
+  my-pool-default:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/exporter.go"
+    line: 134
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/exporter.go#L134"
+  my-newinstance:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/exporter.go"
+    line: 183
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/exporter.go#L183"
+  my-scrapers-go:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/exporter.go"
+    line: 210
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/exporter.go#L210"
+  my-up:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/exporter.go"
+    line: 175
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/exporter.go#L175"
+  my-offset:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "mysqld_exporter.go"
+    line: 47
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/mysqld_exporter.go#L47"
+  my-maxopen-flag:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "mysqld_exporter.go"
+    line: 83
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/mysqld_exporter.go#L83"
+  my-querytimeout:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "mysqld_exporter.go"
+    line: 79
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/mysqld_exporter.go#L79"
+  pg-collect:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/collector.go"
+    line: 183
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/collector.go#L183"
+  pg-timeout:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/collector.go"
+    line: 199
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/collector.go#L199"
+  pg-goroutines:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/collector.go"
+    line: 205
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/collector.go#L205"
+  pg-maxopen:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/instance.go"
+    line: 58
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/instance.go#L58"
+  pg-timeout-flag:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "cmd/postgres_exporter/main.go"
+    line: 51
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/cmd/postgres_exporter/main.go#L51"
+  pg-probe:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "cmd/postgres_exporter/probe.go"
+    line: 62
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/cmd/postgres_exporter/probe.go#L62"
+  op-vmalert-selector:
+    kind: code
+    project: "VictoriaMetrics operator"
+    version: "v0.75.2"
+    file: "docs/resources/vmalert.md"
+    line: 66
+    url: "https://github.com/VictoriaMetrics/operator/blob/v0.75.2/docs/resources/vmalert.md#L66"
+  vma-eval-samples:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/alerting.go"
+    line: 93
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/alerting.go#L93"
+  vma-evalalign:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/group.go"
+    line: 711
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/group.go#L711"
+  p-lookback:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "cmd/prometheus/main.go"
+    line: 435
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/cmd/prometheus/main.go#L435"
+  vm-metricsql-prev:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "docs/victoriametrics/MetricsQL.md"
+    line: 31
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/docs/victoriametrics/MetricsQL.md#L31"

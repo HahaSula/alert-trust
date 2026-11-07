@@ -1,9 +1,11 @@
 id: vmalert
 name: vmalert
 kind: infra
+family: victoriametrics
 status: draft
 stages: [evaluate]
 versions_checked: ["v1.155.0"]
+architecture: architecture/vmalert.md
 role: >-
   獨立的評估行程，依賴都走網路：從 VM 或 VL 查詢、把狀態寫回 VM、通知送 Alertmanager。
   不跟儲存搶 CPU，但每條網路路徑都可能失效。
@@ -12,15 +14,19 @@ silent_failures:
   - text: 查詢失敗時不續送通知，約 2 分鐘後 Alertmanager 把所有 alert 標成 resolved，連 Watchdog 也一樣。
     evidence: tested
     source: art-vm
+    refs: [exp-vm-faults, vma-exec-send]
   - text: 寫入路徑故障時不報錯，條件型 alert 還會繼續 firing 約 6 分鐘（-datasource.queryStep 5m）。
     evidence: tested
     source: art-vm
+    refs: [exp-vm-faults, vma-querystep]
   - text: 查詢飽和（429）時 vmalert_iteration_missed_total 仍是 0。
     evidence: tested
     source: art-vm
+    refs: [exp-vm-faults, vma-missed]
   - text: Operator 的兩個 selector 都沒設時一條 rule 都不選，也沒有錯誤。
     evidence: code
     source: art-vm
+    refs: [op-vmalert-selector]
 
 contracts: [vm-range-window, resend-endsat, group-within-interval, vl-log-delay]
 
@@ -33,6 +39,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-vm
+    refs: [exp-vm-faults]
     upstream: { status: partial, note: "ServiceDown 依 job 名稱比對" }
     rules: [rules/victoriametrics/meta.yml#MetaTargetDown]
 
@@ -45,6 +52,7 @@ signals:
     judged_by: external
     evidence: tested
     source: art-vm
+    refs: [exp-vm-resend]
     upstream: { status: no }
     rules: [rules/victoriametrics/canary.yml#Watchdog]
     contract: resend-endsat
@@ -57,6 +65,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-vm
+    refs: [exp-vm-faults]
     upstream: { status: partial, note: "官方 for 5m，實測 +370s 才響" }
     rules: [rules/victoriametrics/meta.yml#MetaRuleErrors]
 
@@ -68,6 +77,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-vm
+    refs: [exp-vm-faults, vma-notify-send]
     upstream: { status: yes }
     rules: [rules/victoriametrics/meta.yml#MetaNotifierErrors]
 
@@ -79,6 +89,7 @@ signals:
     evaluate_on: inventory
     evidence: code
     source: art-vm
+    refs: [vma-eval-samples]
     upstream: { status: partial, note: "RecordingRulesNoData 只管 recording rule" }
     rules: []
 
@@ -90,6 +101,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-vm
+    refs: [exp-vm-vl, vma-rw-retry]
     upstream: { status: yes }
     rules: [rules/victoriametrics/meta.yml#MetaNoRuleWrites]
 
@@ -101,6 +113,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-vm
+    refs: [exp-vm-faults, vma-missed]
     upstream: { status: partial, note: "只有 missed" }
     rules: [rules/victoriametrics/meta.yml#MetaGroupSlow]
     contract: group-within-interval
@@ -113,6 +126,7 @@ signals:
     evaluate_on: inventory
     evidence: code
     source: art-vm
+    refs: [vma-resend]
     upstream: { status: no }
     rules: []
 

@@ -1,21 +1,26 @@
 id: vmagent
 name: vmagent
 kind: infra
+family: victoriametrics
 status: draft
 stages: [collect]
 versions_checked: ["v1.155.0"]
+architecture: architecture/vmagent.md
 role: 採集並寫入 VM，中間有磁碟 buffer。它壞掉時 rule 只看到資料變舊，不會報錯。
 
 silent_failures:
   - text: 掛掉後 rule 不報錯，條件型 alert 繼續 firing 約 6 分鐘才 resolved。
     evidence: tested
     source: art-vm
+    refs: [exp-vm-faults]
   - text: 恢復後資料補回，圖看起來沒有缺口，但 rule 不補判。
     evidence: tested
     source: art-vm
+    refs: [exp-vm-faults]
   - text: vmagent_remotewrite_pending_data_bytes 在低流量時量到 0，不能單靠它。
     evidence: tested
     source: art-vm
+    refs: [exp-vm-faults]
 
 contracts: [scrape-within-interval]
 
@@ -28,6 +33,7 @@ signals:
     evaluate_on: observer
     evidence: tested
     source: art-vm
+    refs: [exp-vm-faults]
     upstream: { status: partial, note: "依 job 名稱比對" }
     rules: [rules/victoriametrics/meta.yml#MetaTargetDown]
 
@@ -40,6 +46,7 @@ signals:
     judged_by: external
     evidence: tested
     source: art-vm
+    refs: [exp-vm-faults]
     upstream: { status: no }
     rules: [rules/victoriametrics/canary.yml#MetricsFresh]
 
@@ -73,6 +80,7 @@ signals:
     evaluate_on: observer
     evidence: upstream
     source: vm-rules
+    refs: [vmag-ticker]
     upstream: { status: partial, note: "沒有耗時比值" }
     rules: []
     contract: scrape-within-interval

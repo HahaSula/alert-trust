@@ -1,9 +1,11 @@
 id: postgres_exporter
 name: postgres_exporter＋PostgreSQL
 kind: target
+family: database
 status: draft
 stages: [source]
 versions_checked: ["0.20.1"]
+architecture: architecture/exporters.md
 role: >-
   Exporter 裡有兩套程式：舊的 exporter 套件產生 pg_up、pg_exporter_* 與 queries.yaml 自訂查詢，
   新的 collector 套件產生大部分 pg_* 與 pg_scrape_collector_*。兩套各自連資料庫、各自記錯誤，互不相通。
@@ -17,22 +19,26 @@ silent_failures:
       Prometheus 先超時，up=0、pg_up 也消失；只有連線立即被拒時才會看到 pg_up=0。
     evidence: tested
     source: pg-lab
+    refs: [exp-pg]
   - text: >-
       執行中把 exporter 帳號改成 NOLOGIN（或換密碼、pg_hba 改掉）：pg_up 仍是 1、pg_exporter_last_scrape_error 仍是 0，
       因為舊套件重用既有連線；新套件每次 scrape 開新連線失敗，所有 collector metric 連同 pg_scrape_collector_success 一起消失，
       pg_scrape_collector_success == 0 回傳空。要等既有連線斷掉 pg_up 才變 0。
     evidence: tested
     source: pg-lab
+    refs: [exp-pg]
   - text: >-
       Exporter 帳號沒有 pg_monitor 時，只有 wal collector 報錯；stat_activity collector 回報成功，
       但看不到其他使用者的 session，執行中的長交易顯示為 max_tx_duration=0、active=0，長交易規則永遠不響。
     evidence: tested
     source: pg-lab
+    refs: [exp-pg]
   - text: >-
       --collection-timeout 預設 1m，比一般 scrape_timeout 長；/probe 模式完全沒有收集逾時（程式內 TODO）。
       DB 變慢時 Prometheus 先放棄整次 scrape，exporter 仍在跑查詢，下一次 scrape 又開新連線。
     evidence: tested
     source: pg-lab
+    refs: [exp-pg]
   - text: >-
       PostgreSQL 17 把 checkpoint 欄位從 pg_stat_bgwriter 移到 pg_stat_checkpointer。exporter 在 17 以上不再輸出
       pg_stat_bgwriter_checkpoints_*，而 stat_checkpointer collector 預設關閉；collector 回報成功，
@@ -48,6 +54,7 @@ silent_failures:
       mixin 的 PostgresReplicationLaggingMore1Hour 用 pg_replication_lag，這個名字在目前的 exporter 不存在（只有 pg_replication_lag_seconds），規則永遠回傳空。
     evidence: tested
     source: pg-lab
+    refs: [exp-pg]
   - text: >-
       --auto-discover-databases（已棄用）下，只要有一個資料庫連得上 pg_up 就是 1；個別資料庫失敗只反映在整體的 pg_exporter_last_scrape_error。
     evidence: code
@@ -75,6 +82,7 @@ signals:
     silent_failure: Exporter 停機時 pg_up 消失，只看 pg_up 的規則回傳空
     evidence: tested
     source: pg-lab
+    refs: [exp-pg]
     upstream: { status: no, note: "mixin 與 awesome 都只看 pg_up" }
     rules: [rules/targets/postgres.yml#PostgresExporterDown, rules/targets/postgres.yml#PostgresExporterMissing]
 
@@ -86,6 +94,7 @@ signals:
     evaluate_on: self
     evidence: tested
     source: pg-lab
+    refs: [exp-pg]
     upstream: { status: partial, note: "mixin 是 pg_up != 1、awesome 是 pg_up == 0；exporter 停機或 DB 主機不回應時兩條都回傳空" }
     rules: [rules/targets/postgres.yml#PostgresDown]
 
@@ -98,6 +107,7 @@ signals:
     silent_failure: 帳號被鎖或改密碼時 pg_up 仍是 1，collector 結果整批消失
     evidence: tested
     source: pg-lab
+    refs: [exp-pg]
     upstream: { status: no, note: "mixin 與 awesome 都沒有" }
     rules: [rules/targets/postgres.yml#PostgresCollectorsMissing]
 
@@ -110,6 +120,7 @@ signals:
     silent_failure: Collector 失敗時 pg_exporter_last_scrape_error 不會變 1
     evidence: tested
     source: pg-lab
+    refs: [exp-pg]
     upstream: { status: no, note: "mixin 與 awesome 都沒有 pg_scrape_collector_success" }
     rules: [rules/targets/postgres.yml#PostgresCollectorFailed]
 
@@ -121,6 +132,7 @@ signals:
     evaluate_on: self
     evidence: tested
     source: pg-lab
+    refs: [exp-pg]
     upstream: { status: partial, note: "mixin PostgresHasExporterErrors（for 30m）與 awesome 都有；只涵蓋舊架構，collector 失敗不會讓它變 1" }
     rules:
       - rules/targets/postgres.yml#PostgresExporterScrapeError
@@ -135,6 +147,7 @@ signals:
     silent_failure: 沒有 pg_monitor 時 stat_activity 回報成功，長交易顯示為 0
     evidence: tested
     source: pg-lab
+    refs: [exp-pg]
     upstream: { status: no, note: "README 說要 GRANT pg_monitor，沒有任何規則檢查" }
     rules: [rules/targets/postgres.yml#PostgresExporterLacksPgMonitor]
 
@@ -148,6 +161,7 @@ signals:
     evaluate_on: self
     evidence: tested
     source: pg-lab
+    refs: [exp-pg]
     upstream: { status: no, note: "mixin 與 awesome 都沒有" }
     rules: [rules/targets/postgres.yml#PostgresScrapeNearTimeout, rules/targets/postgres.yml#PostgresSlowCollector]
     contract: exporter-deadline
@@ -262,6 +276,7 @@ signals:
     applies_when: pg_stat_statements
     evidence: tested
     source: pg-lab
+    refs: [exp-pg]
     upstream: { status: no }
     rules: []
 
