@@ -85,7 +85,14 @@ class LintTest(unittest.TestCase):
                 "not_applicable": {"probe-blast-radius": "單一 target"}}
         errors = validate.check_target_pattern([card], ROOT)
         missing = {e.split("缺少 target 標準訊號 ")[1].split("（")[0] for e in errors if "缺少" in e}
-        self.assertEqual(missing, {"db-up", "collectors-present", "collector-success", "scrape-budget"})
+        self.assertEqual(missing, {"db-up", "collectors-present", "collector-success", "scrape-budget",
+                                   "exporter-query-timeout", "replication-lag", "role-detection"})
+
+    def test_target_pattern_accepts_aliases(self):
+        card = {"_path": "t.yaml", "kind": "target",
+                "signals": [{"id": "promotion", "tier": 2}, {"id": "lock-blocks-exporter", "tier": 2}]}
+        errors = validate.check_target_pattern([card], ROOT)
+        self.assertFalse(any("role-detection" in e or "exporter-query-timeout" in e for e in errors), errors)
 
     def test_duplicate_keys_rejected(self):
         with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:

@@ -213,7 +213,11 @@ def check_target_pattern(components: list[dict], root: str) -> list[str]:
         na = card.get("not_applicable") or {}
         for req in required:
             rid = req["id"]
-            if rid in na:
+            found = next((a for a in [rid] + list(req.get("aliases", [])) if a in by_id), None)
+            if found:
+                rid = found
+            if rid in na or req["id"] in na:
+                rid = req["id"] if req["id"] in na else rid
                 if not str(na[rid]).strip():
                     errors.append(f"{card['_path']}: not_applicable.{rid} 要寫理由")
                 continue

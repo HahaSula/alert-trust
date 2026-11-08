@@ -238,6 +238,20 @@ signals:
     upstream: { status: partial, note: "README 列出權限與 MAX_USER_CONNECTIONS 建議，沒有對應的檢查或規則" }
     rules: []
 
+  - id: exporter-query-timeout
+    tier: 2
+    aspect: exporter
+    question: Exporter 的查詢會不會被鎖或連線上限卡住
+    signal: "`--exporter.lock_wait_timeout`（預設開啟、2 秒）避免被 metadata lock 卡住；`--exporter.query_timeout` 限制單一 collector。連線打滿時 exporter 自己也被擋，`mysql_up` 變 0，要給 exporter 帳號保留連線"
+    metrics: [mysql_up, mysql_global_status_connection_errors_total]
+    evaluate_on: self
+    silent_failure: max_connections 打滿時 exporter 也收到 Error 1040，依連線比例寫的規則回傳空
+    evidence: tested
+    source: art-mysql
+    refs: [exp-mysql-ha, my-lock-wait-timeout, my-querytimeout]
+    upstream: { status: no }
+    rules: []
+
   - id: collector-set
     aspect: exporter
     tier: 2

@@ -27,3 +27,17 @@ required_signals:
     min_tier: 2
     question: 多 target 模式下，壞的是 exporter 還是服務
     why: 一台 multi-target exporter 掛掉，它背後所有 target 同時消失。
+  - id: exporter-query-timeout
+    aliases: [lock-blocks-exporter]
+    min_tier: 2
+    question: Exporter 的查詢會不會被鎖或連線上限卡住
+    why: PostgreSQL 一張表被 ACCESS EXCLUSIVE 鎖住時，exporter 的查詢排隊等鎖，scrape 逾時、整個 target 消失；MySQL 連線打滿時 exporter 自己也連不進去，mysql_up 變 0、比例類規則回傳空。Exporter 帳號要有查詢逾時與保留連線。
+  - id: replication-lag
+    min_tier: 2
+    question: Replication 延遲量的是真的嗎
+    why: 資料庫自己算的延遲在斷線或沒有寫入時會顯示 0（MySQL 的 Seconds_Behind 變成 NULL 不輸出，PostgreSQL 的 pg_replication_lag_seconds 維持 0）。要用 heartbeat 表，或主庫端看得到每台複本。沒有 replication 的服務寫在 not_applicable。
+  - id: role-detection
+    aliases: [promotion]
+    min_tier: 2
+    question: 每個叢集剛好有一台可寫入的主節點嗎
+    why: Failover 之後靜態的 role label 會指錯節點；舊主節點回來時可能兩邊都能寫。要用 cluster label 跨 instance 計數「可寫入的節點數」，0 或大於 1 都要告警。沒有 HA 的服務寫在 not_applicable。

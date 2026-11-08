@@ -628,5 +628,11 @@
   "v2.55.1",
   "rules/group.go",
   "concurrencyController RuleConcurrencyController"
+ ],
+ "my-lock-wait-timeout": [
+  "prometheus/mysqld_exporter",
+  "v0.21.0",
+  "mysqld_exporter.go",
+  "\"exporter.lock_wait_timeout\""
  ]
 }

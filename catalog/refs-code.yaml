@@ -736,3 +736,10 @@ refs:
     file: "rules/group.go"
     line: 77
     url: "https://github.com/prometheus/prometheus/blob/v2.55.1/rules/group.go#L77"
+  my-lock-wait-timeout:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "mysqld_exporter.go"
+    line: 67
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/mysqld_exporter.go#L67"

@@ -27,7 +27,7 @@
 ## 待辦（依建議順序）
 
 1. **VM lab 沒重測到的項目**（`lab/vm/README.md`）：查詢飽和 429 與 `iteration_missed`、磁碟突然 0 byte 的 panic、vmalert／Alertmanager 本身停機、VL `allow_partial_response`、operator。相關說法已降為「推論」。注意這台機器 Docker 容器的單調時鐘比牆鐘慢約 30%，時間類數字要以牆鐘解讀。
-2. **Target 標準問題擴充**（待使用者確認）：在 `catalog/target-pattern.yaml` 加 `role-detection`（沒有可寫入節點／多個可寫入節點，需要 `cluster` label）、`replication-lag`（不能只靠伺服器算的延遲；MySQL 與 PG 都實測到斷線時顯示 0）、exporter 查詢逾時（PG 表鎖、MySQL 連線打滿都會讓 exporter 消失）。
+2. （已完成）Target 標準問題加入 role-detection、replication-lag、exporter-query-timeout；`aliases` 讓同義的訊號 id 也算數。
 3. **剩下的未公開參考**：`exp-am-compat`（版本相容）、`exp-am-rules`（告警規則測試），在 `catalog/refs.d/reports.yaml`；重做或改引用。
 4. **2 個第 1 級訊號沒有規則範本**：`victorialogs#ingested`、`observer#scrapes-all-infra`。
 5. **規則範本的 job selector**：`PrometheusDown`、`PrometheusCrashLooping` 用 `job=~".*prometheus.*"`，job 名稱不同的環境會「規則在但沒資料」（`lab/coverage` 實測）。要在文件與 skill 強調必須調整，或改成 label 參數化。
