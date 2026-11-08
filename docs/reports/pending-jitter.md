@@ -109,14 +109,16 @@ Scrape loop 用 Go 的 `time.Ticker`，處理不完的 tick 會被直接丟掉�
 **圖 4**　同一個窗口裡兩個函式用到的範圍。外推門檻是 1.1 × 120 = 132 秒；最後一點離終點 160 秒，超過門檻，所以 rate 只往後外推 60 秒，剩下 100 秒沒有被計入。irate 不外推，所以不會低估，但也只反映最後一個間隔。[^p-extrapolated][^p-instantvalue]
 {: .at-caption }
 
-下表假設真實速率固定為 r，I = 120s、d = 110s，ts 落在最新一次 scrape 開始後的不同時間點。數字是「算出來的值 ÷ r」。<span class="at-chip at-ev-inferred">推算</span>
+下表假設真實速率固定為 r，I = 120s、d = 100s（實驗用的延遲），ts 落在最新一次 scrape 開始後的不同時間點。數字是「算出來的值 ÷ r」，由 [`lab/jitter/rate_model.py`](https://github.com/HahaSula/alert-trust/blob/main/lab/jitter/rate_model.py) 依 `extrapolatedRate` 與 `instantValue` 的原始碼邏輯算出[^p-extrapolated][^p-instantvalue]。<span class="at-chip at-ev-inferred">推算</span>
 
 | ts − scrape 開始 | `rate[5m]` | `irate[5m]` | `rate[10m]` | `irate[10m]` | `rate[5m]` + offset 2m |
 |---|---|---|---|---|---|
 | 15s | 75% | 100% | 88% | 100% | 100% |
-| 45s | 65% | 100% | 83% | 100% | 100% |
+| 45s | 65% | 100% | 82% | 100% | 100% |
 | 75s | 空 | 空 | 78% | 100% | 100% |
-| 105s | 空 | 空 | 73% | 100% | 100% |
+| 105s | 100% | 100% | 100% | 100% | 100% |
+
+ts 落在 scrape 開始後 60–100 秒時最新一點還沒寫入：`[5m]` 只剩 1 點回傳空，`[10m]` 有值但被算低。過了 100 秒最新一點寫入，數值回到正確。所以低估和空結果都集中在「scrape 進行中」那一段，加上不小於 d 的 offset 就全部消失。
 
 ### irate 的優點
 
