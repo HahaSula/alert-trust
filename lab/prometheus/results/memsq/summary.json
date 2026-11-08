@@ -1,0 +1,641 @@
+{
+ "name": "memsq",
+ "phases": {
+  "base": {
+   "dur": 420,
+   "alerts_first_fire_s": {},
+   "sink": {
+    "Watchdog": {
+     "count": 14,
+     "max_gap_s": 35
+    },
+    "DataHeartbeat": {
+     "count": 13,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 11,
+     "max_gap_s": 96
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 79,
+     "min": 15.0038,
+     "avg": 15.0212,
+     "max": 15.0227
+    },
+    "scrape_dur_big": {
+     "n": 83,
+     "min": 0.8258,
+     "avg": 1.6955,
+     "max": 6.2723
+    },
+    "up_big": {
+     "n": 83,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 82,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 83,
+     "min": 0.0005,
+     "avg": 6.8829,
+     "max": 10.0091
+    },
+    "rule_missed_5m": {
+     "n": 82,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_failed_5m": {
+     "n": 82,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 83,
+     "min": 12.0716,
+     "avg": 21612772.2075,
+     "max": 1793858518.034
+    },
+    "queue_time_p90": {
+     "n": 83,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "queries_inflight": {
+     "n": 83,
+     "min": 0.0,
+     "avg": 0.4699,
+     "max": 1.0
+    },
+    "fsync_p99": {
+     "n": 0
+    },
+    "append_rate": {
+     "n": 81,
+     "min": 6626.0971,
+     "avg": 19488.0482,
+     "max": 22185.3366
+    },
+    "wal_bytes": {
+     "n": 83,
+     "min": 0.0,
+     "avg": 43476598.9036,
+     "max": 82858517.0
+    },
+    "blocks": {
+     "n": 83,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "reloads_5m": {
+     "n": 82,
+     "min": 0.0,
+     "avg": 2.9882,
+     "max": 5.0848
+    },
+    "compact_failed_5m": {
+     "n": 82,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 82,
+     "min": 0.1034,
+     "avg": 0.5095,
+     "max": 0.7124
+    },
+    "rss": {
+     "n": 83,
+     "min": 68419584.0,
+     "avg": 1165774601.253,
+     "max": 1431969792.0
+    },
+    "gc_p100": {
+     "n": 83,
+     "min": 0.0003,
+     "avg": 0.0999,
+     "max": 0.1134
+    },
+    "throttle_ratio": {
+     "n": 0
+    },
+    "working_set": {
+     "n": 83,
+     "min": 19218432.0,
+     "avg": 1111084217.0602,
+     "max": 1384980480.0
+    },
+    "notify_queue": {
+     "n": 83,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 82,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 82,
+     "min": 0.0129,
+     "avg": 0.0416,
+     "max": 0.0497
+    },
+    "am_discovered": {
+     "n": 83,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    }
+   }
+  },
+  "squeezed": {
+   "dur": 480,
+   "alerts_first_fire_s": {
+    "M_PromRestarted": 10,
+    "M_AlertFlapping": 195,
+    "M_WalCorruption": 205,
+    "M_NotifyDropped": 300,
+    "M_KnownTrueLost": 325
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 16,
+     "max_gap_s": 35
+    },
+    "DataHeartbeat": {
+     "count": 16,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 7,
+     "max_gap_s": 284
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 25,
+     "min": 15.0002,
+     "avg": 15.0041,
+     "max": 15.0295
+    },
+    "scrape_dur_big": {
+     "n": 97,
+     "min": 0.8506,
+     "avg": 2.5098,
+     "max": 4.2068
+    },
+    "up_big": {
+     "n": 97,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 97,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 73,
+     "min": 0.0,
+     "avg": 4.2978,
+     "max": 10.6939
+    },
+    "rule_missed_5m": {
+     "n": 97,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_failed_5m": {
+     "n": 97,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 73,
+     "min": 12.4089,
+     "avg": 982936541.6336,
+     "max": 1793859408.367
+    },
+    "queue_time_p90": {
+     "n": 62,
+     "min": 0.0,
+     "avg": 0.0001,
+     "max": 0.0002
+    },
+    "queries_inflight": {
+     "n": 96,
+     "min": 0.0,
+     "avg": 0.4062,
+     "max": 1.0
+    },
+    "fsync_p99": {
+     "n": 0
+    },
+    "append_rate": {
+     "n": 97,
+     "min": 5028.9187,
+     "avg": 9205.2986,
+     "max": 21914.7636
+    },
+    "wal_bytes": {
+     "n": 96,
+     "min": 82858812.0,
+     "avg": 105905845.8333,
+     "max": 130486426.0
+    },
+    "blocks": {
+     "n": 96,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "reloads_5m": {
+     "n": 97,
+     "min": 0.0,
+     "avg": 2.4533,
+     "max": 6.1018
+    },
+    "compact_failed_5m": {
+     "n": 97,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 97,
+     "min": 0.5936,
+     "avg": 0.7683,
+     "max": 0.9817
+    },
+    "rss": {
+     "n": 96,
+     "min": 79036416.0,
+     "avg": 858019370.6667,
+     "max": 1211269120.0
+    },
+    "gc_p100": {
+     "n": 96,
+     "min": 0.0003,
+     "avg": 0.0138,
+     "max": 0.1134
+    },
+    "throttle_ratio": {
+     "n": 0
+    },
+    "working_set": {
+     "n": 543,
+     "min": 1884160.0,
+     "avg": 943157391.3223,
+     "max": 1125507072.0
+    },
+    "notify_queue": {
+     "n": 96,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 97,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 43,
+     "min": 0.0024,
+     "avg": 0.0042,
+     "max": 0.0497
+    },
+    "am_discovered": {
+     "n": 96,
+     "min": 0.0,
+     "avg": 0.7188,
+     "max": 1.0
+    }
+   }
+  },
+  "recover": {
+   "dur": 420,
+   "alerts_first_fire_s": {
+    "M_AlertFlapping": 0,
+    "M_KnownTrueLost": 0,
+    "M_NotifyDropped": 0,
+    "M_PromRestarted": 0,
+    "M_ReloadStalled": 5
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 14,
+     "max_gap_s": 30
+    },
+    "DataHeartbeat": {
+     "count": 14,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 12,
+     "max_gap_s": 66
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 80,
+     "min": 15.0077,
+     "avg": 15.0077,
+     "max": 15.0077
+    },
+    "scrape_dur_big": {
+     "n": 85,
+     "min": 0.5879,
+     "avg": 0.9251,
+     "max": 4.021
+    },
+    "up_big": {
+     "n": 85,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 85,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 85,
+     "min": 0.0,
+     "avg": 7.5218,
+     "max": 12.7146
+    },
+    "rule_missed_5m": {
+     "n": 85,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_failed_5m": {
+     "n": 85,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 85,
+     "min": 7.6228,
+     "avg": 84416928.9035,
+     "max": 1793859423.579
+    },
+    "queue_time_p90": {
+     "n": 84,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0001
+    },
+    "queries_inflight": {
+     "n": 85,
+     "min": 0.0,
+     "avg": 0.5647,
+     "max": 1.0
+    },
+    "fsync_p99": {
+     "n": 0
+    },
+    "append_rate": {
+     "n": 85,
+     "min": 10101.8535,
+     "avg": 19298.7061,
+     "max": 21899.8909
+    },
+    "wal_bytes": {
+     "n": 85,
+     "min": 130486426.0,
+     "avg": 169640501.7529,
+     "max": 208861353.0
+    },
+    "blocks": {
+     "n": 85,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "reloads_5m": {
+     "n": 85,
+     "min": 0.0,
+     "avg": 2.907,
+     "max": 5.0847
+    },
+    "compact_failed_5m": {
+     "n": 85,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 85,
+     "min": 0.5204,
+     "avg": 0.6916,
+     "max": 0.9831
+    },
+    "rss": {
+     "n": 85,
+     "min": 976658432.0,
+     "avg": 1524842351.4353,
+     "max": 1773977600.0
+    },
+    "gc_p100": {
+     "n": 85,
+     "min": 0.0049,
+     "avg": 0.0112,
+     "max": 0.0114
+    },
+    "throttle_ratio": {
+     "n": 0
+    },
+    "working_set": {
+     "n": 277,
+     "min": 924258304.0,
+     "avg": 1186586964.1011,
+     "max": 1726345216.0
+    },
+    "notify_queue": {
+     "n": 85,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 85,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 83,
+     "min": 0.0054,
+     "avg": 0.0114,
+     "max": 0.0149
+    },
+    "am_discovered": {
+     "n": 85,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    }
+   }
+  }
+ },
+ "extra": {
+  "restarts_after_base": 0,
+  "restarts_after_squeeze": 11,
+  "oom_killed": "false",
+  "restarts_end": 11,
+  "for_state_changes": [
+   [
+    "M_ReloadStalled",
+    "1"
+   ],
+   [
+    "M_CPUThrottled",
+    "1"
+   ],
+   [
+    "DataHeartbeat",
+    "7"
+   ],
+   [
+    "KnownTrueCanary",
+    "7"
+   ],
+   [
+    "Watchdog",
+    "7"
+   ],
+   [
+    "SlowTargetNoOffset",
+    "4"
+   ],
+   [
+    "M_CPUThrottled",
+    "0"
+   ],
+   [
+    "SlowTargetExprOffset",
+    "5"
+   ],
+   [
+    "M_PromRestarted",
+    "0"
+   ],
+   [
+    "M_NoAlertmanager",
+    "10"
+   ],
+   [
+    "M_RuleStale",
+    "10"
+   ],
+   [
+    "M_RuleStale",
+    "10"
+   ],
+   [
+    "M_RuleStale",
+    "7"
+   ],
+   [
+    "M_MemNearLimit",
+    "0"
+   ],
+   [
+    "M_MemNearLimit",
+    "0"
+   ],
+   [
+    "M_MemNearLimit",
+    "0"
+   ],
+   [
+    "M_AlertFlapping",
+    "0"
+   ],
+   [
+    "M_WalCorruption",
+    "0"
+   ],
+   [
+    "M_AlertFlapping",
+    "0"
+   ],
+   [
+    "M_AlertFlapping",
+    "0"
+   ],
+   [
+    "M_MemNearLimit",
+    "2"
+   ],
+   [
+    "M_AlertFlapping",
+    "0"
+   ],
+   [
+    "M_NotifyDropped",
+    "0"
+   ],
+   [
+    "M_MemNearLimit",
+    "0"
+   ],
+   [
+    "M_KnownTrueLost",
+    "0"
+   ],
+   [
+    "M_MemNearLimit",
+    "0"
+   ],
+   [
+    "M_MemNearLimit",
+    "0"
+   ],
+   [
+    "M_PromDown",
+    "0"
+   ],
+   [
+    "M_MemNearLimit",
+    "1"
+   ],
+   [
+    "M_MemNearLimit",
+    "0"
+   ],
+   [
+    "M_RuleGroupSlow",
+    "1"
+   ]
+  ]
+ }
+}

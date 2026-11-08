@@ -1,0 +1,35 @@
+groups:
+  - name: canary
+    rules:
+      - alert: Watchdog            # needs no data at all
+        expr: vector(1)
+      - alert: DataHeartbeat       # fires only while scrape -> TSDB -> query is fresh
+        expr: time() - max(timestamp(demo_requests_total{job="small"})) < 60
+      - alert: KnownTrueCanary     # known-true condition; for timer must never reset
+        expr: rate(demo_requests_total{job="small"}[1m]) > 1
+        for: 1m
+  - name: slow-target
+    rules:
+      - alert: SlowTargetNoOffset
+        expr: rate(demo_requests_total{job="slow"}[5m]) > 1
+        for: 3m
+      - alert: SlowTargetExprOffset   # the only per-rule offset available on 2.51
+        expr: rate(demo_requests_total{job="slow"}[5m] offset 2m) > 1
+        for: 3m
+  - name: toggle-fast      # detection-latency probe in its own small group
+    rules:
+      - alert: ToggleFast
+        expr: demo_toggle{job="small"} == 1
+        for: 30s
+  - name: load
+    interval: 15s
+    rules:
+      - record: ns:demo_filler:sum
+        expr: sum by (ns) (demo_filler)
+      - record: pod:demo_filler:avg
+        expr: avg by (pod) (demo_filler)
+      - record: ns:demo_filler:avg_over_time5m
+        expr: sum by (ns) (avg_over_time(demo_filler[5m]))
+      - alert: ToggleInLoad     # same probe, placed after the expensive rules of a heavy group
+        expr: demo_toggle{job="small"} == 1
+        for: 30s

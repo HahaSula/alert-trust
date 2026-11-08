@@ -11,4 +11,4 @@
 | [Alertmanager 監控指南](alertmanager.md) | 通知失敗計數、email 假成功、`group_interval` 對告警視窗的影響、告警規則、0.27–0.34.2 版本 survey 與升級 | 0.27.0–0.34.2 |
 | [Alert Pending 抖動分析](pending-jitter.md) | 慢 scrape 讓 pending 反覆重置的機制、參數關係、rate 與 irate、通知送出路徑、rule group 執行模型、修正的資源影響 | 2.51.2、2.55.1、3.15.1 |
 
-前身 repo [prometheus-selfcheck-skills](https://github.com/HahaSula/prometheus-selfcheck-skills) 的 `EVIDENCE.md` 與 `lab/` 已公開 Prometheus 部分的實驗數據與腳本。VictoriaMetrics 與 Alertmanager 的實驗腳本正在整理，未公開前，引用會標成「未公開」。
+Prometheus 部分的實驗腳本、原始結果與 `EVIDENCE.md` 在 [`lab/prometheus/`](https://github.com/HahaSula/alert-trust/tree/main/lab/prometheus)（從前身 repo prometheus-selfcheck-skills 搬來）；VictoriaMetrics、Alertmanager、資料庫與 pending 抖動的實驗在 `lab/` 的其他子目錄。

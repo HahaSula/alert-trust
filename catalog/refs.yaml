@@ -3,39 +3,39 @@ refs:
   exp-prom-silent:
     kind: experiment
     title: "Prometheus 實驗：rule 不報錯地失效（4 個版本）"
-    url: "https://github.com/HahaSula/prometheus-selfcheck-skills/blob/b8601c502454dc382691ff5dbd4a9ecff9532a24/EVIDENCE.md?plain=1#L7"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/prometheus/EVIDENCE.md?plain=1#L7"
   exp-prom-range:
     kind: experiment
     title: "Prometheus 實驗：range 視窗矩陣（24 組合）"
-    url: "https://github.com/HahaSula/prometheus-selfcheck-skills/blob/b8601c502454dc382691ff5dbd4a9ecff9532a24/EVIDENCE.md?plain=1#L20"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/prometheus/EVIDENCE.md?plain=1#L20"
   exp-prom-heartbeat:
     kind: experiment
     title: "Prometheus 實驗：heartbeat 在 8 種故障下的盲點"
-    url: "https://github.com/HahaSula/prometheus-selfcheck-skills/blob/b8601c502454dc382691ff5dbd4a9ecff9532a24/EVIDENCE.md?plain=1#L32"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/prometheus/EVIDENCE.md?plain=1#L32"
   exp-prom-cpu:
     kind: experiment
     title: "Prometheus 實驗：CPU 邊際與偵測延遲"
-    url: "https://github.com/HahaSula/prometheus-selfcheck-skills/blob/b8601c502454dc382691ff5dbd4a9ecff9532a24/EVIDENCE.md?plain=1#L49"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/prometheus/EVIDENCE.md?plain=1#L49"
   exp-prom-mem:
     kind: experiment
     title: "Prometheus 實驗：記憶體邊際"
-    url: "https://github.com/HahaSula/prometheus-selfcheck-skills/blob/b8601c502454dc382691ff5dbd4a9ecff9532a24/EVIDENCE.md?plain=1#L65"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/prometheus/EVIDENCE.md?plain=1#L65"
   exp-prom-storage:
     kind: experiment
     title: "Prometheus 實驗：IOPS、磁碟寫滿、compaction 用完空間"
-    url: "https://github.com/HahaSula/prometheus-selfcheck-skills/blob/b8601c502454dc382691ff5dbd4a9ecff9532a24/EVIDENCE.md?plain=1#L77"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/prometheus/EVIDENCE.md?plain=1#L77"
   exp-prom-upgrade:
     kind: experiment
     title: "Prometheus 實驗：升級、回退與資源比較"
-    url: "https://github.com/HahaSula/prometheus-selfcheck-skills/blob/b8601c502454dc382691ff5dbd4a9ecff9532a24/EVIDENCE.md?plain=1#L100"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/prometheus/EVIDENCE.md?plain=1#L100"
   exp-prom-blackbox:
     kind: experiment
     title: "Prometheus 實驗：blackbox 探測能看到什麼"
-    url: "https://github.com/HahaSula/prometheus-selfcheck-skills/blob/b8601c502454dc382691ff5dbd4a9ecff9532a24/EVIDENCE.md?plain=1#L128"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/prometheus/EVIDENCE.md?plain=1#L128"
   exp-prom-query:
     kind: experiment
     title: "Prometheus 實驗：查詢飽和（原始結果）"
-    url: "https://github.com/HahaSula/prometheus-selfcheck-skills/blob/b8601c502454dc382691ff5dbd4a9ecff9532a24/lab/results/query2/summary.json"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/prometheus/results/query2/summary.json"
   exp-mysql:
     kind: experiment
     title: "mysqld_exporter 實驗：停資料庫、停 exporter、收回權限（MariaDB 11.4）"
@@ -83,7 +83,7 @@ refs:
   exp-prom-k8s:
     kind: experiment
     title: "Prometheus 實驗：kube-prometheus-stack 57.2 上的驗證"
-    url: "https://github.com/HahaSula/prometheus-selfcheck-skills/blob/b8601c502454dc382691ff5dbd4a9ecff9532a24/EVIDENCE.md?plain=1#L145"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/prometheus/EVIDENCE.md?plain=1#L145"
   exp-pend:
     kind: experiment
     title: "Prometheus 實驗：rule group 執行模式與查詢 slot（2.55.1、3.13.5）"

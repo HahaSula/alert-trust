@@ -1,0 +1,432 @@
+{
+ "name": "memoff",
+ "phases": {
+  "base": {
+   "dur": 420,
+   "alerts_first_fire_s": {},
+   "sink": {
+    "Watchdog": {
+     "count": 12,
+     "max_gap_s": 75
+    },
+    "DataHeartbeat": {
+     "count": 14,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 11,
+     "max_gap_s": 91
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 80,
+     "min": 15.0011,
+     "avg": 15.0053,
+     "max": 15.0079
+    },
+    "scrape_dur_big": {
+     "n": 83,
+     "min": 0.5564,
+     "avg": 0.8535,
+     "max": 4.5697
+    },
+    "up_big": {
+     "n": 83,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 82,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 83,
+     "min": 0.0,
+     "avg": 6.6979,
+     "max": 9.8503
+    },
+    "rule_missed_5m": {
+     "n": 82,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_failed_5m": {
+     "n": 82,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 83,
+     "min": 12.9025,
+     "avg": 64838277.4642,
+     "max": 1793858533.868
+    },
+    "queue_time_p90": {
+     "n": 83,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0002
+    },
+    "queries_inflight": {
+     "n": 83,
+     "min": 0.0,
+     "avg": 0.3373,
+     "max": 1.0
+    },
+    "fsync_p99": {
+     "n": 0
+    },
+    "append_rate": {
+     "n": 81,
+     "min": 0.9208,
+     "avg": 18932.3716,
+     "max": 21902.5095
+    },
+    "wal_bytes": {
+     "n": 83,
+     "min": 0.0,
+     "avg": 44389106.6627,
+     "max": 82830105.0
+    },
+    "blocks": {
+     "n": 83,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "reloads_5m": {
+     "n": 82,
+     "min": 0.0,
+     "avg": 2.9739,
+     "max": 5.0849
+    },
+    "compact_failed_5m": {
+     "n": 82,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 82,
+     "min": 0.1714,
+     "avg": 0.5035,
+     "max": 0.6778
+    },
+    "rss": {
+     "n": 83,
+     "min": 187826176.0,
+     "avg": 1073854241.9277,
+     "max": 1362120704.0
+    },
+    "gc_p100": {
+     "n": 83,
+     "min": 0.0048,
+     "avg": 0.0229,
+     "max": 0.0253
+    },
+    "throttle_ratio": {
+     "n": 0
+    },
+    "working_set": {
+     "n": 83,
+     "min": 206073856.0,
+     "avg": 1024837360.5783,
+     "max": 1314484224.0
+    },
+    "notify_queue": {
+     "n": 83,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 82,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 81,
+     "min": 0.0048,
+     "avg": 0.006,
+     "max": 0.0065
+    },
+    "am_discovered": {
+     "n": 83,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    }
+   }
+  },
+  "steady": {
+   "dur": 480,
+   "alerts_first_fire_s": {
+    "M_MemNearLimit": 330
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 15,
+     "max_gap_s": 35
+    },
+    "DataHeartbeat": {
+     "count": 15,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 16,
+     "max_gap_s": 35
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 97,
+     "min": 15.0045,
+     "avg": 15.0083,
+     "max": 15.0171
+    },
+    "scrape_dur_big": {
+     "n": 97,
+     "min": 0.5834,
+     "avg": 0.9094,
+     "max": 1.2968
+    },
+    "up_big": {
+     "n": 97,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 97,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 97,
+     "min": 7.1551,
+     "avg": 8.5823,
+     "max": 11.4953
+    },
+    "rule_missed_5m": {
+     "n": 97,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_failed_5m": {
+     "n": 97,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 97,
+     "min": 13.0457,
+     "avg": 18.6663,
+     "max": 28.0485
+    },
+    "queue_time_p90": {
+     "n": 97,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "queries_inflight": {
+     "n": 97,
+     "min": 0.0,
+     "avg": 0.3711,
+     "max": 1.0
+    },
+    "fsync_p99": {
+     "n": 40,
+     "min": 0.0034,
+     "avg": 0.0034,
+     "max": 0.0034
+    },
+    "append_rate": {
+     "n": 97,
+     "min": 16434.1581,
+     "avg": 19924.7589,
+     "max": 21900.34
+    },
+    "wal_bytes": {
+     "n": 97,
+     "min": 82830105.0,
+     "avg": 127218107.9794,
+     "max": 172416472.0
+    },
+    "blocks": {
+     "n": 97,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "reloads_5m": {
+     "n": 97,
+     "min": 4.0678,
+     "avg": 4.9904,
+     "max": 5.0848
+    },
+    "compact_failed_5m": {
+     "n": 97,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 97,
+     "min": 0.5849,
+     "avg": 0.6712,
+     "max": 0.7824
+    },
+    "rss": {
+     "n": 97,
+     "min": 1071300608.0,
+     "avg": 1361280137.2371,
+     "max": 1553920000.0
+    },
+    "gc_p100": {
+     "n": 97,
+     "min": 0.0253,
+     "avg": 0.0283,
+     "max": 0.0329
+    },
+    "throttle_ratio": {
+     "n": 0
+    },
+    "working_set": {
+     "n": 97,
+     "min": 1023348736.0,
+     "avg": 1318063367.9175,
+     "max": 1508237312.0
+    },
+    "notify_queue": {
+     "n": 97,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 97,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 97,
+     "min": 0.0032,
+     "avg": 0.0061,
+     "max": 0.0065
+    },
+    "am_discovered": {
+     "n": 97,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    }
+   }
+  }
+ },
+ "extra": {
+  "restarts_after_base": 0,
+  "restarts_end": 0,
+  "for_state_changes": [
+   [
+    "M_RuleStale",
+    "0"
+   ],
+   [
+    "M_RuleStale",
+    "0"
+   ],
+   [
+    "M_ReloadStalled",
+    "0"
+   ],
+   [
+    "M_CPUThrottled",
+    "1"
+   ],
+   [
+    "DataHeartbeat",
+    "0"
+   ],
+   [
+    "KnownTrueCanary",
+    "0"
+   ],
+   [
+    "Watchdog",
+    "0"
+   ],
+   [
+    "SlowTargetNoOffset",
+    "0"
+   ],
+   [
+    "M_CPUThrottled",
+    "0"
+   ],
+   [
+    "SlowTargetExprOffset",
+    "0"
+   ],
+   [
+    "M_MemNearLimit",
+    "0"
+   ],
+   [
+    "M_MemNearLimit",
+    "0"
+   ],
+   [
+    "M_MemNearLimit",
+    "0"
+   ],
+   [
+    "M_MemNearLimit",
+    "0"
+   ],
+   [
+    "M_MemNearLimit",
+    "0"
+   ],
+   [
+    "M_MemNearLimit",
+    "2"
+   ],
+   [
+    "M_MemNearLimit",
+    "0"
+   ],
+   [
+    "M_MemNearLimit",
+    "0"
+   ],
+   [
+    "M_MemNearLimit",
+    "0"
+   ],
+   [
+    "M_MemNearLimit",
+    "2"
+   ],
+   [
+    "M_MemNearLimit",
+    "0"
+   ],
+   [
+    "M_MemNearLimit",
+    "0"
+   ]
+  ]
+ }
+}

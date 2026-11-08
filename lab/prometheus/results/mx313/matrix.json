@@ -1,0 +1,114 @@
+{
+ "D5_R2m_O0m": {
+  "resets_24m": 0.0,
+  "firing_points_24m": 96
+ },
+ "D5_R3m_O0m": {
+  "resets_24m": 0.0,
+  "firing_points_24m": 96
+ },
+ "D5_R5m_O0m": {
+  "resets_24m": 0.0,
+  "firing_points_24m": 96
+ },
+ "D20_R2m_O0m": {
+  "resets_24m": 24.0,
+  "pending_points_24m": 72
+ },
+ "D20_R3m_O0m": {
+  "resets_24m": 0.0,
+  "firing_points_24m": 96
+ },
+ "D20_R5m_O0m": {
+  "resets_24m": 0.0,
+  "firing_points_24m": 96
+ },
+ "D20_R2m_O1m": {
+  "resets_24m": 0.0,
+  "firing_points_24m": 96
+ },
+ "D20_R3m_O1m": {
+  "resets_24m": 0.0,
+  "firing_points_24m": 96
+ },
+ "D20_R5m_O1m": {
+  "resets_24m": 0.0,
+  "firing_points_24m": 96
+ },
+ "D40_R2m_O0m": {
+  "resets_24m": 23.0,
+  "pending_points_24m": 24
+ },
+ "D40_R3m_O0m": {
+  "resets_24m": 0.0,
+  "firing_points_24m": 96
+ },
+ "D40_R5m_O0m": {
+  "resets_24m": 0.0,
+  "firing_points_24m": 96
+ },
+ "D55_R2m_O0m": {
+  "resets_24m": 23.0,
+  "pending_points_24m": 24
+ },
+ "D55_R3m_O0m": {
+  "resets_24m": 0.0,
+  "firing_points_24m": 96
+ },
+ "D55_R5m_O0m": {
+  "resets_24m": 0.0,
+  "firing_points_24m": 96
+ },
+ "D5_R2m_O1m": {
+  "resets_24m": 0.0,
+  "firing_points_24m": 96
+ },
+ "D5_R3m_O1m": {
+  "resets_24m": 0.0,
+  "firing_points_24m": 96
+ },
+ "D5_R5m_O1m": {
+  "resets_24m": 0.0,
+  "firing_points_24m": 96
+ },
+ "D40_R2m_O1m": {
+  "resets_24m": 0.0,
+  "firing_points_24m": 96
+ },
+ "D40_R3m_O1m": {
+  "resets_24m": 0.0,
+  "firing_points_24m": 96
+ },
+ "D40_R5m_O1m": {
+  "resets_24m": 0.0,
+  "firing_points_24m": 96
+ },
+ "D55_R2m_O1m": {
+  "resets_24m": 0.0,
+  "firing_points_24m": 96
+ },
+ "D55_R3m_O1m": {
+  "resets_24m": 0.0,
+  "firing_points_24m": 96
+ },
+ "D55_R5m_O1m": {
+  "resets_24m": 0.0,
+  "firing_points_24m": 96
+ },
+ "_d5": {
+  "scrape_duration": "5.015397063",
+  "scrapes_24m": "24"
+ },
+ "_d20": {
+  "scrape_duration": "20.006977406",
+  "scrapes_24m": "24"
+ },
+ "_d40": {
+  "scrape_duration": "40.002948661",
+  "scrapes_24m": "23"
+ },
+ "_d55": {
+  "scrape_duration": "55.003175033",
+  "scrapes_24m": "23"
+ }
+}

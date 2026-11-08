@@ -1,0 +1,7 @@
+groups:
+  - name: slow-target-query-offset   # 2.53+ only
+    query_offset: 2m
+    rules:
+      - alert: SlowTargetQueryOffset
+        expr: rate(demo_requests_total{job="slow"}[5m]) > 1
+        for: 3m

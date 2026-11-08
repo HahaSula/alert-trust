@@ -33,7 +33,7 @@
 5. **規則範本的 job selector**：`PrometheusDown`、`PrometheusCrashLooping` 用 `job=~".*prometheus.*"`，job 名稱不同的環境會「規則在但沒資料」（`lab/coverage` 實測）。要在文件與 skill 強調必須調整，或改成 label 參數化。
 6. **覆蓋狀態輸出成 metric**：讓 `check_coverage.py` 定期執行並輸出每個元件、每個訊號的狀態，由外部觀察者抓取並告警，讓 monitor of monitor 的缺口本身也會通知。
 7. **CI 用的 policy lint**：舊 repo 的 `policy_lint.py`、`analyze_rules.py` 尚未改寫成讀新目錄。
-8. **建立 GitHub repo、push、開 Pages**；在 `prometheus-selfcheck-skills` README 指向新 repo。
+8. （已完成）GitHub repo 已建立並 push，Pages 已上線；舊 repo 的實驗搬到 `lab/prometheus/`，舊 repo 已封存。
 9. **小項目**：MySQL `NoWritablePrimary` 修正後未重跑；PG17、`/probe`、auto-discover 只讀碼；契約頁的圖未截圖確認；Prometheus 報告的例子（30s／100s／120s）使用者尚未表示意見。
 
 ## 已做的決定

@@ -1,0 +1,5 @@
+groups:
+  - name: meta-blocks
+    rules:
+      - { alert: M_HeadNotCompacting, expr: 'prometheus_tsdb_head_max_time_seconds{job="prom"} - prometheus_tsdb_head_min_time_seconds{job="prom"} > 600', for: 1m }
+      - { alert: M_RetentionBehind, expr: 'time() - prometheus_tsdb_lowest_timestamp_seconds{job="prom"} > 1500', for: 1m }

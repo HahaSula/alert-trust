@@ -1,0 +1,35 @@
+{
+ "313to255": {
+  "from": "prom/prometheus:v3.13.5",
+  "to": "prom/prometheus:v2.55.1",
+  "blocks_before": "1",
+  "samples_before": "20500",
+  "status": "running",
+  "samples_after": "20500",
+  "blocks_after": "1",
+  "corruptions": "0",
+  "warnings": ""
+ },
+ "251to313": {
+  "from": "prom/prometheus:v2.51.2",
+  "to": "prom/prometheus:v3.13.5",
+  "blocks_before": "1",
+  "samples_before": "20500",
+  "status": "running",
+  "samples_after": "20500",
+  "blocks_after": "2",
+  "corruptions": "0",
+  "warnings": ""
+ },
+ "313to251": {
+  "from": "prom/prometheus:v3.13.5",
+  "to": "prom/prometheus:v2.51.2",
+  "blocks_before": "1",
+  "samples_before": "21000",
+  "status": "running",
+  "samples_after": "21000",
+  "blocks_after": "2",
+  "corruptions": "0",
+  "warnings": ""
+ }
+}

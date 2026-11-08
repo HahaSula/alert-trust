@@ -1,0 +1,50 @@
+{
+ "snaps": {
+  "end_base": [
+   "202MB used",
+   "83\t/prometheus/wal 28\t/prometheus/chunks_head ",
+   "4",
+   "2",
+   "0"
+  ],
+  "end_full": [
+   "2048MB used",
+   "83\t/prometheus/wal 28\t/prometheus/chunks_head ",
+   "4",
+   "2",
+   "0"
+  ],
+  "end_freed": [
+   "285MB used",
+   "135\t/prometheus/wal 60\t/prometheus/chunks_head ",
+   "7",
+   "2",
+   "0"
+  ],
+  "end_restart": [
+   "91MB used",
+   "40\t/prometheus/wal 16\t/prometheus/chunks_head ",
+   "4",
+   "2",
+   "0"
+  ]
+ },
+ "log_counts": {
+  "no space left": 446,
+  "write to WAL": 446,
+  "Scrape commit failed": 124,
+  "compaction failed": 2,
+  "persist head block": 0,
+  "create checkpoint": 2,
+  "WAL truncation in Compact": 2,
+  "unexpected full record": 3,
+  "Encountered WAL read error": 1,
+  "Starting corruption repair": 1,
+  "Successfully repaired WAL": 1,
+  "reloadBlocks": 0,
+  "Deleting obsolete block": 7,
+  "panic": 0,
+  "Rule sample appending failed": 322,
+  "Evaluating rule failed": 0
+ }
+}

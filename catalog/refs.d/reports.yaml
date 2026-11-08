@@ -46,7 +46,7 @@ refs:
   exp-prom-probe:
     kind: experiment
     title: "Prometheus 實驗：rule 當下可見資料的探針（2.51.2）"
-    url: "https://github.com/HahaSula/prometheus-selfcheck-skills/blob/b8601c502454dc382691ff5dbd4a9ecff9532a24/lab/results/probe/probe.json"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/prometheus/results/probe/probe.json"
   exp-am-compat:
     kind: experiment
     title: "Alertmanager 實驗：設定相容性與升級中斷點（0.27.0–0.34.2）"

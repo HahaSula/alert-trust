@@ -1,0 +1,694 @@
+{
+ "name": "iops2",
+ "phases": {
+  "base": {
+   "dur": 720,
+   "alerts_first_fire_s": {},
+   "sink": {
+    "Watchdog": {
+     "count": 23,
+     "max_gap_s": 35
+    },
+    "DataHeartbeat": {
+     "count": 23,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 21,
+     "max_gap_s": 88
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 140,
+     "min": 15.0016,
+     "avg": 15.019,
+     "max": 15.0258
+    },
+    "scrape_dur_big": {
+     "n": 143,
+     "min": 0.6309,
+     "avg": 0.9289,
+     "max": 4.4239
+    },
+    "up_big": {
+     "n": 143,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 142,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 143,
+     "min": 0.0,
+     "avg": 9.2468,
+     "max": 17.0592
+    },
+    "rule_missed_5m": {
+     "n": 142,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_failed_5m": {
+     "n": 142,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 143,
+     "min": 5.4435,
+     "avg": 12544483.5545,
+     "max": 1793858511.399
+    },
+    "queue_time_p90": {
+     "n": 142,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0001
+    },
+    "queries_inflight": {
+     "n": 143,
+     "min": 0.0,
+     "avg": 0.5315,
+     "max": 1.0
+    },
+    "fsync_p99": {
+     "n": 50,
+     "min": 0.0234,
+     "avg": 0.0234,
+     "max": 0.0234
+    },
+    "append_rate": {
+     "n": 141,
+     "min": 0.0,
+     "avg": 19407.4705,
+     "max": 21899.8909
+    },
+    "wal_bytes": {
+     "n": 143,
+     "min": 0.0,
+     "avg": 72522472.5315,
+     "max": 138849713.0
+    },
+    "blocks": {
+     "n": 143,
+     "min": 0.0,
+     "avg": 0.4266,
+     "max": 2.0
+    },
+    "reloads_5m": {
+     "n": 142,
+     "min": 0.0,
+     "avg": 3.9445,
+     "max": 6.1017
+    },
+    "compact_failed_5m": {
+     "n": 142,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 142,
+     "min": 0.1134,
+     "avg": 0.7446,
+     "max": 1.2924
+    },
+    "rss": {
+     "n": 143,
+     "min": 332267520.0,
+     "avg": 1181545794.2378,
+     "max": 1663025152.0
+    },
+    "gc_p100": {
+     "n": 143,
+     "min": 0.0063,
+     "avg": 0.0318,
+     "max": 0.032
+    },
+    "throttle_ratio": {
+     "n": 0
+    },
+    "working_set": {
+     "n": 143,
+     "min": 86978560.0,
+     "avg": 1071775199.7762,
+     "max": 1422753792.0
+    },
+    "notify_queue": {
+     "n": 143,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 142,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 142,
+     "min": 0.0099,
+     "avg": 0.011,
+     "max": 0.0112
+    },
+    "am_discovered": {
+     "n": 143,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    }
+   }
+  },
+  "iops_50": {
+   "dur": 720,
+   "alerts_first_fire_s": {
+    "M_RuleGroupSlow": 15,
+    "M_AlertFlapping": 605,
+    "M_WalFsyncSlow": 645
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 23,
+     "max_gap_s": 35
+    },
+    "DataHeartbeat": {
+     "count": 23,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 23,
+     "max_gap_s": 35
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 145,
+     "min": 15.0068,
+     "avg": 15.01,
+     "max": 15.0258
+    },
+    "scrape_dur_big": {
+     "n": 145,
+     "min": 0.6116,
+     "avg": 0.7703,
+     "max": 1.4149
+    },
+    "up_big": {
+     "n": 145,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 145,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 145,
+     "min": 5.8182,
+     "avg": 10.3493,
+     "max": 19.1849
+    },
+    "rule_missed_5m": {
+     "n": 145,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_failed_5m": {
+     "n": 145,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 145,
+     "min": 11.1915,
+     "avg": 20.6854,
+     "max": 37.828
+    },
+    "queue_time_p90": {
+     "n": 145,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "queries_inflight": {
+     "n": 145,
+     "min": 0.0,
+     "avg": 0.6,
+     "max": 1.0
+    },
+    "fsync_p99": {
+     "n": 145,
+     "min": 0.004,
+     "avg": 0.1598,
+     "max": 0.7259
+    },
+    "append_rate": {
+     "n": 145,
+     "min": 16435.3091,
+     "avg": 20087.6571,
+     "max": 21900.5091
+    },
+    "wal_bytes": {
+     "n": 145,
+     "min": 122065788.0,
+     "avg": 180852860.1448,
+     "max": 245255731.0
+    },
+    "blocks": {
+     "n": 145,
+     "min": 2.0,
+     "avg": 2.8138,
+     "max": 4.0
+    },
+    "reloads_5m": {
+     "n": 145,
+     "min": 4.0676,
+     "avg": 5.0567,
+     "max": 6.1017
+    },
+    "compact_failed_5m": {
+     "n": 145,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 145,
+     "min": 0.716,
+     "avg": 1.0093,
+     "max": 1.3638
+    },
+    "rss": {
+     "n": 145,
+     "min": 1167663104.0,
+     "avg": 1529523743.7793,
+     "max": 1929826304.0
+    },
+    "gc_p100": {
+     "n": 145,
+     "min": 0.032,
+     "avg": 0.032,
+     "max": 0.032
+    },
+    "throttle_ratio": {
+     "n": 0
+    },
+    "working_set": {
+     "n": 145,
+     "min": 928624640.0,
+     "avg": 1211510501.5172,
+     "max": 1575751680.0
+    },
+    "notify_queue": {
+     "n": 145,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 145,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 145,
+     "min": 0.0043,
+     "avg": 0.01,
+     "max": 0.0114
+    },
+    "am_discovered": {
+     "n": 145,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    }
+   }
+  },
+  "iops_10": {
+   "dur": 720,
+   "alerts_first_fire_s": {
+    "M_AlertFlapping": 0,
+    "M_WalFsyncSlow": 0,
+    "M_RetentionBehind": 110,
+    "M_HeadNotCompacting": 615
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 24,
+     "max_gap_s": 30
+    },
+    "DataHeartbeat": {
+     "count": 23,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 23,
+     "max_gap_s": 35
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 145,
+     "min": 15.0049,
+     "avg": 15.0089,
+     "max": 15.0149
+    },
+    "scrape_dur_big": {
+     "n": 145,
+     "min": 0.5889,
+     "avg": 0.6827,
+     "max": 1.4406
+    },
+    "up_big": {
+     "n": 145,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 145,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 145,
+     "min": 5.3552,
+     "avg": 8.1244,
+     "max": 13.5106
+    },
+    "rule_missed_5m": {
+     "n": 145,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_failed_5m": {
+     "n": 145,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 145,
+     "min": 12.9733,
+     "avg": 19.3531,
+     "max": 27.9743
+    },
+    "queue_time_p90": {
+     "n": 145,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "queries_inflight": {
+     "n": 145,
+     "min": 0.0,
+     "avg": 0.4276,
+     "max": 1.0
+    },
+    "fsync_p99": {
+     "n": 145,
+     "min": 0.7259,
+     "avg": 4.7726,
+     "max": 7.7113
+    },
+    "append_rate": {
+     "n": 145,
+     "min": 16434.4,
+     "avg": 20087.2884,
+     "max": 21899.4182
+    },
+    "wal_bytes": {
+     "n": 145,
+     "min": 150061178.0,
+     "avg": 210160644.7172,
+     "max": 280502580.0
+    },
+    "blocks": {
+     "n": 145,
+     "min": 4.0,
+     "avg": 4.669,
+     "max": 6.0
+    },
+    "reloads_5m": {
+     "n": 145,
+     "min": 0.0,
+     "avg": 2.7212,
+     "max": 5.0849
+    },
+    "compact_failed_5m": {
+     "n": 145,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 145,
+     "min": 0.5629,
+     "avg": 0.7534,
+     "max": 0.9565
+    },
+    "rss": {
+     "n": 145,
+     "min": 1316397056.0,
+     "avg": 1750501785.6,
+     "max": 2136612864.0
+    },
+    "gc_p100": {
+     "n": 145,
+     "min": 0.044,
+     "avg": 0.0444,
+     "max": 0.0599
+    },
+    "throttle_ratio": {
+     "n": 0
+    },
+    "working_set": {
+     "n": 145,
+     "min": 919568384.0,
+     "avg": 1309485719.8345,
+     "max": 1684852736.0
+    },
+    "notify_queue": {
+     "n": 145,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 145,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 145,
+     "min": 0.0114,
+     "avg": 0.0162,
+     "max": 0.0172
+    },
+    "am_discovered": {
+     "n": 145,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    }
+   }
+  },
+  "recover": {
+   "dur": 300,
+   "alerts_first_fire_s": {
+    "M_HeadNotCompacting": 0,
+    "M_RetentionBehind": 0,
+    "M_WalFsyncSlow": 0,
+    "M_RuleGroupSlow": 140
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 10,
+     "max_gap_s": 35
+    },
+    "DataHeartbeat": {
+     "count": 9,
+     "max_gap_s": 33
+    },
+    "KnownTrueCanary": {
+     "count": 10,
+     "max_gap_s": 30
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 61,
+     "min": 15.0101,
+     "avg": 15.012,
+     "max": 15.0281
+    },
+    "scrape_dur_big": {
+     "n": 61,
+     "min": 0.6114,
+     "avg": 0.7482,
+     "max": 0.976
+    },
+    "up_big": {
+     "n": 61,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 61,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 61,
+     "min": 5.428,
+     "avg": 9.7953,
+     "max": 14.9131
+    },
+    "rule_missed_5m": {
+     "n": 61,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_failed_5m": {
+     "n": 61,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 61,
+     "min": 10.3033,
+     "avg": 19.074,
+     "max": 30.3043
+    },
+    "queue_time_p90": {
+     "n": 61,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "queries_inflight": {
+     "n": 61,
+     "min": 0.0,
+     "avg": 0.5902,
+     "max": 1.0
+    },
+    "fsync_p99": {
+     "n": 61,
+     "min": 0.5928,
+     "avg": 0.7849,
+     "max": 0.8475
+    },
+    "append_rate": {
+     "n": 61,
+     "min": 16435.6727,
+     "avg": 20104.6853,
+     "max": 21908.8727
+    },
+    "wal_bytes": {
+     "n": 61,
+     "min": 71668113.0,
+     "avg": 116228769.918,
+     "max": 222836266.0
+    },
+    "blocks": {
+     "n": 61,
+     "min": 7.0,
+     "avg": 7.0,
+     "max": 7.0
+    },
+    "reloads_5m": {
+     "n": 61,
+     "min": 1.0169,
+     "avg": 3.1509,
+     "max": 5.0849
+    },
+    "compact_failed_5m": {
+     "n": 61,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 61,
+     "min": 0.6065,
+     "avg": 0.9269,
+     "max": 1.2913
+    },
+    "rss": {
+     "n": 61,
+     "min": 1381634048.0,
+     "avg": 1766852977.3115,
+     "max": 2134859776.0
+    },
+    "gc_p100": {
+     "n": 61,
+     "min": 0.0599,
+     "avg": 0.0599,
+     "max": 0.0599
+    },
+    "throttle_ratio": {
+     "n": 0
+    },
+    "working_set": {
+     "n": 61,
+     "min": 1045467136.0,
+     "avg": 1351182973.9016,
+     "max": 1781272576.0
+    },
+    "notify_queue": {
+     "n": 61,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 61,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 61,
+     "min": 0.0534,
+     "avg": 0.0534,
+     "max": 0.0534
+    },
+    "am_discovered": {
+     "n": 61,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    }
+   }
+  }
+ },
+ "extra": {
+  "probe": {
+   "base": "0",
+   "iops_50": "7",
+   "iops_10": "98"
+  }
+ }
+}

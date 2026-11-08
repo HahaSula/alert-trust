@@ -1,0 +1,16 @@
+{
+ "compaction_failed_total": "18",
+ "reloads_last_5m": "0",
+ "triggered": "35",
+ "span_s": 668.0,
+ "blocks": "2",
+ "log_counts": {
+  "no space left": 469,
+  "persist head block": 0,
+  "compaction failed": 18,
+  "reloadBlocks": 0,
+  "unexpected full record": 0,
+  "Deleting obsolete block": 2,
+  "panic": 0
+ }
+}

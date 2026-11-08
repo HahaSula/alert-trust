@@ -1,0 +1,1486 @@
+{
+ "name": "blind",
+ "phases": {
+  "base": {
+   "dur": 240,
+   "alerts_first_fire_s": {
+    "M_ReloadStalled": 15
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 8,
+     "max_gap_s": 35
+    },
+    "DataHeartbeat": {
+     "count": 8,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 6,
+     "max_gap_s": 83
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 44,
+     "min": 15.0008,
+     "avg": 15.0011,
+     "max": 15.0011
+    },
+    "scrape_dur_big": {
+     "n": 46,
+     "min": 0.5476,
+     "avg": 0.8224,
+     "max": 3.108
+    },
+    "up_big": {
+     "n": 46,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 47,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 47,
+     "min": 0.0005,
+     "avg": 3.7221,
+     "max": 6.2731
+    },
+    "rule_missed_5m": {
+     "n": 46,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_failed_5m": {
+     "n": 46,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 47,
+     "min": 10.1737,
+     "avg": 38167177.6477,
+     "max": 1793856626.137
+    },
+    "queue_time_p90": {
+     "n": 47,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "queries_inflight": {
+     "n": 47,
+     "min": 0.0,
+     "avg": 0.3617,
+     "max": 1.0
+    },
+    "fsync_p99": {
+     "n": 0
+    },
+    "append_rate": {
+     "n": 46,
+     "min": 0.0,
+     "avg": 17938.12,
+     "max": 21890.0304
+    },
+    "wal_bytes": {
+     "n": 47,
+     "min": 281.0,
+     "avg": 25696113.6383,
+     "max": 46442062.0
+    },
+    "blocks": {
+     "n": 47,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "reloads_5m": {
+     "n": 46,
+     "min": 0.0,
+     "avg": 1.6376,
+     "max": 3.1137
+    },
+    "compact_failed_5m": {
+     "n": 46,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 46,
+     "min": 0.0008,
+     "avg": 0.373,
+     "max": 0.5358
+    },
+    "rss": {
+     "n": 47,
+     "min": 70385664.0,
+     "avg": 973487517.9574,
+     "max": 1202348032.0
+    },
+    "gc_p100": {
+     "n": 47,
+     "min": 0.0003,
+     "avg": 0.0059,
+     "max": 0.0088
+    },
+    "throttle_ratio": {
+     "n": 0
+    },
+    "working_set": {
+     "n": 176,
+     "min": 45363200.0,
+     "avg": 539551418.1818,
+     "max": 1243185152.0
+    },
+    "notify_queue": {
+     "n": 47,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 46,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 46,
+     "min": 0.0033,
+     "avg": 0.0033,
+     "max": 0.0033
+    },
+    "am_discovered": {
+     "n": 47,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    }
+   }
+  },
+  "target_small_down": {
+   "dur": 240,
+   "alerts_first_fire_s": {
+    "M_TargetDown": 70,
+    "M_DataHeartbeatLost": 115,
+    "M_KnownTrueLost": 155
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 8,
+     "max_gap_s": 35
+    },
+    "DataHeartbeat": {
+     "count": 0,
+     "max_gap_s": 240
+    },
+    "KnownTrueCanary": {
+     "count": 1,
+     "max_gap_s": 213
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 49,
+     "min": 15.0011,
+     "avg": 15.0039,
+     "max": 15.0062
+    },
+    "scrape_dur_big": {
+     "n": 49,
+     "min": 0.5634,
+     "avg": 0.6911,
+     "max": 0.9856
+    },
+    "up_big": {
+     "n": 49,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.0204,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 49,
+     "min": 5.2974,
+     "avg": 6.6423,
+     "max": 8.2539
+    },
+    "rule_missed_5m": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_failed_5m": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 49,
+     "min": 6.7153,
+     "avg": 15.0804,
+     "max": 21.7164
+    },
+    "queue_time_p90": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "queries_inflight": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.551,
+     "max": 1.0
+    },
+    "fsync_p99": {
+     "n": 0
+    },
+    "append_rate": {
+     "n": 49,
+     "min": 16444.4182,
+     "avg": 20111.5677,
+     "max": 21890.0364
+    },
+    "wal_bytes": {
+     "n": 49,
+     "min": 49233406.0,
+     "avg": 70715920.7755,
+     "max": 94018444.0
+    },
+    "blocks": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "reloads_5m": {
+     "n": 49,
+     "min": 4.0437,
+     "avg": 4.7687,
+     "max": 5.0848
+    },
+    "compact_failed_5m": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 49,
+     "min": 0.4496,
+     "avg": 0.5704,
+     "max": 0.6745
+    },
+    "rss": {
+     "n": 49,
+     "min": 1020043264.0,
+     "avg": 1179051823.0204,
+     "max": 1398910976.0
+    },
+    "gc_p100": {
+     "n": 49,
+     "min": 0.0088,
+     "avg": 0.0088,
+     "max": 0.0088
+    },
+    "throttle_ratio": {
+     "n": 0
+    },
+    "working_set": {
+     "n": 441,
+     "min": 45490176.0,
+     "avg": 599256224.2177,
+     "max": 1947680768.0
+    },
+    "notify_queue": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 49,
+     "min": 0.0033,
+     "avg": 0.0293,
+     "max": 0.0431
+    },
+    "am_discovered": {
+     "n": 49,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    }
+   }
+  },
+  "rec1": {
+   "dur": 180,
+   "alerts_first_fire_s": {
+    "M_DataHeartbeatLost": 0,
+    "M_KnownTrueLost": 0,
+    "M_TargetDown": 0
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 5,
+     "max_gap_s": 35
+    },
+    "DataHeartbeat": {
+     "count": 6,
+     "max_gap_s": 30
+    },
+    "KnownTrueCanary": {
+     "count": 4,
+     "max_gap_s": 81
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 37,
+     "min": 15.0047,
+     "avg": 15.0052,
+     "max": 15.0062
+    },
+    "scrape_dur_big": {
+     "n": 37,
+     "min": 0.6492,
+     "avg": 0.9276,
+     "max": 1.2596
+    },
+    "up_big": {
+     "n": 37,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.973,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 37,
+     "min": 7.6633,
+     "avg": 8.421,
+     "max": 9.1066
+    },
+    "rule_missed_5m": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_failed_5m": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 37,
+     "min": 12.3245,
+     "avg": 17.2067,
+     "max": 22.3494
+    },
+    "queue_time_p90": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "queries_inflight": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.6486,
+     "max": 1.0
+    },
+    "fsync_p99": {
+     "n": 0
+    },
+    "append_rate": {
+     "n": 37,
+     "min": 16435.6545,
+     "avg": 20123.6186,
+     "max": 21899.4364
+    },
+    "wal_bytes": {
+     "n": 37,
+     "min": 94018444.0,
+     "avg": 109908238.2973,
+     "max": 127607067.0
+    },
+    "blocks": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "reloads_5m": {
+     "n": 37,
+     "min": 4.0678,
+     "avg": 5.0023,
+     "max": 5.0847
+    },
+    "compact_failed_5m": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 37,
+     "min": 0.5964,
+     "avg": 0.6495,
+     "max": 0.7109
+    },
+    "rss": {
+     "n": 37,
+     "min": 1131352064.0,
+     "avg": 1321997727.1351,
+     "max": 1451487232.0
+    },
+    "gc_p100": {
+     "n": 37,
+     "min": 0.0088,
+     "avg": 0.0213,
+     "max": 0.0331
+    },
+    "throttle_ratio": {
+     "n": 0
+    },
+    "working_set": {
+     "n": 333,
+     "min": 45600768.0,
+     "avg": 738960344.024,
+     "max": 2171330560.0
+    },
+    "notify_queue": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 37,
+     "min": 0.0431,
+     "avg": 0.0431,
+     "max": 0.0431
+    },
+    "am_discovered": {
+     "n": 37,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    }
+   }
+  },
+  "big_target_down": {
+   "dur": 180,
+   "alerts_first_fire_s": {
+    "M_TargetDown": 80
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 6,
+     "max_gap_s": 35
+    },
+    "DataHeartbeat": {
+     "count": 6,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 6,
+     "max_gap_s": 35
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 37,
+     "min": 15.0047,
+     "avg": 15.0048,
+     "max": 15.0062
+    },
+    "scrape_dur_big": {
+     "n": 37,
+     "min": 0.0356,
+     "avg": 0.1502,
+     "max": 0.9463
+    },
+    "up_big": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0541,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 37,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 37,
+     "min": 6.7503,
+     "avg": 8.101,
+     "max": 8.8029
+    },
+    "rule_missed_5m": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_failed_5m": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 37,
+     "min": 13.7477,
+     "avg": 18.6175,
+     "max": 23.7544
+    },
+    "queue_time_p90": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "queries_inflight": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.6486,
+     "max": 1.0
+    },
+    "fsync_p99": {
+     "n": 0
+    },
+    "append_rate": {
+     "n": 37,
+     "min": 33.3455,
+     "avg": 5506.0024,
+     "max": 21899.4182
+    },
+    "wal_bytes": {
+     "n": 37,
+     "min": 127607067.0,
+     "avg": 129000146.4865,
+     "max": 129142208.0
+    },
+    "blocks": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "reloads_5m": {
+     "n": 37,
+     "min": 4.0678,
+     "avg": 5.0023,
+     "max": 5.0847
+    },
+    "compact_failed_5m": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 37,
+     "min": 0.4929,
+     "avg": 0.587,
+     "max": 0.7229
+    },
+    "rss": {
+     "n": 37,
+     "min": 1237504000.0,
+     "avg": 1388193625.9459,
+     "max": 1425047552.0
+    },
+    "gc_p100": {
+     "n": 37,
+     "min": 0.0331,
+     "avg": 0.0331,
+     "max": 0.0331
+    },
+    "throttle_ratio": {
+     "n": 0
+    },
+    "working_set": {
+     "n": 333,
+     "min": 49901568.0,
+     "avg": 750591643.2913,
+     "max": 1940942848.0
+    },
+    "notify_queue": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 37,
+     "min": 0.0431,
+     "avg": 0.0431,
+     "max": 0.0431
+    },
+    "am_discovered": {
+     "n": 37,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    }
+   }
+  },
+  "rec2": {
+   "dur": 150,
+   "alerts_first_fire_s": {
+    "M_TargetDown": 0
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 5,
+     "max_gap_s": 30
+    },
+    "DataHeartbeat": {
+     "count": 5,
+     "max_gap_s": 30
+    },
+    "KnownTrueCanary": {
+     "count": 4,
+     "max_gap_s": 35
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 31,
+     "min": 15.004,
+     "avg": 15.0053,
+     "max": 15.0062
+    },
+    "scrape_dur_big": {
+     "n": 31,
+     "min": 0.0508,
+     "avg": 0.7503,
+     "max": 1.1906
+    },
+    "up_big": {
+     "n": 31,
+     "min": 0.0,
+     "avg": 0.9355,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 31,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 31,
+     "min": 6.585,
+     "avg": 7.5068,
+     "max": 8.5389
+    },
+    "rule_missed_5m": {
+     "n": 31,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_failed_5m": {
+     "n": 31,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 31,
+     "min": 14.3186,
+     "avg": 19.1622,
+     "max": 24.3253
+    },
+    "queue_time_p90": {
+     "n": 31,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "queries_inflight": {
+     "n": 31,
+     "min": 0.0,
+     "avg": 0.6452,
+     "max": 1.0
+    },
+    "fsync_p99": {
+     "n": 25,
+     "min": 0.0291,
+     "avg": 0.0291,
+     "max": 0.0291
+    },
+    "append_rate": {
+     "n": 31,
+     "min": 33.3455,
+     "avg": 15548.2217,
+     "max": 21890.3273
+    },
+    "wal_bytes": {
+     "n": 31,
+     "min": 129142208.0,
+     "avg": 142242230.8065,
+     "max": 157137205.0
+    },
+    "blocks": {
+     "n": 31,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "reloads_5m": {
+     "n": 31,
+     "min": 4.0678,
+     "avg": 5.0191,
+     "max": 5.085
+    },
+    "compact_failed_5m": {
+     "n": 31,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 31,
+     "min": 0.4818,
+     "avg": 0.5957,
+     "max": 0.6716
+    },
+    "rss": {
+     "n": 31,
+     "min": 1232179200.0,
+     "avg": 1365435821.4194,
+     "max": 1449177088.0
+    },
+    "gc_p100": {
+     "n": 31,
+     "min": 0.0331,
+     "avg": 0.0369,
+     "max": 0.0384
+    },
+    "throttle_ratio": {
+     "n": 0
+    },
+    "working_set": {
+     "n": 279,
+     "min": 48119808.0,
+     "avg": 744303861.9068,
+     "max": 1724858368.0
+    },
+    "notify_queue": {
+     "n": 31,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 31,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 31,
+     "min": 0.0131,
+     "avg": 0.0163,
+     "max": 0.0431
+    },
+    "am_discovered": {
+     "n": 31,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    }
+   }
+  },
+  "am_down": {
+   "dur": 240,
+   "alerts_first_fire_s": {
+    "M_NotifyDropped": 15,
+    "M_NotifyErrors": 45,
+    "M_KnownTrueLost": 100,
+    "M_DataHeartbeatLost": 105,
+    "M_WatchdogLost": 105
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 0,
+     "max_gap_s": 240
+    },
+    "DataHeartbeat": {
+     "count": 0,
+     "max_gap_s": 240
+    },
+    "KnownTrueCanary": {
+     "count": 0,
+     "max_gap_s": 240
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 49,
+     "min": 15.004,
+     "avg": 15.0047,
+     "max": 15.0076
+    },
+    "scrape_dur_big": {
+     "n": 49,
+     "min": 0.5773,
+     "avg": 0.8426,
+     "max": 1.2877
+    },
+    "up_big": {
+     "n": 49,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 49,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 49,
+     "min": 6.665,
+     "avg": 8.1957,
+     "max": 9.8595
+    },
+    "rule_missed_5m": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_failed_5m": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 49,
+     "min": 13.5194,
+     "avg": 18.5275,
+     "max": 23.5293
+    },
+    "queue_time_p90": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "queries_inflight": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.6735,
+     "max": 1.0
+    },
+    "fsync_p99": {
+     "n": 49,
+     "min": 0.0291,
+     "avg": 0.0291,
+     "max": 0.0291
+    },
+    "append_rate": {
+     "n": 49,
+     "min": 16435.6727,
+     "avg": 20112.0839,
+     "max": 21899.4182
+    },
+    "wal_bytes": {
+     "n": 49,
+     "min": 157140493.0,
+     "avg": 179537822.9184,
+     "max": 201940142.0
+    },
+    "blocks": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "reloads_5m": {
+     "n": 49,
+     "min": 4.0678,
+     "avg": 5.0017,
+     "max": 5.0848
+    },
+    "compact_failed_5m": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 49,
+     "min": 0.5585,
+     "avg": 0.6916,
+     "max": 0.8316
+    },
+    "rss": {
+     "n": 49,
+     "min": 1164062720.0,
+     "avg": 1414495420.0816,
+     "max": 1688076288.0
+    },
+    "gc_p100": {
+     "n": 49,
+     "min": 0.0384,
+     "avg": 0.0384,
+     "max": 0.0384
+    },
+    "throttle_ratio": {
+     "n": 0
+    },
+    "working_set": {
+     "n": 441,
+     "min": 49246208.0,
+     "avg": 765351086.1497,
+     "max": 1799262208.0
+    },
+    "notify_queue": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.0405,
+     "max": 0.0609
+    },
+    "notify_latency_p99": {
+     "n": 49,
+     "min": 0.0166,
+     "avg": 0.052,
+     "max": 0.0597
+    },
+    "am_discovered": {
+     "n": 49,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    }
+   }
+  },
+  "rec3": {
+   "dur": 180,
+   "alerts_first_fire_s": {
+    "M_NotifyErrors": 0,
+    "M_DataHeartbeatLost": 0,
+    "M_KnownTrueLost": 0,
+    "M_NotifyDropped": 0,
+    "M_WatchdogLost": 0
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 5,
+     "max_gap_s": 43
+    },
+    "DataHeartbeat": {
+     "count": 4,
+     "max_gap_s": 73
+    },
+    "KnownTrueCanary": {
+     "count": 4,
+     "max_gap_s": 73
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 37,
+     "min": 15.0055,
+     "avg": 15.0059,
+     "max": 15.0076
+    },
+    "scrape_dur_big": {
+     "n": 37,
+     "min": 0.5385,
+     "avg": 0.6259,
+     "max": 0.8147
+    },
+    "up_big": {
+     "n": 37,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 37,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 37,
+     "min": 6.4261,
+     "avg": 7.3316,
+     "max": 9.2542
+    },
+    "rule_missed_5m": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_failed_5m": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 37,
+     "min": 14.4836,
+     "avg": 19.4893,
+     "max": 24.4904
+    },
+    "queue_time_p90": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "queries_inflight": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.6757,
+     "max": 1.0
+    },
+    "fsync_p99": {
+     "n": 37,
+     "min": 0.0291,
+     "avg": 0.0291,
+     "max": 0.0291
+    },
+    "append_rate": {
+     "n": 37,
+     "min": 16435.7818,
+     "avg": 20123.9184,
+     "max": 21899.3091
+    },
+    "wal_bytes": {
+     "n": 37,
+     "min": 201940142.0,
+     "avg": 218736368.7568,
+     "max": 235531048.0
+    },
+    "blocks": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "reloads_5m": {
+     "n": 37,
+     "min": 4.0678,
+     "avg": 5.0023,
+     "max": 5.0847
+    },
+    "compact_failed_5m": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 37,
+     "min": 0.5145,
+     "avg": 0.6168,
+     "max": 0.6835
+    },
+    "rss": {
+     "n": 37,
+     "min": 1443921920.0,
+     "avg": 1571781548.973,
+     "max": 1743790080.0
+    },
+    "gc_p100": {
+     "n": 37,
+     "min": 0.0384,
+     "avg": 0.0384,
+     "max": 0.0384
+    },
+    "throttle_ratio": {
+     "n": 0
+    },
+    "working_set": {
+     "n": 303,
+     "min": 49987584.0,
+     "avg": 721289297.1089,
+     "max": 1700331520.0
+    },
+    "notify_queue": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0284,
+     "max": 0.0696
+    },
+    "notify_latency_p99": {
+     "n": 37,
+     "min": 0.0597,
+     "avg": 0.0597,
+     "max": 0.0597
+    },
+    "am_discovered": {
+     "n": 37,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    }
+   }
+  },
+  "prom_down": {
+   "dur": 180,
+   "alerts_first_fire_s": {
+    "M_NotifyDropped": 0,
+    "M_PromDown": 35
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 6,
+     "max_gap_s": 35
+    },
+    "DataHeartbeat": {
+     "count": 5,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 5,
+     "max_gap_s": 35
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 0
+    },
+    "scrape_dur_big": {
+     "n": 37,
+     "min": 0.5927,
+     "avg": 0.5927,
+     "max": 0.5927
+    },
+    "up_big": {
+     "n": 37,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 37,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 0
+    },
+    "rule_missed_5m": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_failed_5m": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 0
+    },
+    "queue_time_p90": {
+     "n": 0
+    },
+    "queries_inflight": {
+     "n": 0
+    },
+    "fsync_p99": {
+     "n": 0
+    },
+    "append_rate": {
+     "n": 10,
+     "min": 23.4517,
+     "avg": 11408.6972,
+     "max": 18078.84
+    },
+    "wal_bytes": {
+     "n": 0
+    },
+    "blocks": {
+     "n": 0
+    },
+    "reloads_5m": {
+     "n": 37,
+     "min": 2.0947,
+     "avg": 3.3353,
+     "max": 5.1724
+    },
+    "compact_failed_5m": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 10,
+     "min": 0.0424,
+     "avg": 0.3508,
+     "max": 0.6104
+    },
+    "rss": {
+     "n": 0
+    },
+    "gc_p100": {
+     "n": 0
+    },
+    "throttle_ratio": {
+     "n": 0
+    },
+    "working_set": {
+     "n": 289,
+     "min": 50761728.0,
+     "avg": 702848967.308,
+     "max": 1643429888.0
+    },
+    "notify_queue": {
+     "n": 0
+    },
+    "notify_err_rate": {
+     "n": 22,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 0
+    },
+    "am_discovered": {
+     "n": 0
+    }
+   }
+  },
+  "rec4": {
+   "dur": 180,
+   "alerts_first_fire_s": {
+    "M_PromDown": 0,
+    "M_PromRestarted": 10
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 6,
+     "max_gap_s": 35
+    },
+    "DataHeartbeat": {
+     "count": 6,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 4,
+     "max_gap_s": 101
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 30,
+     "min": 15.001,
+     "avg": 15.0015,
+     "max": 15.0025
+    },
+    "scrape_dur_big": {
+     "n": 37,
+     "min": 0.5824,
+     "avg": 0.7198,
+     "max": 1.5608
+    },
+    "up_big": {
+     "n": 37,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 37,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 35,
+     "min": 0.0,
+     "avg": 6.8408,
+     "max": 7.9041
+    },
+    "rule_missed_5m": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_failed_5m": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 35,
+     "min": 11.6732,
+     "avg": 102506200.3015,
+     "max": 1793858232.634
+    },
+    "queue_time_p90": {
+     "n": 35,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0001
+    },
+    "queries_inflight": {
+     "n": 36,
+     "min": 0.0,
+     "avg": 0.6667,
+     "max": 1.0
+    },
+    "fsync_p99": {
+     "n": 0
+    },
+    "append_rate": {
+     "n": 34,
+     "min": 9.7535,
+     "avg": 16791.1185,
+     "max": 21890.0
+    },
+    "wal_bytes": {
+     "n": 36,
+     "min": 235536476.0,
+     "avg": 250932151.4444,
+     "max": 266330611.0
+    },
+    "blocks": {
+     "n": 36,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "reloads_5m": {
+     "n": 37,
+     "min": 1.0261,
+     "avg": 2.0397,
+     "max": 3.0508
+    },
+    "compact_failed_5m": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 35,
+     "min": 0.1341,
+     "avg": 0.5664,
+     "max": 0.7125
+    },
+    "rss": {
+     "n": 36,
+     "min": 990822400.0,
+     "avg": 1520302421.3333,
+     "max": 1672572928.0
+    },
+    "gc_p100": {
+     "n": 36,
+     "min": 0.0078,
+     "avg": 0.0078,
+     "max": 0.0078
+    },
+    "throttle_ratio": {
+     "n": 0
+    },
+    "working_set": {
+     "n": 259,
+     "min": 51085312.0,
+     "avg": 581318727.166,
+     "max": 1643429888.0
+    },
+    "notify_queue": {
+     "n": 36,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 33,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 34,
+     "min": 0.0024,
+     "avg": 0.0024,
+     "max": 0.0024
+    },
+    "am_discovered": {
+     "n": 36,
+     "min": 0.0,
+     "avg": 0.9444,
+     "max": 1.0
+    }
+   }
+  }
+ }
+}

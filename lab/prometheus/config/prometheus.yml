@@ -1,0 +1,14 @@
+global: { scrape_interval: 15s, scrape_timeout: 10s, evaluation_interval: 15s }
+alerting: { alertmanagers: [{ static_configs: [{ targets: [am:9093] }] }] }
+rule_files: [/etc/prometheus/rules/*.yml]
+scrape_configs:
+  - job_name: prometheus
+    static_configs: [{ targets: [localhost:9090] }]
+  - job_name: small
+    static_configs: [{ targets: [target-small:8000] }]
+  - job_name: big
+    static_configs: [{ targets: [target-big:8000] }]
+  - job_name: slow
+    scrape_interval: 2m
+    scrape_timeout: 115s
+    static_configs: [{ targets: [target-slow:8000] }]

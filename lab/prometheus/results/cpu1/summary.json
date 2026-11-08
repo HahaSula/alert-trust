@@ -1,0 +1,702 @@
+{
+ "name": "cpu1",
+ "phases": {
+  "base_1cpu": {
+   "dur": 300,
+   "alerts_first_fire_s": {},
+   "sink": {
+    "Watchdog": {
+     "count": 8,
+     "max_gap_s": 78
+    },
+    "DataHeartbeat": {
+     "count": 10,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 7,
+     "max_gap_s": 94
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 55,
+     "min": 15.0011,
+     "avg": 15.0231,
+     "max": 15.0245
+    },
+    "scrape_dur_big": {
+     "n": 55,
+     "min": 0.6008,
+     "avg": 0.7083,
+     "max": 1.1021
+    },
+    "up_big": {
+     "n": 55,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 57,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 59,
+     "min": 0.0007,
+     "avg": 6.1582,
+     "max": 9.3205
+    },
+    "rule_missed_5m": {
+     "n": 58,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_failed_5m": {
+     "n": 58,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 59,
+     "min": 4.4904,
+     "avg": 14.4596,
+     "max": 24.548
+    },
+    "queue_time_p90": {
+     "n": 59,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "queries_inflight": {
+     "n": 59,
+     "min": 0.0,
+     "avg": 0.322,
+     "max": 1.0
+    },
+    "fsync_p99": {
+     "n": 0
+    },
+    "append_rate": {
+     "n": 56,
+     "min": 6012.118,
+     "avg": 19202.7526,
+     "max": 25532.5853
+    },
+    "wal_bytes": {
+     "n": 59,
+     "min": 0.0,
+     "avg": 32109231.9661,
+     "max": 60416613.0
+    },
+    "blocks": {
+     "n": 59,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "reloads_5m": {
+     "n": 58,
+     "min": 0.0,
+     "avg": 2.1104,
+     "max": 4.0597
+    },
+    "compact_failed_5m": {
+     "n": 58,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 58,
+     "min": 0.043,
+     "avg": 0.4011,
+     "max": 0.5502
+    },
+    "rss": {
+     "n": 59,
+     "min": 69074944.0,
+     "avg": 1426101543.0508,
+     "max": 1645371392.0
+    },
+    "gc_p100": {
+     "n": 59,
+     "min": 0.0003,
+     "avg": 0.0003,
+     "max": 0.0003
+    },
+    "throttle_ratio": {
+     "n": 58,
+     "min": 0.0048,
+     "avg": 0.031,
+     "max": 0.0938
+    },
+    "working_set": {
+     "n": 59,
+     "min": 17448960.0,
+     "avg": 1350957923.7966,
+     "max": 1590226944.0
+    },
+    "notify_queue": {
+     "n": 59,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 58,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 57,
+     "min": 0.1,
+     "avg": 0.1,
+     "max": 0.1
+    },
+    "am_discovered": {
+     "n": 59,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    }
+   }
+  },
+  "cpu_0.3": {
+   "dur": 480,
+   "alerts_first_fire_s": {
+    "M_CPUThrottled": 80,
+    "M_RuleMissed": 80,
+    "M_RuleGroupSlow": 90,
+    "M_AlertFlapping": 155,
+    "M_RuleStale": 220
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 16,
+     "max_gap_s": 30
+    },
+    "DataHeartbeat": {
+     "count": 16,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 16,
+     "max_gap_s": 35
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 97,
+     "min": 15.0245,
+     "avg": 15.1353,
+     "max": 15.1819
+    },
+    "scrape_dur_big": {
+     "n": 97,
+     "min": 0.646,
+     "avg": 6.0589,
+     "max": 9.3038
+    },
+    "up_big": {
+     "n": 97,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 97,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 97,
+     "min": 7.7672,
+     "avg": 34.6505,
+     "max": 43.9154
+    },
+    "rule_missed_5m": {
+     "n": 97,
+     "min": 0.0,
+     "avg": 6.681,
+     "max": 13.2203
+    },
+    "rule_failed_5m": {
+     "n": 97,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 97,
+     "min": 14.62,
+     "avg": 54.4507,
+     "max": 84.1552
+    },
+    "queue_time_p90": {
+     "n": 97,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "queries_inflight": {
+     "n": 97,
+     "min": 0.0,
+     "avg": 0.9897,
+     "max": 1.0
+    },
+    "fsync_p99": {
+     "n": 15,
+     "min": 0.0044,
+     "avg": 0.0044,
+     "max": 0.0044
+    },
+    "append_rate": {
+     "n": 97,
+     "min": 16405.3091,
+     "avg": 19735.8029,
+     "max": 21890.0364
+    },
+    "wal_bytes": {
+     "n": 97,
+     "min": 60416613.0,
+     "avg": 103109207.299,
+     "max": 147107573.0
+    },
+    "blocks": {
+     "n": 97,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "reloads_5m": {
+     "n": 97,
+     "min": 4.0494,
+     "avg": 4.9692,
+     "max": 5.0848
+    },
+    "compact_failed_5m": {
+     "n": 97,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 97,
+     "min": 0.2793,
+     "avg": 0.3112,
+     "max": 0.5004
+    },
+    "rss": {
+     "n": 97,
+     "min": 1254199296.0,
+     "avg": 1459200084.4536,
+     "max": 1743736832.0
+    },
+    "gc_p100": {
+     "n": 97,
+     "min": 0.0003,
+     "avg": 0.0003,
+     "max": 0.0003
+    },
+    "throttle_ratio": {
+     "n": 97,
+     "min": 0.028,
+     "avg": 0.9453,
+     "max": 1.0
+    },
+    "working_set": {
+     "n": 97,
+     "min": 1208160256.0,
+     "avg": 1417194591.0103,
+     "max": 1697816576.0
+    },
+    "notify_queue": {
+     "n": 97,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 97,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 97,
+     "min": 0.1,
+     "avg": 0.1604,
+     "max": 0.2545
+    },
+    "am_discovered": {
+     "n": 97,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    }
+   }
+  },
+  "cpu_0.1": {
+   "dur": 300,
+   "alerts_first_fire_s": {
+    "M_AlertFlapping": 0,
+    "M_CPUThrottled": 0,
+    "M_RuleGroupSlow": 0,
+    "M_RuleMissed": 0,
+    "M_RuleStale": 0,
+    "M_ScrapeNearTimeout": 65
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 10,
+     "max_gap_s": 30
+    },
+    "DataHeartbeat": {
+     "count": 9,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 10,
+     "max_gap_s": 35
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 61,
+     "min": 15.1806,
+     "avg": 24.2892,
+     "max": 30.2948
+    },
+    "scrape_dur_big": {
+     "n": 61,
+     "min": 9.3038,
+     "avg": 17.0918,
+     "max": 23.5101
+    },
+    "up_big": {
+     "n": 61,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 61,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 61,
+     "min": 39.9813,
+     "avg": 96.5861,
+     "max": 169.6937
+    },
+    "rule_missed_5m": {
+     "n": 61,
+     "min": 8.1356,
+     "avg": 12.17,
+     "max": 19.322
+    },
+    "rule_failed_5m": {
+     "n": 61,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 61,
+     "min": 60.3448,
+     "avg": 166.3447,
+     "max": 275.3635
+    },
+    "queue_time_p90": {
+     "n": 61,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "queries_inflight": {
+     "n": 61,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "fsync_p99": {
+     "n": 61,
+     "min": 0.0044,
+     "avg": 0.0044,
+     "max": 0.0044
+    },
+    "append_rate": {
+     "n": 61,
+     "min": 10940.7273,
+     "avg": 14260.5497,
+     "max": 21859.9636
+    },
+    "wal_bytes": {
+     "n": 61,
+     "min": 147107573.0,
+     "avg": 166044173.0984,
+     "max": 186258076.0
+    },
+    "blocks": {
+     "n": 61,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "reloads_5m": {
+     "n": 61,
+     "min": 4.0678,
+     "avg": 4.868,
+     "max": 5.0847
+    },
+    "compact_failed_5m": {
+     "n": 61,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 61,
+     "min": 0.0993,
+     "avg": 0.1205,
+     "max": 0.2998
+    },
+    "rss": {
+     "n": 61,
+     "min": 1293856768.0,
+     "avg": 1429994714.2295,
+     "max": 1643425792.0
+    },
+    "gc_p100": {
+     "n": 61,
+     "min": 0.0003,
+     "avg": 0.0003,
+     "max": 0.0003
+    },
+    "throttle_ratio": {
+     "n": 61,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "working_set": {
+     "n": 61,
+     "min": 1256845312.0,
+     "avg": 1387457418.4918,
+     "max": 1599967232.0
+    },
+    "notify_queue": {
+     "n": 61,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 61,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 61,
+     "min": 0.2545,
+     "avg": 0.5874,
+     "max": 0.6305
+    },
+    "am_discovered": {
+     "n": 61,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    }
+   }
+  },
+  "recover": {
+   "dur": 240,
+   "alerts_first_fire_s": {
+    "M_AlertFlapping": 0,
+    "M_CPUThrottled": 0,
+    "M_RuleGroupSlow": 0,
+    "M_RuleMissed": 0,
+    "M_RuleStale": 0,
+    "M_ScrapeNearTimeout": 0
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 8,
+     "max_gap_s": 30
+    },
+    "DataHeartbeat": {
+     "count": 8,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 8,
+     "max_gap_s": 30
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 49,
+     "min": 27.9068,
+     "avg": 28.5891,
+     "max": 30.2948
+    },
+    "scrape_dur_big": {
+     "n": 49,
+     "min": 0.5837,
+     "avg": 1.4889,
+     "max": 13.798
+    },
+    "up_big": {
+     "n": 49,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 49,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 49,
+     "min": 8.4323,
+     "avg": 17.6578,
+     "max": 169.6937
+    },
+    "rule_missed_5m": {
+     "n": 49,
+     "min": 13.2203,
+     "avg": 15.2542,
+     "max": 19.322
+    },
+    "rule_failed_5m": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 49,
+     "min": 9.874,
+     "avg": 28.7241,
+     "max": 218.3112
+    },
+    "queue_time_p90": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "queries_inflight": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.6735,
+     "max": 1.0
+    },
+    "fsync_p99": {
+     "n": 25,
+     "min": 0.0044,
+     "avg": 0.0044,
+     "max": 0.0044
+    },
+    "append_rate": {
+     "n": 49,
+     "min": 16395.7455,
+     "avg": 21668.9944,
+     "max": 32808.8
+    },
+    "wal_bytes": {
+     "n": 49,
+     "min": 186258076.0,
+     "avg": 213212342.7959,
+     "max": 236630345.0
+    },
+    "blocks": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "reloads_5m": {
+     "n": 49,
+     "min": 4.0678,
+     "avg": 4.8149,
+     "max": 5.0847
+    },
+    "compact_failed_5m": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 49,
+     "min": 0.1,
+     "avg": 0.6332,
+     "max": 0.7991
+    },
+    "rss": {
+     "n": 49,
+     "min": 1563734016.0,
+     "avg": 1752298391.5102,
+     "max": 1786687488.0
+    },
+    "gc_p100": {
+     "n": 49,
+     "min": 0.0003,
+     "avg": 0.0003,
+     "max": 0.0003
+    },
+    "throttle_ratio": {
+     "n": 49,
+     "min": 0.0913,
+     "avg": 0.2278,
+     "max": 1.0
+    },
+    "working_set": {
+     "n": 49,
+     "min": 1520635904.0,
+     "avg": 1710409936.9796,
+     "max": 1743728640.0
+    },
+    "notify_queue": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 49,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 49,
+     "min": 0.6305,
+     "avg": 0.6305,
+     "max": 0.6305
+    },
+    "am_discovered": {
+     "n": 49,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    }
+   }
+  }
+ }
+}

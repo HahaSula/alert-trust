@@ -87,7 +87,7 @@ python3 tools/check_coverage.py --env env/<name>.yaml --snapshot snapshot --out 
 
 實驗都是小規模的單機 Docker，**驗證的是機制和訊號出現的順序**，門檻和時間不能直接套到大型環境。
 
-前身是 [prometheus-selfcheck-skills](https://github.com/HahaSula/prometheus-selfcheck-skills)，只涵蓋 Prometheus 與 Alertmanager。
+前身是 [prometheus-selfcheck-skills](https://github.com/HahaSula/prometheus-selfcheck-skills)（已封存），只涵蓋 Prometheus 與 Alertmanager；它的實驗已搬到 `lab/prometheus/`。
 
 ## 給 AI agent
 

@@ -1,0 +1,4 @@
+route: { receiver: sink, group_by: [alertname], group_wait: 1s, group_interval: 5s, repeat_interval: 30s }
+receivers:
+  - name: sink
+    webhook_configs: [{ url: http://sink:9000/, send_resolved: true }]

@@ -21,8 +21,8 @@ sources:
     title: prometheus-selfcheck-skills（前身）
     kind: experiment
     visibility: public
-    url: https://github.com/HahaSula/prometheus-selfcheck-skills
-    note: EVIDENCE.md 有實驗數據
+    url: https://github.com/HahaSula/alert-trust/tree/main/lab/prometheus
+    note: 實驗與 EVIDENCE.md 已搬到 lab/prometheus/；舊 repo 已封存
 
   # 上游官方
   prom-docs-alerting:

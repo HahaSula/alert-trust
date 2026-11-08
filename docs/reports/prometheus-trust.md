@@ -829,7 +829,7 @@ Prometheus 每分鐘要 reload 一次 block，**retention 也是在這時候執�
 
 ## 限制與來源
 
-**可重現：**實驗程式、結果與自檢 skill 都在 [prometheus-selfcheck-skills](https://github.com/HahaSula/prometheus-selfcheck-skills)（`EVIDENCE.md` 與 `lab/`）。
+**可重現：**實驗程式與結果在 [`lab/prometheus/`](https://github.com/HahaSula/alert-trust/tree/main/lab/prometheus)，自檢 skill 在 alert-trust 的 `skills/`（`EVIDENCE.md` 與 `lab/`）。
 
 **實驗限制：**單機 Docker，受測規模 30 萬 series、每秒約 2 萬 sample，CPU 和記憶體遠小於一般正式環境。實驗證明的是機制和訊號順序，門檻與時間不能直接套用。第一批實驗有多個情境同時執行，CPU 掃描另外檢查過機器負載。
 

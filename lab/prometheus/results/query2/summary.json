@@ -1,0 +1,593 @@
+{
+ "name": "query2",
+ "phases": {
+  "base": {
+   "dur": 360,
+   "alerts_first_fire_s": {},
+   "sink": {
+    "Watchdog": {
+     "count": 12,
+     "max_gap_s": 35
+    },
+    "DataHeartbeat": {
+     "count": 11,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 9,
+     "max_gap_s": 99
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 67,
+     "min": 15.0022,
+     "avg": 15.0049,
+     "max": 15.0052
+    },
+    "scrape_dur_big": {
+     "n": 66,
+     "min": 0.6042,
+     "avg": 0.727,
+     "max": 0.9482
+    },
+    "up_big": {
+     "n": 66,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 69,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 71,
+     "min": 0.0006,
+     "avg": 5.7229,
+     "max": 10.4355
+    },
+    "rule_missed_5m": {
+     "n": 70,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_failed_5m": {
+     "n": 70,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 71,
+     "min": 9.088,
+     "avg": 25265631.5733,
+     "max": 1793858515.053
+    },
+    "queue_time_p90": {
+     "n": 71,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0002
+    },
+    "queries_inflight": {
+     "n": 71,
+     "min": 0.0,
+     "avg": 0.6479,
+     "max": 1.0
+    },
+    "fsync_p99": {
+     "n": 0
+    },
+    "append_rate": {
+     "n": 69,
+     "min": 0.1641,
+     "avg": 18663.4145,
+     "max": 21899.3818
+    },
+    "wal_bytes": {
+     "n": 71,
+     "min": 0.0,
+     "avg": 35889974.831,
+     "max": 68835379.0
+    },
+    "blocks": {
+     "n": 71,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "reloads_5m": {
+     "n": 70,
+     "min": 0.0,
+     "avg": 2.6342,
+     "max": 5.0848
+    },
+    "compact_failed_5m": {
+     "n": 70,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 70,
+     "min": 0.0011,
+     "avg": 0.4468,
+     "max": 0.5769
+    },
+    "rss": {
+     "n": 71,
+     "min": 69206016.0,
+     "avg": 1027078518.9859,
+     "max": 1333776384.0
+    },
+    "gc_p100": {
+     "n": 71,
+     "min": 0.0001,
+     "avg": 0.0116,
+     "max": 0.0121
+    },
+    "throttle_ratio": {
+     "n": 0
+    },
+    "working_set": {
+     "n": 71,
+     "min": 17956864.0,
+     "avg": 980870677.6338,
+     "max": 1285787648.0
+    },
+    "notify_queue": {
+     "n": 71,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 70,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 70,
+     "min": 0.0135,
+     "avg": 0.0135,
+     "max": 0.0135
+    },
+    "am_discovered": {
+     "n": 71,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    }
+   }
+  },
+  "hammer": {
+   "dur": 360,
+   "alerts_first_fire_s": {
+    "M_QuerySaturated": 65,
+    "M_RuleMissed": 65,
+    "M_RuleGroupSlow": 90,
+    "M_QueueTimeHigh": 105,
+    "M_AlertFlapping": 170,
+    "M_RuleStale": 285
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 12,
+     "max_gap_s": 35
+    },
+    "DataHeartbeat": {
+     "count": 12,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 12,
+     "max_gap_s": 35
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 73,
+     "min": 15.0052,
+     "avg": 15.0095,
+     "max": 15.0159
+    },
+    "scrape_dur_big": {
+     "n": 73,
+     "min": 0.6156,
+     "avg": 0.9368,
+     "max": 1.3887
+    },
+    "up_big": {
+     "n": 73,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 73,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 73,
+     "min": 6.5265,
+     "avg": 32.3401,
+     "max": 41.4881
+    },
+    "rule_missed_5m": {
+     "n": 73,
+     "min": 0.0,
+     "avg": 11.7193,
+     "max": 29.3942
+    },
+    "rule_failed_5m": {
+     "n": 73,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 73,
+     "min": 14.1995,
+     "avg": 56.8647,
+     "max": 80.1784
+    },
+    "queue_time_p90": {
+     "n": 73,
+     "min": 0.0,
+     "avg": 6.1935,
+     "max": 9.1954
+    },
+    "queries_inflight": {
+     "n": 73,
+     "min": 1.0,
+     "avg": 5.0,
+     "max": 8.0
+    },
+    "fsync_p99": {
+     "n": 2,
+     "min": 0.0039,
+     "avg": 0.0039,
+     "max": 0.0039
+    },
+    "append_rate": {
+     "n": 73,
+     "min": 16416.2243,
+     "avg": 20081.6185,
+     "max": 21899.3273
+    },
+    "wal_bytes": {
+     "n": 73,
+     "min": 68835379.0,
+     "avg": 102392449.3425,
+     "max": 135966683.0
+    },
+    "blocks": {
+     "n": 73,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "reloads_5m": {
+     "n": 73,
+     "min": 4.0678,
+     "avg": 4.9872,
+     "max": 5.0848
+    },
+    "compact_failed_5m": {
+     "n": 73,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 73,
+     "min": 0.5635,
+     "avg": 2.0773,
+     "max": 2.3567
+    },
+    "rss": {
+     "n": 73,
+     "min": 1107742720.0,
+     "avg": 1786939868.9315,
+     "max": 2177515520.0
+    },
+    "gc_p100": {
+     "n": 73,
+     "min": 0.0121,
+     "avg": 0.0453,
+     "max": 0.0487
+    },
+    "throttle_ratio": {
+     "n": 0
+    },
+    "working_set": {
+     "n": 73,
+     "min": 1056731136.0,
+     "avg": 1705483446.3562,
+     "max": 2143150080.0
+    },
+    "notify_queue": {
+     "n": 73,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 73,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 73,
+     "min": 0.0135,
+     "avg": 0.0161,
+     "max": 0.0199
+    },
+    "am_discovered": {
+     "n": 73,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    }
+   }
+  },
+  "recover": {
+   "dur": 180,
+   "alerts_first_fire_s": {
+    "M_AlertFlapping": 0,
+    "M_QuerySaturated": 0,
+    "M_QueueTimeHigh": 0,
+    "M_RuleGroupSlow": 0,
+    "M_RuleMissed": 0,
+    "M_RuleStale": 0
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 6,
+     "max_gap_s": 35
+    },
+    "DataHeartbeat": {
+     "count": 5,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 5,
+     "max_gap_s": 35
+    }
+   },
+   "metrics": {
+    "scrape_interval_p99": {
+     "n": 37,
+     "min": 15.0141,
+     "avg": 15.0144,
+     "max": 15.0159
+    },
+    "scrape_dur_big": {
+     "n": 37,
+     "min": 0.6313,
+     "avg": 0.7681,
+     "max": 1.0598
+    },
+    "up_big": {
+     "n": 37,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "up_small": {
+     "n": 37,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    },
+    "rule_load_last_dur": {
+     "n": 37,
+     "min": 7.106,
+     "avg": 13.3058,
+     "max": 41.4881
+    },
+    "rule_missed_5m": {
+     "n": 37,
+     "min": 16.2712,
+     "avg": 22.2033,
+     "max": 28.4613
+    },
+    "rule_failed_5m": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "rule_eval_age": {
+     "n": 37,
+     "min": 14.5344,
+     "avg": 28.0049,
+     "max": 84.7058
+    },
+    "queue_time_p90": {
+     "n": 37,
+     "min": 9.1733,
+     "avg": 9.3403,
+     "max": 9.4085
+    },
+    "queries_inflight": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 1.2432,
+     "max": 6.0
+    },
+    "fsync_p99": {
+     "n": 37,
+     "min": 0.0039,
+     "avg": 0.0039,
+     "max": 0.0039
+    },
+    "append_rate": {
+     "n": 37,
+     "min": 16417.2727,
+     "avg": 20124.3938,
+     "max": 21920.9818
+    },
+    "wal_bytes": {
+     "n": 37,
+     "min": 135966683.0,
+     "avg": 152762408.973,
+     "max": 169557212.0
+    },
+    "blocks": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "reloads_5m": {
+     "n": 37,
+     "min": 4.0678,
+     "avg": 4.9748,
+     "max": 5.0848
+    },
+    "compact_failed_5m": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "cpu_core": {
+     "n": 37,
+     "min": 0.5958,
+     "avg": 1.159,
+     "max": 2.2196
+    },
+    "rss": {
+     "n": 37,
+     "min": 1183191040.0,
+     "avg": 1376454711.3514,
+     "max": 1998159872.0
+    },
+    "gc_p100": {
+     "n": 37,
+     "min": 0.0487,
+     "avg": 0.0487,
+     "max": 0.0487
+    },
+    "throttle_ratio": {
+     "n": 0
+    },
+    "working_set": {
+     "n": 37,
+     "min": 1156993024.0,
+     "avg": 1332546587.6757,
+     "max": 1919561728.0
+    },
+    "notify_queue": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_err_rate": {
+     "n": 37,
+     "min": 0.0,
+     "avg": 0.0,
+     "max": 0.0
+    },
+    "notify_latency_p99": {
+     "n": 37,
+     "min": 0.0199,
+     "avg": 0.0199,
+     "max": 0.0199
+    },
+    "am_discovered": {
+     "n": 37,
+     "min": 1.0,
+     "avg": 1.0,
+     "max": 1.0
+    }
+   }
+  }
+ },
+ "extra": {
+  "for_changes": {
+   "M_CPUThrottled": "0",
+   "DataHeartbeat": "0",
+   "KnownTrueCanary": "0",
+   "Watchdog": "0",
+   "SlowTargetNoOffset": "0",
+   "SlowTargetExprOffset": "0",
+   "M_QuerySaturated": "0",
+   "M_RuleGroupSlow": "0",
+   "M_QueueTimeHigh": "0",
+   "M_RuleStale": "1",
+   "M_RuleMissed": "0",
+   "M_MemNearLimit": "0",
+   "M_AlertFlapping": "0"
+  },
+  "alerts_pending_series": [
+   {
+    "__name__": "ALERTS",
+    "alertname": "SlowTargetExprOffset",
+    "alertstate": "pending",
+    "instance": "target-slow:8000",
+    "job": "slow"
+   }
+  ],
+  "rule_detail": [
+   [
+    "Watchdog",
+    "ok",
+    0.000432483,
+    ""
+   ],
+   [
+    "DataHeartbeat",
+    "ok",
+    0.000313339,
+    ""
+   ],
+   [
+    "KnownTrueCanary",
+    "ok",
+    0.000197017,
+    ""
+   ],
+   [
+    "ns:demo_filler:sum",
+    "ok",
+    3.629465199,
+    ""
+   ],
+   [
+    "pod:demo_filler:avg",
+    "ok",
+    2.76349234,
+    ""
+   ],
+   [
+    "ns:demo_filler:avg_over_time5m",
+    "ok",
+    3.5218175179999998,
+    ""
+   ],
+   [
+    "SlowTargetNoOffset",
+    "ok",
+    0.000528365,
+    ""
+   ],
+   [
+    "SlowTargetExprOffset",
+    "ok",
+    0.000255755,
+    ""
+   ]
+  ]
+ }
+}

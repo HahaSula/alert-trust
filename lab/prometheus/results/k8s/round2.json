@@ -1,0 +1,303 @@
+{
+ "rules": [
+  {
+   "alert": "ScrapeSlowerThanInterval",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": []
+  },
+  {
+   "alert": "ScrapeIntervalStretched",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": [
+    "prometheus_target_interval_length_seconds{interval=\"30s\",quantile=\"0.9\"}"
+   ]
+  },
+  {
+   "alert": "RuleGroupNearInterval",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": []
+  },
+  {
+   "alert": "RuleGroupMissingEvaluations",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": []
+  },
+  {
+   "alert": "RuleGroupStale",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": []
+  },
+  {
+   "alert": "RuleEvaluationFailures",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": []
+  },
+  {
+   "alert": "AlertForTimerResetting",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": [
+    "ALERTS_FOR_STATE{alertname!~\"Watchdog|Meta.*\"}"
+   ]
+  },
+  {
+   "alert": "QueryQueueing",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": []
+  },
+  {
+   "alert": "NotificationsFailing",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": []
+  },
+  {
+   "alert": "NotificationsDropped",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": []
+  },
+  {
+   "alert": "NoAlertmanagerDiscovered",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": []
+  },
+  {
+   "alert": "AlertmanagerNotificationsFailing",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": []
+  },
+  {
+   "alert": "AlertmanagerConfigReloadFailed",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": []
+  },
+  {
+   "alert": "PrometheusCPUThrottled",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": []
+  },
+  {
+   "alert": "PrometheusMemoryNearLimit",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": []
+  },
+  {
+   "alert": "PrometheusRestarted",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": []
+  },
+  {
+   "alert": "WALWriteFailed",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": []
+  },
+  {
+   "alert": "WALCheckpointFailing",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": []
+  },
+  {
+   "alert": "WALRepairedAtStartup",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": []
+  },
+  {
+   "alert": "WALFsyncSlow",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": []
+  },
+  {
+   "alert": "HeadNotCompacting",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": []
+  },
+  {
+   "alert": "RetentionBehind",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": []
+  },
+  {
+   "alert": "CompactionFailing",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": []
+  },
+  {
+   "alert": "BlockReloadStalled",
+   "health": "ok",
+   "state": "inactive",
+   "no_data": []
+  }
+ ],
+ "firing_healthy": [
+  "Watchdog"
+ ],
+ "sources": {
+  "am": true,
+  "limits": true,
+  "ksm_reason": false,
+  "kubelet_volume": false,
+  "cfs": true
+ },
+ "policy": "> 注意：TSDB 實際只有約 44.5m 的資料，短於查詢範圍 1h，尖峰可能還沒出現，建議值偏低。\n\n# Policy 檢查\n\nFAIL 50、WARN 29、INFO 36、已豁免 0（尖峰範圍 1h）\n\n## 違反的 policy\n\n| 嚴重度 | Policy | 數量 |\n|---|---|---|\n| FAIL | SERIES_NOT_FOUND | 49 |\n| FAIL | SCRAPE_INTERVAL_TOO_SHORT | 1 |\n| WARN | FOR_ZERO | 17 |\n| WARN | OFFSET_MISSING | 12 |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | 27 |\n| INFO | SCRAPE_NO_SAMPLE_LIMIT | 9 |\n\n## 明細\n\n| 嚴重度 | Policy | 對象 | 問題 | 建議 |\n|---|---|---|---|---|\n| FAIL | SCRAPE_INTERVAL_TOO_SHORT | job/demo | 尖峰 scrape 43s 超過 interval 15s，tick 被丟掉，實際間隔拉長到約 45s | 優先降低 series 或拆 target；無法降低時，把 interval 改成至少 1m，讓設定反映實際 |\n| FAIL | SERIES_NOT_FOUND | alert/AlertmanagerMembersInconsistent | 目前查不到 alertmanager_cluster_members。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeAPITerminatedRequests | 目前查不到 apiserver_request_terminations_total。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeAggregatedAPIErrors | 目前查不到 aggregator_unavailable_apiservice_total。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeCPUQuotaOvercommit | 目前查不到 kube_resourcequota。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeContainerWaiting | 目前查不到 kube_pod_container_status_waiting_reason。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeHpaMaxedOut | 目前查不到 kube_horizontalpodautoscaler_status_current_replicas。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeHpaMaxedOut | 目前查不到 kube_horizontalpodautoscaler_spec_max_replicas。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeHpaReplicasMismatch | 目前查不到 kube_horizontalpodautoscaler_status_desired_replicas。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeHpaReplicasMismatch | 目前查不到 kube_horizontalpodautoscaler_status_current_replicas。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeHpaReplicasMismatch | 目前查不到 kube_horizontalpodautoscaler_spec_min_replicas。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeHpaReplicasMismatch | 目前查不到 kube_horizontalpodautoscaler_spec_max_replicas。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeJobFailed | 目前查不到 kube_job_failed。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeJobNotCompleted | 目前查不到 kube_job_status_start_time。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeJobNotCompleted | 目前查不到 kube_job_status_active。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeMemoryQuotaOvercommit | 目前查不到 kube_resourcequota。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeNodeUnreachable | 目前查不到 kube_node_spec_taint。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubePersistentVolumeFillingUp | 目前查不到 kubelet_volume_stats_available_bytes。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubePersistentVolumeFillingUp | 目前查不到 kubelet_volume_stats_capacity_bytes。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubePersistentVolumeFillingUp | 目前查不到 kubelet_volume_stats_used_bytes。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubePersistentVolumeFillingUp | 目前查不到 kube_persistentvolumeclaim_labels。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubePersistentVolumeInodesFillingUp | 目前查不到 kubelet_volume_stats_inodes_free。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubePersistentVolumeInodesFillingUp | 目前查不到 kubelet_volume_stats_inodes。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubePersistentVolumeInodesFillingUp | 目前查不到 kubelet_volume_stats_inodes_used。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubePersistentVolumeInodesFillingUp | 目前查不到 kube_persistentvolumeclaim_labels。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubePodCrashLooping | 目前查不到 kube_pod_container_status_waiting_reason。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeQuotaAlmostFull | 目前查不到 kube_resourcequota。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeQuotaExceeded | 目前查不到 kube_resourcequota。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeQuotaFullyUsed | 目前查不到 kube_resourcequota。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeStateMetricsListErrors | 目前查不到 kube_state_metrics_list_total。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeStateMetricsShardingMismatch | 目前查不到 kube_state_metrics_total_shards。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeStateMetricsShardsMissing | 目前查不到 kube_state_metrics_total_shards。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeStateMetricsShardsMissing | 目前查不到 kube_state_metrics_shard_ordinal。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeStateMetricsWatchErrors | 目前查不到 kube_state_metrics_watch_total。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeletServerCertificateExpiration | 目前查不到 kubelet_certificate_manager_server_ttl_seconds。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/KubeletServerCertificateRenewalErrors | 目前查不到 kubelet_server_expiration_renew_errors。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/NodeBondingDegraded | 目前查不到 node_bonding_slaves。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/NodeBondingDegraded | 目前查不到 node_bonding_active。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/NodeRAIDDegraded | 目前查不到 node_md_disks_required。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/NodeRAIDDegraded | 目前查不到 node_md_disks。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/NodeRAIDDiskFailure | 目前查不到 node_md_disks。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/NodeSystemdServiceFailed | 目前查不到 node_systemd_unit_state。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/PrometheusRemoteStorageFailures | 目前查不到 prometheus_remote_storage_failed_samples_total。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/PrometheusRemoteStorageFailures | 目前查不到 prometheus_remote_storage_samples_failed_total。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/PrometheusRemoteStorageFailures | 目前查不到 prometheus_remote_storage_succeeded_samples_total。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/PrometheusRemoteStorageFailures | 目前查不到 prometheus_remote_storage_samples_total。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/PrometheusRemoteWriteBehind | 目前查不到 prometheus_remote_storage_queue_highest_sent_timestamp_seconds。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/PrometheusRemoteWriteDesiredShards | 目前查不到 prometheus_remote_storage_shards_desired。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/PrometheusRemoteWriteDesiredShards | 目前查不到 prometheus_remote_storage_shards_max。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| FAIL | SERIES_NOT_FOUND | alert/PrometheusSDRefreshFailure | 目前查不到 prometheus_sd_refresh_failures_total。名稱打錯或 target 消失時，這條 alert 永遠不會觸發 | 確認 metric 名稱與 relabel，並為來源 job 加上 absent 告警 |\n| WARN | FOR_ZERO | alert/AlertForTimerResetting | 沒有 for，一次抖動就觸發或解除 | 除非這是刻意的立即告警，否則加上 for |\n| WARN | FOR_ZERO | alert/CompactionFailing | 沒有 for，一次抖動就觸發或解除 | 除非這是刻意的立即告警，否則加上 for |\n| WARN | FOR_ZERO | alert/InfoInhibitor | 沒有 for，一次抖動就觸發或解除 | 除非這是刻意的立即告警，否則加上 for |\n| WARN | FOR_ZERO | alert/KubeAggregatedAPIErrors | 沒有 for，一次抖動就觸發或解除 | 除非這是刻意的立即告警，否則加上 for |\n| WARN | FOR_ZERO | alert/KubeJobNotCompleted | 沒有 for，一次抖動就觸發或解除 | 除非這是刻意的立即告警，否則加上 for |\n| WARN | FOR_ZERO | alert/KubeletClientCertificateExpiration | 沒有 for，一次抖動就觸發或解除 | 除非這是刻意的立即告警，否則加上 for |\n| WARN | FOR_ZERO | alert/KubeletServerCertificateExpiration | 沒有 for，一次抖動就觸發或解除 | 除非這是刻意的立即告警，否則加上 for |\n| WARN | FOR_ZERO | alert/NodeHighNumberConntrackEntriesUsed | 沒有 for，一次抖動就觸發或解除 | 除非這是刻意的立即告警，否則加上 for |\n| WARN | FOR_ZERO | alert/NodeRAIDDiskFailure | 沒有 for，一次抖動就觸發或解除 | 除非這是刻意的立即告警，否則加上 for |\n| WARN | FOR_ZERO | alert/NodeTextFileCollectorScrapeError | 沒有 for，一次抖動就觸發或解除 | 除非這是刻意的立即告警，否則加上 for |\n| WARN | FOR_ZERO | alert/NotificationsDropped | 沒有 for，一次抖動就觸發或解除 | 除非這是刻意的立即告警，否則加上 for |\n| WARN | FOR_ZERO | alert/PrometheusRestarted | 沒有 for，一次抖動就觸發或解除 | 除非這是刻意的立即告警，否則加上 for |\n| WARN | FOR_ZERO | alert/RuleEvaluationFailures | 沒有 for，一次抖動就觸發或解除 | 除非這是刻意的立即告警，否則加上 for |\n| WARN | FOR_ZERO | alert/RuleGroupMissingEvaluations | 沒有 for，一次抖動就觸發或解除 | 除非這是刻意的立即告警，否則加上 for |\n| WARN | FOR_ZERO | alert/WALCheckpointFailing | 沒有 for，一次抖動就觸發或解除 | 除非這是刻意的立即告警，否則加上 for |\n| WARN | FOR_ZERO | alert/WALRepairedAtStartup | 沒有 for，一次抖動就觸發或解除 | 除非這是刻意的立即告警，否則加上 for |\n| WARN | FOR_ZERO | alert/WALWriteFailed | 沒有 for，一次抖動就觸發或解除 | 除非這是刻意的立即告警，否則加上 for |\n| WARN | OFFSET_MISSING | alert/KubeAPIDown | job apiserver scrape 尖峰 7.60s，offset 只有 0.00s，rule 看不到還沒寫入的資料，事後查詢也會對不上 | offset 至少 15s：2.53 以上用 query_offset，舊版在每個 selector 寫 offset |\n| WARN | OFFSET_MISSING | alert/KubeAPITerminatedRequests | job apiserver scrape 尖峰 7.60s，offset 只有 0.00s，rule 看不到還沒寫入的資料，事後查詢也會對不上 | offset 至少 15s：2.53 以上用 query_offset，舊版在每個 selector 寫 offset |\n| WARN | OFFSET_MISSING | alert/KubeAggregatedAPIDown | job apiserver scrape 尖峰 7.60s，offset 只有 0.00s，rule 看不到還沒寫入的資料，事後查詢也會對不上 | offset 至少 15s：2.53 以上用 query_offset，舊版在每個 selector 寫 offset |\n| WARN | OFFSET_MISSING | alert/KubeAggregatedAPIErrors | job apiserver scrape 尖峰 7.60s，offset 只有 0.00s，rule 看不到還沒寫入的資料，事後查詢也會對不上 | offset 至少 15s：2.53 以上用 query_offset，舊版在每個 selector 寫 offset |\n| WARN | OFFSET_MISSING | alert/KubeClientCertificateExpiration | job apiserver scrape 尖峰 7.60s，offset 只有 0.00s，rule 看不到還沒寫入的資料，事後查詢也會對不上 | offset 至少 15s：2.53 以上用 query_offset，舊版在每個 selector 寫 offset |\n| WARN | OFFSET_MISSING | alert/KubeClientErrors | job apiserver scrape 尖峰 7.60s，offset 只有 0.00s，rule 看不到還沒寫入的資料，事後查詢也會對不上 | offset 至少 15s：2.53 以上用 query_offset，舊版在每個 selector 寫 offset |\n| WARN | OFFSET_MISSING | alert/KubeVersionMismatch | job apiserver scrape 尖峰 7.60s，offset 只有 0.00s，rule 看不到還沒寫入的資料，事後查詢也會對不上 | offset 至少 15s：2.53 以上用 query_offset，舊版在每個 selector 寫 offset |\n| WARN | OFFSET_MISSING | alert/PrometheusRestarted | job apiserver scrape 尖峰 7.60s，offset 只有 0.00s，rule 看不到還沒寫入的資料，事後查詢也會對不上 | offset 至少 15s：2.53 以上用 query_offset，舊版在每個 selector 寫 offset |\n| WARN | OFFSET_MISSING | alert/ScrapeSlowerThanInterval | job apiserver scrape 尖峰 7.60s，offset 只有 0.00s，rule 看不到還沒寫入的資料，事後查詢也會對不上 | offset 至少 15s：2.53 以上用 query_offset，舊版在每個 selector 寫 offset |\n| WARN | OFFSET_MISSING | alert/ScrapeSlowerThanInterval | job demo scrape 尖峰 43s，offset 只有 0.00s，rule 看不到還沒寫入的資料，事後查詢也會對不上 | offset 至少 1m：2.53 以上用 query_offset，舊版在每個 selector 寫 offset |\n| WARN | OFFSET_MISSING | alert/TargetDown | job apiserver scrape 尖峰 7.60s，offset 只有 0.00s，rule 看不到還沒寫入的資料，事後查詢也會對不上 | offset 至少 15s：2.53 以上用 query_offset，舊版在每個 selector 寫 offset |\n| WARN | OFFSET_MISSING | alert/TargetDown | job demo scrape 尖峰 43s，offset 只有 0.00s，rule 看不到還沒寫入的資料，事後查詢也會對不上 | offset 至少 1m：2.53 以上用 query_offset，舊版在每個 selector 寫 offset |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/AlertmanagerClusterCrashlooping | for 5.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/AlertmanagerClusterDown | for 5.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/AlertmanagerClusterFailedToSendAlerts | for 5.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/AlertmanagerFailedToSendAlerts | for 5.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/AlertmanagerNotificationsFailing | for 5.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/BlockReloadStalled | for 5.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/KubeAPIErrorBudgetBurn | for 2.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/KubeAPITerminatedRequests | for 5.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/KubeAggregatedAPIDown | for 5.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/KubeCPUQuotaOvercommit | for 5.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/KubeClientCertificateExpiration | for 5.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/KubeMemoryQuotaOvercommit | for 5.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/KubePersistentVolumeErrors | for 5.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/KubePersistentVolumeFillingUp | for 60s 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/KubePersistentVolumeInodesFillingUp | for 60s 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/KubeletPlegDurationHigh | for 5.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/NoAlertmanagerDiscovered | for 5.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/NodeBondingDegraded | for 5.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/NodeNetworkInterfaceFlapping | for 2.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/NodeSystemdServiceFailed | for 5.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/NotificationsFailing | for 5.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/PrometheusOperatorNotReady | for 5.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/PrometheusOperatorRejectedResources | for 5.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/PrometheusTargetSyncFailure | for 5.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/QueryQueueing | for 5.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/RuleGroupStale | for 2.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | FOR_NOT_RESTORED_ON_RESTART | alert/ScrapeIntervalStretched | for 5.0m 小於 grace period 10.0m，重啟後從零計時 | 可接受就忽略；要接續計時需要較長的 for |\n| INFO | SCRAPE_NO_SAMPLE_LIMIT | job/apiserver | 沒有 sample_limit，target 突然暴增 series 時會直接衝擊整台 Prometheus | 設定比現況略高的 sample_limit，並監控 prometheus_target_scrapes_exceeded_sample_limit_total |\n| INFO | SCRAPE_NO_SAMPLE_LIMIT | job/coredns | 沒有 sample_limit，target 突然暴增 series 時會直接衝擊整台 Prometheus | 設定比現況略高的 sample_limit，並監控 prometheus_target_scrapes_exceeded_sample_limit_total |\n| INFO | SCRAPE_NO_SAMPLE_LIMIT | job/demo | 沒有 sample_limit，target 突然暴增 series 時會直接衝擊整台 Prometheus | 設定比現況略高的 sample_limit，並監控 prometheus_target_scrapes_exceeded_sample_limit_total |\n| INFO | SCRAPE_NO_SAMPLE_LIMIT | job/kps-kube-prometheus-stack-alertmanager | 沒有 sample_limit，target 突然暴增 series 時會直接衝擊整台 Prometheus | 設定比現況略高的 sample_limit，並監控 prometheus_target_scrapes_exceeded_sample_limit_total |\n| INFO | SCRAPE_NO_SAMPLE_LIMIT | job/kps-kube-prometheus-stack-operator | 沒有 sample_limit，target 突然暴增 series 時會直接衝擊整台 Prometheus | 設定比現況略高的 sample_limit，並監控 prometheus_target_scrapes_exceeded_sample_limit_total |\n| INFO | SCRAPE_NO_SAMPLE_LIMIT | job/kps-kube-prometheus-stack-prometheus | 沒有 sample_limit，target 突然暴增 series 時會直接衝擊整台 Prometheus | 設定比現況略高的 sample_limit，並監控 prometheus_target_scrapes_exceeded_sample_limit_total |\n| INFO | SCRAPE_NO_SAMPLE_LIMIT | job/kube-state-metrics | 沒有 sample_limit，target 突然暴增 series 時會直接衝擊整台 Prometheus | 設定比現況略高的 sample_limit，並監控 prometheus_target_scrapes_exceeded_sample_limit_total |\n| INFO | SCRAPE_NO_SAMPLE_LIMIT | job/kubelet | 沒有 sample_limit，target 突然暴增 series 時會直接衝擊整台 Prometheus | 設定比現況略高的 sample_limit，並監控 prometheus_target_scrapes_exceeded_sample_limit_total |\n| INFO | SCRAPE_NO_SAMPLE_LIMIT | job/node-exporter | 沒有 sample_limit，target 突然暴增 series 時會直接衝擊整台 Prometheus | 設定比現況略高的 sample_limit，並監控 prometheus_target_scrapes_exceeded_sample_limit_total |",
+ "coverage": "# Monitor of monitor 覆蓋\n\n150 條 alert，涵蓋 32／34 個訊號。\n\n## 缺少的訊號\n\n| 優先度 | 層 | 訊號 | 為什麼需要 |\n|---|---|---|---|\n| high | L1 | 資料新鮮度 heartbeat | vector(1) 不依賴資料；scrape 或 TSDB 壞掉時它依然正常 |\n| high | K8s | OOMKilled／重啟原因 | Prometheus 自己看不到被殺的原因 |\n\n## 已涵蓋（請再確認門檻與路由）\n\n| 層 | 訊號 | Alert |\n|---|---|---|\n| L0 | 外部 dead man's switch | Watchdog |\n| L1 | 關鍵 target 消失或停機 | AlertmanagerClusterDown, AlertmanagerClusterCrashlooping, TargetDown, KubeAPIDown, KubeletDown |\n| L1 | Prometheus 自身停機（外部） | AlertmanagerClusterDown, AlertmanagerClusterCrashlooping |\n| L2 | for 計時反覆重置 | AlertForTimerResetting |\n| L3 | Scrape 耗時接近 interval | ScrapeSlowerThanInterval |\n| L3 | 實際 scrape 間隔拉長 | ScrapeIntervalStretched |\n| L3 | Scrape 超過 sample／body 上限 | PrometheusDuplicateTimestamps, PrometheusOutOfOrderTimestamps, PrometheusScrapeBodySizeLimitHit, PrometheusScrapeSampleLimitHit |\n| L3 | Rule group 跳過 evaluation | PrometheusMissingRuleEvaluations, RuleGroupMissingEvaluations |\n| L3 | Rule group 耗時比值 | RuleGroupNearInterval |\n| L3 | Rule 評估失敗 | PrometheusRuleFailures, RuleEvaluationFailures |\n| L3 | Rule group 停止評估 | RuleGroupStale |\n| L3 | 查詢排隊 | PrometheusHighQueryLoad, QueryQueueing |\n| L3 | 通知送出失敗 | PrometheusErrorSendingAlertsToSomeAlertmanagers, PrometheusErrorSendingAlertsToAnyAlertmanager, NotificationsFailing |\n| L3 | 通知被丟棄 | NotificationsDropped |\n| L3 | Notifier queue 接近滿 | PrometheusNotificationQueueRunningFull |\n| L3 | 沒有可用的 Alertmanager | PrometheusNotConnectedToAlertmanagers, NoAlertmanagerDiscovered |\n| L3 | Alertmanager 通知失敗 | AlertmanagerFailedToSendAlerts, AlertmanagerClusterFailedToSendAlerts, AlertmanagerClusterFailedToSendAlerts, AlertmanagerNotificationsFailing |\n| L3 | Alertmanager 設定載入失敗 | AlertmanagerFailedReload, AlertmanagerConfigReloadFailed |\n| L3 | Alertmanager 叢集異常 | AlertmanagerMembersInconsistent |\n| L3 | 設定檔載入失敗 | PrometheusBadConfig |\n| L3 | 重啟 | AlertmanagerClusterCrashlooping, PrometheusRestarted |\n| L3 | WAL 寫入失敗 | WALWriteFailed |\n| L3 | Checkpoint 失敗 | WALCheckpointFailing |\n| L3 | WAL 啟動修復 | WALRepairedAtStartup |\n| L3 | WAL fsync 變慢 | WALFsyncSlow |\n| L3 | Compaction 失敗 | PrometheusTSDBCompactionsFailing, CompactionFailing |\n| L3 | Reload 停止或失敗 | PrometheusTSDBReloadsFailing, BlockReloadStalled |\n| L3 | Head 未落成 block | HeadNotCompacting |\n| L3 | Retention 落後 | RetentionBehind |\n| L3 | 磁碟或 PVC 空間 | KubePersistentVolumeFillingUp, KubePersistentVolumeFillingUp, NodeFilesystemSpaceFillingUp, NodeFilesystemSpaceFillingUp, NodeFilesystemAlmostOutOfSpace |\n| K8s | CPU throttling | CPUThrottlingHigh, PrometheusCPUThrottled |\n| K8s | 記憶體接近 limit | PrometheusMemoryNearLimit |\n\n## 資料來源\n\n這些 metric 要先有人抓，規則才有資料可用。\n\n| 來源 | 狀態 |\n|---|---|\n| Prometheus 自身 metric | 有 |\n| Alertmanager metric | 有 |\n| cAdvisor | 有 |\n| kube-state-metrics | 有 |\n| kubelet volume stats | 查不到 |\n| node_exporter | 有 |\n| blackbox 探測（這台） | 查不到 |",
+ "contract": "# Rule 契約檢查\n\n共 150 條 alert：FAIL 36、WARN 18、OK 96（尖峰範圍 1h）\n\n| 結果 | Alert | Group | S | d 尖峰 | I | E | T 尖峰 | for | 偵測延遲上限 |\n|---|---|---|---|---|---|---|---|---|---|\n| FAIL | AlertmanagerMembersInconsistent | alertmanager.rules | 15s | 0.01s | 15s | 15s | 0.40s | 15.0m | 15.5m |\n| FAIL | TargetDown | general.rules | 15s | 43s | 45s | 15s | 0.10s | 10.0m | 11.7m |\n| FAIL | KubeStateMetricsListErrors | kube-state-metrics | 15s | 1.10s | 15s | 15s | 0.04s | 15.0m | 15.5m |\n| FAIL | KubeStateMetricsShardingMismatch | kube-state-metrics | 15s | 1.10s | 15s | 15s | 0.04s | 15.0m | 15.5m |\n| FAIL | KubeStateMetricsShardsMissing | kube-state-metrics | 15s | 1.10s | 15s | 15s | 0.04s | 15.0m | 15.5m |\n| FAIL | KubeStateMetricsWatchErrors | kube-state-metrics | 15s | 1.10s | 15s | 15s | 0.04s | 15.0m | 15.5m |\n| FAIL | KubeContainerWaiting | kubernetes-apps | 15s | 1.10s | 15s | 15s | 1.00s | 60.0m | 60.5m |\n| FAIL | KubeHpaMaxedOut | kubernetes-apps | 15s | 1.10s | 15s | 15s | 1.00s | 15.0m | 15.5m |\n| FAIL | KubeHpaReplicasMismatch | kubernetes-apps | 15s | 1.10s | 15s | 15s | 1.00s | 15.0m | 15.5m |\n| FAIL | KubeJobFailed | kubernetes-apps | 15s | 1.10s | 15s | 15s | 1.00s | 15.0m | 15.5m |\n| FAIL | KubeJobNotCompleted | kubernetes-apps | 15s | 1.10s | 15s | 15s | 1.00s | 0.00s | 32s |\n| FAIL | KubePodCrashLooping | kubernetes-apps | 15s | 1.10s | 15s | 15s | 1.00s | 15.0m | 15.5m |\n| FAIL | KubeCPUQuotaOvercommit | kubernetes-resources | 15s | 1.10s | 15s | 15s | 0.40s | 5.0m | 5.5m |\n| FAIL | KubeMemoryQuotaOvercommit | kubernetes-resources | 15s | 1.10s | 15s | 15s | 0.40s | 5.0m | 5.5m |\n| FAIL | KubeQuotaAlmostFull | kubernetes-resources | 15s | 1.10s | 15s | 15s | 0.40s | 15.0m | 15.5m |\n| FAIL | KubeQuotaExceeded | kubernetes-resources | 15s | 1.10s | 15s | 15s | 0.40s | 15.0m | 15.5m |\n| FAIL | KubeQuotaFullyUsed | kubernetes-resources | 15s | 1.10s | 15s | 15s | 0.40s | 15.0m | 15.5m |\n| FAIL | KubePersistentVolumeFillingUp | kubernetes-storage | 15s | 1.20s | 15s | 15s | 0.60s | 60s | 92s |\n| FAIL | KubePersistentVolumeFillingUp | kubernetes-storage | 15s | 1.20s | 15s | 15s | 0.60s | 60.0m | 60.5m |\n| FAIL | KubePersistentVolumeInodesFillingUp | kubernetes-storage | 15s | 1.20s | 15s | 15s | 0.60s | 60s | 92s |\n| FAIL | KubePersistentVolumeInodesFillingUp | kubernetes-storage | 15s | 1.20s | 15s | 15s | 0.60s | 60.0m | 60.5m |\n| FAIL | KubeAPITerminatedRequests | kubernetes-system-apiserver | 15s | 7.60s | 15s | 15s | 0.60s | 5.0m | 5.6m |\n| FAIL | KubeAggregatedAPIErrors | kubernetes-system-apiserver | 15s | 7.60s | 15s | 15s | 0.60s | 0.00s | 38s |\n| FAIL | KubeNodeUnreachable | kubernetes-system-kubelet | 15s | 1.10s | 15s | 15s | 0.30s | 15.0m | 15.5m |\n| FAIL | KubeletServerCertificateExpiration | kubernetes-system-kubelet | ? | ? | ? | 15s | 0.30s | 0.00s | ? |\n| FAIL | KubeletServerCertificateExpiration | kubernetes-system-kubelet | ? | ? | ? | 15s | 0.30s | 0.00s | ? |\n| FAIL | KubeletServerCertificateRenewalErrors | kubernetes-system-",
+ "ws_gb": 1.29,
+ "cpu": [
+  {
+   "t": 120,
+   "firing": [],
+   "throttle": []
+  },
+  {
+   "t": 240,
+   "firing": [],
+   "throttle": [
+    0.87
+   ]
+  },
+  {
+   "t": 360,
+   "firing": [],
+   "throttle": [
+    0.76
+   ]
+  },
+  {
+   "t": 480,
+   "firing": [],
+   "throttle": [
+    0.71
+   ]
+  },
+  {
+   "t": 600,
+   "firing": [],
+   "throttle": [
+    0.71
+   ]
+  },
+  {
+   "t": 720,
+   "firing": [],
+   "throttle": [
+    0.69
+   ]
+  },
+  {
+   "t": 840,
+   "firing": [
+    "PrometheusCPUThrottled"
+   ],
+   "throttle": [
+    0.7
+   ]
+  },
+  {
+   "t": 960,
+   "firing": [
+    "PrometheusCPUThrottled"
+   ],
+   "throttle": [
+    0.66
+   ]
+  },
+  {
+   "t": 1080,
+   "firing": [
+    "CPUThrottlingHigh",
+    "PrometheusCPUThrottled"
+   ],
+   "throttle": [
+    0.71
+   ]
+  }
+ ],
+ "mem_limit": 1990,
+ "mem": [
+  {
+   "t": 120,
+   "firing": [
+    "CPUThrottlingHigh"
+   ],
+   "ratio": []
+  },
+  {
+   "t": 240,
+   "firing": [],
+   "ratio": [
+    0.76
+   ]
+  },
+  {
+   "t": 360,
+   "firing": [],
+   "ratio": [
+    0.9
+   ]
+  },
+  {
+   "t": 480,
+   "firing": [],
+   "ratio": [
+    0.88
+   ]
+  },
+  {
+   "t": 600,
+   "firing": [],
+   "ratio": [
+    0.88
+   ]
+  },
+  {
+   "t": 720,
+   "firing": [],
+   "ratio": [
+    0.71
+   ]
+  },
+  {
+   "t": 840,
+   "firing": [],
+   "ratio": [
+    0.71
+   ]
+  },
+  {
+   "t": 960,
+   "firing": [],
+   "ratio": [
+    0.72
+   ]
+  },
+  {
+   "t": 1080,
+   "firing": [],
+   "ratio": [
+    0.72
+   ]
+  }
+ ],
+ "restarts": "0"
+}

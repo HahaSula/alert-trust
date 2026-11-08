@@ -1,0 +1,940 @@
+{
+ "phases": {
+  "base": {
+   "dur": 240,
+   "probes": {
+    "prom_healthy": {
+     "probes": 14,
+     "success": 14,
+     "max_s": 0.0
+    },
+    "prom_ready": {
+     "probes": 14,
+     "success": 14,
+     "max_s": 0.01
+    },
+    "prom_query": {
+     "probes": 14,
+     "success": 14,
+     "max_s": 0.01
+    },
+    "am_healthy": {
+     "probes": 14,
+     "success": 14,
+     "max_s": 0.0
+    },
+    "am_ready": {
+     "probes": 14,
+     "success": 14,
+     "max_s": 0.01
+    },
+    "am_status": {
+     "probes": 14,
+     "success": 14,
+     "max_s": 0.01
+    }
+   },
+   "meta_alerts": {},
+   "sink": {
+    "Watchdog": {
+     "count": 8,
+     "max_gap_s": 35
+    },
+    "DataHeartbeat": {
+     "count": 8,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 5,
+     "max_gap_s": 99
+    }
+   }
+  },
+  "cpu_0.1": {
+   "dur": 300,
+   "probes": {
+    "prom_healthy": {
+     "probes": 18,
+     "success": 18,
+     "max_s": 0.24
+    },
+    "prom_ready": {
+     "probes": 18,
+     "success": 18,
+     "max_s": 0.11
+    },
+    "prom_query": {
+     "probes": 18,
+     "success": 18,
+     "max_s": 0.17
+    },
+    "am_healthy": {
+     "probes": 18,
+     "success": 18,
+     "max_s": 0.01
+    },
+    "am_ready": {
+     "probes": 18,
+     "success": 18,
+     "max_s": 0.01
+    },
+    "am_status": {
+     "probes": 18,
+     "success": 18,
+     "max_s": 0.0
+    }
+   },
+   "meta_alerts": {
+    "M_RuleMissed": 50,
+    "M_CPUThrottled": 80,
+    "M_RuleStale": 85,
+    "M_RuleGroupSlow": 110,
+    "M_RuleFailures": 230
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 10,
+     "max_gap_s": 30
+    },
+    "DataHeartbeat": {
+     "count": 9,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 10,
+     "max_gap_s": 35
+    }
+   }
+  },
+  "rec_cpu": {
+   "dur": 120,
+   "probes": {
+    "prom_healthy": {
+     "probes": 6,
+     "success": 6,
+     "max_s": 0.0
+    },
+    "prom_ready": {
+     "probes": 6,
+     "success": 6,
+     "max_s": 0.0
+    },
+    "prom_query": {
+     "probes": 6,
+     "success": 6,
+     "max_s": 0.01
+    },
+    "am_healthy": {
+     "probes": 6,
+     "success": 6,
+     "max_s": 0.01
+    },
+    "am_ready": {
+     "probes": 6,
+     "success": 6,
+     "max_s": 0.0
+    },
+    "am_status": {
+     "probes": 6,
+     "success": 6,
+     "max_s": 0.0
+    }
+   },
+   "meta_alerts": {
+    "M_CPUThrottled": 0,
+    "M_RuleFailures": 0,
+    "M_RuleGroupSlow": 0,
+    "M_RuleMissed": 0,
+    "M_RuleStale": 0,
+    "M_AlertFlapping": 25
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 4,
+     "max_gap_s": 30
+    },
+    "DataHeartbeat": {
+     "count": 4,
+     "max_gap_s": 30
+    },
+    "KnownTrueCanary": {
+     "count": 4,
+     "max_gap_s": 30
+    }
+   }
+  },
+  "query_saturated": {
+   "dur": 240,
+   "probes": {
+    "prom_healthy": {
+     "probes": 14,
+     "success": 14,
+     "max_s": 0.02
+    },
+    "prom_ready": {
+     "probes": 14,
+     "success": 14,
+     "max_s": 0.01
+    },
+    "prom_query": {
+     "probes": 14,
+     "success": 10,
+     "max_s": 5.01
+    },
+    "am_healthy": {
+     "probes": 14,
+     "success": 14,
+     "max_s": 0.02
+    },
+    "am_ready": {
+     "probes": 14,
+     "success": 14,
+     "max_s": 0.02
+    },
+    "am_status": {
+     "probes": 14,
+     "success": 14,
+     "max_s": 0.01
+    }
+   },
+   "meta_alerts": {
+    "M_AlertFlapping": 0,
+    "M_RuleFailures": 0,
+    "M_RuleMissed": 0,
+    "M_QuerySaturated": 70,
+    "M_CPUThrottled": 75,
+    "M_RuleGroupSlow": 90,
+    "M_QueueTimeHigh": 110
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 8,
+     "max_gap_s": 30
+    },
+    "DataHeartbeat": {
+     "count": 8,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 8,
+     "max_gap_s": 30
+    }
+   }
+  },
+  "rec_query": {
+   "dur": 90,
+   "probes": {
+    "prom_healthy": {
+     "probes": 4,
+     "success": 4,
+     "max_s": 0.0
+    },
+    "prom_ready": {
+     "probes": 4,
+     "success": 4,
+     "max_s": 0.0
+    },
+    "prom_query": {
+     "probes": 4,
+     "success": 4,
+     "max_s": 0.0
+    },
+    "am_healthy": {
+     "probes": 4,
+     "success": 4,
+     "max_s": 0.0
+    },
+    "am_ready": {
+     "probes": 4,
+     "success": 4,
+     "max_s": 0.0
+    },
+    "am_status": {
+     "probes": 4,
+     "success": 4,
+     "max_s": 0.0
+    }
+   },
+   "meta_alerts": {
+    "M_CPUThrottled": 0,
+    "M_QuerySaturated": 0,
+    "M_QueueTimeHigh": 0,
+    "M_RuleGroupSlow": 0,
+    "M_RuleMissed": 0
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 3,
+     "max_gap_s": 30
+    },
+    "DataHeartbeat": {
+     "count": 3,
+     "max_gap_s": 30
+    },
+    "KnownTrueCanary": {
+     "count": 3,
+     "max_gap_s": 30
+    }
+   }
+  },
+  "target_down": {
+   "dur": 180,
+   "probes": {
+    "prom_healthy": {
+     "probes": 11,
+     "success": 11,
+     "max_s": 0.0
+    },
+    "prom_ready": {
+     "probes": 11,
+     "success": 11,
+     "max_s": 0.0
+    },
+    "prom_query": {
+     "probes": 11,
+     "success": 11,
+     "max_s": 0.0
+    },
+    "am_healthy": {
+     "probes": 11,
+     "success": 11,
+     "max_s": 0.01
+    },
+    "am_ready": {
+     "probes": 11,
+     "success": 11,
+     "max_s": 0.0
+    },
+    "am_status": {
+     "probes": 11,
+     "success": 11,
+     "max_s": 0.0
+    }
+   },
+   "meta_alerts": {
+    "M_QueueTimeHigh": 0,
+    "M_RuleMissed": 0,
+    "M_TargetDown": 85,
+    "M_DataHeartbeatLost": 140,
+    "M_KnownTrueLost": 175
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 6,
+     "max_gap_s": 30
+    },
+    "DataHeartbeat": {
+     "count": 1,
+     "max_gap_s": 168
+    },
+    "KnownTrueCanary": {
+     "count": 2,
+     "max_gap_s": 133
+    }
+   }
+  },
+  "rec_target": {
+   "dur": 90,
+   "probes": {
+    "prom_healthy": {
+     "probes": 5,
+     "success": 5,
+     "max_s": 0.0
+    },
+    "prom_ready": {
+     "probes": 5,
+     "success": 5,
+     "max_s": 0.0
+    },
+    "prom_query": {
+     "probes": 5,
+     "success": 5,
+     "max_s": 0.01
+    },
+    "am_healthy": {
+     "probes": 5,
+     "success": 5,
+     "max_s": 0.01
+    },
+    "am_ready": {
+     "probes": 5,
+     "success": 5,
+     "max_s": 0.01
+    },
+    "am_status": {
+     "probes": 5,
+     "success": 5,
+     "max_s": 0.0
+    }
+   },
+   "meta_alerts": {
+    "M_DataHeartbeatLost": 0,
+    "M_KnownTrueLost": 0,
+    "M_QueueTimeHigh": 0,
+    "M_RuleMissed": 0,
+    "M_TargetDown": 0
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 3,
+     "max_gap_s": 30
+    },
+    "DataHeartbeat": {
+     "count": 3,
+     "max_gap_s": 30
+    },
+    "KnownTrueCanary": {
+     "count": 0,
+     "max_gap_s": 90
+    }
+   }
+  },
+  "receiver_down": {
+   "dur": 240,
+   "probes": {
+    "prom_healthy": {
+     "probes": 15,
+     "success": 15,
+     "max_s": 0.0
+    },
+    "prom_ready": {
+     "probes": 15,
+     "success": 15,
+     "max_s": 0.0
+    },
+    "prom_query": {
+     "probes": 15,
+     "success": 15,
+     "max_s": 0.0
+    },
+    "am_healthy": {
+     "probes": 15,
+     "success": 15,
+     "max_s": 0.0
+    },
+    "am_ready": {
+     "probes": 15,
+     "success": 15,
+     "max_s": 0.0
+    },
+    "am_status": {
+     "probes": 15,
+     "success": 15,
+     "max_s": 0.0
+    }
+   },
+   "meta_alerts": {
+    "M_KnownTrueLost": 0,
+    "M_QueueTimeHigh": 0
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 0,
+     "max_gap_s": 240
+    },
+    "DataHeartbeat": {
+     "count": 0,
+     "max_gap_s": 240
+    },
+    "KnownTrueCanary": {
+     "count": 0,
+     "max_gap_s": 240
+    }
+   }
+  },
+  "rec_receiver": {
+   "dur": 90,
+   "probes": {
+    "prom_healthy": {
+     "probes": 5,
+     "success": 5,
+     "max_s": 0.0
+    },
+    "prom_ready": {
+     "probes": 5,
+     "success": 5,
+     "max_s": 0.0
+    },
+    "prom_query": {
+     "probes": 5,
+     "success": 5,
+     "max_s": 0.0
+    },
+    "am_healthy": {
+     "probes": 5,
+     "success": 5,
+     "max_s": 0.0
+    },
+    "am_ready": {
+     "probes": 5,
+     "success": 5,
+     "max_s": 0.0
+    },
+    "am_status": {
+     "probes": 5,
+     "success": 5,
+     "max_s": 0.0
+    }
+   },
+   "meta_alerts": {},
+   "sink": {
+    "Watchdog": {
+     "count": 3,
+     "max_gap_s": 34
+    },
+    "DataHeartbeat": {
+     "count": 3,
+     "max_gap_s": 34
+    },
+    "KnownTrueCanary": {
+     "count": 3,
+     "max_gap_s": 30
+    }
+   }
+  },
+  "am_down": {
+   "dur": 180,
+   "probes": {
+    "prom_healthy": {
+     "probes": 11,
+     "success": 11,
+     "max_s": 0.01
+    },
+    "prom_ready": {
+     "probes": 11,
+     "success": 11,
+     "max_s": 0.01
+    },
+    "prom_query": {
+     "probes": 11,
+     "success": 11,
+     "max_s": 0.01
+    },
+    "am_healthy": {
+     "probes": 11,
+     "success": 0,
+     "max_s": 0.05
+    },
+    "am_ready": {
+     "probes": 11,
+     "success": 0,
+     "max_s": 0.06
+    },
+    "am_status": {
+     "probes": 11,
+     "success": 0,
+     "max_s": 0.06
+    }
+   },
+   "meta_alerts": {
+    "M_NotifyDropped": 40,
+    "M_NotifyErrors": 70,
+    "M_KnownTrueLost": 95,
+    "M_DataHeartbeatLost": 100,
+    "M_WatchdogLost": 100
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 0,
+     "max_gap_s": 180
+    },
+    "DataHeartbeat": {
+     "count": 0,
+     "max_gap_s": 180
+    },
+    "KnownTrueCanary": {
+     "count": 0,
+     "max_gap_s": 180
+    }
+   }
+  },
+  "rec_am": {
+   "dur": 120,
+   "probes": {
+    "prom_healthy": {
+     "probes": 7,
+     "success": 7,
+     "max_s": 0.0
+    },
+    "prom_ready": {
+     "probes": 7,
+     "success": 7,
+     "max_s": 0.0
+    },
+    "prom_query": {
+     "probes": 7,
+     "success": 7,
+     "max_s": 0.0
+    },
+    "am_healthy": {
+     "probes": 7,
+     "success": 7,
+     "max_s": 0.0
+    },
+    "am_ready": {
+     "probes": 7,
+     "success": 7,
+     "max_s": 0.0
+    },
+    "am_status": {
+     "probes": 7,
+     "success": 7,
+     "max_s": 0.0
+    }
+   },
+   "meta_alerts": {
+    "M_NotifyErrors": 0,
+    "M_DataHeartbeatLost": 0,
+    "M_KnownTrueLost": 0,
+    "M_NotifyDropped": 0,
+    "M_WatchdogLost": 0
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 3,
+     "max_gap_s": 32
+    },
+    "DataHeartbeat": {
+     "count": 4,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 4,
+     "max_gap_s": 35
+    }
+   }
+  },
+  "oom_crash_loop": {
+   "dur": 300,
+   "probes": {
+    "prom_healthy": {
+     "probes": 19,
+     "success": 19,
+     "max_s": 0.05
+    },
+    "prom_ready": {
+     "probes": 19,
+     "success": 18,
+     "max_s": 0.07
+    },
+    "prom_query": {
+     "probes": 19,
+     "success": 18,
+     "max_s": 0.0
+    },
+    "am_healthy": {
+     "probes": 19,
+     "success": 19,
+     "max_s": 0.01
+    },
+    "am_ready": {
+     "probes": 19,
+     "success": 19,
+     "max_s": 0.0
+    },
+    "am_status": {
+     "probes": 19,
+     "success": 19,
+     "max_s": 0.0
+    }
+   },
+   "meta_alerts": {
+    "M_NotifyDropped": 0,
+    "M_PromRestarted": 10,
+    "M_MemNearLimit": 255
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 10,
+     "max_gap_s": 30
+    },
+    "DataHeartbeat": {
+     "count": 9,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 9,
+     "max_gap_s": 35
+    }
+   }
+  },
+  "rec_oom": {
+   "dur": 180,
+   "probes": {
+    "prom_healthy": {
+     "probes": 11,
+     "success": 11,
+     "max_s": 0.0
+    },
+    "prom_ready": {
+     "probes": 11,
+     "success": 11,
+     "max_s": 0.0
+    },
+    "prom_query": {
+     "probes": 11,
+     "success": 11,
+     "max_s": 0.01
+    },
+    "am_healthy": {
+     "probes": 11,
+     "success": 11,
+     "max_s": 0.0
+    },
+    "am_ready": {
+     "probes": 11,
+     "success": 11,
+     "max_s": 0.0
+    },
+    "am_status": {
+     "probes": 11,
+     "success": 11,
+     "max_s": 0.0
+    }
+   },
+   "meta_alerts": {
+    "M_PromRestarted": 0
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 6,
+     "max_gap_s": 30
+    },
+    "DataHeartbeat": {
+     "count": 6,
+     "max_gap_s": 30
+    },
+    "KnownTrueCanary": {
+     "count": 6,
+     "max_gap_s": 35
+    }
+   }
+  },
+  "disk_full": {
+   "dur": 300,
+   "probes": {
+    "prom_healthy": {
+     "probes": 19,
+     "success": 19,
+     "max_s": 0.01
+    },
+    "prom_ready": {
+     "probes": 19,
+     "success": 19,
+     "max_s": 0.0
+    },
+    "prom_query": {
+     "probes": 19,
+     "success": 19,
+     "max_s": 0.0
+    },
+    "am_healthy": {
+     "probes": 19,
+     "success": 19,
+     "max_s": 0.0
+    },
+    "am_ready": {
+     "probes": 19,
+     "success": 19,
+     "max_s": 0.0
+    },
+    "am_status": {
+     "probes": 19,
+     "success": 19,
+     "max_s": 0.0
+    }
+   },
+   "meta_alerts": {
+    "M_PromRestarted": 0,
+    "M_WalWriteFailed": 15,
+    "M_RuleFailures": 20,
+    "M_DataHeartbeatLost": 165,
+    "M_KnownTrueLost": 165
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 10,
+     "max_gap_s": 35
+    },
+    "DataHeartbeat": {
+     "count": 2,
+     "max_gap_s": 260
+    },
+    "KnownTrueCanary": {
+     "count": 2,
+     "max_gap_s": 264
+    }
+   }
+  },
+  "rec_disk": {
+   "dur": 120,
+   "probes": {
+    "prom_healthy": {
+     "probes": 7,
+     "success": 7,
+     "max_s": 0.0
+    },
+    "prom_ready": {
+     "probes": 7,
+     "success": 7,
+     "max_s": 0.0
+    },
+    "prom_query": {
+     "probes": 7,
+     "success": 7,
+     "max_s": 0.0
+    },
+    "am_healthy": {
+     "probes": 7,
+     "success": 7,
+     "max_s": 0.0
+    },
+    "am_ready": {
+     "probes": 7,
+     "success": 7,
+     "max_s": 0.0
+    },
+    "am_status": {
+     "probes": 7,
+     "success": 7,
+     "max_s": 0.01
+    }
+   },
+   "meta_alerts": {
+    "M_DataHeartbeatLost": 0,
+    "M_KnownTrueLost": 0,
+    "M_PromRestarted": 0,
+    "M_RuleFailures": 0,
+    "M_WalWriteFailed": 0
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 4,
+     "max_gap_s": 30
+    },
+    "DataHeartbeat": {
+     "count": 4,
+     "max_gap_s": 30
+    },
+    "KnownTrueCanary": {
+     "count": 1,
+     "max_gap_s": 91
+    }
+   }
+  },
+  "prom_down": {
+   "dur": 120,
+   "probes": {
+    "prom_healthy": {
+     "probes": 7,
+     "success": 0,
+     "max_s": 0.05
+    },
+    "prom_ready": {
+     "probes": 7,
+     "success": 0,
+     "max_s": 0.05
+    },
+    "prom_query": {
+     "probes": 7,
+     "success": 0,
+     "max_s": 0.05
+    },
+    "am_healthy": {
+     "probes": 7,
+     "success": 7,
+     "max_s": 0.0
+    },
+    "am_ready": {
+     "probes": 7,
+     "success": 7,
+     "max_s": 0.0
+    },
+    "am_status": {
+     "probes": 7,
+     "success": 7,
+     "max_s": 0.0
+    }
+   },
+   "meta_alerts": {
+    "M_PromRestarted": 0,
+    "M_RuleFailures": 0,
+    "M_WalWriteFailed": 0,
+    "M_PromDown": 35
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 4,
+     "max_gap_s": 30
+    },
+    "DataHeartbeat": {
+     "count": 4,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 4,
+     "max_gap_s": 35
+    }
+   }
+  },
+  "rec_prom": {
+   "dur": 120,
+   "probes": {
+    "prom_healthy": {
+     "probes": 7,
+     "success": 7,
+     "max_s": 0.0
+    },
+    "prom_ready": {
+     "probes": 7,
+     "success": 7,
+     "max_s": 0.0
+    },
+    "prom_query": {
+     "probes": 7,
+     "success": 7,
+     "max_s": 0.0
+    },
+    "am_healthy": {
+     "probes": 7,
+     "success": 7,
+     "max_s": 0.0
+    },
+    "am_ready": {
+     "probes": 7,
+     "success": 7,
+     "max_s": 0.0
+    },
+    "am_status": {
+     "probes": 7,
+     "success": 7,
+     "max_s": 0.0
+    }
+   },
+   "meta_alerts": {
+    "M_PromDown": 0,
+    "M_PromRestarted": 0,
+    "M_RuleFailures": 0,
+    "M_WalWriteFailed": 0,
+    "M_WalCorruption": 15
+   },
+   "sink": {
+    "Watchdog": {
+     "count": 4,
+     "max_gap_s": 30
+    },
+    "DataHeartbeat": {
+     "count": 4,
+     "max_gap_s": 35
+    },
+    "KnownTrueCanary": {
+     "count": 4,
+     "max_gap_s": 40
+    }
+   }
+  }
+ },
+ "events": {
+  "restarts": "4"
+ }
+}
