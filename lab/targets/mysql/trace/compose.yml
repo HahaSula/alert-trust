@@ -1,0 +1,37 @@
+# 輕量檢查：用 general_log 記下 mysqld_exporter v0.21.0 實際送出的 SQL。
+# project 名稱 at-mytrace；只開 127.0.0.1:22501/22502（exporter）。
+name: at-mytrace
+x-exporter-args: &args
+  - --collect.global_status
+  - --collect.global_variables
+  - --collect.slave_status
+  - --collect.info_schema.innodb_metrics
+  - --collect.info_schema.innodb_trx
+  - --collect.info_schema.processlist
+  - --collect.heartbeat
+services:
+  mdb:
+    image: mariadb:11.4
+    environment: {MARIADB_ROOT_PASSWORD: rootpass}
+    command: [--server-id=1, --general-log=ON, --log-output=TABLE]
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./init-mariadb.sql:/docker-entrypoint-initdb.d/02-init.sql:ro
+  my:
+    image: mysql:8.4.7
+    environment: {MYSQL_ROOT_PASSWORD: rootpass}
+    command: [--server-id=11, --general-log=ON, --log-output=TABLE]
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+  ex-mdb:
+    image: prom/mysqld-exporter:v0.21.0
+    command: *args
+    environment: {MYSQLD_EXPORTER_PASSWORD: exporterpass}
+    entrypoint: ["/bin/mysqld_exporter", "--mysqld.address=mdb:3306", "--mysqld.username=exporter"]
+    ports: ["127.0.0.1:22501:9104"]
+  ex-my:
+    image: prom/mysqld-exporter:v0.21.0
+    command: *args
+    environment: {MYSQLD_EXPORTER_PASSWORD: exporterpass}
+    entrypoint: ["/bin/mysqld_exporter", "--mysqld.address=my:3306", "--mysqld.username=exporter"]
+    ports: ["127.0.0.1:22502:9104"]

@@ -71,6 +71,7 @@ nav:
           - PostgreSQL: components/postgres_exporter.md
   - Target 怎麼監控:
       - MySQL／MariaDB: targets/mysql.md
+      - MySQL／MariaDB 附錄：原始碼到 metric: targets/mysql-appendix.md
       - PostgreSQL: targets/postgres.md
   - 內部架構:
       - 總覽：單序點對照: architecture/index.md

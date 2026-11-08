@@ -1,0 +1,624 @@
+# MySQL／MariaDB「從資料庫原始碼到 metric」附錄的參考（docs/targets/mysql-appendix.md）。
+# 每一行都用 gh api 取 tag 上的檔案核對過（行內含關鍵字）。
+# 原始碼：mysqld_exporter v0.21.0、MySQL 8.4.7（mysql-8.4.7）、MariaDB 11.4.13（mariadb-11.4.13）。
+refs:
+  my-trace-ex-version-query:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/instance.go"
+    line: 100
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/instance.go#L100"
+  my-trace-ex-conn-error:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/exporter.go"
+    line: 186
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/exporter.go#L186"
+  my-trace-ex-up:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/exporter.go"
+    line: 175
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/exporter.go#L175"
+  my-trace-ex-maxopen:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/exporter.go"
+    line: 134
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/exporter.go#L134"
+  my-trace-ex-lockwait:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/exporter.go"
+    line: 146
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/exporter.go#L146"
+  my-trace-ex-gs-query:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/global_status.go"
+    line: 32
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/global_status.go#L32"
+  my-trace-ex-gs-types:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/global_status.go"
+    line: 40
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/global_status.go#L40"
+  my-trace-ex-gs-generic:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/global_status.go"
+    line: 147
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/global_status.go#L147"
+  my-trace-ex-gs-connerr:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/global_status.go"
+    line: 67
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/global_status.go#L67"
+  my-trace-ex-gv-query:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/global_variables.go"
+    line: 34
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/global_variables.go#L34"
+  my-trace-ex-validname:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/global_variables.go"
+    line: 250
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/global_variables.go#L250"
+  my-trace-ex-parse-primary:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/collector.go"
+    line: 57
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/collector.go#L57"
+  my-trace-ex-parse-logre:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/collector.go"
+    line: 68
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/collector.go#L68"
+  my-trace-ex-parse-float:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/collector.go"
+    line: 72
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/collector.go#L72"
+  my-trace-ex-slave-loop:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/slave_status.go"
+    line: 90
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/slave_status.go#L90"
+  my-trace-ex-slave-suffix:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/slave_status.go"
+    line: 94
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/slave_status.go#L94"
+  my-trace-ex-slave-name:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/slave_status.go"
+    line: 146
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/slave_status.go#L146"
+  my-trace-ex-slave-labels:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/slave_status.go"
+    line: 148
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/slave_status.go#L148"
+  my-trace-ex-slave-gtid:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/slave_status.go"
+    line: 159
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/slave_status.go#L159"
+  my-trace-ex-trx-desc:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/info_schema_innodb_trx.go"
+    line: 44
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/info_schema_innodb_trx.go#L44"
+  my-trace-ex-im-colquery:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/info_schema_innodb_metrics.go"
+    line: 29
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/info_schema_innodb_metrics.go#L29"
+  my-trace-ex-im-switch:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/info_schema_innodb_metrics.go"
+    line: 107
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/info_schema_innodb_metrics.go#L107"
+  my-trace-ex-im-total:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/info_schema_innodb_metrics.go"
+    line: 177
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/info_schema_innodb_metrics.go#L177"
+  my-trace-ex-hb-schema:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/heartbeat.go"
+    line: 54
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/heartbeat.go#L54"
+  my-trace-ex-hb-now:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/heartbeat.go"
+    line: 84
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/heartbeat.go#L84"
+  my-trace-ex-hb-default:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "config/config.go"
+    line: 67
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/config/config.go#L67"
+  my-trace-ex-qrt-check:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/info_schema_query_response_time.go"
+    line: 125
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/info_schema_query_response_time.go#L125"
+  my-trace-ex-pl-sanitize:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/info_schema_processlist.go"
+    line: 160
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/info_schema_processlist.go#L160"
+  my-trace-my-threads-running:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/mysqld.cc"
+    line: 11638
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/mysqld.cc#L11638"
+  my-trace-my-threads-running-fn:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/mysqld.cc"
+    line: 10945
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/mysqld.cc#L10945"
+  my-trace-my-uptime:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/mysqld.cc"
+    line: 11640
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/mysqld.cc#L11640"
+  my-trace-my-uptime-fn:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/mysqld.cc"
+    line: 10925
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/mysqld.cc#L10925"
+  my-trace-my-max-used:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/mysqld.cc"
+    line: 11452
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/mysqld.cc#L11452"
+  my-trace-my-max-used-upd:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/conn_handler/connection_handler_manager.cc"
+    line: 122
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/conn_handler/connection_handler_manager.cc#L122"
+  my-trace-my-connerr-var:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/mysqld.cc"
+    line: 11341
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/mysqld.cc#L11341"
+  my-trace-my-connerr-inc:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/conn_handler/connection_handler_manager.cc"
+    line: 118
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/conn_handler/connection_handler_manager.cc#L118"
+  my-trace-my-connerr-inc2:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/conn_handler/connection_handler_manager.cc"
+    line: 98
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/conn_handler/connection_handler_manager.cc#L98"
+  my-trace-my-slow:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/mysqld.cc"
+    line: 11512
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/mysqld.cc#L11512"
+  my-trace-my-innodb-prefix:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 22174
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/handler/ha_innodb.cc#L22174"
+  my-trace-my-rowlock-var:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 1255
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/handler/ha_innodb.cc#L1255"
+  my-trace-my-rowlock-export:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/innobase/srv/srv0srv.cc"
+    line: 1676
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/srv/srv0srv.cc#L1676"
+  my-trace-my-rowlock-inc:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/innobase/lock/lock0wait.cc"
+    line: 169
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/lock/lock0wait.cc#L169"
+  my-trace-my-histlen-mon:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/innobase/srv/srv0mon.cc"
+    line: 789
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/srv/srv0mon.cc#L789"
+  my-trace-my-histlen-val:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/innobase/srv/srv0mon.cc"
+    line: 1902
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/srv/srv0mon.cc#L1902"
+  my-trace-my-deadlock-mon:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/innobase/srv/srv0mon.cc"
+    line: 126
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/srv/srv0mon.cc#L126"
+  my-trace-my-deadlock-inc:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/innobase/lock/lock0wait.cc"
+    line: 1306
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/lock/lock0wait.cc#L1306"
+  my-trace-my-ism-status-col:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/innobase/handler/i_s.cc"
+    line: 1838
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/handler/i_s.cc#L1838"
+  my-trace-my-ism-type:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/innobase/handler/i_s.cc"
+    line: 2100
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/handler/i_s.cc#L2100"
+  my-trace-my-trx-started:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/innobase/handler/i_s.cc"
+    line: 423
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/handler/i_s.cc#L423"
+  my-trace-my-io-running-field:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/rpl_replica.cc"
+    line: 3354
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/rpl_replica.cc#L3354"
+  my-trace-my-io-running-val:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/rpl_replica.cc"
+    line: 3494
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/rpl_replica.cc#L3494"
+  my-trace-my-sbs-field:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/rpl_replica.cc"
+    line: 3382
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/rpl_replica.cc#L3382"
+  my-trace-my-sbs-null2:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/rpl_replica.cc"
+    line: 3624
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/rpl_replica.cc#L3624"
+  my-trace-my-last-sql-errno:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/rpl_replica.cc"
+    line: 3389
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/rpl_replica.cc#L3389"
+  my-trace-my-executed-gtid-set:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/rpl_replica.cc"
+    line: 3413
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/rpl_replica.cc#L3413"
+  my-trace-my-readonly:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/sys_vars.cc"
+    line: 3689
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/sys_vars.cc#L3689"
+  my-trace-my-super-readonly:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/sys_vars.cc"
+    line: 3699
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/sys_vars.cc#L3699"
+  my-trace-my-gtid-executed:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/sys_vars.cc"
+    line: 6418
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/sys_vars.cc#L6418"
+  my-trace-my-semisync-status:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "plugin/semisync/semisync_source_plugin.cc"
+    line: 455
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/plugin/semisync/semisync_source_plugin.cc#L455"
+  my-trace-my-semisync-prefix:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "plugin/semisync/semisync_source_plugin.cc"
+    line: 60
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/plugin/semisync/semisync_source_plugin.cc#L60"
+  my-trace-mdb-threads-running:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7883
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7883"
+  my-trace-mdb-uptime:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7888
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7888"
+  my-trace-mdb-max-used:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7749
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7749"
+  my-trace-mdb-conn-check:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 6376
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L6376"
+  my-trace-mdb-max-used-upd:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 6385
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L6385"
+  my-trace-mdb-connerr-var:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7675
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7675"
+  my-trace-mdb-slow:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7822
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7822"
+  my-trace-mdb-innodb-prefix:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 18756
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/handler/ha_innodb.cc#L18756"
+  my-trace-mdb-histlen-var:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 945
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/handler/ha_innodb.cc#L945"
+  my-trace-mdb-histlen-export:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/innobase/srv/srv0srv.cc"
+    line: 896
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/srv/srv0srv.cc#L896"
+  my-trace-mdb-rowlock-var:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 965
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/handler/ha_innodb.cc#L965"
+  my-trace-mdb-rowlock-export:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/innobase/srv/srv0srv.cc"
+    line: 901
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/srv/srv0srv.cc#L901"
+  my-trace-mdb-deadlock-inc:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/innobase/lock/lock0lock.cc"
+    line: 7277
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/lock/lock0lock.cc#L7277"
+  my-trace-mdb-deadlock-mon:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/innobase/srv/srv0mon.cc"
+    line: 85
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/srv/srv0mon.cc#L85"
+  my-trace-mdb-histlen-mon:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/innobase/srv/srv0mon.cc"
+    line: 638
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/srv/srv0mon.cc#L638"
+  my-trace-mdb-ism-enabled-col:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/innobase/handler/i_s.cc"
+    line: 1711
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/handler/i_s.cc#L1711"
+  my-trace-mdb-ism-type:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/innobase/handler/i_s.cc"
+    line: 1972
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/handler/i_s.cc#L1972"
+  my-trace-mdb-trx-started:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/innobase/handler/i_s.cc"
+    line: 286
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/handler/i_s.cc#L286"
+  my-trace-mdb-io-running-vals:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/slave.cc"
+    line: 3357
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/slave.cc#L3357"
+  my-trace-mdb-sbm-field:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/slave.cc"
+    line: 3234
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/slave.cc#L3234"
+  my-trace-mdb-sbm-null:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/slave.cc"
+    line: 3488
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/slave.cc#L3488"
+  my-trace-mdb-last-sql-errno:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/slave.cc"
+    line: 3249
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/slave.cc#L3249"
+  my-trace-mdb-gtid-slave-pos:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/slave.cc"
+    line: 3349
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/slave.cc#L3349"
+  my-trace-mdb-readonly:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sys_vars.cc"
+    line: 3199
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sys_vars.cc#L3199"
+  my-trace-mdb-gtid-binlog-pos:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sys_vars.cc"
+    line: 2055
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sys_vars.cc#L2055"
+  my-trace-mdb-semisync-status:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7770
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7770"
+  my-trace-mdb-wsrep-ready:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7894
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7894"
+  my-trace-mdb-wsrep-ifdef:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7892
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7892"
+  exp-mysql-trace:
+    kind: experiment
+    title: "mysqld_exporter v0.21.0 實際送出的 SQL（general_log 與 performance_schema 錯誤計數）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/mysql/trace/results/general-log-20261109.md"
