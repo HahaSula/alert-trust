@@ -82,5 +82,10 @@ nav:
       - 信任契約: contracts.md
       - 契約計算器: tools/calculator.md
       - 名詞：設定與 metric: reference/terms.md
-  - 實驗報告: reports/index.md
+  - 實驗報告:
+      - 總覽: reports/index.md
+      - Prometheus Rule 信任邊際: reports/prometheus-trust.md
+      - Alert Pending 抖動分析: reports/pending-jitter.md
+      - VictoriaMetrics Rule 信任邊際: reports/victoriametrics-trust.md
+      - Alertmanager 監控指南: reports/alertmanager.md
   - 來源: reference/sources.md

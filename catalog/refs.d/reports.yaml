@@ -1,0 +1,59 @@
+# docs/reports/ 用到、但 refs.yaml 與 refs-code.yaml 還沒有的參考。
+# code 類的行號都在對應 tag 的檔案上確認過（2026-11-08）。
+refs:
+  am027-email-defer:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.27.0"
+    file: "notify/email/email.go"
+    line: 245
+    url: "https://github.com/prometheus/alertmanager/blob/v0.27.0/notify/email/email.go#L245"
+  am029-email-close:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.29.0"
+    file: "notify/email/email.go"
+    line: 245
+    url: "https://github.com/prometheus/alertmanager/blob/v0.29.0/notify/email/email.go#L245"
+  p-eval-fail-return:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "rules/group.go"
+    line: 473
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/rules/group.go#L473"
+  p255-range-closed:
+    kind: code
+    project: "Prometheus"
+    version: "v2.55.1"
+    file: "promql/engine.go"
+    line: 2388
+    url: "https://github.com/prometheus/prometheus/blob/v2.55.1/promql/engine.go#L2388"
+  p3-range-open:
+    kind: code
+    project: "Prometheus"
+    version: "v3.15.1"
+    file: "promql/engine.go"
+    line: 3103
+    url: "https://github.com/prometheus/prometheus/blob/v3.15.1/promql/engine.go#L3103"
+  p255-analyse-rules:
+    kind: code
+    project: "Prometheus"
+    version: "v2.55.1"
+    file: "rules/manager.go"
+    line: 448
+    url: "https://github.com/prometheus/prometheus/blob/v2.55.1/rules/manager.go#L448"
+  exp-prom-probe:
+    kind: experiment
+    title: "Prometheus 實驗：rule 當下可見資料的探針（2.51.2）"
+    url: "https://github.com/HahaSula/prometheus-selfcheck-skills/blob/b8601c502454dc382691ff5dbd4a9ecff9532a24/lab/results/probe/probe.json"
+  exp-am-compat:
+    kind: experiment
+    title: "Alertmanager 實驗：設定相容性與升級中斷點（0.27.0–0.34.2）"
+    visibility: private
+    note: "原始報告含環境資訊，整理後公開"
+  exp-am-rules:
+    kind: experiment
+    title: "Alertmanager 實驗：告警規則的故障注入與 promtool 測試（0.27.0、0.29.0、0.34.2）"
+    visibility: private
+    note: "原始報告含環境資訊，整理後公開"
