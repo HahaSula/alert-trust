@@ -1,0 +1,14 @@
+# 第二輪：for 2m（需要連續 5 次 evaluation 有值），另外記錄 rate 回 0 的次數。
+groups:
+  - name: matrix
+    interval: 30s
+    rules:
+      - alert: Rate2m
+        expr: rate(lab_m[2m]) > 0
+        for: 2m
+      - alert: Rate5m
+        expr: rate(lab_m[5m]) > 0
+        for: 2m
+      # 視窗內沒有 sample、但 queryStep（5m）內有前一筆時，VM 的 rate 回 0 而不是空
+      - alert: Rate2mZero
+        expr: rate(lab_m[2m]) == 0

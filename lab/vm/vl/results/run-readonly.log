@@ -1,0 +1,5 @@
+[    2.4s] == steady 
+[  155.7s] == readonly-on 
+[  161.6s] == readonly-probe {'ingest': (429, 'cannot add rows into storage in read-only mode; the storage can be in read-only mode because of lack of free disk space at -storageDataPath=/vl\n'), 'canary_count': (200, '{"c":"16"}')}
+[  313.3s] == readonly-off 
+[  375.9s] == end {'canary_count_10m': (200, '{"c":"22"}')}

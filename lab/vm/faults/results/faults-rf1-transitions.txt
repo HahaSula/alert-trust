@@ -1,0 +1,140 @@
+== warmup @ 3.2s {"rf": "1"}
+  +     5s am:Watchdog|default: absent -> 1
+  +     5s am:Watchdog|resend3m: absent -> 1
+  +     5s up:vmselect: False -> True
+  +     5s vmalert_default:Watchdog.firing: absent -> 1
+  +     5s vmalert_resend:Watchdog.firing: absent -> 1
+  +    33s health_default:lowcount-realparam.err: True -> False
+  +    72s vmalert_default:CondAlive.firing: absent -> 0
+  +    72s vmalert_default:Heartbeat.firing: absent -> 0
+  +    72s vmalert_default:ItemUp.firing: absent -> 0
+  +    72s vmalert_resend:CondAlive.firing: absent -> 0
+  +    72s vmalert_resend:Heartbeat.firing: absent -> 0
+  +    72s vmalert_resend:ItemUp.firing: absent -> 0
+  +    77s vmalert_default:EventsTooLowDocParam.firing: absent -> 0
+  +    77s vmalert_resend:EventsTooLowDocParam.firing: absent -> 0
+  +    85s vmalert_default:EventsTooLow.firing: absent -> 0
+  +    85s vmalert_resend:EventsTooLow.firing: absent -> 0
+  +   100s vmalert_default:EventsTooLowRealParam.firing: absent -> 0
+  +   100s vmalert_resend:EventsTooLowRealParam.firing: absent -> 0
+  +   138s am:CondAlive|default: absent -> 1
+  +   138s am:CondAlive|resend3m: absent -> 1
+  +   138s am:Heartbeat|default: absent -> 1
+  +   138s am:Heartbeat|resend3m: absent -> 1
+  +   138s am:ItemUp|default: absent -> 30
+  +   138s am:ItemUp|resend3m: absent -> 30
+  +   138s vmalert_default:CondAlive.firing: 0 -> 1
+  +   138s vmalert_default:Heartbeat.firing: 0 -> 1
+  +   138s vmalert_default:ItemUp.firing: 0 -> 30
+  +   138s vmalert_resend:CondAlive.firing: 0 -> 1
+  +   138s vmalert_resend:Heartbeat.firing: 0 -> 1
+  +   138s vmalert_resend:ItemUp.firing: 0 -> 30
+  +   143s am:EventsTooLowDocParam|default: absent -> 1
+  +   143s am:EventsTooLowDocParam|resend3m: absent -> 1
+  +   143s vmalert_default:EventsTooLowDocParam.firing: 0 -> 1
+  +   143s vmalert_resend:EventsTooLowDocParam.firing: 0 -> 1
+  +   152s am:EventsTooLow|default: absent -> 1
+  +   152s am:EventsTooLow|resend3m: absent -> 1
+  +   152s vmalert_default:EventsTooLow.firing: 0 -> 1
+  +   152s vmalert_resend:EventsTooLow.firing: 0 -> 1
+  +   167s am:EventsTooLowRealParam|default: absent -> 1
+  +   167s am:EventsTooLowRealParam|resend3m: absent -> 1
+  +   167s vmalert_default:EventsTooLowRealParam.firing: 0 -> 1
+  +   167s vmalert_resend:EventsTooLowRealParam.firing: 0 -> 1
+  +   243s am:EventsTooLowDocParam|default: 1 -> absent
+  +   243s am:EventsTooLowDocParam|resend3m: 1 -> absent
+  +   243s vmalert_default:EventsTooLowDocParam.firing: 1 -> absent
+  +   243s vmalert_resend:EventsTooLowDocParam.firing: 1 -> absent
+  +   252s am:EventsTooLow|default: 1 -> absent
+  +   252s am:EventsTooLow|resend3m: 1 -> absent
+  +   252s vmalert_default:EventsTooLow.firing: 1 -> absent
+  +   252s vmalert_resend:EventsTooLow.firing: 1 -> absent
+  +   267s am:EventsTooLowRealParam|default: 1 -> absent
+  +   267s am:EventsTooLowRealParam|resend3m: 1 -> absent
+  +   267s vmalert_default:EventsTooLowRealParam.firing: 1 -> absent
+  +   267s vmalert_resend:EventsTooLowRealParam.firing: 1 -> absent
+  +   285s iteration_missed_total starts growing (0 -> 1)
+  (phase total) partial_results_total +0
+  (phase total) rule_errors_total +0
+  (phase total) iteration_missed_total +4
+
+== vmstorage-3-down @ 336.5s 
+  +     1s read_only: [0.0, 0.0, 0.0] -> [0.0, 0.0, None]
+  +     1s up:vmstorage: [True, True, True] -> [True, True, False]
+  +     6s storage_reachable: 3.0 -> 2.0
+  +    11s partial_results_total starts growing (0 -> 8)
+  +    11s am:ItemUp|default: 30 -> 18
+  +    11s am:ItemUp|resend3m: 30 -> 18
+  +    11s vmalert_default:EventsTooLowDocParam.firing: absent -> 0
+  +    11s vmalert_default:ItemUp.firing: 30 -> 18
+  +    11s vmalert_resend:EventsTooLowDocParam.firing: absent -> 0
+  +    11s vmalert_resend:ItemUp.firing: 30 -> 18
+  +    19s vmalert_default:EventsTooLow.firing: absent -> 0
+  +    19s vmalert_resend:EventsTooLow.firing: absent -> 0
+  +    34s rule_errors_total starts growing (1 -> 2)
+  +    34s health_default:lowcount-realparam.err: False -> True
+  +    72s am:EventsTooLowDocParam|default: absent -> 1
+  +    72s am:EventsTooLowDocParam|resend3m: absent -> 1
+  +    72s vmalert_default:EventsTooLowDocParam.firing: 0 -> 1
+  +    72s vmalert_resend:EventsTooLowDocParam.firing: 0 -> 1
+  +    86s am:EventsTooLow|default: absent -> 1
+  +    86s am:EventsTooLow|resend3m: absent -> 1
+  +    86s vmalert_default:EventsTooLow.firing: 0 -> 1
+  +    86s vmalert_resend:EventsTooLow.firing: 0 -> 1
+  +   139s am:EventsTooLowDocParam|default: 1 -> absent
+  +   139s am:EventsTooLowDocParam|resend3m: 1 -> absent
+  +   139s am:ItemUp|default: 18 -> 30
+  +   139s am:ItemUp|resend3m: 18 -> 30
+  +   139s vmalert_default:EventsTooLowDocParam.firing: 1 -> absent
+  +   139s vmalert_default:ItemUp.firing: 18 -> 30
+  +   139s vmalert_resend:EventsTooLowDocParam.firing: 1 -> absent
+  +   139s vmalert_resend:ItemUp.firing: 18 -> 30
+  +   152s am:EventsTooLow|default: 1 -> absent
+  +   152s am:EventsTooLow|resend3m: 1 -> absent
+  +   152s vmalert_default:EventsTooLow.firing: 1 -> absent
+  +   152s vmalert_resend:EventsTooLow.firing: 1 -> absent
+  (phase total) partial_results_total +78
+  (phase total) rule_errors_total +7
+  (phase total) iteration_missed_total +0
+
+== vmstorage-3-up @ 580.6s 
+  +     9s partial_results_total starts growing (78 -> 80)
+  +     9s iteration_missed_total starts growing (4 -> 5)
+  +     9s read_only: [0.0, 0.0, None] -> [0.0, 0.0, 0.0]
+  +     9s storage_reachable: 2.0 -> 3.0
+  +     9s up:vmstorage: [True, True, False] -> [True, True, True]
+  +    24s health_default:lowcount-realparam.err: True -> False
+  (phase total) partial_results_total +2
+  (phase total) rule_errors_total +0
+  (phase total) iteration_missed_total +4
+
+== vmselect-down @ 761.0s 
+  +     1s up:vmselect: True -> False
+  +    16s rule_errors_total starts growing (8 -> 11)
+  +    16s health_default:lab.err: False -> True
+  +    16s health_default:lowcount-docparam.err: False -> True
+  +    16s health_default:lowcount-realparam.err: False -> True
+  +    29s health_default:lowcount-default.err: False -> True
+  +   101s am:CondAlive|default: 1 -> absent
+  +   101s am:Heartbeat|default: 1 -> absent
+  +   101s am:ItemUp|default: 30 -> absent
+  +   101s am:Watchdog|default: 1 -> absent
+  +   129s iteration_missed_total starts growing (8 -> 9)
+  (phase total) partial_results_total +0
+  (phase total) rule_errors_total +49
+  (phase total) iteration_missed_total +4
+
+== vmselect-up @ 1004.9s 
+  +     0s up:vmselect: False -> True
+  +     5s rule_errors_total starts growing (57 -> 58)
+  +     5s am:CondAlive|default: absent -> 1
+  +     5s am:Heartbeat|default: absent -> 1
+  +     5s am:ItemUp|default: absent -> 30
+  +     5s am:Watchdog|default: absent -> 1
+  +     5s health_default:lab.err: True -> False
+  +     5s health_default:lowcount-docparam.err: True -> False
+  +    19s health_default:lowcount-default.err: True -> False
+  +    34s health_default:lowcount-realparam.err: True -> False
+  (phase total) partial_results_total +-80
+  (phase total) rule_errors_total +1
+  (phase total) iteration_missed_total +0

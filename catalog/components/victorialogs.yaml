@@ -21,6 +21,10 @@ silent_failures:
     evidence: tested
     source: art-vm
     refs: [exp-vm-vl]
+  - text: VL single 唯讀時，寫入回 429（shipper 看得到），但 rule 不報錯，新 log 查不到。
+    evidence: tested
+    source: art-vm
+    refs: [exp-vm-vl]
   - text: Cluster 缺節點時預設回 502，所有 log rule 變 ERR，接著假 resolved。
     evidence: tested
     source: art-vm

@@ -51,13 +51,13 @@ Rule 和 dashboard 共用同一組併發上限，所以 dashboard 的重查詢�
 
 - 可用空間低於 `-storage.minFreeDiskSpaceBytes`（預設 100MB）時切成唯讀[^vst-minfree][^vst-readonly]；vminsert 把資料轉到其他節點。
 - 所有節點都唯讀時，資料寫不進去，rule 不報錯，只會看到資料變舊。<span class="at-chip at-ev-tested">實測</span>[^exp-vm-faults]
-- 磁碟突然變成 0 byte 時，切唯讀後仍會因 flush 失敗而 panic。<span class="at-chip at-ev-tested">實測</span>[^exp-vm-faults]
+- 磁碟突然變成 0 byte 時，切唯讀後仍可能因 flush 失敗而 panic。<span class="at-chip at-ev-inferred">推論</span>（原始報告觀察到，lab 尚未重測）
 
 ## 這對 rule 代表什麼
 
 | 故障 | Rule 看到什麼 | 證據 |
 |---|---|---|
-| RF=1，一台 vmstorage 掛 | 結果少一部分，`increase` 類的「數量太低」規則假觸發 9 分鐘 | <span class="at-chip at-ev-tested">實測</span>[^exp-vm-faults] |
+| RF=1，一台 vmstorage 掛 | 結果少一部分，`increase` 類的「數量太低」規則假觸發（lab：4 分鐘故障中持續 66 秒） | <span class="at-chip at-ev-tested">實測</span>[^exp-vm-faults] |
 | RF=2，一台 vmstorage 掛 | 完全不受影響 | <span class="at-chip at-ev-tested">實測</span>[^exp-vm-faults] |
 | vmselect 全掛或飽和 | 查詢失敗，約 2 分鐘後假 resolved | <span class="at-chip at-ev-tested">實測</span>[^exp-vm-faults] |
 | vminsert 全掛或全部唯讀 | 不報錯，資料變舊；條件 alert 繼續 firing 約 6 分鐘 | <span class="at-chip at-ev-tested">實測</span>[^exp-vm-faults] |

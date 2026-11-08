@@ -1,0 +1,27 @@
+# VL single 的 log rule。D = -rule.evalDelay 30s，E = 30s，沒有 for，每次 evaluation 有結果就 firing。
+groups:
+  - name: logdelay
+    type: vlogs
+    interval: 30s
+    rules:
+      - alert: EvL0
+        expr: 'kind:event lag:0 | stats count() c | filter c:>0'
+      - alert: EvL20
+        expr: 'kind:event lag:20 | stats count() c | filter c:>0'
+      - alert: EvL45
+        expr: 'kind:event lag:45 | stats count() c | filter c:>0'
+      - alert: EvL90
+        expr: 'kind:event lag:90 | stats count() c | filter c:>0'
+      - alert: EvL90Time10m
+        expr: '_time:10m kind:event lag:90 | stats count() c | filter c:>0'
+  - name: canary-shape
+    type: vlogs
+    interval: 30s
+    rules:
+      # 沒有任何符合的 log：stats count() 仍回一列 c=0，所以這條會 firing
+      - alert: CountNoMatch
+        expr: 'kind:nonexistent | stats count() c'
+      - alert: CountNoMatchFiltered
+        expr: 'kind:nonexistent | stats count() c | filter c:>0'
+      - alert: SingleCanary
+        expr: '_time:2m flow:canary | stats count() c | filter c:>0'

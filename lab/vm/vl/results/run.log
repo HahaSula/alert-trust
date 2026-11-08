@@ -1,0 +1,10 @@
+[    5.1s] == empty-count {'single': (200, '{"c":"0"}'), 'cluster': (200, '{"c":"0"}'), 'single_filtered': (200, '')}
+[    8.1s] == content-type {'content_type': None, 'http_status': 200, 'response': '', 'rows_ingested_delta': 5.0, 'query_count': '{"c":"5"}'}
+[   11.1s] == content-type {'content_type': 'application/x-www-form-urlencoded', 'http_status': 200, 'response': '', 'rows_ingested_delta': 0.0, 'query_count': '{"c":"0"}'}
+[   14.1s] == content-type {'content_type': 'application/stream+json', 'http_status': 200, 'response': '', 'rows_ingested_delta': 5.0, 'query_count': '{"c":"5"}'}
+[   14.7s] == steady 
+[  314.7s] == vlstorage-2-down 
+[  561.8s] == vlstorage-2-up 
+[  718.9s] == readonly-on 
+[  873.2s] == readonly-off 
+[  935.8s] == end 

@@ -1,0 +1,6 @@
+[    3.2s] == warmup {'rf': '2'}
+[  336.5s] == vmstorage-3-down 
+[  580.5s] == vmstorage-3-up 
+[  760.9s] == vmagent-down 
+[ 1161.5s] == vmagent-up 
+[ 1315.1s] == backfill-check {'window_s': 400, 'samples': None, 'expected': 40}

@@ -1,0 +1,5 @@
+[    3.2s] == warmup {'rf': '1'}
+[  336.5s] == vmstorage-3-down 
+[  580.6s] == vmstorage-3-up 
+[  761.0s] == vmselect-down 
+[ 1004.9s] == vmselect-up 

@@ -1,0 +1,56 @@
+# VM cluster：3 台 vmstorage、vminsert、vmselect、vmagent、兩個 vmalert（預設／-rule.resendDelay=3m）、Alertmanager、假 target。
+# RF 與 host port 前綴由環境變數決定：RF=1 P=2002 → port 20020–20028。
+x-vmstorage: &vmstorage
+  image: victoriametrics/vmstorage:v1.155.0-cluster
+  command: [-storageDataPath=/storage, -retentionPeriod=1d, "-storage.minFreeDiskSpaceBytes=${MINFREE:-10000000}"]
+services:
+  vmstorage-1: { <<: *vmstorage, ports: ["${P}6:8482"], volumes: ["vms1:/storage"] }
+  vmstorage-2: { <<: *vmstorage, ports: ["${P}7:8482"], volumes: ["vms2:/storage"] }
+  vmstorage-3: { <<: *vmstorage, ports: ["${P}8:8482"], volumes: ["vms3:/storage"] }
+  vminsert:
+    image: victoriametrics/vminsert:v1.155.0-cluster
+    command: ["-storageNode=vmstorage-1:8400,vmstorage-2:8400,vmstorage-3:8400", "-replicationFactor=${RF}"]
+    ports: ["${P}1:8480"]
+  vmselect:
+    image: victoriametrics/vmselect:v1.155.0-cluster
+    command: ["-storageNode=vmstorage-1:8401,vmstorage-2:8401,vmstorage-3:8401", "-replicationFactor=${RF}", -dedup.minScrapeInterval=1ms]
+    ports: ["${P}0:8481"]
+  target:
+    image: python:3.12.7-alpine
+    command: [python, -u, /app/target.py]
+    volumes: [./target.py:/app/target.py:ro]
+  vmagent:
+    image: victoriametrics/vmagent:v1.155.0
+    command:
+      - -promscrape.config=/etc/scrape.yml
+      - -remoteWrite.url=http://vminsert:8480/insert/0/prometheus/api/v1/write
+      - -remoteWrite.tmpDataPath=/tmp/vmagent
+    volumes: [./scrape.yml:/etc/scrape.yml:ro]
+    ports: ["${P}2:8429"]
+  vmalert-default:
+    image: victoriametrics/vmalert:v1.155.0
+    command: &vmalert
+      - -datasource.url=http://vmselect:8481/select/0/prometheus
+      - -notifier.url=http://alertmanager:9093
+      - -rule=/etc/rules.yml
+      - -evaluationInterval=30s
+      - -external.label=vmalert=default
+    volumes: [./rules.yml:/etc/rules.yml:ro]
+    ports: ["${P}3:8880"]
+  vmalert-resend:
+    image: victoriametrics/vmalert:v1.155.0
+    command:
+      - -datasource.url=http://vmselect:8481/select/0/prometheus
+      - -notifier.url=http://alertmanager:9093
+      - -rule=/etc/rules.yml
+      - -evaluationInterval=30s
+      - -external.label=vmalert=resend3m
+      - -rule.resendDelay=3m
+    volumes: [./rules.yml:/etc/rules.yml:ro]
+    ports: ["${P}4:8880"]
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    command: [--config.file=/etc/alertmanager/alertmanager.yml]
+    volumes: [./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro]
+    ports: ["${P}5:9093"]
+volumes: { vms1: {}, vms2: {}, vms3: {} }  # 具名 volume：唯讀測試要重建容器，資料不能跟著消失

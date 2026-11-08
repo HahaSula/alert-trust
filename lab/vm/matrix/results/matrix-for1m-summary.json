@@ -1,0 +1,227 @@
+{
+ "cells": {
+  "Rate2m|I=30|L=0": {
+   "alert": "Rate2m",
+   "I": 30,
+   "L": 0,
+   "R": 120,
+   "predicted_ok": true,
+   "first_firing_s": 208,
+   "pending_resets": 0
+  },
+  "Rate2m|I=30|L=60": {
+   "alert": "Rate2m",
+   "I": 30,
+   "L": 60,
+   "R": 120,
+   "predicted_ok": true,
+   "first_firing_s": 208,
+   "pending_resets": 0
+  },
+  "Rate2m|I=30|L=120": {
+   "alert": "Rate2m",
+   "I": 30,
+   "L": 120,
+   "R": 120,
+   "predicted_ok": true,
+   "first_firing_s": 275,
+   "pending_resets": 0
+  },
+  "Rate2m|I=30|L=180": {
+   "alert": "Rate2m",
+   "I": 30,
+   "L": 180,
+   "R": 120,
+   "predicted_ok": false,
+   "first_firing_s": null,
+   "pending_resets": 2
+  },
+  "Rate2m|I=60|L=0": {
+   "alert": "Rate2m",
+   "I": 60,
+   "L": 0,
+   "R": 120,
+   "predicted_ok": true,
+   "first_firing_s": 275,
+   "pending_resets": 0
+  },
+  "Rate2m|I=60|L=60": {
+   "alert": "Rate2m",
+   "I": 60,
+   "L": 60,
+   "R": 120,
+   "predicted_ok": true,
+   "first_firing_s": 275,
+   "pending_resets": 0
+  },
+  "Rate2m|I=60|L=120": {
+   "alert": "Rate2m",
+   "I": 60,
+   "L": 120,
+   "R": 120,
+   "predicted_ok": false,
+   "first_firing_s": 308,
+   "pending_resets": 0
+  },
+  "Rate2m|I=60|L=180": {
+   "alert": "Rate2m",
+   "I": 60,
+   "L": 180,
+   "R": 120,
+   "predicted_ok": false,
+   "first_firing_s": null,
+   "pending_resets": 1
+  },
+  "Rate2m|I=120|L=0": {
+   "alert": "Rate2m",
+   "I": 120,
+   "L": 0,
+   "R": 120,
+   "predicted_ok": true,
+   "first_firing_s": 375,
+   "pending_resets": 0
+  },
+  "Rate2m|I=120|L=60": {
+   "alert": "Rate2m",
+   "I": 120,
+   "L": 60,
+   "R": 120,
+   "predicted_ok": false,
+   "first_firing_s": 375,
+   "pending_resets": 0
+  },
+  "Rate2m|I=120|L=120": {
+   "alert": "Rate2m",
+   "I": 120,
+   "L": 120,
+   "R": 120,
+   "predicted_ok": false,
+   "first_firing_s": null,
+   "pending_resets": 3
+  },
+  "Rate2m|I=120|L=180": {
+   "alert": "Rate2m",
+   "I": 120,
+   "L": 180,
+   "R": 120,
+   "predicted_ok": false,
+   "first_firing_s": null,
+   "pending_resets": 1
+  },
+  "Rate5m|I=30|L=0": {
+   "alert": "Rate5m",
+   "I": 30,
+   "L": 0,
+   "R": 300,
+   "predicted_ok": true,
+   "first_firing_s": 208,
+   "pending_resets": 0
+  },
+  "Rate5m|I=30|L=60": {
+   "alert": "Rate5m",
+   "I": 30,
+   "L": 60,
+   "R": 300,
+   "predicted_ok": true,
+   "first_firing_s": 208,
+   "pending_resets": 0
+  },
+  "Rate5m|I=30|L=120": {
+   "alert": "Rate5m",
+   "I": 30,
+   "L": 120,
+   "R": 300,
+   "predicted_ok": true,
+   "first_firing_s": 275,
+   "pending_resets": 0
+  },
+  "Rate5m|I=30|L=180": {
+   "alert": "Rate5m",
+   "I": 30,
+   "L": 180,
+   "R": 300,
+   "predicted_ok": true,
+   "first_firing_s": 308,
+   "pending_resets": 0
+  },
+  "Rate5m|I=60|L=0": {
+   "alert": "Rate5m",
+   "I": 60,
+   "L": 0,
+   "R": 300,
+   "predicted_ok": true,
+   "first_firing_s": 275,
+   "pending_resets": 0
+  },
+  "Rate5m|I=60|L=60": {
+   "alert": "Rate5m",
+   "I": 60,
+   "L": 60,
+   "R": 300,
+   "predicted_ok": true,
+   "first_firing_s": 275,
+   "pending_resets": 0
+  },
+  "Rate5m|I=60|L=120": {
+   "alert": "Rate5m",
+   "I": 60,
+   "L": 120,
+   "R": 300,
+   "predicted_ok": true,
+   "first_firing_s": 308,
+   "pending_resets": 0
+  },
+  "Rate5m|I=60|L=180": {
+   "alert": "Rate5m",
+   "I": 60,
+   "L": 180,
+   "R": 300,
+   "predicted_ok": true,
+   "first_firing_s": 375,
+   "pending_resets": 0
+  },
+  "Rate5m|I=120|L=0": {
+   "alert": "Rate5m",
+   "I": 120,
+   "L": 0,
+   "R": 300,
+   "predicted_ok": true,
+   "first_firing_s": 375,
+   "pending_resets": 0
+  },
+  "Rate5m|I=120|L=60": {
+   "alert": "Rate5m",
+   "I": 120,
+   "L": 60,
+   "R": 300,
+   "predicted_ok": true,
+   "first_firing_s": 375,
+   "pending_resets": 0
+  },
+  "Rate5m|I=120|L=120": {
+   "alert": "Rate5m",
+   "I": 120,
+   "L": 120,
+   "R": 300,
+   "predicted_ok": true,
+   "first_firing_s": 442,
+   "pending_resets": 0
+  },
+  "Rate5m|I=120|L=180": {
+   "alert": "Rate5m",
+   "I": 120,
+   "L": 180,
+   "R": 300,
+   "predicted_ok": true,
+   "first_firing_s": 508,
+   "pending_resets": 0
+  }
+ },
+ "servicedown": {
+  "up_job_vm": 1,
+  "servicedown_selector": 0
+ },
+ "duration_s": 780,
+ "D": 30,
+ "E": 30
+}

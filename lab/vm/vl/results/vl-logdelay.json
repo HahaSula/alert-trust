@@ -1,0 +1,40 @@
+{
+ "window": [
+  1794149790.1,
+  1794150494.3
+ ],
+ "D": 30,
+ "E": 30,
+ "rules": {
+  "EvL0": {
+   "lag_s": 0,
+   "events": 9,
+   "firing_episodes": 8,
+   "predicted": "always"
+  },
+  "EvL20": {
+   "lag_s": 20,
+   "events": 9,
+   "firing_episodes": 8,
+   "predicted": "always"
+  },
+  "EvL45": {
+   "lag_s": 45,
+   "events": 9,
+   "firing_episodes": 8,
+   "predicted": "phase-dependent"
+  },
+  "EvL90": {
+   "lag_s": 90,
+   "events": 8,
+   "firing_episodes": 0,
+   "predicted": "never"
+  },
+  "EvL90Time10m": {
+   "lag_s": 90,
+   "events": 8,
+   "firing_episodes": 1,
+   "predicted": "covered by _time:10m"
+  }
+ }
+}

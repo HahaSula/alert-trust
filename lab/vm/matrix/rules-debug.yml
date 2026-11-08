@@ -1,0 +1,54 @@
+# 第三輪：每個 cell 一條 rule，開 debug，vmalert log 會記下每次 evaluation 的查詢時間 ts 與回傳筆數。
+# 用來逐次比對「視窗內有沒有可見 sample」的預測與實際結果，不受 evaluation 相位影響。
+groups:
+  - name: matrix
+    interval: 30s
+    rules:
+      - alert: Rate2m_I30_L0
+        expr: rate(lab_m{I="30",L="0"}[2m]) > 0
+        for: 1m
+        debug: true
+      - alert: Rate2m_I30_L60
+        expr: rate(lab_m{I="30",L="60"}[2m]) > 0
+        for: 1m
+        debug: true
+      - alert: Rate2m_I30_L120
+        expr: rate(lab_m{I="30",L="120"}[2m]) > 0
+        for: 1m
+        debug: true
+      - alert: Rate2m_I30_L180
+        expr: rate(lab_m{I="30",L="180"}[2m]) > 0
+        for: 1m
+        debug: true
+      - alert: Rate2m_I60_L0
+        expr: rate(lab_m{I="60",L="0"}[2m]) > 0
+        for: 1m
+        debug: true
+      - alert: Rate2m_I60_L60
+        expr: rate(lab_m{I="60",L="60"}[2m]) > 0
+        for: 1m
+        debug: true
+      - alert: Rate2m_I60_L120
+        expr: rate(lab_m{I="60",L="120"}[2m]) > 0
+        for: 1m
+        debug: true
+      - alert: Rate2m_I60_L180
+        expr: rate(lab_m{I="60",L="180"}[2m]) > 0
+        for: 1m
+        debug: true
+      - alert: Rate2m_I120_L0
+        expr: rate(lab_m{I="120",L="0"}[2m]) > 0
+        for: 1m
+        debug: true
+      - alert: Rate2m_I120_L60
+        expr: rate(lab_m{I="120",L="60"}[2m]) > 0
+        for: 1m
+        debug: true
+      - alert: Rate2m_I120_L120
+        expr: rate(lab_m{I="120",L="120"}[2m]) > 0
+        for: 1m
+        debug: true
+      - alert: Rate2m_I120_L180
+        expr: rate(lab_m{I="120",L="180"}[2m]) > 0
+        for: 1m
+        debug: true

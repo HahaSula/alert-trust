@@ -91,7 +91,7 @@ Sample 帶的是 scrape 開始的時間，要等寫入完成才查得到。Rule 
 
 vmalert 查詢時已經往前移了 `D`（`eval_delay`），所以延遲 `L` 裡有 `D` 已經被吸收；MetricsQL 的 `rate` 也會用到視窗前的最後一個點，需要的樣本比 Prometheus 少。[^vm-metricsql-prev]違反時查詢回空，`for` 永遠歸零。
 
-實驗的 120 個組合中，失敗的格子都違反這條。有一格違反了 10 秒卻成立，是 evaluation 相位剛好避開，不能依賴，所以這條公式是偏保守的設計值。[^exp-vm-matrix]
+Lab 的 12 格中，逐次比對 61 次 evaluation 與實際寫入時間，0 次不符；違反最多的格子從未 firing。只違反約 30 秒的格子仍會 firing，因為實際延遲介於 `eval_delay` 與 `eval_delay` + E 之間，成不成立看相位，所以這條公式是偏保守的設計值。[^exp-vm-matrix]
 
 `eval_alignment`（預設 true）會再把查詢時間按 interval 向下取整，實際的 `D` 落在 `eval_delay` 到 `eval_delay + E` 之間。[^vma-evalalign][^vma-evaldelay]
 
@@ -135,7 +135,7 @@ Prometheus 和 vmalert 送出的 alert 都帶 `EndsAt`。查詢失敗、ruler �
 | 預設值下的寬限 | resend-delay 預設 1m，`E` = 30s 時是 4 分鐘 | resendDelay 預設 0，`E` = 30s 時只有 2 分鐘 |
 | 拉長的代價 | Watchdog 也要更久才會斷 | 同左；Watchdog 要放在不設 resendDelay 的獨立 vmalert |
 
-實驗中把 `-rule.resendDelay` 設成 3m 後，8 分鐘的查詢故障都沒有出現假 resolved。[^exp-vm-resend]
+實驗中把 `-rule.resendDelay` 設成 3m 後，4 分鐘的查詢故障沒有出現假 resolved；代價是部分真正的 resolved 會晚 2–3 分鐘才到。[^exp-vm-resend]
 
 架構：[Prometheus notifier](architecture/prometheus.md#notifier)、[vmalert 送通知](architecture/vmalert.md#notify)。
 

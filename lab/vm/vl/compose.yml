@@ -1,0 +1,49 @@
+# VictoriaLogs：single（log rule 視窗、Content-Type、唯讀）與小 cluster（vlfront 兼 vlinsert／vlselect，2 台 vlstorage）。
+x-vl: &vl
+  image: victoriametrics/victoria-logs:v1.53.0
+services:
+  vl:
+    <<: *vl
+    command: [-storageDataPath=/vl, -retentionPeriod=1d, "-storage.minFreeDiskSpaceBytes=${VLMINFREE:-10000000}"]
+    ports: ["20060:9428"]
+    volumes: ["vldata:/vl"]  # 具名 volume：唯讀測試要重建容器，資料不能跟著消失
+  vlstorage-1: { <<: *vl, command: [-storageDataPath=/vl, -retentionPeriod=1d], ports: ["20066:9428"] }
+  vlstorage-2: { <<: *vl, command: [-storageDataPath=/vl, -retentionPeriod=1d], ports: ["20067:9428"] }
+  vlfront:
+    <<: *vl
+    command: ["-storageNode=vlstorage-1:9428,vlstorage-2:9428"]
+    ports: ["20064:9428"]
+  vmalert-single:
+    image: victoriametrics/vmalert:v1.155.0
+    command:
+      - -datasource.url=http://vl:9428
+      - -rule.defaultRuleType=vlogs
+      - -rule=/etc/rules.yml
+      - -evaluationInterval=30s
+      - -rule.evalDelay=30s
+      - -notifier.url=http://alertmanager:9093
+      - -external.label=vmalert=vl-single
+    volumes: [./rules-single.yml:/etc/rules.yml:ro]
+    ports: ["20061:8880"]
+  vmalert-cluster:
+    image: victoriametrics/vmalert:v1.155.0
+    command:
+      - -datasource.url=http://vlfront:9428
+      - -rule.defaultRuleType=vlogs
+      - -rule=/etc/rules.yml
+      - -evaluationInterval=30s
+      - -notifier.url=http://alertmanager:9093
+      - -external.label=vmalert=vl-cluster
+    volumes: [./rules-cluster.yml:/etc/rules.yml:ro]
+    ports: ["20062:8880"]
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    command: [--config.file=/etc/alertmanager/alertmanager.yml]
+    volumes: [./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro]
+    ports: ["20063:9093"]
+  loggen:
+    image: python:3.12.7-alpine
+    command: [python, -u, /app/loggen.py]
+    volumes: [./loggen.py:/app/loggen.py:ro, "${OUT:-./results}:/out"]
+    profiles: [gen]
+volumes: { vldata: {} }

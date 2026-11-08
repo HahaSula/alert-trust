@@ -20,9 +20,12 @@ silent_failures:
     source: art-vm
     refs: [exp-vm-faults, vma-querystep]
   - text: 查詢飽和（429）時 vmalert_iteration_missed_total 仍是 0。
+    evidence: inferred
+    source: art-vm
+  - text: 設了 -rule.resendDelay=3m 後，部分真正的 resolved 會晚 2–3 分鐘才到 Alertmanager（lab 23 次中 5 次）；預設值時 0 次。
     evidence: tested
     source: art-vm
-    refs: [exp-vm-faults, vma-missed]
+    refs: [exp-vm-resend]
   - text: Operator 的兩個 selector 都沒設時一條 rule 都不選，也沒有錯誤。
     evidence: code
     source: art-vm

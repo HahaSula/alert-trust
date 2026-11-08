@@ -1,0 +1,149 @@
+{
+ "R": 120,
+ "cells": {
+  "I=30,L=0": {
+   "I": 30,
+   "L": 0,
+   "evals": 9,
+   "border": 1,
+   "pred_nonempty": 8,
+   "actual_nonempty": 8,
+   "mismatch": 0,
+   "delay_min": 50.3,
+   "delay_max": 77.0,
+   "contract_ok_D30": true
+  },
+  "I=30,L=60": {
+   "I": 30,
+   "L": 60,
+   "evals": 7,
+   "border": 1,
+   "pred_nonempty": 6,
+   "actual_nonempty": 6,
+   "mismatch": 0,
+   "delay_min": 50.3,
+   "delay_max": 77.0,
+   "contract_ok_D30": true
+  },
+  "I=30,L=120": {
+   "I": 30,
+   "L": 120,
+   "evals": 5,
+   "border": 1,
+   "pred_nonempty": 4,
+   "actual_nonempty": 4,
+   "mismatch": 0,
+   "delay_min": 50.3,
+   "delay_max": 77.0,
+   "contract_ok_D30": true
+  },
+  "I=30,L=180": {
+   "I": 30,
+   "L": 180,
+   "evals": 4,
+   "border": 0,
+   "pred_nonempty": 3,
+   "actual_nonempty": 3,
+   "mismatch": 0,
+   "delay_min": 50.3,
+   "delay_max": 77.0,
+   "contract_ok_D30": false
+  },
+  "I=60,L=0": {
+   "I": 60,
+   "L": 0,
+   "evals": 8,
+   "border": 1,
+   "pred_nonempty": 7,
+   "actual_nonempty": 7,
+   "mismatch": 0,
+   "delay_min": 50.3,
+   "delay_max": 77.0,
+   "contract_ok_D30": true
+  },
+  "I=60,L=60": {
+   "I": 60,
+   "L": 60,
+   "evals": 6,
+   "border": 1,
+   "pred_nonempty": 5,
+   "actual_nonempty": 5,
+   "mismatch": 0,
+   "delay_min": 50.3,
+   "delay_max": 77.0,
+   "contract_ok_D30": true
+  },
+  "I=60,L=120": {
+   "I": 60,
+   "L": 120,
+   "evals": 4,
+   "border": 0,
+   "pred_nonempty": 4,
+   "actual_nonempty": 4,
+   "mismatch": 0,
+   "delay_min": 50.3,
+   "delay_max": 77.0,
+   "contract_ok_D30": false
+  },
+  "I=60,L=180": {
+   "I": 60,
+   "L": 180,
+   "evals": 3,
+   "border": 0,
+   "pred_nonempty": 1,
+   "actual_nonempty": 1,
+   "mismatch": 0,
+   "delay_min": 50.3,
+   "delay_max": 77.0,
+   "contract_ok_D30": false
+  },
+  "I=120,L=0": {
+   "I": 120,
+   "L": 0,
+   "evals": 8,
+   "border": 0,
+   "pred_nonempty": 8,
+   "actual_nonempty": 8,
+   "mismatch": 0,
+   "delay_min": 50.3,
+   "delay_max": 77.0,
+   "contract_ok_D30": true
+  },
+  "I=120,L=60": {
+   "I": 120,
+   "L": 60,
+   "evals": 6,
+   "border": 1,
+   "pred_nonempty": 5,
+   "actual_nonempty": 5,
+   "mismatch": 0,
+   "delay_min": 50.3,
+   "delay_max": 77.0,
+   "contract_ok_D30": false
+  },
+  "I=120,L=120": {
+   "I": 120,
+   "L": 120,
+   "evals": 4,
+   "border": 0,
+   "pred_nonempty": 2,
+   "actual_nonempty": 2,
+   "mismatch": 0,
+   "delay_min": 50.3,
+   "delay_max": 77.0,
+   "contract_ok_D30": false
+  },
+  "I=120,L=180": {
+   "I": 120,
+   "L": 180,
+   "evals": 3,
+   "border": 0,
+   "pred_nonempty": 0,
+   "actual_nonempty": 0,
+   "mismatch": 0,
+   "delay_min": 50.3,
+   "delay_max": 77.0,
+   "contract_ok_D30": false
+  }
+ }
+}

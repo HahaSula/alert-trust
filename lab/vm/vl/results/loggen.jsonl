@@ -1,0 +1,161 @@
+{"t": 1794149793.8, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794149798.8, "type": "event-created", "seq": 1}
+{"t": 1794149798.9, "type": "event-pushed", "lag": "0", "seq": 1, "code": 200}
+{"t": 1794149803.9, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794149813.9, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794149818.9, "type": "event-pushed", "lag": "20", "seq": 1, "code": 200}
+{"t": 1794149827.2, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794149834.2, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794149844.2, "type": "event-pushed", "lag": "45", "seq": 1, "code": 200}
+{"t": 1794149844.2, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794149854.2, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794149864.1, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794149865.8, "type": "event-created", "seq": 2}
+{"t": 1794149866.1, "type": "event-pushed", "lag": "0", "seq": 2, "code": 200}
+{"t": 1794149874.1, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794149884.1, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794149886.1, "type": "event-pushed", "lag": "20", "seq": 2, "code": 200}
+{"t": 1794149889.1, "type": "event-pushed", "lag": "90", "seq": 1, "code": 200}
+{"t": 1794149893.9, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794149903.9, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794149910.9, "type": "event-pushed", "lag": "45", "seq": 2, "code": 200}
+{"t": 1794149914.0, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794149927.3, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794149932.8, "type": "event-created", "seq": 3}
+{"t": 1794149933.3, "type": "event-pushed", "lag": "0", "seq": 3, "code": 200}
+{"t": 1794149934.3, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794149944.3, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794149953.3, "type": "event-pushed", "lag": "20", "seq": 3, "code": 200}
+{"t": 1794149954.3, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794149956.3, "type": "event-pushed", "lag": "90", "seq": 2, "code": 200}
+{"t": 1794149964.2, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794149974.2, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794149978.2, "type": "event-pushed", "lag": "45", "seq": 3, "code": 200}
+{"t": 1794149984.2, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794149994.0, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794149999.8, "type": "event-created", "seq": 4}
+{"t": 1794150000.0, "type": "event-pushed", "lag": "0", "seq": 4, "code": 200}
+{"t": 1794150004.0, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150014.0, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150020.0, "type": "event-pushed", "lag": "20", "seq": 4, "code": 200}
+{"t": 1794150023.0, "type": "event-pushed", "lag": "90", "seq": 3, "code": 200}
+{"t": 1794150027.4, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150033.9, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150043.9, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150045.0, "type": "event-pushed", "lag": "45", "seq": 4, "code": 200}
+{"t": 1794150054.0, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150063.8, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150066.8, "type": "event-created", "seq": 5}
+{"t": 1794150066.8, "type": "event-pushed", "lag": "0", "seq": 5, "code": 200}
+{"t": 1794150073.8, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150083.9, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150086.9, "type": "event-pushed", "lag": "20", "seq": 5, "code": 200}
+{"t": 1794150089.9, "type": "event-pushed", "lag": "90", "seq": 4, "code": 200}
+{"t": 1794150094.2, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150104.2, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150112.2, "type": "event-pushed", "lag": "45", "seq": 5, "code": 200}
+{"t": 1794150114.2, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150127.5, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150133.8, "type": "event-created", "seq": 6}
+{"t": 1794150134.1, "type": "event-pushed", "lag": "0", "seq": 6, "code": 200}
+{"t": 1794150134.1, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150144.1, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150154.1, "type": "event-pushed", "lag": "20", "seq": 6, "code": 200}
+{"t": 1794150154.1, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150160.9, "type": "event-pushed", "lag": "90", "seq": 5, "code": 200}
+{"t": 1794150163.9, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150173.9, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150178.9, "type": "event-pushed", "lag": "45", "seq": 6, "code": 200}
+{"t": 1794150183.9, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150194.3, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150200.8, "type": "event-created", "seq": 7}
+{"t": 1794150201.3, "type": "event-pushed", "lag": "0", "seq": 7, "code": 200}
+{"t": 1794150204.3, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150214.3, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150221.3, "type": "event-pushed", "lag": "20", "seq": 7, "code": 200}
+{"t": 1794150227.2, "type": "event-pushed", "lag": "90", "seq": 6, "code": 200}
+{"t": 1794150227.2, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150234.2, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150244.2, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150246.2, "type": "event-pushed", "lag": "45", "seq": 7, "code": 200}
+{"t": 1794150254.2, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150264.1, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150267.8, "type": "event-created", "seq": 8}
+{"t": 1794150268.1, "type": "event-pushed", "lag": "0", "seq": 8, "code": 200}
+{"t": 1794150274.1, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150284.1, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150288.1, "type": "event-pushed", "lag": "20", "seq": 8, "code": 200}
+{"t": 1794150293.9, "type": "event-pushed", "lag": "90", "seq": 7, "code": 200}
+{"t": 1794150293.9, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150303.9, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150312.9, "type": "event-pushed", "lag": "45", "seq": 8, "code": 200}
+{"t": 1794150313.9, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150327.3, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150334.3, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150334.8, "type": "event-created", "seq": 9}
+{"t": 1794150335.3, "type": "event-pushed", "lag": "0", "seq": 9, "code": 200}
+{"t": 1794150344.3, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150354.3, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150355.3, "type": "event-pushed", "lag": "20", "seq": 9, "code": 200}
+{"t": 1794150360.6, "type": "event-pushed", "lag": "90", "seq": 8, "code": 200}
+{"t": 1794150364.1, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150374.1, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150380.1, "type": "event-pushed", "lag": "45", "seq": 9, "code": 200}
+{"t": 1794150384.1, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150394.0, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150401.8, "type": "event-created", "seq": 10}
+{"t": 1794150402.0, "type": "event-pushed", "lag": "0", "seq": 10, "code": 200}
+{"t": 1794150404.0, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150414.0, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150422.0, "type": "event-pushed", "lag": "20", "seq": 10, "code": 200}
+{"t": 1794150427.3, "type": "event-pushed", "lag": "90", "seq": 9, "code": 200}
+{"t": 1794150427.3, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150433.8, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150443.8, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150446.9, "type": "event-pushed", "lag": "45", "seq": 10, "code": 200}
+{"t": 1794150453.9, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150464.2, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150468.8, "type": "event-created", "seq": 11}
+{"t": 1794150469.2, "type": "event-pushed", "lag": "0", "seq": 11, "code": 200}
+{"t": 1794150474.2, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150484.2, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150489.2, "type": "event-pushed", "lag": "20", "seq": 11, "code": 200}
+{"t": 1794150494.0, "type": "event-pushed", "lag": "90", "seq": 10, "code": 200}
+{"t": 1794150494.0, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150504.1, "type": "canary", "single": 429, "cluster": 200}
+{"t": 1794150514.1, "type": "event-pushed", "lag": "45", "seq": 11, "code": 429}
+{"t": 1794150514.1, "type": "canary", "single": 429, "cluster": 200}
+{"t": 1794150527.4, "type": "canary", "single": 429, "cluster": 200}
+{"t": 1794150533.9, "type": "canary", "single": 429, "cluster": 200}
+{"t": 1794150535.8, "type": "event-created", "seq": 12}
+{"t": 1794150535.9, "type": "event-pushed", "lag": "0", "seq": 12, "code": 429}
+{"t": 1794150543.9, "type": "canary", "single": 429, "cluster": 200}
+{"t": 1794150553.9, "type": "canary", "single": 429, "cluster": 200}
+{"t": 1794150555.9, "type": "event-pushed", "lag": "20", "seq": 12, "code": 429}
+{"t": 1794150560.8, "type": "event-pushed", "lag": "90", "seq": 11, "code": 429}
+{"t": 1794150564.3, "type": "canary", "single": 429, "cluster": 200}
+{"t": 1794150574.3, "type": "canary", "single": 429, "cluster": 200}
+{"t": 1794150581.3, "type": "event-pushed", "lag": "45", "seq": 12, "code": 429}
+{"t": 1794150584.3, "type": "canary", "single": 429, "cluster": 200}
+{"t": 1794150594.1, "type": "canary", "single": 429, "cluster": 200}
+{"t": 1794150602.8, "type": "event-created", "seq": 13}
+{"t": 1794150603.1, "type": "event-pushed", "lag": "0", "seq": 13, "code": 429}
+{"t": 1794150604.1, "type": "canary", "single": 429, "cluster": 200}
+{"t": 1794150614.1, "type": "canary", "single": 429, "cluster": 200}
+{"t": 1794150623.1, "type": "event-pushed", "lag": "20", "seq": 13, "code": 429}
+{"t": 1794150627.5, "type": "event-pushed", "lag": "90", "seq": 12, "code": 429}
+{"t": 1794150627.5, "type": "canary", "single": 429, "cluster": 200}
+{"t": 1794150634.0, "type": "canary", "single": 429, "cluster": 200}
+{"t": 1794150644.0, "type": "canary", "single": 429, "cluster": 200}
+{"t": 1794150648.0, "type": "event-pushed", "lag": "45", "seq": 13, "code": 429}
+{"t": 1794150654.0, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150664.3, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150669.8, "type": "event-created", "seq": 14}
+{"t": 1794150670.3, "type": "event-pushed", "lag": "0", "seq": 14, "code": 200}
+{"t": 1794150674.3, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150683.8, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150689.8, "type": "event-pushed", "lag": "20", "seq": 14, "code": 200}
+{"t": 1794150694.2, "type": "event-pushed", "lag": "90", "seq": 13, "code": 200}
+{"t": 1794150694.2, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150704.2, "type": "canary", "single": 200, "cluster": 200}
+{"t": 1794150714.2, "type": "canary", "single": null, "cluster": null}

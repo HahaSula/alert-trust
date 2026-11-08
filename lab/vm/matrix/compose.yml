@@ -1,0 +1,22 @@
+# 延遲矩陣：VM single + vmalert + 假資料來源。3 個小容器。
+services:
+  vm:
+    image: victoriametrics/victoria-metrics:v1.155.0
+    command: [-storageDataPath=/storage, -retentionPeriod=1d, -promscrape.config=/etc/scrape.yml]
+    volumes: [./scrape.yml:/etc/scrape.yml:ro]
+    ports: ["20010:8428"]
+  vmalert:
+    image: victoriametrics/vmalert:v1.155.0
+    command:
+      - -datasource.url=http://vm:8428
+      - -rule=/etc/rules.yml
+      - -evaluationInterval=30s
+      - -rule.evalDelay=30s
+      - -notifier.blackhole
+    volumes: ["./${RULES:-rules.yml}:/etc/rules.yml:ro"]
+    ports: ["20011:8880"]
+  pusher:
+    image: python:3.12.7-alpine
+    command: [python, -u, /app/pusher.py]
+    environment: { VM: "http://vm:8428" }
+    volumes: [./pusher.py:/app/pusher.py:ro]

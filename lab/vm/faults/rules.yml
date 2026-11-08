@@ -1,0 +1,40 @@
+# 故障矩陣的 rule。E = 30s，D = 30s（預設），-datasource.queryStep 預設 5m。
+groups:
+  - name: lab
+    interval: 30s
+    rules:
+      - alert: Watchdog
+        expr: vector(1)
+      # 每條 series 一個 alert（30 條）
+      - alert: ItemUp
+        expr: lab_item == 1
+        for: 1m
+      # 條件型 alert（聚合）
+      - alert: CondAlive
+        expr: count(lab_item) > 0
+        for: 1m
+      # 資料新鮮度 heartbeat
+      - alert: Heartbeat
+        expr: time() - max(timestamp(lab_item)) < 120
+        for: 1m
+  # 「數量太低」：正常 30 條 × 180 = 5400，門檻 4500。三個 group 只差 params。
+  - name: lowcount-default
+    interval: 30s
+    rules:
+      - alert: EventsTooLow
+        expr: sum(increase(lab_events_total[3m])) < 4500
+        for: 1m
+  - name: lowcount-docparam
+    interval: 30s
+    params: { denyPartialResponse: ["true"] }
+    rules:
+      - alert: EventsTooLowDocParam
+        expr: sum(increase(lab_events_total[3m])) < 4500
+        for: 1m
+  - name: lowcount-realparam
+    interval: 30s
+    params: { deny_partial_response: ["1"] }
+    rules:
+      - alert: EventsTooLowRealParam
+        expr: sum(increase(lab_events_total[3m])) < 4500
+        for: 1m

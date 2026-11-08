@@ -1,0 +1,6 @@
+[    2.9s] == warmup {'rf': '1'}
+[  336.2s] == readonly-on 
+[  581.2s] == readonly-off 
+[  767.7s] == vminsert-down 
+[ 1168.1s] == vminsert-up 
+[ 1321.8s] == backfill-check {'window_s': 400, 'samples': 36.0, 'expected': 40}

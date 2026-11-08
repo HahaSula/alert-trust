@@ -1,0 +1,202 @@
+== warmup @ 2.9s {"rf": "1"}
+  +     5s up:vmselect: False -> True
+  +    15s am:Watchdog|default: absent -> 1
+  +    15s am:Watchdog|resend3m: absent -> 1
+  +    15s vmalert_default:Watchdog.firing: absent -> 1
+  +    15s vmalert_resend:Watchdog.firing: absent -> 1
+  +    48s vmalert_default:CondAlive.firing: absent -> 0
+  +    48s vmalert_default:Heartbeat.firing: absent -> 0
+  +    48s vmalert_default:ItemUp.firing: absent -> 0
+  +    48s vmalert_resend:CondAlive.firing: absent -> 0
+  +    48s vmalert_resend:Heartbeat.firing: absent -> 0
+  +    48s vmalert_resend:ItemUp.firing: absent -> 0
+  +    53s vmalert_default:EventsTooLowDocParam.firing: absent -> 0
+  +    53s vmalert_resend:EventsTooLowDocParam.firing: absent -> 0
+  +    67s vmalert_default:EventsTooLow.firing: absent -> 0
+  +    67s vmalert_resend:EventsTooLow.firing: absent -> 0
+  +    82s vmalert_default:EventsTooLowRealParam.firing: absent -> 0
+  +    82s vmalert_resend:EventsTooLowRealParam.firing: absent -> 0
+  +   115s am:CondAlive|default: absent -> 1
+  +   115s am:CondAlive|resend3m: absent -> 1
+  +   115s am:Heartbeat|default: absent -> 1
+  +   115s am:Heartbeat|resend3m: absent -> 1
+  +   115s am:ItemUp|default: absent -> 30
+  +   115s am:ItemUp|resend3m: absent -> 30
+  +   115s vmalert_default:CondAlive.firing: 0 -> 1
+  +   115s vmalert_default:Heartbeat.firing: 0 -> 1
+  +   115s vmalert_default:ItemUp.firing: 0 -> 30
+  +   115s vmalert_resend:CondAlive.firing: 0 -> 1
+  +   115s vmalert_resend:Heartbeat.firing: 0 -> 1
+  +   115s vmalert_resend:ItemUp.firing: 0 -> 30
+  +   120s am:EventsTooLowDocParam|default: absent -> 1
+  +   120s am:EventsTooLowDocParam|resend3m: absent -> 1
+  +   120s vmalert_default:EventsTooLowDocParam.firing: 0 -> 1
+  +   120s vmalert_resend:EventsTooLowDocParam.firing: 0 -> 1
+  +   133s am:EventsTooLow|default: absent -> 1
+  +   133s am:EventsTooLow|resend3m: absent -> 1
+  +   133s vmalert_default:EventsTooLow.firing: 0 -> 1
+  +   133s vmalert_resend:EventsTooLow.firing: 0 -> 1
+  +   148s am:EventsTooLowRealParam|default: absent -> 1
+  +   148s am:EventsTooLowRealParam|resend3m: absent -> 1
+  +   148s vmalert_default:EventsTooLowRealParam.firing: 0 -> 1
+  +   148s vmalert_resend:EventsTooLowRealParam.firing: 0 -> 1
+  +   220s am:EventsTooLowDocParam|default: 1 -> absent
+  +   220s am:EventsTooLowDocParam|resend3m: 1 -> absent
+  +   220s vmalert_default:EventsTooLowDocParam.firing: 1 -> absent
+  +   220s vmalert_resend:EventsTooLowDocParam.firing: 1 -> absent
+  +   233s am:EventsTooLow|default: 1 -> absent
+  +   233s am:EventsTooLow|resend3m: 1 -> absent
+  +   233s vmalert_default:EventsTooLow.firing: 1 -> absent
+  +   233s vmalert_resend:EventsTooLow.firing: 1 -> absent
+  +   248s am:EventsTooLowRealParam|default: 1 -> absent
+  +   248s am:EventsTooLowRealParam|resend3m: 1 -> absent
+  +   248s vmalert_default:EventsTooLowRealParam.firing: 1 -> absent
+  +   248s vmalert_resend:EventsTooLowRealParam.firing: 1 -> absent
+  +   300s iteration_missed_total starts growing (0 -> 1)
+  (phase total) partial_results_total +0
+  (phase total) rule_errors_total +0
+  (phase total) iteration_missed_total +4
+
+== readonly-on @ 336.2s 
+  +     2s read_only: [0.0, 0.0, 0.0] -> [1.0, 1.0, 1.0]
+  +    88s vmalert_default:EventsTooLowDocParam.firing: absent -> 0
+  +    88s vmalert_resend:EventsTooLowDocParam.firing: absent -> 0
+  +    97s vmalert_default:EventsTooLow.firing: absent -> 0
+  +    97s vmalert_resend:EventsTooLow.firing: absent -> 0
+  +   112s vmalert_default:EventsTooLowRealParam.firing: absent -> 0
+  +   112s vmalert_resend:EventsTooLowRealParam.firing: absent -> 0
+  +   155s am:EventsTooLowDocParam|default: absent -> 1
+  +   155s am:EventsTooLowDocParam|resend3m: absent -> 1
+  +   155s vmalert_default:EventsTooLowDocParam.firing: 0 -> 1
+  +   155s vmalert_resend:EventsTooLowDocParam.firing: 0 -> 1
+  +   163s am:EventsTooLow|default: absent -> 1
+  +   163s am:EventsTooLow|resend3m: absent -> 1
+  +   163s vmalert_default:EventsTooLow.firing: 0 -> 1
+  +   163s vmalert_resend:EventsTooLow.firing: 0 -> 1
+  +   178s am:EventsTooLowRealParam|default: absent -> 1
+  +   178s am:EventsTooLowRealParam|resend3m: absent -> 1
+  +   178s vmalert_default:EventsTooLowRealParam.firing: 0 -> 1
+  +   178s vmalert_resend:EventsTooLowRealParam.firing: 0 -> 1
+  +   183s am:Heartbeat|default: 1 -> absent
+  +   183s am:Heartbeat|resend3m: 1 -> absent
+  +   183s vmalert_default:Heartbeat.firing: 1 -> absent
+  +   183s vmalert_resend:Heartbeat.firing: 1 -> absent
+  (phase total) partial_results_total +0
+  (phase total) rule_errors_total +0
+  (phase total) iteration_missed_total +0
+
+== readonly-off @ 581.2s 
+  +     2s read_only: [1.0, 1.0, 1.0] -> [None, 0.0, 0.0]
+  +     2s up:vmstorage: [True, True, True] -> [False, True, True]
+  +     6s am:EventsTooLowDocParam|default: 1 -> absent
+  +     6s am:EventsTooLowDocParam|resend3m: 1 -> absent
+  +     6s read_only: [None, 0.0, 0.0] -> [0.0, 0.0, 0.0]
+  +     6s up:vmstorage: [False, True, True] -> [True, True, True]
+  +     6s vmalert_default:EventsTooLowDocParam.firing: 1 -> absent
+  +     6s vmalert_resend:EventsTooLowDocParam.firing: 1 -> absent
+  +    20s iteration_missed_total starts growing (4 -> 5)
+  +    20s am:EventsTooLow|default: 1 -> absent
+  +    20s am:EventsTooLow|resend3m: 1 -> absent
+  +    20s vmalert_default:EventsTooLow.firing: 1 -> absent
+  +    20s vmalert_resend:EventsTooLow.firing: 1 -> absent
+  +    25s storage_reachable: 3.0 -> 2.0
+  +    30s storage_reachable: 2.0 -> 3.0
+  +    35s am:EventsTooLowRealParam|default: 1 -> absent
+  +    35s am:EventsTooLowRealParam|resend3m: 1 -> absent
+  +    35s vmalert_default:EventsTooLowRealParam.firing: 1 -> absent
+  +    35s vmalert_resend:EventsTooLowRealParam.firing: 1 -> absent
+  +    73s vmalert_default:Heartbeat.firing: absent -> 0
+  +    73s vmalert_resend:Heartbeat.firing: absent -> 0
+  +   140s am:Heartbeat|default: absent -> 1
+  +   140s am:Heartbeat|resend3m: absent -> 1
+  +   140s vmalert_default:Heartbeat.firing: 0 -> 1
+  +   140s vmalert_resend:Heartbeat.firing: 0 -> 1
+  (phase total) partial_results_total +0
+  (phase total) rule_errors_total +0
+  (phase total) iteration_missed_total +4
+
+== vminsert-down @ 767.7s 
+  +     0s storage_reachable: 3.0 -> None
+  +     0s up:vminsert: True -> False
+  +   120s vmalert_default:EventsTooLowDocParam.firing: absent -> 0
+  +   120s vmalert_resend:EventsTooLowDocParam.firing: absent -> 0
+  +   134s iteration_missed_total starts growing (8 -> 9)
+  +   134s vmalert_default:EventsTooLow.firing: absent -> 0
+  +   134s vmalert_resend:EventsTooLow.firing: absent -> 0
+  +   149s vmalert_default:EventsTooLowRealParam.firing: absent -> 0
+  +   149s vmalert_resend:EventsTooLowRealParam.firing: absent -> 0
+  +   154s am:EventsTooLowDocParam|default: absent -> 1
+  +   154s am:EventsTooLowDocParam|resend3m: absent -> 1
+  +   154s am:Heartbeat|default: 1 -> absent
+  +   154s am:Heartbeat|resend3m: 1 -> absent
+  +   154s vmalert_default:EventsTooLowDocParam.firing: 0 -> 1
+  +   154s vmalert_default:Heartbeat.firing: 1 -> absent
+  +   154s vmalert_resend:EventsTooLowDocParam.firing: 0 -> 1
+  +   154s vmalert_resend:Heartbeat.firing: 1 -> absent
+  +   200s am:EventsTooLow|default: absent -> 1
+  +   200s am:EventsTooLow|resend3m: absent -> 1
+  +   200s vmalert_default:EventsTooLow.firing: 0 -> 1
+  +   200s vmalert_resend:EventsTooLow.firing: 0 -> 1
+  +   215s am:EventsTooLowRealParam|default: absent -> 1
+  +   215s am:EventsTooLowRealParam|resend3m: absent -> 1
+  +   215s vmalert_default:EventsTooLowRealParam.firing: 0 -> 1
+  +   215s vmalert_resend:EventsTooLowRealParam.firing: 0 -> 1
+  +   220s am:EventsTooLowDocParam|default: 1 -> absent
+  +   220s am:EventsTooLowDocParam|resend3m: 1 -> absent
+  +   220s vmalert_default:EventsTooLowDocParam.firing: 1 -> absent
+  +   220s vmalert_resend:EventsTooLowDocParam.firing: 1 -> absent
+  +   234s am:EventsTooLow|default: 1 -> absent
+  +   234s vmalert_default:EventsTooLow.firing: 1 -> absent
+  +   234s vmalert_resend:EventsTooLow.firing: 1 -> absent
+  +   249s am:EventsTooLowRealParam|default: 1 -> absent
+  +   249s vmalert_default:EventsTooLowRealParam.firing: 1 -> absent
+  +   249s vmalert_resend:EventsTooLowRealParam.firing: 1 -> absent
+  +   354s am:CondAlive|default: 1 -> absent
+  +   354s am:CondAlive|resend3m: 1 -> absent
+  +   354s am:ItemUp|default: 30 -> absent
+  +   354s am:ItemUp|resend3m: 30 -> absent
+  +   354s vmalert_default:CondAlive.firing: 1 -> absent
+  +   354s vmalert_default:ItemUp.firing: 30 -> absent
+  +   354s vmalert_resend:CondAlive.firing: 1 -> absent
+  +   354s vmalert_resend:ItemUp.firing: 30 -> absent
+  +   367s pending_bytes: 0.0 -> 447.0
+  +   377s pending_bytes: 447.0 -> 911.0
+  +   387s pending_bytes: 911.0 -> 1366.0
+  (phase total) partial_results_total +0
+  (phase total) rule_errors_total +0
+  (phase total) iteration_missed_total +4
+
+== vminsert-up @ 1168.1s 
+  +     0s am:EventsTooLow|resend3m: 1 -> absent
+  +     0s pending_bytes: 1366.0 -> 1820.0
+  +     5s pending_bytes: 1820.0 -> 0.0
+  +     5s storage_reachable: None -> 3.0
+  +     5s up:vminsert: False -> True
+  +    20s vmalert_default:CondAlive.firing: absent -> 0
+  +    20s vmalert_default:Heartbeat.firing: absent -> 0
+  +    20s vmalert_default:ItemUp.firing: absent -> 0
+  +    20s vmalert_resend:CondAlive.firing: absent -> 0
+  +    20s vmalert_resend:Heartbeat.firing: absent -> 0
+  +    20s vmalert_resend:ItemUp.firing: absent -> 0
+  +    34s iteration_missed_total starts growing (12 -> 13)
+  +    49s am:EventsTooLowRealParam|resend3m: 1 -> absent
+  +    54s am:CondAlive|default: absent -> 1
+  +    54s am:CondAlive|resend3m: absent -> 1
+  +    54s am:Heartbeat|default: absent -> 1
+  +    54s am:Heartbeat|resend3m: absent -> 1
+  +    54s am:ItemUp|default: absent -> 30
+  +    54s am:ItemUp|resend3m: absent -> 30
+  +    54s vmalert_default:CondAlive.firing: 0 -> 1
+  +    54s vmalert_default:Heartbeat.firing: 0 -> 1
+  +    54s vmalert_default:ItemUp.firing: 0 -> 30
+  +    54s vmalert_resend:CondAlive.firing: 0 -> 1
+  +    54s vmalert_resend:Heartbeat.firing: 0 -> 1
+  +    54s vmalert_resend:ItemUp.firing: 0 -> 30
+  (phase total) partial_results_total +0
+  (phase total) rule_errors_total +0
+  (phase total) iteration_missed_total +4
+
+== backfill-check @ 1321.8s {"window_s": 400, "samples": 36.0, "expected": 40}
+  (phase total) partial_results_total +0
+  (phase total) rule_errors_total +0
+  (phase total) iteration_missed_total +0

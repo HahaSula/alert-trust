@@ -18,15 +18,15 @@
 | 覆蓋檢查器（含驗證 lab） | `tools/check_coverage.py`、`lab/coverage/` |
 | 唯讀蒐集器 | `tools/collect.py` |
 | Claude Code plugin：selfcheck、env-profile、prometheus、victoriametrics、alertmanager、database-targets、policy-lint | `skills/`、`.claude-plugin/` |
-| Lab：metric 名稱、MySQL／MariaDB、PostgreSQL、pending 抖動（10 組）、Alertmanager、rule 並行與查詢 slot | `lab/` |
+| Lab：metric 名稱、MySQL／MariaDB、PostgreSQL、pending 抖動（10 組）、Alertmanager、rule 並行與查詢 slot、VictoriaMetrics／VictoriaLogs（延遲矩陣、故障、resendDelay、log rule） | `lab/` |
 
 ## 進行中
 
-- **VictoriaMetrics／VictoriaLogs 實驗重做**（`lab/vm/`）：完成後把 `catalog/refs.yaml` 的 `exp-vm-matrix`、`exp-vm-faults`、`exp-vm-vl`、`exp-vm-resend` 換成公開結果，並核對 vmalert、vmagent、victoriametrics、victorialogs 卡與 `docs/architecture/` 的說法。
+（無）
 
 ## 待辦（依建議順序）
 
-1. **整合 VM lab 結果**（上一項）。
+1. **VM lab 沒重測到的項目**（`lab/vm/README.md`）：查詢飽和 429 與 `iteration_missed`、磁碟突然 0 byte 的 panic、vmalert／Alertmanager 本身停機、VL `allow_partial_response`、operator。相關說法已降為「推論」。注意這台機器 Docker 容器的單調時鐘比牆鐘慢約 30%，時間類數字要以牆鐘解讀。
 2. **Target 標準問題擴充**（待使用者確認）：在 `catalog/target-pattern.yaml` 加 `role-detection`（沒有可寫入節點／多個可寫入節點，需要 `cluster` label）、`replication-lag`（不能只靠伺服器算的延遲；MySQL 與 PG 都實測到斷線時顯示 0）、exporter 查詢逾時（PG 表鎖、MySQL 連線打滿都會讓 exporter 消失）。
 3. **剩下的未公開參考**：`exp-am-compat`（版本相容）、`exp-am-rules`（告警規則測試），在 `catalog/refs.d/reports.yaml`；重做或改引用。
 4. **2 個第 1 級訊號沒有規則範本**：`victorialogs#ingested`、`observer#scrapes-all-infra`。

@@ -22,7 +22,7 @@ flowchart LR
 | 跑不完時 | 下一輪被跳過，`vmalert_iteration_missed_total` 增加，下一次評估時間直接往後跳[^vma-missed] |
 
 - `concurrency` 大於 1 時，rule 之間不保證順序。Alert 依賴同 group 的 recording rule 時不要調高。
-- 查詢失敗會很快返回，所以查詢飽和（429）時 `iteration_missed` 仍是 0。要看錯誤比率，不要只看 missed。<span class="at-chip at-ev-tested">實測</span>[^exp-vm-faults]
+- 查詢失敗會很快返回，所以查詢飽和（429）時 `iteration_missed` 仍是 0。要看錯誤比率，不要只看 missed。<span class="at-chip at-ev-inferred">推論</span>（原始報告觀察到，lab 尚未重測）
 
 ## 查詢時間 {#query-time}
 

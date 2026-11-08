@@ -17,10 +17,6 @@ silent_failures:
     evidence: tested
     source: art-vm
     refs: [exp-vm-faults]
-  - text: vmagent_remotewrite_pending_data_bytes 在低流量時量到 0，不能單靠它。
-    evidence: tested
-    source: art-vm
-    refs: [exp-vm-faults]
 
 contracts: [scrape-within-interval]
 

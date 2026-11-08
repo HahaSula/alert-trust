@@ -1,0 +1,49 @@
+== steady @ 2.4s 
+  +    33s am:CountNoMatch|vl-single: absent -> 1
+  +    33s vl-single:CountNoMatch.firing: absent -> 1
+  +    67s am:SingleCanary|vl-single: absent -> 1
+  +    67s vl-single:SingleCanary.firing: absent -> 1
+  +    77s am:EvL0|vl-single: absent -> 1
+  +    77s am:EvL20|vl-single: absent -> 1
+  +    77s am:EvL45|vl-single: absent -> 1
+  +    77s vl-single:EvL0.firing: absent -> 1
+  +    77s vl-single:EvL20.firing: absent -> 1
+  +    77s vl-single:EvL45.firing: absent -> 1
+  +   110s am:EvL0|vl-single: 1 -> absent
+  +   110s am:EvL20|vl-single: 1 -> absent
+  +   110s am:EvL45|vl-single: 1 -> absent
+  +   110s am:EvL90Time10m|vl-single: absent -> 1
+  +   110s vl-single:EvL0.firing: 1 -> absent
+  +   110s vl-single:EvL20.firing: 1 -> absent
+  +   110s vl-single:EvL45.firing: 1 -> absent
+  +   110s vl-single:EvL90Time10m.firing: absent -> 1
+
+== readonly-on @ 155.7s 
+
+== readonly-probe @ 161.6s {"ingest": [429, "cannot add rows into storage in read-only mode; the storage can be in read-only mode because of lack of free disk space at -storageDataPath=/vl\n"], "canary_count": [200, "{\"c\":\"16\"}"]}
+  +     0s single_read_only: 0.0 -> 1.0
+  +    18s am:EvL0|vl-single: absent -> 1
+  +    18s am:EvL20|vl-single: absent -> 1
+  +    18s am:EvL45|vl-single: absent -> 1
+  +    18s vl-single:EvL0.firing: absent -> 1
+  +    18s vl-single:EvL20.firing: absent -> 1
+  +    18s vl-single:EvL45.firing: absent -> 1
+  +    52s am:EvL0|vl-single: 1 -> absent
+  +    52s am:EvL20|vl-single: 1 -> absent
+  +    52s am:EvL45|vl-single: 1 -> absent
+  +    52s vl-single:EvL0.firing: 1 -> absent
+  +    52s vl-single:EvL20.firing: 1 -> absent
+  +    52s vl-single:EvL45.firing: 1 -> absent
+  +    85s am:EvL0|vl-single: absent -> 1
+  +    85s vl-single:EvL0.firing: absent -> 1
+  +   118s am:EvL0|vl-single: 1 -> absent
+  +   118s vl-single:EvL0.firing: 1 -> absent
+
+== readonly-off @ 313.3s 
+  +     1s single_read_only: 1.0 -> 0.0
+  +    24s am:SingleCanary|vl-single: 1 -> absent
+  +    24s vl-single:SingleCanary.firing: 1 -> absent
+  +    34s am:EvL45|vl-single: absent -> 1
+  +    34s vl-single:EvL45.firing: absent -> 1
+
+== end @ 375.9s {"canary_count_10m": [200, "{\"c\":\"22\"}"]}

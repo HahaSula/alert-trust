@@ -10,7 +10,7 @@ role: >-
   儲存與查詢。Cluster 版多了「部分節點故障」這種狀態，預設回傳不完整的答案、HTTP 200。
 
 silent_failures:
-  - text: Cluster RF=1 時一台 vmstorage 掛掉會 partial response，increase 類的「數量太低」規則假觸發 9 分鐘。
+  - text: Cluster RF=1 時一台 vmstorage 掛掉會 partial response，increase 類的「數量太低」規則假觸發（lab 中 4 分鐘的故障裡持續 66 秒）。
     evidence: tested
     source: art-vm
     refs: [exp-vm-faults, vms-partial]
@@ -23,9 +23,8 @@ silent_failures:
     source: art-vm
     refs: [exp-vm-faults, vms-denypartial]
   - text: 磁碟突然 0 byte 時切唯讀後仍會 panic。
-    evidence: tested
+    evidence: inferred
     source: art-vm
-    refs: [exp-vm-faults, vst-minfree]
 
 contracts: []
 
@@ -97,9 +96,9 @@ signals:
     signal: vm_concurrent_select_limit_timeout_total 增加
     metrics: [vm_concurrent_select_limit_timeout_total]
     evaluate_on: observer
-    evidence: tested
+    evidence: code
     source: art-vm
-    refs: [exp-vm-faults, vms-queue]
+    refs: [vms-queue]
     upstream: { status: yes }
     rules: []
 

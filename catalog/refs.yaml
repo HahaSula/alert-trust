@@ -50,24 +50,20 @@ refs:
     url: "https://github.com/HahaSula/alert-trust/blob/main/lab/metric-names/README.md"
   exp-vm-matrix:
     kind: experiment
-    title: "VictoriaMetrics 實驗：延遲矩陣（120 條 alert）"
-    visibility: private
-    note: "原始報告含環境資訊，整理後公開"
+    title: "VictoriaMetrics lab：延遲矩陣（12 格 I×L，rate[2m]，逐次 evaluation 比對）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/vm/README.md#結果延遲矩陣matrix"
   exp-vm-faults:
     kind: experiment
-    title: "VictoriaMetrics 實驗：VM single／cluster 故障矩陣"
-    visibility: private
-    note: "原始報告含環境資訊，整理後公開"
+    title: "VictoriaMetrics lab：cluster 故障矩陣（RF=1／RF=2：vmstorage、vmselect、vminsert、vmagent 停、全部唯讀）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/vm/README.md#結果vm-cluster-故障矩陣faults"
   exp-vm-vl:
     kind: experiment
-    title: "VictoriaMetrics 實驗：VictoriaLogs 故障與 log rule 視窗"
-    visibility: private
-    note: "原始報告含環境資訊，整理後公開"
+    title: "VictoriaLogs lab：log rule 視窗、stats count() 空結果、Content-Type、缺 vlstorage、唯讀"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/vm/README.md#結果victorialogsvl"
   exp-vm-resend:
     kind: experiment
-    title: "VictoriaMetrics 實驗：-rule.resendDelay 與假 resolved"
-    visibility: private
-    note: "原始報告含環境資訊，整理後公開"
+    title: "VictoriaMetrics lab：vmselect 停 4 分鐘，預設與 -rule.resendDelay=3m 的假 resolved"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/vm/README.md#結果vm-cluster-故障矩陣faults"
   exp-am-delivery:
     kind: experiment
     title: "Alertmanager 實驗：webhook 400／500／連線被拒與 SMTP 554 時的 counter（0.27.0、0.29.0、0.34.2）"

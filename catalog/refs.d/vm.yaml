@@ -1,0 +1,58 @@
+# lab/vm 重做實驗時另外核對的原始碼位置（v1.155.0，行號已對照 tag 上的檔案）。
+refs:
+  vma-eval-align:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/group.go"
+    line: 715
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/group.go#L715"
+  vma-eval-ts:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/group.go"
+    line: 390
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/group.go#L390"
+  vma-start-phase:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/group.go"
+    line: 528
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/group.go#L528"
+  vma-resolved-at:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/alerting.go"
+    line: 585
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/alerting.go#L585"
+  vma-resolved-send:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/alerting.go"
+    line: 883
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/alerting.go#L883"
+  vma-vlogs-window:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/datasource/client_vlogs.go"
+    line: 20
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/datasource/client_vlogs.go#L20"
+  vms-rate-empty:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmselect/promql/rollup.go"
+    line: 1962
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmselect/promql/rollup.go#L1962"
+  vm-rule-servicedown:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "deployment/docker/rules/alerts-health.yml"
+    line: 34
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/deployment/docker/rules/alerts-health.yml#L34"

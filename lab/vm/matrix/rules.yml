@@ -1,0 +1,11 @@
+# 永遠成立的 alert：每個 (I, L) cell 一條 series。D = -rule.evalDelay 預設 30s，E = 30s。
+groups:
+  - name: matrix
+    interval: 30s
+    rules:
+      - alert: Rate2m
+        expr: rate(lab_m[2m]) > 0
+        for: 1m
+      - alert: Rate5m
+        expr: rate(lab_m[5m]) > 0
+        for: 1m

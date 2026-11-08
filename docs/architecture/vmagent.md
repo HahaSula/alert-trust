@@ -39,6 +39,6 @@ flowchart LR
 
 - **資料會補回，rule 不會補判。**vmagent 掛 8 分鐘，事後查詢幾乎沒有缺口，但 rule 當下確實看不到資料。事後看圖會以為不該漏報。<span class="at-chip at-ev-tested">實測</span>[^exp-vm-faults]
 - **資料停止時 rule 不報錯。**條件型 alert 還會繼續 firing 約 6 分鐘才 resolved，因為 vmalert 的 instant 查詢會往回找 5 分鐘。<span class="at-chip at-ev-tested">實測</span>[^exp-vm-faults][^vma-querystep]
-- **`vmagent_remotewrite_pending_data_bytes` 在低流量時量到 0**，不能只靠它判斷有沒有積壓。<span class="at-chip at-ev-tested">實測</span>[^exp-vm-faults]
+- **`vmagent_remotewrite_pending_data_bytes` 會反映積壓**：lab 中 vminsert 停機時升到 1366 bytes。<span class="at-chip at-ev-tested">實測</span>[^exp-vm-faults]
 
 所以 vmagent 卡片的第 1 級訊號是每個關鍵 job 一條資料新鮮度 heartbeat，而不是 vmagent 自己的 metric。

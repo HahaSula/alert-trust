@@ -1,0 +1,26 @@
+[    0.0s] == sampling {'D': 30, 'E': 30, 'duration': 780}
+[  785.1s] == servicedown-check {'up_job_vm': 1, 'servicedown_selector': 0}
+Rate2m|I=30|L=0 {'alert': 'Rate2m', 'I': 30, 'L': 0, 'R': 120, 'predicted_ok': True, 'first_firing_s': 262, 'pending_resets': 0, 'samples_with_rate_zero': 0}
+Rate2m|I=30|L=60 {'alert': 'Rate2m', 'I': 30, 'L': 60, 'R': 120, 'predicted_ok': True, 'first_firing_s': 262, 'pending_resets': 0, 'samples_with_rate_zero': 0}
+Rate2m|I=30|L=120 {'alert': 'Rate2m', 'I': 30, 'L': 120, 'R': 120, 'predicted_ok': True, 'first_firing_s': 295, 'pending_resets': 0, 'samples_with_rate_zero': 0}
+Rate2m|I=30|L=180 {'alert': 'Rate2m', 'I': 30, 'L': 180, 'R': 120, 'predicted_ok': False, 'first_firing_s': None, 'pending_resets': 2, 'samples_with_rate_zero': 0}
+Rate2m|I=60|L=0 {'alert': 'Rate2m', 'I': 60, 'L': 0, 'R': 120, 'predicted_ok': True, 'first_firing_s': 295, 'pending_resets': 0, 'samples_with_rate_zero': 0}
+Rate2m|I=60|L=60 {'alert': 'Rate2m', 'I': 60, 'L': 60, 'R': 120, 'predicted_ok': True, 'first_firing_s': 295, 'pending_resets': 0, 'samples_with_rate_zero': 0}
+Rate2m|I=60|L=120 {'alert': 'Rate2m', 'I': 60, 'L': 120, 'R': 120, 'predicted_ok': False, 'first_firing_s': 328, 'pending_resets': 0, 'samples_with_rate_zero': 0}
+Rate2m|I=60|L=180 {'alert': 'Rate2m', 'I': 60, 'L': 180, 'R': 120, 'predicted_ok': False, 'first_firing_s': None, 'pending_resets': 1, 'samples_with_rate_zero': 0}
+Rate2m|I=120|L=0 {'alert': 'Rate2m', 'I': 120, 'L': 0, 'R': 120, 'predicted_ok': True, 'first_firing_s': 362, 'pending_resets': 0, 'samples_with_rate_zero': 0}
+Rate2m|I=120|L=60 {'alert': 'Rate2m', 'I': 120, 'L': 60, 'R': 120, 'predicted_ok': False, 'first_firing_s': 362, 'pending_resets': 0, 'samples_with_rate_zero': 0}
+Rate2m|I=120|L=120 {'alert': 'Rate2m', 'I': 120, 'L': 120, 'R': 120, 'predicted_ok': False, 'first_firing_s': None, 'pending_resets': 4, 'samples_with_rate_zero': 0}
+Rate2m|I=120|L=180 {'alert': 'Rate2m', 'I': 120, 'L': 180, 'R': 120, 'predicted_ok': False, 'first_firing_s': None, 'pending_resets': 0, 'samples_with_rate_zero': 0}
+Rate5m|I=30|L=0 {'alert': 'Rate5m', 'I': 30, 'L': 0, 'R': 300, 'predicted_ok': True, 'first_firing_s': 262, 'pending_resets': 0, 'samples_with_rate_zero': None}
+Rate5m|I=30|L=60 {'alert': 'Rate5m', 'I': 30, 'L': 60, 'R': 300, 'predicted_ok': True, 'first_firing_s': 262, 'pending_resets': 0, 'samples_with_rate_zero': None}
+Rate5m|I=30|L=120 {'alert': 'Rate5m', 'I': 30, 'L': 120, 'R': 300, 'predicted_ok': True, 'first_firing_s': 295, 'pending_resets': 0, 'samples_with_rate_zero': None}
+Rate5m|I=30|L=180 {'alert': 'Rate5m', 'I': 30, 'L': 180, 'R': 300, 'predicted_ok': True, 'first_firing_s': 328, 'pending_resets': 0, 'samples_with_rate_zero': None}
+Rate5m|I=60|L=0 {'alert': 'Rate5m', 'I': 60, 'L': 0, 'R': 300, 'predicted_ok': True, 'first_firing_s': 295, 'pending_resets': 0, 'samples_with_rate_zero': None}
+Rate5m|I=60|L=60 {'alert': 'Rate5m', 'I': 60, 'L': 60, 'R': 300, 'predicted_ok': True, 'first_firing_s': 295, 'pending_resets': 0, 'samples_with_rate_zero': None}
+Rate5m|I=60|L=120 {'alert': 'Rate5m', 'I': 60, 'L': 120, 'R': 300, 'predicted_ok': True, 'first_firing_s': 328, 'pending_resets': 0, 'samples_with_rate_zero': None}
+Rate5m|I=60|L=180 {'alert': 'Rate5m', 'I': 60, 'L': 180, 'R': 300, 'predicted_ok': True, 'first_firing_s': 428, 'pending_resets': 0, 'samples_with_rate_zero': None}
+Rate5m|I=120|L=0 {'alert': 'Rate5m', 'I': 120, 'L': 0, 'R': 300, 'predicted_ok': True, 'first_firing_s': 362, 'pending_resets': 0, 'samples_with_rate_zero': None}
+Rate5m|I=120|L=60 {'alert': 'Rate5m', 'I': 120, 'L': 60, 'R': 300, 'predicted_ok': True, 'first_firing_s': 362, 'pending_resets': 0, 'samples_with_rate_zero': None}
+Rate5m|I=120|L=120 {'alert': 'Rate5m', 'I': 120, 'L': 120, 'R': 300, 'predicted_ok': True, 'first_firing_s': 428, 'pending_resets': 0, 'samples_with_rate_zero': None}
+Rate5m|I=120|L=180 {'alert': 'Rate5m', 'I': 120, 'L': 180, 'R': 300, 'predicted_ok': True, 'first_firing_s': 495, 'pending_resets': 0, 'samples_with_rate_zero': None}

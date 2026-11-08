@@ -1,0 +1,7 @@
+groups:
+  - name: cluster-canary
+    type: vlogs
+    interval: 30s
+    rules:
+      - alert: ClusterCanary
+        expr: '_time:2m flow:canary | stats count() c | filter c:>0'

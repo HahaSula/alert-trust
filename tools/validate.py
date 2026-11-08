@@ -158,7 +158,7 @@ def check_refs(components: list[dict], contracts: dict, root: str) -> tuple[list
         for n in names:
             if n.endswith(".md"):
                 path = os.path.join(dirpath, n)
-                text = open(path, encoding="utf-8").read()
+                text = re.sub(r"`[^`\n]*`", "", open(path, encoding="utf-8").read())
                 for fig in re.findall(r"^<!-- figure: ([a-z0-9-]+) -->$", text, re.M):
                     if not os.path.exists(os.path.join(docs, "assets", "figures", fig + ".svg")):
                         errors.append(f"{os.path.relpath(path, root)}: 圖 {fig} 不存在")

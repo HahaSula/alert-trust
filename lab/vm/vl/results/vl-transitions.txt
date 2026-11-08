@@ -1,0 +1,147 @@
+== empty-count @ 5.1s {"single": [200, "{\"c\":\"0\"}"], "cluster": [200, "{\"c\":\"0\"}"], "single_filtered": [200, ""]}
+
+== content-type @ 8.1s {"content_type": null, "http_status": 200, "response": "", "rows_ingested_delta": 5.0, "query_count": "{\"c\":\"5\"}"}
+
+== content-type @ 11.1s {"content_type": "application/x-www-form-urlencoded", "http_status": 200, "response": "", "rows_ingested_delta": 0.0, "query_count": "{\"c\":\"0\"}"}
+
+== content-type @ 14.1s {"content_type": "application/stream+json", "http_status": 200, "response": "", "rows_ingested_delta": 5.0, "query_count": "{\"c\":\"5\"}"}
+
+== steady @ 14.7s 
+  +    23s am:CountNoMatch|vl-single: absent -> 1
+  +    90s am:SingleCanary|vl-single: absent -> 1
+  +    90s vl-single:SingleCanary.firing: absent -> 1
+  +   100s am:ClusterCanary|vl-cluster: absent -> 1
+  +   100s am:EvL0|vl-single: absent -> 1
+  +   100s am:EvL20|vl-single: absent -> 1
+  +   100s am:EvL45|vl-single: absent -> 1
+  +   100s vl-cluster:ClusterCanary.firing: absent -> 1
+  +   100s vl-single:EvL0.firing: absent -> 1
+  +   100s vl-single:EvL20.firing: absent -> 1
+  +   100s vl-single:EvL45.firing: absent -> 1
+  +   133s am:EvL0|vl-single: 1 -> absent
+  +   133s am:EvL20|vl-single: 1 -> absent
+  +   133s am:EvL45|vl-single: 1 -> absent
+  +   133s am:EvL90Time10m|vl-single: absent -> 1
+  +   133s vl-single:EvL0.firing: 1 -> absent
+  +   133s vl-single:EvL20.firing: 1 -> absent
+  +   133s vl-single:EvL45.firing: 1 -> absent
+  +   133s vl-single:EvL90Time10m.firing: absent -> 1
+  +   167s am:EvL0|vl-single: absent -> 1
+  +   167s am:EvL20|vl-single: absent -> 1
+  +   167s am:EvL45|vl-single: absent -> 1
+  +   167s vl-single:EvL0.firing: absent -> 1
+  +   167s vl-single:EvL20.firing: absent -> 1
+  +   167s vl-single:EvL45.firing: absent -> 1
+  +   200s am:EvL0|vl-single: 1 -> absent
+  +   200s am:EvL20|vl-single: 1 -> absent
+  +   200s am:EvL45|vl-single: 1 -> absent
+  +   200s vl-single:EvL0.firing: 1 -> absent
+  +   200s vl-single:EvL20.firing: 1 -> absent
+  +   200s vl-single:EvL45.firing: 1 -> absent
+  +   233s am:EvL0|vl-single: absent -> 1
+  +   233s am:EvL20|vl-single: absent -> 1
+  +   233s am:EvL45|vl-single: absent -> 1
+  +   233s vl-single:EvL0.firing: absent -> 1
+  +   233s vl-single:EvL20.firing: absent -> 1
+  +   233s vl-single:EvL45.firing: absent -> 1
+  +   267s am:EvL0|vl-single: 1 -> absent
+  +   267s am:EvL20|vl-single: 1 -> absent
+  +   267s am:EvL45|vl-single: 1 -> absent
+  +   267s vl-single:EvL0.firing: 1 -> absent
+  +   267s vl-single:EvL20.firing: 1 -> absent
+  +   267s vl-single:EvL45.firing: 1 -> absent
+
+== vlstorage-2-down @ 314.7s 
+  +     4s ingest_during_down = [200, '']
+  +     7s cluster_query_status: 200 -> 502
+  +    32s cluster_health:cluster-canary.err: False -> True
+  +    65s am:EvL0|vl-single: absent -> 1
+  +    65s am:EvL20|vl-single: absent -> 1
+  +    65s am:EvL45|vl-single: absent -> 1
+  +    65s vl-single:EvL0.firing: absent -> 1
+  +    65s vl-single:EvL20.firing: absent -> 1
+  +    65s vl-single:EvL45.firing: absent -> 1
+  +    99s am:EvL0|vl-single: 1 -> absent
+  +    99s am:EvL20|vl-single: 1 -> absent
+  +    99s am:EvL45|vl-single: 1 -> absent
+  +    99s vl-single:EvL0.firing: 1 -> absent
+  +    99s vl-single:EvL20.firing: 1 -> absent
+  +    99s vl-single:EvL45.firing: 1 -> absent
+  +   122s am:ClusterCanary|vl-cluster: 1 -> absent
+  +   132s am:EvL0|vl-single: absent -> 1
+  +   132s am:EvL20|vl-single: absent -> 1
+  +   132s am:EvL45|vl-single: absent -> 1
+  +   132s vl-single:EvL0.firing: absent -> 1
+  +   132s vl-single:EvL20.firing: absent -> 1
+  +   132s vl-single:EvL45.firing: absent -> 1
+  +   165s am:EvL0|vl-single: 1 -> absent
+  +   165s am:EvL20|vl-single: 1 -> absent
+  +   165s am:EvL45|vl-single: 1 -> absent
+  +   165s vl-single:EvL0.firing: 1 -> absent
+  +   165s vl-single:EvL20.firing: 1 -> absent
+  +   165s vl-single:EvL45.firing: 1 -> absent
+  +   199s am:EvL0|vl-single: absent -> 1
+  +   199s am:EvL20|vl-single: absent -> 1
+  +   199s am:EvL45|vl-single: absent -> 1
+  +   199s vl-single:EvL0.firing: absent -> 1
+  +   199s vl-single:EvL20.firing: absent -> 1
+  +   199s vl-single:EvL45.firing: absent -> 1
+  +   232s am:EvL0|vl-single: 1 -> absent
+  +   232s am:EvL20|vl-single: 1 -> absent
+  +   232s am:EvL45|vl-single: 1 -> absent
+  +   232s vl-single:EvL0.firing: 1 -> absent
+  +   232s vl-single:EvL20.firing: 1 -> absent
+  +   232s vl-single:EvL45.firing: 1 -> absent
+
+== vlstorage-2-up @ 561.8s 
+  +     0s cluster_query_status: 502 -> 200
+  +    24s am:ClusterCanary|vl-cluster: absent -> 1
+  +    24s am:EvL0|vl-single: absent -> 1
+  +    24s am:EvL20|vl-single: absent -> 1
+  +    24s am:EvL45|vl-single: absent -> 1
+  +    24s cluster_health:cluster-canary.err: True -> False
+  +    24s vl-single:EvL0.firing: absent -> 1
+  +    24s vl-single:EvL20.firing: absent -> 1
+  +    24s vl-single:EvL45.firing: absent -> 1
+  +    57s am:EvL0|vl-single: 1 -> absent
+  +    57s am:EvL20|vl-single: 1 -> absent
+  +    57s am:EvL45|vl-single: 1 -> absent
+  +    57s vl-single:EvL0.firing: 1 -> absent
+  +    57s vl-single:EvL20.firing: 1 -> absent
+  +    57s vl-single:EvL45.firing: 1 -> absent
+  +    90s am:EvL0|vl-single: absent -> 1
+  +    90s am:EvL20|vl-single: absent -> 1
+  +    90s am:EvL45|vl-single: absent -> 1
+  +    90s vl-single:EvL0.firing: absent -> 1
+  +    90s vl-single:EvL20.firing: absent -> 1
+  +    90s vl-single:EvL45.firing: absent -> 1
+  +   124s am:EvL0|vl-single: 1 -> absent
+  +   124s am:EvL20|vl-single: 1 -> absent
+  +   124s am:EvL45|vl-single: 1 -> absent
+  +   124s vl-single:EvL0.firing: 1 -> absent
+  +   124s vl-single:EvL20.firing: 1 -> absent
+  +   124s vl-single:EvL45.firing: 1 -> absent
+
+== readonly-on @ 718.9s 
+  +     1s am:EvL0|vl-single: absent -> 1
+  +     1s am:EvL20|vl-single: absent -> 1
+  +     1s am:EvL45|vl-single: absent -> 1
+  +     1s single_read_only: 0.0 -> 1.0
+  +     1s vl-single:EvL0.firing: absent -> 1
+  +     1s vl-single:EvL20.firing: absent -> 1
+  +     1s vl-single:EvL45.firing: absent -> 1
+  +    16s am:SingleCanary|vl-single: 1 -> absent
+  +    16s vl-single:SingleCanary.firing: 1 -> absent
+  +    34s am:EvL0|vl-single: 1 -> absent
+  +    34s am:EvL20|vl-single: 1 -> absent
+  +    34s am:EvL45|vl-single: 1 -> absent
+  +    34s am:EvL90Time10m|vl-single: 1 -> absent
+  +    34s vl-single:EvL0.firing: 1 -> absent
+  +    34s vl-single:EvL20.firing: 1 -> absent
+  +    34s vl-single:EvL45.firing: 1 -> absent
+  +    34s vl-single:EvL90Time10m.firing: 1 -> absent
+
+== readonly-off @ 873.2s 
+  +     1s single_read_only: 1.0 -> 0.0
+
+== end @ 935.8s 
