@@ -1,0 +1,799 @@
+# PostgreSQL「從資料庫原始碼到 metric」附錄的參考（docs/targets/postgres-appendix.md）。
+# 每一行都用 gh api 取 tag 上的檔案核對過（行內含關鍵字）。
+# 原始碼：postgres_exporter v0.20.1、PostgreSQL REL_16_15、REL_17_11。
+refs:
+  pg-trace-ex-collect-setup:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/collector.go"
+    line: 188
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/collector.go#L188"
+  pg-trace-ex-collect-fail:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/collector.go"
+    line: 191
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/collector.go#L191"
+  pg-trace-ex-success:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/collector.go"
+    line: 235
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/collector.go#L235"
+  pg-trace-ex-setup-open:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/instance.go"
+    line: 54
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/instance.go#L54"
+  pg-trace-ex-setup-maxconn:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/instance.go"
+    line: 58
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/instance.go#L58"
+  pg-trace-ex-version:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/instance.go"
+    line: 86
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/instance.go#L86"
+  pg-trace-ex-legacy-reuse:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "exporter/server.go"
+    line: 169
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/exporter/server.go#L169"
+  pg-trace-ex-legacy-ping:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "exporter/server.go"
+    line: 178
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/exporter/server.go#L178"
+  pg-trace-ex-legacy-connerr:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "exporter/datasource.go"
+    line: 102
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/exporter/datasource.go#L102"
+  pg-trace-ex-legacy-up:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "exporter/postgres_exporter.go"
+    line: 616
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/exporter/postgres_exporter.go#L616"
+  pg-trace-ex-legacy-select:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "exporter/namespace.go"
+    line: 47
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/exporter/namespace.go#L47"
+  pg-trace-ex-activity-self:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_activity.go"
+    line: 92
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_activity.go#L92"
+  pg-trace-ex-activity-join:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_activity.go"
+    line: 94
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_activity.go#L94"
+  pg-trace-ex-activity-states:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_activity.go"
+    line: 72
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_activity.go#L72"
+  pg-trace-ex-longtx-age:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_long_running_transactions.go"
+    line: 56
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_long_running_transactions.go#L56"
+  pg-trace-ex-longtx-default:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_long_running_transactions.go"
+    line: 27
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_long_running_transactions.go#L27"
+  pg-trace-ex-db-query:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_database.go"
+    line: 223
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_database.go#L223"
+  pg-trace-ex-db-name:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_database.go"
+    line: 56
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_database.go#L56"
+  pg-trace-ex-db-skip-datname:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_database.go"
+    line: 304
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_database.go#L304"
+  pg-trace-ex-db-statsreset:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_database.go"
+    line: 377
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_database.go#L377"
+  pg-trace-ex-db-active-gate:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_database.go"
+    line: 251
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_database.go#L251"
+  pg-trace-ex-repl-isreplica:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_replication.go"
+    line: 71
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_replication.go#L71"
+  pg-trace-ex-repl-else:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_replication.go"
+    line: 68
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_replication.go#L68"
+  pg-trace-ex-repl-lastreplay:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_replication.go"
+    line: 74
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_replication.go#L74"
+  pg-trace-ex-repl-scan:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_replication.go"
+    line: 86
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_replication.go#L86"
+  pg-trace-ex-statrep-labels:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_replication.go"
+    line: 37
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_replication.go#L37"
+  pg-trace-ex-statrep-join:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_replication.go"
+    line: 71
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_replication.go#L71"
+  pg-trace-ex-statrep-valid:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_replication.go"
+    line: 135
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_replication.go#L135"
+  pg-trace-ex-slots-diff:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_replication_slots.go"
+    line: 106
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_replication_slots.go#L106"
+  pg-trace-ex-slots-diff-valid:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_replication_slots.go"
+    line: 172
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_replication_slots.go#L172"
+  pg-trace-ex-slots-v13:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_replication_slots.go"
+    line: 217
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_replication_slots.go#L217"
+  pg-trace-ex-slots-flush-active:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_replication_slots.go"
+    line: 263
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_replication_slots.go#L263"
+  pg-trace-ex-slots-safe-valid:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_replication_slots.go"
+    line: 271
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_replication_slots.go#L271"
+  pg-trace-ex-slots-status-valid:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_replication_slots.go"
+    line: 278
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_replication_slots.go#L278"
+  pg-trace-ex-walrecv-from:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_walreceiver.go"
+    line: 118
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_walreceiver.go#L118"
+  pg-trace-ex-walrecv-host:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_walreceiver.go"
+    line: 106
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_walreceiver.go#L106"
+  pg-trace-ex-walrecv-hostnull:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_walreceiver.go"
+    line: 158
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_walreceiver.go#L158"
+  pg-trace-ex-walrecv-mod:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_walreceiver.go"
+    line: 115
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_walreceiver.go#L115"
+  pg-trace-ex-archiver-age-valid:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_archiver.go"
+    line: 94
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_archiver.go#L94"
+  pg-trace-ex-archiver-name:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_archiver.go"
+    line: 44
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_archiver.go#L44"
+  pg-trace-ex-bgwriter-after17:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_bgwriter.go"
+    line: 119
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_bgwriter.go#L119"
+  pg-trace-ex-bgwriter-req-name:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_bgwriter.go"
+    line: 45
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_bgwriter.go#L45"
+  pg-trace-ex-checkpointer-skip:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_checkpointer.go"
+    line: 115
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_checkpointer.go#L115"
+  pg-trace-ex-checkpointer-query:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_checkpointer.go"
+    line: 107
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_checkpointer.go#L107"
+  pg-trace-ex-wrap-name:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_database_wraparound.go"
+    line: 40
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_database_wraparound.go#L40"
+  pg-trace-ex-wrap-allowconn:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_database_wraparound.go"
+    line: 60
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_database_wraparound.go#L60"
+  pg-trace-ex-postmaster-default:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_postmaster.go"
+    line: 26
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_postmaster.go#L26"
+  pg-trace-ex-postmaster-null0:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_postmaster.go"
+    line: 60
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_postmaster.go#L60"
+  pg-trace-ex-settings-name:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_setting.go"
+    line: 92
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_setting.go#L92"
+  pg-trace-ex-settings-unit:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_setting.go"
+    line: 109
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_setting.go#L109"
+  pg-trace-ex-settings-minus1:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_setting.go"
+    line: 157
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_setting.go#L157"
+  pg-trace-ex-locks-dbnotnull:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_locks.go"
+    line: 78
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_locks.go#L78"
+  pg-trace-ex-wal-default:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_wal.go"
+    line: 26
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_wal.go#L26"
+  pg-trace-pg17-view-activity:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/catalog/system_views.sql"
+    line: 865
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_views.sql#L865"
+  pg-trace-pg16-view-activity:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/catalog/system_views.sql"
+    line: 844
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/catalog/system_views.sql#L844"
+  pg-trace-pg17-activity-xmin:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/adt/pgstatfuncs.c"
+    line: 356
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/adt/pgstatfuncs.c#L356"
+  pg-trace-pg17-activity-state:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/adt/pgstatfuncs.c"
+    line: 367
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/adt/pgstatfuncs.c#L367"
+  pg-trace-pg17-activity-undefined:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/adt/pgstatfuncs.c"
+    line: 387
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/adt/pgstatfuncs.c#L387"
+  pg-trace-pg17-activity-xact:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/adt/pgstatfuncs.c"
+    line: 465
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/adt/pgstatfuncs.c#L465"
+  pg-trace-pg17-activity-noperm:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/adt/pgstatfuncs.c"
+    line: 622
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/adt/pgstatfuncs.c#L622"
+  pg-trace-pg16-activity-privs:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/utils/adt/pgstatfuncs.c"
+    line: 363
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/utils/adt/pgstatfuncs.c#L363"
+  pg-trace-pg17-view-database:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1055
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_views.sql#L1055"
+  pg-trace-pg17-view-database-oid0:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1082
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_views.sql#L1082"
+  pg-trace-pg16-view-database-oid0:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1056
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/catalog/system_views.sql#L1056"
+  pg-trace-pg17-xact-count:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/activity/pgstat_database.c"
+    line: 259
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/activity/pgstat_database.c#L259"
+  pg-trace-pg17-xact-flush:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/activity/pgstat_database.c"
+    line: 287
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/activity/pgstat_database.c#L287"
+  pg-trace-pg17-deadlock-call:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/storage/lmgr/deadlock.c"
+    line: 1128
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/storage/lmgr/deadlock.c#L1128"
+  pg-trace-pg17-deadlock-inc:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/activity/pgstat_database.c"
+    line: 133
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/activity/pgstat_database.c#L133"
+  pg-trace-pg17-temp-call:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/storage/file/fd.c"
+    line: 1530
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/storage/file/fd.c#L1530"
+  pg-trace-pg16-temp-call:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/storage/file/fd.c"
+    line: 1484
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/storage/file/fd.c#L1484"
+  pg-trace-pg17-temp-inc:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/activity/pgstat_database.c"
+    line: 183
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/activity/pgstat_database.c#L183"
+  pg-trace-pg17-statsreset-null:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/adt/pgstatfuncs.c"
+    line: 1097
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/adt/pgstatfuncs.c#L1097"
+  pg-trace-pg17-flush-interval:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/activity/pgstat.c"
+    line: 118
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/activity/pgstat.c#L118"
+  pg-trace-pg17-didcrash:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/access/transam/xlog.c"
+    line: 5508
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/access/transam/xlog.c#L5508"
+  pg-trace-pg16-crash-stats:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/access/transam/xlog.c"
+    line: 5287
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/access/transam/xlog.c#L5287"
+  pg-trace-pg17-view-replication:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/catalog/system_views.sql"
+    line: 916
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_views.sql#L916"
+  pg-trace-pg17-walsnd-lagnull:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/replication/walsender.c"
+    line: 4069
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/replication/walsender.c#L4069"
+  pg-trace-pg17-walsnd-clear:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/replication/walsender.c"
+    line: 2506
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/replication/walsender.c#L2506"
+  pg-trace-pg17-walsnd-clear-apply:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/replication/walsender.c"
+    line: 2533
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/replication/walsender.c#L2533"
+  pg-trace-pg16-walsnd-clear:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/replication/walsender.c"
+    line: 2185
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/replication/walsender.c#L2185"
+  pg-trace-pg17-view-walrcv:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/catalog/system_views.sql"
+    line: 950
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_views.sql#L950"
+  pg-trace-pg17-walrcv-none:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/replication/walreceiver.c"
+    line: 1523
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/replication/walreceiver.c#L1523"
+  pg-trace-pg17-walrcv-slotnull:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/replication/walreceiver.c"
+    line: 1587
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/replication/walreceiver.c#L1587"
+  pg-trace-pg17-walrcv-tempslot:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/replication/walreceiver.c"
+    line: 472
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/replication/walreceiver.c#L472"
+  pg-trace-pg16-walrcv-flushinit:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/replication/walreceiverfuncs.c"
+    line: 310
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/replication/walreceiverfuncs.c#L310"
+  pg-trace-pg16-walrcv-segstart:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/replication/walreceiverfuncs.c"
+    line: 261
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/replication/walreceiverfuncs.c#L261"
+  pg-trace-pg17-receive-lsn-null:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/access/transam/xlogfuncs.c"
+    line: 344
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/access/transam/xlogfuncs.c#L344"
+  pg-trace-pg17-replay-ts-null:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/access/transam/xlogfuncs.c"
+    line: 633
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/access/transam/xlogfuncs.c#L633"
+  pg-trace-pg17-in-recovery:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/access/transam/xlogfuncs.c"
+    line: 644
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/access/transam/xlogfuncs.c#L644"
+  pg-trace-pg17-slot-restartnull:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/replication/slotfuncs.c"
+    line: 315
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/replication/slotfuncs.c#L315"
+  pg-trace-pg17-slot-invalidlsn:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/replication/slotfuncs.c"
+    line: 336
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/replication/slotfuncs.c#L336"
+  pg-trace-pg17-slot-lost:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/replication/slotfuncs.c"
+    line: 379
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/replication/slotfuncs.c#L379"
+  pg-trace-pg17-slot-safenull:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/replication/slotfuncs.c"
+    line: 387
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/replication/slotfuncs.c#L387"
+  pg-trace-pg17-slot-invalidate:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/replication/slot.c"
+    line: 1704
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/replication/slot.c#L1704"
+  pg-trace-pg16-slot-invalidate:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/replication/slot.c"
+    line: 1480
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/replication/slot.c#L1480"
+  pg-trace-pg17-arch-report-fail:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/postmaster/pgarch.c"
+    line: 493
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/postmaster/pgarch.c#L493"
+  pg-trace-pg17-arch-retries:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/postmaster/pgarch.c"
+    line: 70
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/postmaster/pgarch.c#L70"
+  pg-trace-pg17-arch-autowake:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/postmaster/pgarch.c"
+    line: 61
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/postmaster/pgarch.c#L61"
+  pg-trace-pg17-arch-failinc:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/activity/pgstat_archiver.c"
+    line: 37
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/activity/pgstat_archiver.c#L37"
+  pg-trace-pg17-arch-lastnull:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/adt/pgstatfuncs.c"
+    line: 1878
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/adt/pgstatfuncs.c#L1878"
+  pg-trace-pg17-ckpt-req:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/postmaster/checkpointer.c"
+    line: 430
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/postmaster/checkpointer.c#L430"
+  pg-trace-pg17-rstpt-req:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/postmaster/checkpointer.c"
+    line: 428
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/postmaster/checkpointer.c#L428"
+  pg-trace-pg16-ckpt-req:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/postmaster/checkpointer.c"
+    line: 373
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/postmaster/checkpointer.c#L373"
+  pg-trace-pg17-xid-age:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/adt/xid.c"
+    line: 113
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/adt/xid.c#L113"
+  pg-trace-pg17-starttime-fn:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/adt/timestamp.c"
+    line: 1638
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/adt/timestamp.c#L1638"
+  pg-trace-pg17-guc-maxconn:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/misc/guc_tables.c"
+    line: 2215
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/misc/guc_tables.c#L2215"
+  pg-trace-pg17-guc-reserved:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/misc/guc_tables.c"
+    line: 2236
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/misc/guc_tables.c#L2236"
+  pg-trace-pg16-guc-reserved:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/utils/misc/guc_tables.c"
+    line: 2208
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/utils/misc/guc_tables.c#L2208"
+  pg-trace-pg17-reserved-role:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/init/postinit.c"
+    line: 965
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/init/postinit.c#L965"
+  pg-trace-pg17-lock-xid-nulldb:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/adt/lockfuncs.c"
+    line: 295
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/adt/lockfuncs.c#L295"
+  pg-trace-pg17-lock-xid-case:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/adt/lockfuncs.c"
+    line: 292
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/adt/lockfuncs.c#L292"
+  pg-trace-pg17-waldir-grant:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/catalog/system_functions.sql"
+    line: 766
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_functions.sql#L766"
+  pg-trace-pg16-waldir-grant:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/catalog/system_functions.sql"
+    line: 731
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/catalog/system_functions.sql#L731"
+  pg-trace-exp:
+    kind: experiment
+    title: "postgres_exporter v0.20.1 實際送出的 SQL（log_statement=all，PostgreSQL 16.15／17.11，兩次 scrape）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/postgres/trace/results/statements-20261109.md"

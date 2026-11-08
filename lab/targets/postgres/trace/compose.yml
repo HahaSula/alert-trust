@@ -1,0 +1,35 @@
+# postgres_exporter v0.20.1 每次 scrape 送出的 SQL：PostgreSQL 16.15 與 17.11 各一台（非 replica），開 log_statement=all。
+# 只對外開 exporter：127.0.0.1:23501（PG16）、127.0.0.1:23502（PG17）。執行 ./run.sh，結束會 docker compose down -v。
+name: at-pgtrace
+x-exp: &exp
+  image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+  command:
+    - --collector.stat_wal_receiver
+    - --collector.database_wraparound
+    - --collector.postmaster
+    - --collector.stat_checkpointer
+    - --collector.long_running_transactions
+x-pgcmd: &pgcmd >-
+  postgres -c log_statement=all -c log_connections=on -c log_disconnections=on
+  -c log_line_prefix='%m [%p] %u@%d app=%a '
+services:
+  p16:
+    image: postgres:16.15-alpine
+    environment: { POSTGRES_PASSWORD: postgres }
+    volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql:ro"]
+    command: *pgcmd
+  p17:
+    image: postgres:17.11-alpine
+    environment: { POSTGRES_PASSWORD: postgres }
+    volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql:ro"]
+    command: *pgcmd
+  e-p16:
+    <<: *exp
+    environment: { DATA_SOURCE_NAME: "postgresql://exporter:exporter@p16:5432/postgres?sslmode=disable" }
+    ports: ["127.0.0.1:23501:9187"]
+    depends_on: [p16]
+  e-p17:
+    <<: *exp
+    environment: { DATA_SOURCE_NAME: "postgresql://exporter:exporter@p17:5432/postgres?sslmode=disable" }
+    ports: ["127.0.0.1:23502:9187"]
+    depends_on: [p17]
