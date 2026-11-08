@@ -1,0 +1,12 @@
+{
+  "name": "alert-trust",
+  "description": "Self-check skills for the whole alert chain: Prometheus, VictoriaMetrics/vmalert/vmagent/VictoriaLogs, Alertmanager and database exporters, driven by the alert-trust catalog",
+  "owner": { "name": "HahaSula" },
+  "plugins": [
+    {
+      "name": "alert-trust",
+      "source": "./",
+      "description": "Audit whether your alert rules can be trusted at peak and which monitor-of-monitor signals are missing, reading signals and contracts from the alert-trust catalog"
+    }
+  ]
+}

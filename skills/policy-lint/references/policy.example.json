@@ -1,0 +1,17 @@
+{
+  "tolerate_missed_scrapes": 1,
+  "scrape_ratio_warn": 0.8,
+  "group_ratio_warn": 0.8,
+  "large_target_samples": 200000,
+  "for_reset_warn": 3,
+  "long_silence_days": 14,
+  "log_delay_seconds": null,
+  "data_latency_seconds": null,
+  "required_labels": ["severity"],
+  "required_annotations": ["summary"],
+  "critical_severities": ["critical", "page"],
+  "ignore_jobs": [],
+  "exempt": [
+    { "policy": "SCRAPE_NOT_MONITORED", "object": "^prom-a/job/best-effort-.*", "reason": "這些 job 只用於 dashboard，沒有 SLO", "until": "2027-01-31" }
+  ]
+}
