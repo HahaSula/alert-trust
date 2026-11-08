@@ -26,7 +26,7 @@ Alert 只存在記憶體，全域一把鎖。寫入時持鎖把 alert 送進 dis
 | 一次 flush 的逾時 | `group_interval` 加上等待時間 |
 | 卡住時影響誰 | 只有這個 group |
 
-- **失敗要等整輪 flush 結束才計數。**`group_interval` 是 30m 時，單一 group 持續失敗的 `notifications_failed_total` 每 30 分鐘才加 1，`rate(...[5m])` 抓不到。<span class="at-chip at-ev-tested">實測</span>[^exp-am-window] 見[告警視窗契約](../contracts.md#am-failure-window)。
+- **失敗要等整輪 flush 結束才計數。**`group_interval` 是 1h 時，單一 group 持續失敗的 `notifications_failed_total` 每 1 小時才加 1，`rate(...[5m])` 抓不到。<span class="at-chip at-ev-tested">實測</span>[^exp-am-window] 見[告警視窗契約](../contracts.md#am-failure-window)。
 - **SMTP 不回應時整個 group 停止通知**，同 receiver 的 webhook 也收不到，counter 不動，到 0.34.2 仍是如此。<span class="at-chip at-ev-tested">實測</span>[^exp-am-smtp]
 
 ## 通知流程 {#pipeline}

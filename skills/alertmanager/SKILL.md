@@ -54,7 +54,7 @@ argument-hint: "[snapshot-dir] [component-id]"
 
 1. 從 `config.original` 找出所有路由（含繼承）裡最大的 `group_interval`（量測）。
 2. 找出觀察者上引用 `alertmanager_notifications_failed_total` 的規則（觀察者的 `rules.json`），讀它的 range 與 `for`。
-3. 視窗小於 `2 × 最大 group_interval` 就是 FAIL：`group_interval` 30m 時，`rate(...[5m]) > 0` 加 `for: 5m` 完全抓不到單一 group 的持續失敗。上游 mixin 用 `rate[15m]`，同樣會漏。
+3. 視窗小於 `2 × 最大 group_interval` 就是 FAIL：`group_interval` 1h 時，`rate(...[5m]) > 0` 加 `for: 5m` 完全抓不到單一 group 的持續失敗。上游 mixin 用 `rate[15m]`，同樣會漏。
 4. 建議寫法見卡片 `delivery-failing` 訊號與 `rules/alertmanager/meta.yml#AlertmanagerNotificationsFailing`；排除 `reason="contextCanceled"`。
 
 ## 3. 送達失敗：健康檢查看不到

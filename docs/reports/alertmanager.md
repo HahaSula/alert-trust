@@ -13,7 +13,7 @@ Alertmanager 的架構、失敗時哪些 counter 會動、`group_interval` 對�
 
 **0.27.0 的 email 可能失敗卻記成成功。**假 SMTP 在 DATA 結尾回 554 時，0.27.0 的失敗 counter 全是 0、log 沒有錯誤，觀察期間也沒有重試。0.29.0 則正確計入失敗並持續重試。[^exp-am-delivery]這在 0.27.0 無法靠 metric 發現，要升級，或用外部檢查信箱的 canary。
 
-**長 `group_interval` 會拉長偵測時間。**失敗是整輪 flush 結束才計數。以實驗的 30m 為例，`rate(...[5m]) > 0` 加 `for: 5m` 的告警在單一 group 持續失敗時完全不會觸發。[^exp-am-window]告警視窗要取 `group_interval` 的 2 倍，Watchdog 和 canary 要有自己的短週期路由。見[告警視窗契約](../contracts.md#am-failure-window)。
+**長 `group_interval` 會拉長偵測時間。**失敗是整輪 flush 結束才計數。以 1h 為例，`rate(...[5m]) > 0` 加 `for: 5m` 的告警在單一 group 持續失敗時完全不會觸發。[^exp-am-window]告警視窗要取 `group_interval` 的 2 倍，Watchdog 和 canary 要有自己的短週期路由。見[告警視窗契約](../contracts.md#am-failure-window)。
 
 **升到 0.34.2 前要先處理 3 項。**設定檔格式相容，實測 0.27、0.29 升級再回退都正常。[^exp-am-ha]但子路由的 `group_by: []` 從 0.31 起語意改變且語法檢查抓不到，`auto-gomaxprocs` 會讓 0.34.2 啟動失敗，CORS 預設關閉。[^exp-am-compat]
 
@@ -160,7 +160,7 @@ POST /api/v2/alerts → provider/mem → dispatcher → aggregation group → go
 ### 設定時要注意
 
 - **只靠 `AlertmanagerMembersInconsistent` 抓不到 peer 停機。**實測停掉一台後，存活的實例回報 `cluster_members=1`，停掉的那台又抓不到，兩邊數字相等不會觸發。這條抓的是叢集分裂，peer 停機要靠 `AlertmanagerClusterFailedPeers` 和 `AlertmanagerScrapeDown`。<span class="at-chip at-ev-tested">實測</span>[^exp-am-rules]
-- **視窗要跟著 `group_interval`。**下方範例以 G = 30m 寫成 `[1h]`；有路由的 G 更長時，視窗也要一起拉長。
+- **視窗要跟著 `group_interval`。**下方範例以 G = 1h 寫成 `[2h]`；有路由的 G 更長時，視窗也要一起拉長。
 - **不要用 `reason="clientError"` 篩選。**0.34 起 401、403 改成 `authError`，429 改成 `rateLimited`。<span class="at-chip at-ev-tested">實測</span>[^exp-am-delivery]
 - **Email 失敗的 reason 是 `other`，**SMTP 錯誤沒有 HTTP 狀態碼。<span class="at-chip at-ev-tested">實測</span>[^exp-am-delivery]
 
@@ -169,18 +169,18 @@ POST /api/v2/alerts → provider/mem → dispatcher → aggregation group → go
 放在外部 Prometheus。`prometheus-to-alertmanager` 這組要抓得到每台受測 Prometheus 的 metric。
 
 ```yaml
-# 範例視窗以 group_interval 30m 計算（[1h] = 2 × G）。cluster、job 的 label 請對齊實際環境。
+# 範例視窗以 group_interval 1h 計算（[2h] = 2 × G）。cluster、job 的 label 請對齊實際環境。
 groups:
   - name: alertmanager-delivery            # 通知有沒有送出去
     rules:
       - alert: AlertmanagerNotificationsFailing
-        expr: sum by (cluster, instance, integration) (increase(alertmanager_notifications_failed_total{reason!="contextCanceled"}[1h])) > 0
+        expr: sum by (cluster, instance, integration) (increase(alertmanager_notifications_failed_total{reason!="contextCanceled"}[2h])) > 0
         labels: { severity: critical }
         annotations: { summary: "至少一輪通知完全失敗；視窗是 group_interval 的 2 倍" }
       - alert: AlertmanagerAllInstancesFailing
         expr: |
           min by (cluster, integration) (
-            sum by (cluster, instance, integration) (increase(alertmanager_notifications_failed_total{reason!="contextCanceled"}[1h]))
+            sum by (cluster, instance, integration) (increase(alertmanager_notifications_failed_total{reason!="contextCanceled"}[2h]))
           ) > 0
         labels: { severity: critical }
         annotations: { summary: "叢集內每個實例都有失敗，通知很可能完全送不出去" }
@@ -319,7 +319,7 @@ groups:
         annotations: { summary: "走真實 SMTP 路徑到專用信箱，由外部程式檢查最新一封的時間" }
 ```
 
-Canary 路由要有自己的短週期，不要繼承主路由的長週期。下面的主路由以 G = 30m 為例。
+Canary 路由要有自己的短週期，不要繼承主路由的長週期。下面的主路由以 G = 1h 為例。
 
 ```yaml
 # 範例設定。Canary 路由各自設定短週期，不要繼承主路由的 group_interval。
@@ -330,7 +330,7 @@ route:
   receiver: default-email
   group_by: [alertname]
   group_wait: 30s
-  group_interval: 30m
+  group_interval: 1h
   repeat_interval: 4h
   routes:
     - matchers: ['alertname="Watchdog"']
@@ -434,7 +434,7 @@ Email notifier 建立連線後沒有設 deadline，`group_interval` 導出的 fl
 
 - **標頭模板失敗：**伺服器收到完全空白的信，沒有主旨。
 - **內文模板失敗：**信有主旨，但沒有內文。
-- **每次 flush 再寄一封：**失敗不會寫進 nflog，也不重試，所以每個 `group_interval` 寄一封（例如 G = 30m 時約每 30 分鐘一封），同時 `notifications_failed_total{reason="other"}` 會增加。
+- **每次 flush 再寄一封：**失敗不會寫進 nflog，也不重試，所以每個 `group_interval` 寄一封（例如 G = 1h 時約每小時一封），同時 `notifications_failed_total{reason="other"}` 會增加。
 - **語法檢查抓不到：**`amtool check-config` 對引用不存在模板的設定回 SUCCESS，要在非正式環境實際發一次。
 
 以上皆為假 SMTP 實測，每項跑一次；真實 SMTP、STARTTLS 路徑與 TCP 對端整個消失的情況沒有測。

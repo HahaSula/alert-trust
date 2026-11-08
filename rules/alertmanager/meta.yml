@@ -1,19 +1,19 @@
 # Alertmanager 的 meta 規則，放在外部觀察者，通知不要經過被監控的 Alertmanager。
-# 視窗以 group_interval 30m 計算（[1h] = 2 倍）；有更長的 group_interval 時一起拉長。
+# 失敗視窗以 group_interval 1h 為例（[2h] = 2 倍）；請改成 2 × 你最長的 group_interval。
 # cluster、job 的 label 請對齊實際環境。
 groups:
   - name: alertmanager-delivery
     rules:
       - alert: AlertmanagerNotificationsFailing
-        expr: sum by (cluster, instance, integration) (increase(alertmanager_notifications_failed_total{reason!="contextCanceled"}[1h])) > 0
+        expr: sum by (cluster, instance, integration) (increase(alertmanager_notifications_failed_total{reason!="contextCanceled"}[2h])) > 0
         labels: { severity: critical, component: alertmanager, tier: "1" }
         annotations:
-          summary: "至少一輪通知完全失敗；視窗是 group_interval 的 2 倍"
+          summary: "至少一輪通知完全失敗；視窗是 group_interval 的 2 倍（這裡以 1h 為例）"
           runbook_url: https://hahasula.github.io/alert-trust/components/alertmanager/#delivery-failing
       - alert: AlertmanagerAllInstancesFailing
         expr: |
           min by (cluster, integration) (
-            sum by (cluster, instance, integration) (increase(alertmanager_notifications_failed_total{reason!="contextCanceled"}[1h]))
+            sum by (cluster, instance, integration) (increase(alertmanager_notifications_failed_total{reason!="contextCanceled"}[2h]))
           ) > 0
         labels: { severity: critical, component: alertmanager, tier: "1" }
         annotations:

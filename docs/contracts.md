@@ -143,7 +143,7 @@ Prometheus 和 vmalert 送出的 alert 都帶 `EndsAt`。查詢失敗、ruler �
 
 告警視窗 `≥ 2 × 最大的 group_interval`
 
-失敗要等整輪 flush 結束才計數。`group_interval` 是 30m 時，單一 group 持續失敗的 counter 每 30 分鐘才加 1，`rate(...[5m]) > 0` 加 `for: 5m` 完全抓不到。[^exp-am-window]
+失敗要等整輪 flush 結束才計數。`group_interval` 是 1h 時，單一 group 持續失敗的 counter 每 1 小時才加 1，`rate(...[5m]) > 0` 加 `for: 5m` 完全抓不到。[^exp-am-window]
 
 架構：[Aggregation group](architecture/alertmanager.md#aggregation-group)。
 

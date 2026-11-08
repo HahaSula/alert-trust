@@ -22,7 +22,7 @@ silent_failures:
     evidence: tested
     source: art-am
     refs: [exp-am-smtp]
-  - text: 失敗要整輪 flush 結束才計數；group_interval 30m 時 rate[5m] 寫法完全抓不到。
+  - text: 失敗要整輪 flush 結束才計數；group_interval 1h 時 rate[5m] 寫法完全抓不到。
     evidence: tested
     source: art-am
     refs: [exp-am-window, am-aggr-run]
