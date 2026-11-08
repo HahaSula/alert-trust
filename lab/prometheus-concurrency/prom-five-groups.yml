@@ -1,0 +1,2 @@
+global: { evaluation_interval: 3s }
+rule_files: [/rules/five-groups.yml]

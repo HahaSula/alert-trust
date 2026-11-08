@@ -1,0 +1,6 @@
+v2.51.2 Rate5mFor5m firing_points=0/151
+v2.51.2 Increase1h firing_points=151/151
+v2.51.2 Increase2h firing_points=151/151
+v3.13.5 Rate5mFor5m firing_points=0/151
+v3.13.5 Increase1h firing_points=151/151
+v3.13.5 Increase2h firing_points=151/151

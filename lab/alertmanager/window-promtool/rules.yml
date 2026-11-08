@@ -1,0 +1,11 @@
+groups:
+  - name: window
+    interval: 1m
+    rules:
+      - alert: Rate5mFor5m
+        expr: rate(fails[5m]) > 0
+        for: 5m
+      - alert: Increase1h
+        expr: increase(fails[1h]) > 0
+      - alert: Increase2h
+        expr: increase(fails[2h]) > 0

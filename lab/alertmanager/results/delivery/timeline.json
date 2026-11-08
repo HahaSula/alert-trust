@@ -1,0 +1,893 @@
+[
+ {
+  "0.27.0": {},
+  "0.29.0": {},
+  "0.34.2": {},
+  "t": 1.7
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 7.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 8.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 4.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 4.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 7.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 4.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 8.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 4.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 3.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 8.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 3.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 9.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 4.0
+  },
+  "t": 4.7
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 11.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 12.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 4.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 6.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 11.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 6.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 12.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 4.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 5.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 12.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 5.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 13.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 4.0
+  },
+  "t": 7.7
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 12.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 13.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 4.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 6.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 13.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 6.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 14.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 4.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 7.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 14.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 7.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 15.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 4.0
+  },
+  "t": 10.7
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 14.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 15.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 4.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 7.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 14.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 7.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 15.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 4.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 7.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 15.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 7.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 16.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 4.0
+  },
+  "t": 13.7
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 16.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 17.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 4.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 7.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 15.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 7.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 16.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 4.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 8.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 17.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 8.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 18.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 4.0
+  },
+  "t": 16.7
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 24.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 25.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 7.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 10.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 22.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 10.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 23.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 7.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 11.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 24.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 11.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 25.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 7.0
+  },
+  "t": 19.8
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 27.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 28.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 7.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 12.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 26.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 12.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 27.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 7.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 13.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 28.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 13.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 29.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 7.0
+  },
+  "t": 26.1
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 29.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 30.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 7.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 13.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 28.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 13.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 29.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 7.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 14.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 30.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 14.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 31.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 7.0
+  },
+  "t": 29.1
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 30.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 31.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 7.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 13.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 28.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 13.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 29.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 7.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 15.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 31.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 15.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 32.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 7.0
+  },
+  "t": 32.1
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 32.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 33.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 7.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 14.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 30.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 14.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 31.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 7.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 16.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 32.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 16.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 33.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 1.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 7.0
+  },
+  "t": 35.1
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 40.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 41.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 10.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 17.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 38.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 17.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 39.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 10.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 19.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 40.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 19.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 41.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 10.0
+  },
+  "t": 38.1
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 43.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 44.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 10.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 19.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 41.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 19.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 42.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 10.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 21.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 44.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 21.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 45.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 10.0
+  },
+  "t": 41.1
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 46.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 47.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 10.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 20.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 43.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 20.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 44.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 10.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 22.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 46.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 22.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 47.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 10.0
+  },
+  "t": 44.1
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 47.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 48.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 10.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 21.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 44.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 21.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 45.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 10.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 23.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 48.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 23.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 49.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 10.0
+  },
+  "t": 47.1
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 48.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 49.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 10.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 21.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 45.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 21.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 46.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 10.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 23.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 49.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 23.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 50.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 2.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 2.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 10.0
+  },
+  "t": 50.2
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 55.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 56.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 13.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 25.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 52.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 25.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 53.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 13.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 28.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 58.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 28.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 59.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 13.0
+  },
+  "t": 53.2
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 60.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 61.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 13.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 26.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 56.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 26.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 57.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 13.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 29.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 60.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 29.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 61.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 13.0
+  },
+  "t": 59.5
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 61.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 62.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 13.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 27.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 58.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 27.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 59.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 13.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 30.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 63.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 30.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 64.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 13.0
+  },
+  "t": 62.5
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 62.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 63.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 13.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 28.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 58.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 28.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 59.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 13.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 31.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 64.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 31.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 65.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 13.0
+  },
+  "t": 65.5
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 64.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 65.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 13.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 28.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 60.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 28.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 61.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 13.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 32.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 66.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 32.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 67.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 3.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 3.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 13.0
+  },
+  "t": 68.5
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 71.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 72.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 5.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 16.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 33.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 68.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 33.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 69.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 5.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 5.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 16.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 35.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 75.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 35.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 76.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 5.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 5.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 16.0
+  },
+  "t": 71.5
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 75.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 76.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 5.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 16.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 34.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 71.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 34.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 72.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 5.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 5.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 16.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 37.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 77.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 37.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 78.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 5.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 5.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 16.0
+  },
+  "t": 74.5
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 77.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 78.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 5.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 16.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 35.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 73.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 35.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 74.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 5.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 5.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 16.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 38.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 79.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 38.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 80.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 5.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 5.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 16.0
+  },
+  "t": 77.6
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 78.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 79.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 5.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 16.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 36.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 74.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 36.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 75.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 5.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 5.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 16.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 38.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 80.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 38.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 81.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 5.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 5.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 16.0
+  },
+  "t": 80.6
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 79.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 1.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 80.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 5.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 1.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 16.0
+  },
+  "0.29.0": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 36.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 75.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 36.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 76.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 5.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 5.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 16.0
+  },
+  "0.34.2": {
+   "alertmanager_notification_requests_failed_total{integration=\"email\"}": 39.0,
+   "alertmanager_notification_requests_failed_total{integration=\"webhook\"}": 81.0,
+   "alertmanager_notification_requests_total{integration=\"email\"}": 39.0,
+   "alertmanager_notification_requests_total{integration=\"webhook\"}": 82.0,
+   "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 5.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"other\"}": 4.0,
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"serverError\"}": 4.0,
+   "alertmanager_notifications_total{integration=\"email\"}": 5.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 16.0
+  },
+  "t": 83.6
+ }
+]

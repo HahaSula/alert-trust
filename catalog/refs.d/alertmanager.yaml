@@ -1,0 +1,49 @@
+# Alertmanager 與查詢 slot lab 用到的額外參考。原始碼行號都在對應的 tag 上確認過。
+refs:
+  exp-am-window-promtool:
+    kind: experiment
+    title: "Alertmanager 實驗：G = 1h 模擬序列的 promtool test rules 結果（2.51.2、3.13.5）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/alertmanager/results/window/promtool.txt"
+  exp-am-failed-peers-reset:
+    kind: experiment
+    title: "Alertmanager 實驗：存活實例重啟後 cluster_failed_peers 歸零"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/alertmanager/results/summary.md#ha"
+  exp-prom-slots:
+    kind: experiment
+    title: "Prometheus 實驗：查詢 slot 兩道關卡與 query.timeout（2.55.1、3.13.5）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/prometheus-concurrency/results/summary.md#slots"
+  am027-email-data:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.27.0"
+    file: "notify/email/email.go"
+    line: 241
+    url: "https://github.com/prometheus/alertmanager/blob/v0.27.0/notify/email/email.go#L241"
+  p255-queue-gate1:
+    kind: code
+    project: "Prometheus"
+    version: "v2.55.1"
+    file: "promql/engine.go"
+    line: 474
+    url: "https://github.com/prometheus/prometheus/blob/v2.55.1/promql/engine.go#L474"
+  p255-query-timeout:
+    kind: code
+    project: "Prometheus"
+    version: "v2.55.1"
+    file: "promql/engine.go"
+    line: 621
+    url: "https://github.com/prometheus/prometheus/blob/v2.55.1/promql/engine.go#L621"
+  p255-queue-gate2:
+    kind: code
+    project: "Prometheus"
+    version: "v2.55.1"
+    file: "promql/engine.go"
+    line: 659
+    url: "https://github.com/prometheus/prometheus/blob/v2.55.1/promql/engine.go#L659"
+  p255-queue-ctx-err:
+    kind: code
+    project: "Prometheus"
+    version: "v2.55.1"
+    file: "promql/query_logger.go"
+    line: 223
+    url: "https://github.com/prometheus/prometheus/blob/v2.55.1/promql/query_logger.go#L223"

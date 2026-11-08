@@ -1,0 +1,363 @@
+[
+ {
+  "am1": {
+   "alertmanager_cluster_failed_peers": 0.0,
+   "alertmanager_cluster_members": 2.0,
+   "alertmanager_cluster_peers_left_total": 0.0,
+   "alertmanager_config_hash": 138277982136780.0,
+   "alertmanager_config_last_reload_successful": 1.0,
+   "alertmanager_nflog_snapshot_size_bytes": 0.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 0.0,
+   "healthy": 200,
+   "process_start_time_seconds": 1794149970.09
+  },
+  "am2": {
+   "alertmanager_cluster_failed_peers": 0.0,
+   "alertmanager_cluster_members": 2.0,
+   "alertmanager_cluster_peers_left_total": 0.0,
+   "alertmanager_config_hash": 138277982136780.0,
+   "alertmanager_config_last_reload_successful": 1.0,
+   "alertmanager_nflog_snapshot_size_bytes": 0.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 0.0,
+   "healthy": 200,
+   "process_start_time_seconds": 1794149969.58
+  },
+  "step": "cluster formed",
+  "t": 5.3
+ },
+ {
+  "am1": {
+   "alertmanager_cluster_failed_peers": 0.0,
+   "alertmanager_cluster_members": 2.0,
+   "alertmanager_cluster_peers_left_total": 0.0,
+   "alertmanager_config_hash": 138277982136780.0,
+   "alertmanager_config_last_reload_successful": 1.0,
+   "alertmanager_nflog_snapshot_size_bytes": 0.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 1.0,
+   "healthy": 200,
+   "process_start_time_seconds": 1794149970.09
+  },
+  "am2": {
+   "alertmanager_cluster_failed_peers": 0.0,
+   "alertmanager_cluster_members": 2.0,
+   "alertmanager_cluster_peers_left_total": 0.0,
+   "alertmanager_config_hash": 138277982136780.0,
+   "alertmanager_config_last_reload_successful": 1.0,
+   "alertmanager_nflog_snapshot_size_bytes": 0.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 0.0,
+   "healthy": 200,
+   "process_start_time_seconds": 1794149969.58
+  },
+  "hits": {
+   "a": 1
+  },
+  "step": "HaA sent to both; webhook hits",
+  "t": 20.3
+ },
+ {
+  "am1": {
+   "alertmanager_cluster_failed_peers": 1.0,
+   "alertmanager_cluster_members": 1.0,
+   "alertmanager_cluster_peers_left_total": 1.0,
+   "alertmanager_config_hash": 138277982136780.0,
+   "alertmanager_config_last_reload_successful": 1.0,
+   "alertmanager_nflog_snapshot_size_bytes": 0.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 1.0,
+   "healthy": 200,
+   "process_start_time_seconds": 1794149973.09
+  },
+  "members_inconsistent": {
+   "count": 1,
+   "fires": false,
+   "members": [
+    1.0
+   ]
+  },
+  "step": "am2 stopped +5s",
+  "t": 29.7
+ },
+ {
+  "am1": {
+   "alertmanager_cluster_failed_peers": 1.0,
+   "alertmanager_cluster_members": 1.0,
+   "alertmanager_cluster_peers_left_total": 1.0,
+   "alertmanager_config_hash": 138277982136780.0,
+   "alertmanager_config_last_reload_successful": 1.0,
+   "alertmanager_nflog_snapshot_size_bytes": 0.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 1.0,
+   "healthy": 200,
+   "process_start_time_seconds": 1794149973.09
+  },
+  "members_inconsistent": {
+   "count": 1,
+   "fires": false,
+   "members": [
+    1.0
+   ]
+  },
+  "step": "am2 stopped +10s",
+  "t": 34.7
+ },
+ {
+  "am1": {
+   "alertmanager_cluster_failed_peers": 1.0,
+   "alertmanager_cluster_members": 1.0,
+   "alertmanager_cluster_peers_left_total": 1.0,
+   "alertmanager_config_hash": 138277982136780.0,
+   "alertmanager_config_last_reload_successful": 1.0,
+   "alertmanager_nflog_snapshot_size_bytes": 0.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 1.0,
+   "healthy": 200,
+   "process_start_time_seconds": 1794149973.09
+  },
+  "members_inconsistent": {
+   "count": 1,
+   "fires": false,
+   "members": [
+    1.0
+   ]
+  },
+  "step": "am2 stopped +15s",
+  "t": 39.7
+ },
+ {
+  "am1": {
+   "alertmanager_cluster_failed_peers": 1.0,
+   "alertmanager_cluster_members": 1.0,
+   "alertmanager_cluster_peers_left_total": 1.0,
+   "alertmanager_config_hash": 138277982136780.0,
+   "alertmanager_config_last_reload_successful": 1.0,
+   "alertmanager_nflog_snapshot_size_bytes": 0.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 1.0,
+   "healthy": 200,
+   "process_start_time_seconds": 1794149973.09
+  },
+  "members_inconsistent": {
+   "count": 1,
+   "fires": false,
+   "members": [
+    1.0
+   ]
+  },
+  "step": "am2 stopped +20s",
+  "t": 44.7
+ },
+ {
+  "am1": {
+   "alertmanager_cluster_failed_peers": 1.0,
+   "alertmanager_cluster_members": 1.0,
+   "alertmanager_cluster_peers_left_total": 1.0,
+   "alertmanager_config_hash": 138277982136780.0,
+   "alertmanager_config_last_reload_successful": 1.0,
+   "alertmanager_nflog_snapshot_size_bytes": 0.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 1.0,
+   "healthy": 200,
+   "process_start_time_seconds": 1794149973.09
+  },
+  "members_inconsistent": {
+   "count": 1,
+   "fires": false,
+   "members": [
+    1.0
+   ]
+  },
+  "step": "am2 stopped +25s",
+  "t": 49.7
+ },
+ {
+  "am1": {
+   "alertmanager_cluster_failed_peers": 1.0,
+   "alertmanager_cluster_members": 1.0,
+   "alertmanager_cluster_peers_left_total": 1.0,
+   "alertmanager_config_hash": 138277982136780.0,
+   "alertmanager_config_last_reload_successful": 1.0,
+   "alertmanager_nflog_snapshot_size_bytes": 0.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 1.0,
+   "healthy": 200,
+   "process_start_time_seconds": 1794149976.09
+  },
+  "members_inconsistent": {
+   "count": 1,
+   "fires": false,
+   "members": [
+    1.0
+   ]
+  },
+  "step": "am2 stopped +30s",
+  "t": 58.1
+ },
+ {
+  "am1": {
+   "alertmanager_cluster_failed_peers": 1.0,
+   "alertmanager_cluster_members": 1.0,
+   "alertmanager_cluster_peers_left_total": 1.0,
+   "alertmanager_config_hash": 138277982136780.0,
+   "alertmanager_config_last_reload_successful": 1.0,
+   "alertmanager_nflog_snapshot_size_bytes": 0.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 1.0,
+   "healthy": 200,
+   "process_start_time_seconds": 1794149976.09
+  },
+  "members_inconsistent": {
+   "count": 1,
+   "fires": false,
+   "members": [
+    1.0
+   ]
+  },
+  "step": "am2 stopped +35s",
+  "t": 63.1
+ },
+ {
+  "am1": {
+   "alertmanager_cluster_failed_peers": 1.0,
+   "alertmanager_cluster_members": 1.0,
+   "alertmanager_cluster_peers_left_total": 1.0,
+   "alertmanager_config_hash": 138277982136780.0,
+   "alertmanager_config_last_reload_successful": 1.0,
+   "alertmanager_nflog_snapshot_size_bytes": 0.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 1.0,
+   "healthy": 200,
+   "process_start_time_seconds": 1794149976.09
+  },
+  "members_inconsistent": {
+   "count": 1,
+   "fires": false,
+   "members": [
+    1.0
+   ]
+  },
+  "step": "am2 stopped +40s",
+  "t": 68.1
+ },
+ {
+  "am1": {
+   "alertmanager_cluster_failed_peers": 1.0,
+   "alertmanager_cluster_members": 1.0,
+   "alertmanager_cluster_peers_left_total": 1.0,
+   "alertmanager_config_hash": 138277982136780.0,
+   "alertmanager_config_last_reload_successful": 0.0,
+   "alertmanager_nflog_snapshot_size_bytes": 0.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 1.0,
+   "healthy": 200,
+   "process_start_time_seconds": 1794149976.09
+  },
+  "reload_body": "failed to reload config: undefined receiver \"does-not-exist\" used in route\n",
+  "reload_code": 500,
+  "step": "invalid config reload on am1",
+  "t": 70.2
+ },
+ {
+  "am1": {
+   "alertmanager_cluster_failed_peers": 1.0,
+   "alertmanager_cluster_members": 1.0,
+   "alertmanager_cluster_peers_left_total": 1.0,
+   "alertmanager_config_hash": 138277982136780.0,
+   "alertmanager_config_last_reload_successful": 0.0,
+   "alertmanager_nflog_snapshot_size_bytes": 0.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 2.0,
+   "healthy": 200,
+   "process_start_time_seconds": 1794149976.09
+  },
+  "hits": {
+   "a": 1,
+   "b": 1
+  },
+  "step": "new alert HaB after failed reload (old config should still route it to tag=b)",
+  "t": 78.3
+ },
+ {
+  "am1": {
+   "alertmanager_cluster_failed_peers": 1.0,
+   "alertmanager_cluster_members": 1.0,
+   "alertmanager_cluster_peers_left_total": 1.0,
+   "alertmanager_config_hash": 138277982136780.0,
+   "alertmanager_config_last_reload_successful": 1.0,
+   "alertmanager_nflog_snapshot_size_bytes": 0.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 2.0,
+   "healthy": 200,
+   "process_start_time_seconds": 1794149976.09
+  },
+  "reload_code": 200,
+  "step": "good config reload",
+  "t": 80.4
+ },
+ {
+  "am1": {
+   "alertmanager_cluster_failed_peers": 0.0,
+   "alertmanager_cluster_members": 1.0,
+   "alertmanager_cluster_peers_left_total": 0.0,
+   "alertmanager_config_hash": 138277982136780.0,
+   "alertmanager_config_last_reload_successful": 1.0,
+   "alertmanager_nflog_snapshot_size_bytes": 0.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 0.0,
+   "healthy": 200,
+   "process_start_time_seconds": 1794150054.16
+  },
+  "hits": {
+   "a": 1,
+   "b": 1
+  },
+  "hits_before": {
+   "a": 1,
+   "b": 1
+  },
+  "start_before": 1794149976.09,
+  "step": "am1 restarted with its data volume; HaA/HaB re-sent",
+  "t": 112.6
+ },
+ {
+  "am1": {
+   "alertmanager_cluster_failed_peers": 0.0,
+   "alertmanager_cluster_members": 1.0,
+   "alertmanager_cluster_peers_left_total": 0.0,
+   "alertmanager_config_hash": 138277982136780.0,
+   "alertmanager_config_last_reload_successful": 1.0,
+   "alertmanager_nflog_snapshot_size_bytes": 0.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 2.0,
+   "healthy": 200,
+   "process_start_time_seconds": 1794150086.11
+  },
+  "hits": {
+   "a": 2,
+   "b": 2
+  },
+  "hits_before": {
+   "a": 1,
+   "b": 1
+  },
+  "step": "control: am1 recreated without its data volume; HaA/HaB re-sent",
+  "t": 143.6
+ },
+ {
+  "am1": {
+   "alertmanager_cluster_failed_peers": 0.0,
+   "alertmanager_cluster_members": 2.0,
+   "alertmanager_cluster_peers_left_total": 0.0,
+   "alertmanager_config_hash": 138277982136780.0,
+   "alertmanager_config_last_reload_successful": 1.0,
+   "alertmanager_nflog_snapshot_size_bytes": 0.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 3.0,
+   "healthy": 200,
+   "process_start_time_seconds": 1794150089.11
+  },
+  "am3old": {
+   "alertmanager_cluster_failed_peers": 0.0,
+   "alertmanager_cluster_members": 2.0,
+   "alertmanager_cluster_peers_left_total": 0.0,
+   "alertmanager_config_hash": 138277982136780.0,
+   "alertmanager_config_last_reload_successful": 1.0,
+   "alertmanager_nflog_snapshot_size_bytes": 0.0,
+   "alertmanager_notifications_total{integration=\"webhook\"}": 0.0,
+   "healthy": 200,
+   "process_start_time_seconds": 1794150115.76
+  },
+  "hits": {
+   "a": 2,
+   "b": 2,
+   "c": 1
+  },
+  "step": "mixed cluster 0.34.2 + 0.27.0; HaC sent to both",
+  "t": 178.6
+ }
+]

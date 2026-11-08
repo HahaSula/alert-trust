@@ -22,6 +22,10 @@ silent_failures:
     evidence: tested
     source: art-am
     refs: [exp-am-smtp]
+  - text: 0.27.0 在 SMTP 卡住的連線被斷開時，把沒寄出的信記成成功；0.29.0 起計為 contextDeadlineExceeded。
+    evidence: tested
+    source: art-am
+    refs: [exp-am-smtp]
   - text: 失敗要整輪 flush 結束才計數；group_interval 1h 時 rate[5m] 寫法完全抓不到。
     evidence: tested
     source: art-am
@@ -36,9 +40,8 @@ signals:
     signal: up == 0，加上 absent(up{job=~".*alertmanager.*"})
     metrics: [up]
     evaluate_on: observer
-    evidence: tested
+    evidence: inferred
     source: art-am
-    refs: [exp-am-ha]
     upstream: { status: partial, note: "mixin 只有 ClusterDown 的比例" }
     rules:
       - rules/alertmanager/meta.yml#AlertmanagerScrapeDown
@@ -99,7 +102,7 @@ signals:
   - id: cluster-health
     tier: 2
     question: 叢集一致嗎
-    signal: cluster_failed_peers、成員數、config_hash
+    signal: cluster_failed_peers、成員數、config_hash；存活那台重啟後 failed_peers 會歸零，即使另一台仍停機
     metrics: [alertmanager_cluster_failed_peers, alertmanager_cluster_members, alertmanager_config_hash]
     evaluate_on: observer
     evidence: tested
@@ -118,9 +121,8 @@ signals:
     signal: changes(process_start_time_seconds[15m]) > 2
     metrics: [process_start_time_seconds]
     evaluate_on: observer
-    evidence: tested
+    evidence: inferred
     source: art-am
-    refs: [exp-am-ha]
     upstream: { status: yes }
     rules: [rules/alertmanager/meta.yml#AlertmanagerCrashLooping]
 
@@ -133,9 +135,8 @@ signals:
       - alertmanager_silences_maintenance_errors_total
       - alertmanager_alerts_invalid_total
     evaluate_on: observer
-    evidence: tested
+    evidence: inferred
     source: art-am
-    refs: [exp-am-ha]
     upstream: { status: no }
     rules:
       - rules/alertmanager/meta.yml#AlertmanagerStateSnapshotFailing

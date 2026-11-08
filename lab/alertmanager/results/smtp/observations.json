@@ -1,0 +1,312 @@
+[
+ {
+  "0.27.0": {
+   "healthy": 200,
+   "hits": {
+    "/status/200?tag=hang": 1,
+    "/status/200?tag=other": 1
+   },
+   "hung": 1,
+   "mails": 2,
+   "metrics": {
+    "alertmanager_notification_requests_failed_total{integration=\"email\"}": 2.0,
+    "alertmanager_notification_requests_total{integration=\"email\"}": 2.0,
+    "alertmanager_notification_requests_total{integration=\"webhook\"}": 2.0,
+    "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 2.0,
+    "alertmanager_notifications_total{integration=\"email\"}": 3.0,
+    "alertmanager_notifications_total{integration=\"webhook\"}": 2.0
+   },
+   "ready": 200,
+   "smtp_events": 3
+  },
+  "0.29.0": {
+   "healthy": 200,
+   "hits": {
+    "/status/200?tag=hang": 1,
+    "/status/200?tag=other": 1
+   },
+   "hung": 1,
+   "mails": 2,
+   "metrics": {
+    "alertmanager_notification_requests_failed_total{integration=\"email\"}": 2.0,
+    "alertmanager_notification_requests_total{integration=\"email\"}": 2.0,
+    "alertmanager_notification_requests_total{integration=\"webhook\"}": 2.0,
+    "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 2.0,
+    "alertmanager_notifications_total{integration=\"email\"}": 3.0,
+    "alertmanager_notifications_total{integration=\"webhook\"}": 2.0
+   },
+   "ready": 200,
+   "smtp_events": 3
+  },
+  "0.34.2": {
+   "healthy": 200,
+   "hits": {
+    "/status/200?tag=hang": 1,
+    "/status/200?tag=other": 1
+   },
+   "hung": 1,
+   "mails": 2,
+   "metrics": {
+    "alertmanager_notification_requests_failed_total{integration=\"email\"}": 2.0,
+    "alertmanager_notification_requests_total{integration=\"email\"}": 2.0,
+    "alertmanager_notification_requests_total{integration=\"webhook\"}": 2.0,
+    "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 2.0,
+    "alertmanager_notifications_total{integration=\"email\"}": 3.0,
+    "alertmanager_notifications_total{integration=\"webhook\"}": 2.0
+   },
+   "ready": 200,
+   "smtp_events": 3
+  },
+  "label": "first flush done; Hang group should be stuck in email",
+  "t": 13.6
+ },
+ {
+  "0.27.0": {
+   "healthy": 200,
+   "hits": {
+    "/status/200?tag=hang": 1,
+    "/status/200?tag=other": 1
+   },
+   "hung": 1,
+   "mails": 8,
+   "metrics": {
+    "alertmanager_notification_requests_failed_total{integration=\"email\"}": 8.0,
+    "alertmanager_notification_requests_total{integration=\"email\"}": 8.0,
+    "alertmanager_notification_requests_total{integration=\"webhook\"}": 2.0,
+    "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 8.0,
+    "alertmanager_notifications_total{integration=\"email\"}": 9.0,
+    "alertmanager_notifications_total{integration=\"webhook\"}": 2.0
+   },
+   "ready": 200,
+   "smtp_events": 9
+  },
+  "0.29.0": {
+   "healthy": 200,
+   "hits": {
+    "/status/200?tag=hang": 1,
+    "/status/200?tag=other": 1
+   },
+   "hung": 1,
+   "mails": 8,
+   "metrics": {
+    "alertmanager_notification_requests_failed_total{integration=\"email\"}": 8.0,
+    "alertmanager_notification_requests_total{integration=\"email\"}": 8.0,
+    "alertmanager_notification_requests_total{integration=\"webhook\"}": 2.0,
+    "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 8.0,
+    "alertmanager_notifications_total{integration=\"email\"}": 9.0,
+    "alertmanager_notifications_total{integration=\"webhook\"}": 2.0
+   },
+   "ready": 200,
+   "smtp_events": 9
+  },
+  "0.34.2": {
+   "healthy": 200,
+   "hits": {
+    "/status/200?tag=hang": 1,
+    "/status/200?tag=other": 1
+   },
+   "hung": 1,
+   "mails": 8,
+   "metrics": {
+    "alertmanager_notification_requests_failed_total{integration=\"email\"}": 8.0,
+    "alertmanager_notification_requests_total{integration=\"email\"}": 8.0,
+    "alertmanager_notification_requests_total{integration=\"webhook\"}": 2.0,
+    "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 8.0,
+    "alertmanager_notifications_total{integration=\"email\"}": 9.0,
+    "alertmanager_notifications_total{integration=\"webhook\"}": 2.0
+   },
+   "ready": 200,
+   "smtp_events": 9
+  },
+  "label": "30s after 2nd alert in Hang group",
+  "t": 47.0
+ },
+ {
+  "0.27.0": {
+   "healthy": 200,
+   "hits": {
+    "/status/200?tag=hang": 1,
+    "/status/200?tag=other": 2
+   },
+   "hung": 1,
+   "mails": 14,
+   "metrics": {
+    "alertmanager_notification_requests_failed_total{integration=\"email\"}": 14.0,
+    "alertmanager_notification_requests_total{integration=\"email\"}": 14.0,
+    "alertmanager_notification_requests_total{integration=\"webhook\"}": 3.0,
+    "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 14.0,
+    "alertmanager_notifications_total{integration=\"email\"}": 15.0,
+    "alertmanager_notifications_total{integration=\"webhook\"}": 3.0
+   },
+   "ready": 200,
+   "smtp_events": 15
+  },
+  "0.29.0": {
+   "healthy": 200,
+   "hits": {
+    "/status/200?tag=hang": 1,
+    "/status/200?tag=other": 2
+   },
+   "hung": 1,
+   "mails": 14,
+   "metrics": {
+    "alertmanager_notification_requests_failed_total{integration=\"email\"}": 14.0,
+    "alertmanager_notification_requests_total{integration=\"email\"}": 14.0,
+    "alertmanager_notification_requests_total{integration=\"webhook\"}": 3.0,
+    "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 14.0,
+    "alertmanager_notifications_total{integration=\"email\"}": 15.0,
+    "alertmanager_notifications_total{integration=\"webhook\"}": 3.0
+   },
+   "ready": 200,
+   "smtp_events": 15
+  },
+  "0.34.2": {
+   "healthy": 200,
+   "hits": {
+    "/status/200?tag=hang": 1,
+    "/status/200?tag=other": 2
+   },
+   "hung": 1,
+   "mails": 14,
+   "metrics": {
+    "alertmanager_notification_requests_failed_total{integration=\"email\"}": 14.0,
+    "alertmanager_notification_requests_total{integration=\"email\"}": 14.0,
+    "alertmanager_notification_requests_total{integration=\"webhook\"}": 3.0,
+    "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 14.0,
+    "alertmanager_notifications_total{integration=\"email\"}": 15.0,
+    "alertmanager_notifications_total{integration=\"webhook\"}": 3.0
+   },
+   "ready": 200,
+   "smtp_events": 15
+  },
+  "label": "62s after 2nd alert in Hang group; 32s after new alert in Other group",
+  "t": 82.3
+ },
+ {
+  "0.27.0": {
+   "healthy": 200,
+   "hits": {
+    "/status/200?tag=hang": 2,
+    "/status/200?tag=other": 2
+   },
+   "hung": 2,
+   "mails": 16,
+   "metrics": {
+    "alertmanager_notification_requests_failed_total{integration=\"email\"}": 16.0,
+    "alertmanager_notification_requests_total{integration=\"email\"}": 16.0,
+    "alertmanager_notification_requests_total{integration=\"webhook\"}": 4.0,
+    "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 16.0,
+    "alertmanager_notifications_total{integration=\"email\"}": 18.0,
+    "alertmanager_notifications_total{integration=\"webhook\"}": 4.0
+   },
+   "ready": 200,
+   "smtp_events": 18
+  },
+  "0.29.0": {
+   "healthy": 200,
+   "hits": {
+    "/status/200?tag=hang": 2,
+    "/status/200?tag=other": 2
+   },
+   "hung": 2,
+   "mails": 16,
+   "metrics": {
+    "alertmanager_notification_requests_failed_total{integration=\"email\"}": 16.0,
+    "alertmanager_notification_requests_total{integration=\"email\"}": 16.0,
+    "alertmanager_notification_requests_total{integration=\"webhook\"}": 4.0,
+    "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 16.0,
+    "alertmanager_notifications_total{integration=\"email\"}": 18.0,
+    "alertmanager_notifications_total{integration=\"webhook\"}": 4.0
+   },
+   "ready": 200,
+   "smtp_events": 18
+  },
+  "0.34.2": {
+   "healthy": 200,
+   "hits": {
+    "/status/200?tag=hang": 2,
+    "/status/200?tag=other": 2
+   },
+   "hung": 2,
+   "mails": 16,
+   "metrics": {
+    "alertmanager_notification_requests_failed_total{integration=\"email\"}": 16.0,
+    "alertmanager_notification_requests_total{integration=\"email\"}": 16.0,
+    "alertmanager_notification_requests_total{integration=\"webhook\"}": 4.0,
+    "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 16.0,
+    "alertmanager_notifications_total{integration=\"email\"}": 18.0,
+    "alertmanager_notifications_total{integration=\"webhook\"}": 4.0
+   },
+   "ready": 200,
+   "smtp_events": 18
+  },
+  "label": "6s after reload",
+  "t": 88.4
+ },
+ {
+  "0.27.0": {
+   "healthy": 200,
+   "hits": {
+    "/status/200?tag=hang": 2,
+    "/status/200?tag=other": 2
+   },
+   "hung": 1,
+   "mails": 18,
+   "metrics": {
+    "alertmanager_notification_requests_failed_total{integration=\"email\"}": 18.0,
+    "alertmanager_notification_requests_total{integration=\"email\"}": 20.0,
+    "alertmanager_notification_requests_total{integration=\"webhook\"}": 4.0,
+    "alertmanager_notifications_failed_total{integration=\"email\",reason=\"contextCanceled\"}": 1.0,
+    "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 18.0,
+    "alertmanager_notifications_total{integration=\"email\"}": 22.0,
+    "alertmanager_notifications_total{integration=\"webhook\"}": 4.0
+   },
+   "ready": 200,
+   "smtp_events": 21
+  },
+  "0.29.0": {
+   "healthy": 200,
+   "hits": {
+    "/status/200?tag=hang": 2,
+    "/status/200?tag=other": 2
+   },
+   "hung": 1,
+   "mails": 18,
+   "metrics": {
+    "alertmanager_notification_requests_failed_total{integration=\"email\"}": 20.0,
+    "alertmanager_notification_requests_total{integration=\"email\"}": 20.0,
+    "alertmanager_notification_requests_total{integration=\"webhook\"}": 4.0,
+    "alertmanager_notifications_failed_total{integration=\"email\",reason=\"contextCanceled\"}": 1.0,
+    "alertmanager_notifications_failed_total{integration=\"email\",reason=\"contextDeadlineExceeded\"}": 1.0,
+    "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 18.0,
+    "alertmanager_notifications_total{integration=\"email\"}": 21.0,
+    "alertmanager_notifications_total{integration=\"webhook\"}": 4.0
+   },
+   "ready": 200,
+   "smtp_events": 21
+  },
+  "0.34.2": {
+   "healthy": 200,
+   "hits": {
+    "/status/200?tag=hang": 2,
+    "/status/200?tag=other": 2
+   },
+   "hung": 1,
+   "mails": 18,
+   "metrics": {
+    "alertmanager_notification_requests_failed_total{integration=\"email\"}": 20.0,
+    "alertmanager_notification_requests_total{integration=\"email\"}": 20.0,
+    "alertmanager_notification_requests_total{integration=\"webhook\"}": 4.0,
+    "alertmanager_notifications_failed_total{integration=\"email\",reason=\"contextCanceled\"}": 1.0,
+    "alertmanager_notifications_failed_total{integration=\"email\",reason=\"contextDeadlineExceeded\"}": 1.0,
+    "alertmanager_notifications_failed_total{integration=\"email\",reason=\"other\"}": 18.0,
+    "alertmanager_notifications_total{integration=\"email\"}": 21.0,
+    "alertmanager_notifications_total{integration=\"webhook\"}": 4.0
+   },
+   "ready": 200,
+   "smtp_events": 21
+  },
+  "label": "6s after the fake SMTP closed the hung connections",
+  "t": 94.4
+ }
+]

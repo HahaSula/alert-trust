@@ -1,0 +1,11 @@
+# exp-am-window 實機部分：單一 group 持續失敗（HTTP 400，不重試），group_interval 120s。
+# 等比例縮小原本的情境：group_interval 30m → 120s（÷15），rate[5m] for 5m → rate[20s] for 20s。
+route:
+  receiver: wh-400
+  group_by: [alertname]
+  group_wait: 1s
+  group_interval: 120s
+  repeat_interval: 1h
+receivers:
+  - name: wh-400
+    webhook_configs: [{ url: 'http://fake:8080/status/400' }]

@@ -1,0 +1,9 @@
+am27-1  | ts=2026-11-08T14:57:43.265Z caller=main.go:181 level=info msg="Starting Alertmanager" version="(version=0.27.0, branch=HEAD, revision=0aa3c2aad14cff039931923ab16b26b7481783b5)"
+am27-1  | ts=2026-11-08T14:57:43.265Z caller=main.go:182 level=info build_context="(go=go1.21.7, platform=linux/amd64, user=root@22cd11f671e9, date=20240228-11:51:20, tags=netgo)"
+am27-1  | ts=2026-11-08T14:57:43.287Z caller=coordinator.go:113 level=info component=configuration msg="Loading configuration file" file=/etc/am/am.yml
+am27-1  | ts=2026-11-08T14:57:43.287Z caller=coordinator.go:126 level=info component=configuration msg="Completed loading of configuration file" file=/etc/am/am.yml
+am27-1  | ts=2026-11-08T14:57:43.289Z caller=tls_config.go:313 level=info msg="Listening on" address=[::]:9093
+am27-1  | ts=2026-11-08T14:57:43.289Z caller=tls_config.go:316 level=info msg="TLS is disabled." http2=false address=[::]:9093
+am27-1  | ts=2026-11-08T14:57:50.284Z caller=dispatch.go:353 level=error component=dispatcher msg="Notify for alerts failed" num_alerts=1 err="wh-400/webhook[0]: notify retry canceled due to unrecoverable error after 1 attempts: unexpected status code 400: http://fake:8080/status/400: ok"
+am27-1  | ts=2026-11-08T15:00:03.624Z caller=dispatch.go:353 level=error component=dispatcher msg="Notify for alerts failed" num_alerts=1 err="wh-400/webhook[0]: notify retry canceled due to unrecoverable error after 1 attempts: unexpected status code 400: http://fake:8080/status/400: ok"
+am27-1  | ts=2026-11-08T15:02:16.964Z caller=dispatch.go:353 level=error component=dispatcher msg="Notify for alerts failed" num_alerts=1 err="wh-400/webhook[0]: notify retry canceled due to unrecoverable error after 1 attempts: unexpected status code 400: http://fake:8080/status/400: ok"

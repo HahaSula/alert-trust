@@ -1,0 +1,30 @@
+# exp-am-smtp：SMTP 不回應、模板失敗。group_interval 10s。
+global:
+  smtp_from: am@example.test
+  smtp_require_tls: false
+route:
+  receiver: other
+  group_by: [alertname]
+  group_wait: 1s
+  group_interval: 10s
+  repeat_interval: 1h
+  routes:
+    - { matchers: ['alertname="Hang"'],       receiver: hang }
+    - { matchers: ['alertname="TmplHeader"'], receiver: tmpl-header }
+    - { matchers: ['alertname="TmplBody"'],   receiver: tmpl-body }
+receivers:
+  - name: other
+    webhook_configs: [{ url: 'http://fake:8080/status/200?tag=other' }]
+  - name: hang                     # 同一個 receiver：email（不回應的 SMTP）加 webhook
+    email_configs: [{ to: 'oncall@example.test', smarthost: 'fake:2527' }]
+    webhook_configs: [{ url: 'http://fake:8080/status/200?tag=hang' }]
+  - name: tmpl-header              # 主旨引用不存在的模板
+    email_configs:
+      - to: 'oncall@example.test'
+        smarthost: 'fake:2525'
+        headers: { Subject: '{{ template "does.not.exist" . }}' }
+  - name: tmpl-body                # 內文引用不存在的模板
+    email_configs:
+      - to: 'oncall@example.test'
+        smarthost: 'fake:2525'
+        html: '{{ template "does.not.exist" . }}'

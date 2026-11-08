@@ -1,0 +1,21 @@
+# exp-pend：rule group 執行模式與查詢 slot。每個服務是一台獨立的 Prometheus，沒有 scrape target。
+name: at-am-pend
+x-p255: &p255
+  image: prom/prometheus:v2.55.1
+  volumes: [./rules:/rules:ro, ./prom-one-group.yml:/one.yml:ro, ./prom-five-groups.yml:/five.yml:ro, ./prom-slot.yml:/slot.yml:ro]
+x-p313: &p313
+  <<: *p255
+  image: prom/prometheus:v3.13.5
+services:
+  # A. 一個 group、8 條 rule
+  seq:   { <<: *p255, ports: ["21301:9090"], command: [--config.file=/one.yml] }
+  k4:    { <<: *p255, ports: ["21302:9090"], command: [--config.file=/one.yml, --enable-feature=concurrent-rule-eval, --rules.max-concurrent-evals=4] }
+  k2:    { <<: *p255, ports: ["21303:9090"], command: [--config.file=/one.yml, --enable-feature=concurrent-rule-eval, --rules.max-concurrent-evals=2] }
+  k1:    { <<: *p255, ports: ["21307:9090"], command: [--config.file=/one.yml, --enable-feature=concurrent-rule-eval, --rules.max-concurrent-evals=1] }
+  v3k2:  { <<: *p313, ports: ["21306:9090"], command: [--config.file=/one.yml, --enable-feature=concurrent-rule-eval, --rules.max-concurrent-evals=2] }
+  # B. 五個 group、各 8 條
+  multi:   { <<: *p255, ports: ["21304:9090"], command: [--config.file=/five.yml] }
+  multik2: { <<: *p255, ports: ["21305:9090"], command: [--config.file=/five.yml, --enable-feature=concurrent-rule-eval, --rules.max-concurrent-evals=2] }
+  # C. 查詢 slot：只有 1 個 slot，query.timeout 300ms
+  slot:  { <<: *p255, ports: ["21310:9090"], command: [--config.file=/slot.yml, --query.max-concurrency=1, --query.timeout=300ms], profiles: [slot] }
+  slot3: { <<: *p313, ports: ["21311:9090"], command: [--config.file=/slot.yml, --query.max-concurrency=1, --query.timeout=300ms], profiles: [slot] }

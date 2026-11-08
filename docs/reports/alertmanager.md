@@ -103,7 +103,7 @@ POST /api/v2/alerts → provider/mem → dispatcher → aggregation group → go
 
 ## 4. 長 `group_interval` 帶來什麼
 
-下表用 G 代表 `group_interval`。實驗用 G = 30m，是刻意選的長週期，用來把效果放大。
+下表用 G 代表 `group_interval`。實驗用 G = 1h，是刻意選的長週期，用來把效果放大。
 
 | 情況 | 影響 | 處理 |
 |---|---|---|
@@ -115,15 +115,15 @@ POST /api/v2/alerts → provider/mem → dispatcher → aggregation group → go
 
 ### 告警視窗實測
 
-模擬單一 group 持續失敗，counter 每 30 分鐘加 1，評估 151 個時間點（90–240 分鐘，每分鐘一點）。<span class="at-chip at-ev-tested">實測</span>[^exp-am-window]
+模擬單一 group 持續失敗，counter 每小時加 1，在 180–330 分鐘之間每分鐘評估一次，共 151 個時間點。<span class="at-chip at-ev-tested">實測</span>[^exp-am-window]
 
 | 寫法 | Prometheus 2.51.2 | Prometheus 3.13.5 |
 |---|---|---|
 | `rate(...[5m]) > 0` 加 `for: 5m` | **0／151** | **0／151** |
-| `increase(...[30m]) > 0` | 151／151 | 151／151 |
-| `increase(...[1h]) > 0`（建議，2 × G） | 151／151 | 151／151 |
+| `increase(...[1h]) > 0`（= G，邊界） | 151／151 | 151／151 |
+| `increase(...[2h]) > 0`（建議，2 × G） | 151／151 | 151／151 |
 
-`[30m]` 剛好等於失敗週期，落在邊界上。這次只測整分鐘的時間點，實際 scrape 有抖動，在 3.x 的左開區間下也可能短暫歸零，所以建議用 2 倍的視窗。代價是恢復後告警最多再持續約 2 × G。多個 group 交錯失敗時，短視窗的寫法仍可能觸發，所以它最容易漏掉的就是只有一個 group 在失敗的時候。
+`[1h]` 剛好等於失敗週期，落在邊界上。這次只測整分鐘的時間點，實際 scrape 有抖動，在 3.x 的左開區間下也可能短暫歸零，所以建議用 2 倍的視窗。代價是恢復後告警最多再持續約 2 × G。另外用真實的 Alertmanager 跑了縮小版（G = 120s，0.27.0、0.29.0、0.34.2）：counter 一輪只加 1，`rate[20s]` 加 `for: 20s` 一直停在 pending、從未 firing，`increase[240s]` 一直 firing。[^exp-am-window]多個 group 交錯失敗時，短視窗的寫法仍可能觸發，所以它最容易漏掉的就是只有一個 group 在失敗的時候。
 
 ## 5. 需要設定的告警
 

@@ -1,0 +1,17 @@
+# exp-am-ha：兩台叢集，每個 alertname 一個 group，各自送到不同的 webhook tag 以便計數。
+route:
+  receiver: a
+  group_by: [alertname]
+  group_wait: 1s
+  group_interval: 10s
+  repeat_interval: 1h
+  routes:
+    - { matchers: ['alertname="HaB"'], receiver: b }
+    - { matchers: ['alertname="HaC"'], receiver: c }
+receivers:
+  - name: a
+    webhook_configs: [{ url: 'http://fake:8080/status/200?tag=a' }]
+  - name: b
+    webhook_configs: [{ url: 'http://fake:8080/status/200?tag=b' }]
+  - name: c
+    webhook_configs: [{ url: 'http://fake:8080/status/200?tag=c' }]

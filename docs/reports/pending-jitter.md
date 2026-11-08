@@ -378,12 +378,26 @@ changes(ALERTS_FOR_STATE{alertname="<alertname>"}[30m])
 
 <!-- figure: rule-group-modes -->
 
-**圖 7**　三種情況的時間軸。每格是一條 rule。A、B 的時間與峰值是下方實驗以每條 rule 100 ms 量到的數字；C 是示意，實驗中 5 個 group、每條 400 ms 時全域峰值為 5，每個 group 自己的峰值都是 1，也始終只用同一個 goroutine。[^exp-pend]
+**圖 7**　三種情況的時間軸，每格是一條 rule。**機制**來自原始碼：group 內依序；開 flag 後搶不到 slot 的 rule 不等待，直接在 group 的 goroutine 裡跑。圖上的時間是示意，實機數據見下表。[^p-group-eval][^p255-max-concurrent][^p255-concurrency-ctrl][^exp-pend]
 {: .at-caption }
 
 ### 實驗結果
 
-用 v2.55.1 與 v3.15.1 的原始碼加上測試，把查詢換成固定耗時的假 `QueryFunc`，再記錄同時執行數與 goroutine ID。因為沒有真實的 CPU 與 I/O 競爭，**實際加速幅度會比這裡小**。<span class="at-chip at-ev-tested">實測</span>[^exp-pend]
+**實機**（[`lab/prometheus-concurrency`](https://github.com/HahaSula/alert-trust/tree/main/lab/prometheus-concurrency)，真實的 Prometheus 2.55.1 與 3.13.5，每條 rule 是 `count_over_time(vector(N)[1000s:1ms])`，約 70–200 ms）：<span class="at-chip at-ev-tested">實測</span>[^exp-pend]
+
+| 情境 | 版本與旗標 | group 一輪中位數 | 同時執行峰值（全域） | 每個 group 的峰值 |
+|---|---|---|---|---|
+| 1 group × 8 條 | 2.55.1 預設 | 585 ms | 1 | 1 |
+| 1 group × 8 條 | 2.55.1 開 flag，K = 1 | 458 ms | 2 | 2 |
+| 1 group × 8 條 | 2.55.1 開 flag，K = 2 | 479 ms | 3 | 3 |
+| 1 group × 8 條 | 2.55.1 開 flag，K = 4 | 446 ms | 5 | 5 |
+| 1 group × 8 條 | 3.13.5 開 flag，K = 2 | 340 ms | 3 | 3 |
+| 5 group × 8 條 | 2.55.1 預設 | 665 ms | 4 | 各 1 |
+| 5 group × 8 條 | 2.55.1 開 flag，K = 2 | 487 ms | 5 | 各 3 |
+
+一個 group 內的峰值是 **K + 1**，證實 K 不是硬上限。開了並行之後單條 rule 變慢（同時搶 CPU），group 一輪只縮短約 20–40%，不是 1/(K + 1)。
+
+**參考：原分析的單元測試。**原分析用 v2.55.1 與 v3.15.1 的原始碼加上測試，把查詢換成固定耗時的假 `QueryFunc`，再記錄同時執行數與 goroutine ID。因為沒有真實的 CPU 與 I/O 競爭，**實際加速幅度會比這裡小**（上面的實機數據證實了這點）。這組測試的程式沒有保留，結果只作參考；依賴判斷的差異（後兩列）在 lab 中還沒有重現。<span class="at-chip at-ev-inferred">無法重現</span>
 
 | 情境（每條 rule 100 ms） | v2.55.1 | v3.15.1 |
 |---|---|---|
@@ -422,7 +436,7 @@ changes(ALERTS_FOR_STATE{alertname="<alertname>"}[30m])
 
 <!-- figure: query-slots -->
 
-**圖 8**　一條 rule 的查詢要過兩次同一組 slot，解析完會先釋放，執行時再搶一次。實測 `--query.timeout` 設 300 ms、只有 1 個 slot：在 ② 被佔住時 300 ms 回傳 `context deadline exceeded`；在 ① 被佔住 2 秒時完全不受 timeout 影響，2001 ms 後成功。② 失敗屬於第 3 節的「查詢失敗」，pending 狀態不變。[^p-engine-queue][^exp-pend]
+**圖 8**　**機制**（原始碼）：一條 rule 的查詢要過兩次同一組 slot，解析完會先釋放，執行時再搶一次。**實機數據**（2.55.1、3.13.5，`--query.timeout` 300 ms、只有 1 個 slot）：在 ② 排隊時回傳 `context deadline exceeded`，rule 失敗但 pending 的 `activeAt` 不變；在 ① 排隊 0.5–4.4 秒時不受 timeout 影響，10 次都成功。[^p-engine-queue][^p-maxconc][^exp-pend]
 {: .at-caption }
 
 單一查詢不跨 goroutine，所以預設模式下每個 group 最多佔一個 slot。要估算會不會塞車，可以看平均同時執行的 group 數：

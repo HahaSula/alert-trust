@@ -1,0 +1,2745 @@
+[
+ {
+  "0.27.0": {},
+  "0.29.0": {},
+  "0.34.2": {},
+  "alerts": [],
+  "t": 7.4
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowRate",
+    "am29:9093",
+    "pending"
+   ],
+   [
+    "WindowRate",
+    "am27:9093",
+    "pending"
+   ],
+   [
+    "WindowRate",
+    "am34:9093",
+    "pending"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 12.4
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowRate",
+    "am34:9093",
+    "pending"
+   ],
+   [
+    "WindowRate",
+    "am29:9093",
+    "pending"
+   ],
+   [
+    "WindowRate",
+    "am27:9093",
+    "pending"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ]
+  ],
+  "t": 17.4
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowRate",
+    "am34:9093",
+    "pending"
+   ],
+   [
+    "WindowRate",
+    "am29:9093",
+    "pending"
+   ],
+   [
+    "WindowRate",
+    "am27:9093",
+    "pending"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 22.4
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowRate",
+    "am34:9093",
+    "pending"
+   ],
+   [
+    "WindowRate",
+    "am29:9093",
+    "pending"
+   ],
+   [
+    "WindowRate",
+    "am27:9093",
+    "pending"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 27.4
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 35.8
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ]
+  ],
+  "t": 40.8
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 45.8
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 50.8
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ]
+  ],
+  "t": 55.8
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ]
+  ],
+  "t": 60.9
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 69.2
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 74.2
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 79.3
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 84.3
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 89.3
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 94.3
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 102.6
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 107.6
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 112.7
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 117.7
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 122.7
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 127.7
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 136.0
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 1.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ]
+  ],
+  "t": 141.0
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 146.0
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowRate",
+    "am27:9093",
+    "pending"
+   ],
+   [
+    "WindowRate",
+    "am34:9093",
+    "pending"
+   ],
+   [
+    "WindowRate",
+    "am29:9093",
+    "pending"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ]
+  ],
+  "t": 151.1
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowRate",
+    "am34:9093",
+    "pending"
+   ],
+   [
+    "WindowRate",
+    "am29:9093",
+    "pending"
+   ],
+   [
+    "WindowRate",
+    "am27:9093",
+    "pending"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ]
+  ],
+  "t": 156.1
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowRate",
+    "am34:9093",
+    "pending"
+   ],
+   [
+    "WindowRate",
+    "am29:9093",
+    "pending"
+   ],
+   [
+    "WindowRate",
+    "am27:9093",
+    "pending"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ]
+  ],
+  "t": 161.1
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 169.4
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 174.5
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 179.6
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 184.6
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 189.7
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ]
+  ],
+  "t": 194.7
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 203.0
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 208.0
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 213.1
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 218.1
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 223.1
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 228.1
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ]
+  ],
+  "t": 236.4
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 241.4
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 246.4
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 251.5
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ]
+  ],
+  "t": 256.5
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 261.5
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 269.8
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 2.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 274.8
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowRate",
+    "am29:9093",
+    "pending"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 279.8
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowRate",
+    "am34:9093",
+    "pending"
+   ],
+   [
+    "WindowRate",
+    "am27:9093",
+    "pending"
+   ],
+   [
+    "WindowRate",
+    "am29:9093",
+    "pending"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 284.8
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowRate",
+    "am34:9093",
+    "pending"
+   ],
+   [
+    "WindowRate",
+    "am27:9093",
+    "pending"
+   ],
+   [
+    "WindowRate",
+    "am29:9093",
+    "pending"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 289.9
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowRate",
+    "am29:9093",
+    "pending"
+   ],
+   [
+    "WindowRate",
+    "am34:9093",
+    "pending"
+   ],
+   [
+    "WindowRate",
+    "am27:9093",
+    "pending"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 294.9
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ]
+  ],
+  "t": 303.2
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 308.2
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 313.2
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 318.2
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 323.2
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 328.3
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ]
+  ],
+  "t": 336.6
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 341.6
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 346.6
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ]
+  ],
+  "t": 351.7
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 356.7
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 359.9
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 370.1
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 375.1
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ]
+  ],
+  "t": 380.2
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 385.2
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 390.2
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 393.4
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 403.6
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ]
+  ],
+  "t": 408.6
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 413.6
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ]
+  ],
+  "t": 418.6
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 423.6
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ]
+  ],
+  "t": 432.0
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 437.0
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 442.0
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ]
+  ],
+  "t": 447.0
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 452.0
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ]
+  ],
+  "t": 457.0
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 465.3
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 470.3
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 475.4
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ]
+  ],
+  "t": 480.4
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 485.4
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ]
+  ],
+  "t": 490.4
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ]
+  ],
+  "t": 498.7
+ },
+ {
+  "0.27.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.29.0": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "0.34.2": {
+   "alertmanager_notifications_failed_total{integration=\"webhook\",reason=\"clientError\"}": 3.0
+  },
+  "alerts": [
+   [
+    "WindowIncrease",
+    "am29:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am27:9093",
+    "firing"
+   ],
+   [
+    "WindowIncrease",
+    "am34:9093",
+    "firing"
+   ]
+  ],
+  "t": 503.7
+ }
+]

@@ -1,0 +1,22 @@
+# 每條 rule 都是 count_over_time(vector(N)[1000s:1ms])：子查詢在每 1ms 求一次 vector(N)，約 100 萬步，
+# 在 16 核的 lab 機器上約 70–150 ms。只花 CPU，不需要任何 series。
+groups:
+  - name: g0
+    interval: 3s
+    rules:
+      - record: lab:cost:g0_0
+        expr: count_over_time(vector(1)[1000s:1ms])
+      - record: lab:cost:g0_1
+        expr: count_over_time(vector(2)[1000s:1ms])
+      - record: lab:cost:g0_2
+        expr: count_over_time(vector(3)[1000s:1ms])
+      - record: lab:cost:g0_3
+        expr: count_over_time(vector(4)[1000s:1ms])
+      - record: lab:cost:g0_4
+        expr: count_over_time(vector(5)[1000s:1ms])
+      - record: lab:cost:g0_5
+        expr: count_over_time(vector(6)[1000s:1ms])
+      - record: lab:cost:g0_6
+        expr: count_over_time(vector(7)[1000s:1ms])
+      - record: lab:cost:g0_7
+        expr: count_over_time(vector(8)[1000s:1ms])

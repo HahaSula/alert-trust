@@ -1,0 +1,98 @@
+# 每條 rule 都是 count_over_time(vector(N)[1000s:1ms])：子查詢在每 1ms 求一次 vector(N)，約 100 萬步，
+# 在 16 核的 lab 機器上約 70–150 ms。只花 CPU，不需要任何 series。
+groups:
+  - name: g0
+    interval: 3s
+    rules:
+      - record: lab:cost:g0_0
+        expr: count_over_time(vector(1)[1000s:1ms])
+      - record: lab:cost:g0_1
+        expr: count_over_time(vector(2)[1000s:1ms])
+      - record: lab:cost:g0_2
+        expr: count_over_time(vector(3)[1000s:1ms])
+      - record: lab:cost:g0_3
+        expr: count_over_time(vector(4)[1000s:1ms])
+      - record: lab:cost:g0_4
+        expr: count_over_time(vector(5)[1000s:1ms])
+      - record: lab:cost:g0_5
+        expr: count_over_time(vector(6)[1000s:1ms])
+      - record: lab:cost:g0_6
+        expr: count_over_time(vector(7)[1000s:1ms])
+      - record: lab:cost:g0_7
+        expr: count_over_time(vector(8)[1000s:1ms])
+  - name: g1
+    interval: 3s
+    rules:
+      - record: lab:cost:g1_0
+        expr: count_over_time(vector(1)[1000s:1ms])
+      - record: lab:cost:g1_1
+        expr: count_over_time(vector(2)[1000s:1ms])
+      - record: lab:cost:g1_2
+        expr: count_over_time(vector(3)[1000s:1ms])
+      - record: lab:cost:g1_3
+        expr: count_over_time(vector(4)[1000s:1ms])
+      - record: lab:cost:g1_4
+        expr: count_over_time(vector(5)[1000s:1ms])
+      - record: lab:cost:g1_5
+        expr: count_over_time(vector(6)[1000s:1ms])
+      - record: lab:cost:g1_6
+        expr: count_over_time(vector(7)[1000s:1ms])
+      - record: lab:cost:g1_7
+        expr: count_over_time(vector(8)[1000s:1ms])
+  - name: g2
+    interval: 3s
+    rules:
+      - record: lab:cost:g2_0
+        expr: count_over_time(vector(1)[1000s:1ms])
+      - record: lab:cost:g2_1
+        expr: count_over_time(vector(2)[1000s:1ms])
+      - record: lab:cost:g2_2
+        expr: count_over_time(vector(3)[1000s:1ms])
+      - record: lab:cost:g2_3
+        expr: count_over_time(vector(4)[1000s:1ms])
+      - record: lab:cost:g2_4
+        expr: count_over_time(vector(5)[1000s:1ms])
+      - record: lab:cost:g2_5
+        expr: count_over_time(vector(6)[1000s:1ms])
+      - record: lab:cost:g2_6
+        expr: count_over_time(vector(7)[1000s:1ms])
+      - record: lab:cost:g2_7
+        expr: count_over_time(vector(8)[1000s:1ms])
+  - name: g3
+    interval: 3s
+    rules:
+      - record: lab:cost:g3_0
+        expr: count_over_time(vector(1)[1000s:1ms])
+      - record: lab:cost:g3_1
+        expr: count_over_time(vector(2)[1000s:1ms])
+      - record: lab:cost:g3_2
+        expr: count_over_time(vector(3)[1000s:1ms])
+      - record: lab:cost:g3_3
+        expr: count_over_time(vector(4)[1000s:1ms])
+      - record: lab:cost:g3_4
+        expr: count_over_time(vector(5)[1000s:1ms])
+      - record: lab:cost:g3_5
+        expr: count_over_time(vector(6)[1000s:1ms])
+      - record: lab:cost:g3_6
+        expr: count_over_time(vector(7)[1000s:1ms])
+      - record: lab:cost:g3_7
+        expr: count_over_time(vector(8)[1000s:1ms])
+  - name: g4
+    interval: 3s
+    rules:
+      - record: lab:cost:g4_0
+        expr: count_over_time(vector(1)[1000s:1ms])
+      - record: lab:cost:g4_1
+        expr: count_over_time(vector(2)[1000s:1ms])
+      - record: lab:cost:g4_2
+        expr: count_over_time(vector(3)[1000s:1ms])
+      - record: lab:cost:g4_3
+        expr: count_over_time(vector(4)[1000s:1ms])
+      - record: lab:cost:g4_4
+        expr: count_over_time(vector(5)[1000s:1ms])
+      - record: lab:cost:g4_5
+        expr: count_over_time(vector(6)[1000s:1ms])
+      - record: lab:cost:g4_6
+        expr: count_over_time(vector(7)[1000s:1ms])
+      - record: lab:cost:g4_7
+        expr: count_over_time(vector(8)[1000s:1ms])

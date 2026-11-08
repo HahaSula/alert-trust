@@ -1,0 +1,224 @@
+{
+ "0.27.0": [
+  {
+   "msg": "\r\n",
+   "t": 0.665
+  },
+  {
+   "msg": "Subject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nFrom: am@example.test\r\nMessage-Id: <1794149719036066510.8007654491245463611@b20143154448>\r\nDate: Sun, 08 Nov 2026 14:55:19 +0000\r\nContent-Type: multipart/alternative;  boundary=2775e029ec1a5f96c2ac25d6f2e9d286759c4dfb229a940dd029d159f699\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 0.666
+  },
+  {
+   "msg": "Subject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nFrom: am@example.test\r\nMessage-Id: <1794149732368700633.16646015706967142692@b20143154448>\r\nDate: Sun, 08 Nov 2026 14:55:32 +0000\r\nContent-Type: multipart/alternative;  boundary=3563cff6f80d70cd431110159b6ed8782cfc6514067e572cd11345147607\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 13.999
+  },
+  {
+   "msg": "\r\n",
+   "t": 13.999
+  },
+  {
+   "msg": "\r\n",
+   "t": 24.007
+  },
+  {
+   "msg": "Subject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nFrom: am@example.test\r\nMessage-Id: <1794149742376934872.4317967053839112542@b20143154448>\r\nDate: Sun, 08 Nov 2026 14:55:42 +0000\r\nContent-Type: multipart/alternative;  boundary=5c122b36e216d17d085f5835ca98f7f1b7d743f5949c3cc4ddb37b1eb7a2\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 24.007
+  },
+  {
+   "msg": "\r\n",
+   "t": 34.007
+  },
+  {
+   "msg": "Subject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nFrom: am@example.test\r\nMessage-Id: <1794149752377377107.6547466856045897207@b20143154448>\r\nDate: Sun, 08 Nov 2026 14:55:52 +0000\r\nContent-Type: multipart/alternative;  boundary=f4b80a64f8e54e3bd5ad21f01f8a6a9bfd54f1688be48d11e2f143edcdf0\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 34.008
+  },
+  {
+   "msg": "Subject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nFrom: am@example.test\r\nMessage-Id: <1794149765713115304.8876703838351599786@b20143154448>\r\nDate: Sun, 08 Nov 2026 14:56:05 +0000\r\nContent-Type: multipart/alternative;  boundary=96b471f2dee4955f6eb22b663294641cd05fa42df00a770b3330153d3700\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 47.344
+  },
+  {
+   "msg": "\r\n",
+   "t": 47.344
+  },
+  {
+   "msg": "To: oncall@example.test\r\nFrom: am@example.test\r\nSubject: [FIRING:1] TmplBody \r\nMessage-Id: <1794149775720893952.7752485759548810131@b20143154448>\r\nDate: Sun, 08 Nov 2026 14:56:15 +0000\r\nContent-Type: multipart/alternative;  boundary=aca3b33b44dfb3f6efc94b2914bb1e8734f32bf50eefd3159a8506248e06\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 57.351
+  },
+  {
+   "msg": "\r\n",
+   "t": 57.351
+  },
+  {
+   "msg": "\r\n",
+   "t": 67.352
+  },
+  {
+   "msg": "To: oncall@example.test\r\nFrom: am@example.test\r\nSubject: [FIRING:1] TmplBody \r\nMessage-Id: <1794149785722382767.9863727977150006414@b20143154448>\r\nDate: Sun, 08 Nov 2026 14:56:25 +0000\r\nContent-Type: multipart/alternative;  boundary=0027e06e32e9728366982fc84d633dcabe887ec28dee161a5e60f7065ac0\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 67.353
+  },
+  {
+   "msg": "Subject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nFrom: am@example.test\r\nMessage-Id: <1794149798106244018.9778977896051656380@b20143154448>\r\nDate: Sun, 08 Nov 2026 14:56:38 +0000\r\nContent-Type: multipart/alternative;  boundary=1cf279799046d111f7675eeac0817763311c364f8e9c2a6822e145f38897\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 79.737
+  },
+  {
+   "msg": "\r\n",
+   "t": 79.737
+  },
+  {
+   "msg": "Subject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nFrom: am@example.test\r\nMessage-Id: <1794149808107994095.8193966429594469@b20143154448>\r\nDate: Sun, 08 Nov 2026 14:56:48 +0000\r\nContent-Type: multipart/alternative;  boundary=174612c0ac61107a67af535246f2d5afb2d5e813dc6c4ae236f64a609bc5\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 89.738
+  },
+  {
+   "msg": "\r\n",
+   "t": 89.739
+  }
+ ],
+ "0.29.0": [
+  {
+   "msg": "\r\n",
+   "t": 0.848
+  },
+  {
+   "msg": "Subject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nFrom: am@example.test\r\nMessage-Id: <1794149719035371682.3014411097160842180@bcaa1be5a1f6>\r\nDate: Sun, 08 Nov 2026 14:55:19 +0000\r\nContent-Type: multipart/alternative;  boundary=52fafce666b0d9a6d27e1bc426b0b588e1f4d9efdda03053375154b64e6e\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 0.849
+  },
+  {
+   "msg": "\r\n",
+   "t": 14.182
+  },
+  {
+   "msg": "Subject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nFrom: am@example.test\r\nMessage-Id: <1794149732368802638.8459710043759569501@bcaa1be5a1f6>\r\nDate: Sun, 08 Nov 2026 14:55:32 +0000\r\nContent-Type: multipart/alternative;  boundary=0475c0a029102c0288f55dcb6d96ecd43ed36e9a555632f7f57ce5991de4\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 14.182
+  },
+  {
+   "msg": "\r\n",
+   "t": 24.191
+  },
+  {
+   "msg": "Subject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nFrom: am@example.test\r\nMessage-Id: <1794149742378546646.2615606145689040455@bcaa1be5a1f6>\r\nDate: Sun, 08 Nov 2026 14:55:42 +0000\r\nContent-Type: multipart/alternative;  boundary=f2463ca48281d6f64ce485a66a616843d3a58cebecd5b5b522ea90f3e5ff\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 24.192
+  },
+  {
+   "msg": "Subject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nFrom: am@example.test\r\nMessage-Id: <1794149752377634658.12597211359396770716@bcaa1be5a1f6>\r\nDate: Sun, 08 Nov 2026 14:55:52 +0000\r\nContent-Type: multipart/alternative;  boundary=e896d420fe1247df1b89ae2a00fcecc94d38cdfd4dc9e12cece2f6cba510\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 34.191
+  },
+  {
+   "msg": "\r\n",
+   "t": 34.191
+  },
+  {
+   "msg": "From: am@example.test\r\nSubject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nMessage-Id: <1794149765713845835.4048767469984370674@bcaa1be5a1f6>\r\nDate: Sun, 08 Nov 2026 14:56:05 +0000\r\nContent-Type: multipart/alternative;  boundary=a518e5c915f83b48b7abdf6bda677bf2257c1165ed2d72095d6fa5797b6a\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 47.527
+  },
+  {
+   "msg": "\r\n",
+   "t": 47.527
+  },
+  {
+   "msg": "Subject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nFrom: am@example.test\r\nMessage-Id: <1794149775720794368.5748463917054146698@bcaa1be5a1f6>\r\nDate: Sun, 08 Nov 2026 14:56:15 +0000\r\nContent-Type: multipart/alternative;  boundary=387536adbde4359249a331013292f8da168f177f4a5b31458f69d4342bd8\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 57.534
+  },
+  {
+   "msg": "\r\n",
+   "t": 57.534
+  },
+  {
+   "msg": "\r\n",
+   "t": 67.535
+  },
+  {
+   "msg": "From: am@example.test\r\nSubject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nMessage-Id: <1794149785722305876.12965841429313621224@bcaa1be5a1f6>\r\nDate: Sun, 08 Nov 2026 14:56:25 +0000\r\nContent-Type: multipart/alternative;  boundary=915afc1845147f6d6f296a3d0074019aef01c4c007eeb795083b8cae2edf\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 67.536
+  },
+  {
+   "msg": "\r\n",
+   "t": 79.925
+  },
+  {
+   "msg": "Subject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nFrom: am@example.test\r\nMessage-Id: <1794149798111791052.18434539573367933484@bcaa1be5a1f6>\r\nDate: Sun, 08 Nov 2026 14:56:38 +0000\r\nContent-Type: multipart/alternative;  boundary=d797610f9089b3634b491cff8ca3cb3b7cc2956e1a85e0949c004c7fec61\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 79.925
+  },
+  {
+   "msg": "Subject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nFrom: am@example.test\r\nMessage-Id: <1794149808111681814.15047402724485367796@bcaa1be5a1f6>\r\nDate: Sun, 08 Nov 2026 14:56:48 +0000\r\nContent-Type: multipart/alternative;  boundary=04a3847356864384a92509a1ec5422f1ea14410d854d84d560bcc9394afd\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 89.925
+  },
+  {
+   "msg": "\r\n",
+   "t": 89.925
+  }
+ ],
+ "0.34.2": [
+  {
+   "msg": "\r\n",
+   "t": 1.491
+  },
+  {
+   "msg": "To: oncall@example.test\r\nFrom: am@example.test\r\nSubject: [FIRING:1] TmplBody \r\nMessage-Id: <1794149719036935995.12328536563150995578@4429ceed6029>\r\nDate: Sun, 08 Nov 2026 14:55:19 +0000\r\nContent-Type: multipart/alternative;  boundary=6f5fe3f5b73465e4818db0537f92ebc186a8967efdd08e425b9792aa5453\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 1.492
+  },
+  {
+   "msg": "\r\n",
+   "t": 14.826
+  },
+  {
+   "msg": "From: am@example.test\r\nSubject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nMessage-Id: <1794149732371561324.6996347648502598865@4429ceed6029>\r\nDate: Sun, 08 Nov 2026 14:55:32 +0000\r\nContent-Type: multipart/alternative;  boundary=f07189654fa17ca7d0739d34d74f7518ead098e90bcb4e1cf3ef8f4a8fe4\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 14.826
+  },
+  {
+   "msg": "\r\n",
+   "t": 24.828
+  },
+  {
+   "msg": "Subject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nFrom: am@example.test\r\nMessage-Id: <1794149742373643241.893265664108850729@4429ceed6029>\r\nDate: Sun, 08 Nov 2026 14:55:42 +0000\r\nContent-Type: multipart/alternative;  boundary=e417381cf23bd7ab34860c5038c054e592d52af5e278ab2ad574cda5bae1\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 24.828
+  },
+  {
+   "msg": "\r\n",
+   "t": 34.828
+  },
+  {
+   "msg": "From: am@example.test\r\nSubject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nMessage-Id: <1794149752374982701.12850588983293848775@4429ceed6029>\r\nDate: Sun, 08 Nov 2026 14:55:52 +0000\r\nContent-Type: multipart/alternative;  boundary=481998e88f7dfd290f4c3e3f71e96d8daa4a9146c27e5a52c325edb4da2c\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 34.831
+  },
+  {
+   "msg": "\r\n",
+   "t": 48.165
+  },
+  {
+   "msg": "Subject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nFrom: am@example.test\r\nMessage-Id: <1794149765711108857.5570032800643021005@4429ceed6029>\r\nDate: Sun, 08 Nov 2026 14:56:05 +0000\r\nContent-Type: multipart/alternative;  boundary=db986593a2de82a9fda64ca3e5b8dde07657c0860b4ece35e84ce51a5b3f\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 48.166
+  },
+  {
+   "msg": "From: am@example.test\r\nSubject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nMessage-Id: <1794149775718627569.17326145973966180603@4429ceed6029>\r\nDate: Sun, 08 Nov 2026 14:56:15 +0000\r\nContent-Type: multipart/alternative;  boundary=a911dd7a506ae809f4373111254584d79d01fb182e2edca52efd093d3235\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 58.174
+  },
+  {
+   "msg": "\r\n",
+   "t": 58.174
+  },
+  {
+   "msg": "\r\n",
+   "t": 68.174
+  },
+  {
+   "msg": "Subject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nFrom: am@example.test\r\nMessage-Id: <1794149785719615846.9164354973661485428@4429ceed6029>\r\nDate: Sun, 08 Nov 2026 14:56:25 +0000\r\nContent-Type: multipart/alternative;  boundary=59be782c3622b07435effc35cb991ce5beb1c855b4484177e351ffff3e79\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 68.174
+  },
+  {
+   "msg": "\r\n",
+   "t": 80.574
+  },
+  {
+   "msg": "Subject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nFrom: am@example.test\r\nMessage-Id: <1794149798119203932.13595314654827043288@4429ceed6029>\r\nDate: Sun, 08 Nov 2026 14:56:38 +0000\r\nContent-Type: multipart/alternative;  boundary=0cde499093342ec2c65c6e31cae5a1aff40522b7ba9c7969e316e7ad9cfd\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 80.574
+  },
+  {
+   "msg": "Subject: [FIRING:1] TmplBody \r\nTo: oncall@example.test\r\nFrom: am@example.test\r\nMessage-Id: <1794149808118622133.10520639482456174252@4429ceed6029>\r\nDate: Sun, 08 Nov 2026 14:56:48 +0000\r\nContent-Type: multipart/alternative;  boundary=31a61014e9d59b27b6bf486c84e03c7770c2c168ce9667e87fc8cb06ac01\r\nMIME-Version: 1.0\r\n\r\n",
+   "t": 90.573
+  },
+  {
+   "msg": "\r\n",
+   "t": 90.574
+  }
+ ]
+}

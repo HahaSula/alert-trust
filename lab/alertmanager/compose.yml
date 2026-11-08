@@ -1,0 +1,26 @@
+# exp-am-delivery、exp-am-smtp、exp-am-window：三個版本各一台 Alertmanager 配一個假接收端，彼此隔離。
+# AM_CONFIG 指向要用的設定檔（configs/ 底下），由 run.sh 設定。
+name: at-am-single
+x-fake: &fake
+  image: python:3.12.7-alpine
+  command: [python3, -u, /fake.py]
+  volumes: [./fake.py:/fake.py:ro]
+x-am: &am
+  command: [--config.file=/etc/am/am.yml, --storage.path=/alertmanager, --cluster.listen-address=]
+  volumes: ["${AM_CONFIG:-./configs/delivery.yml}:/etc/am/am.yml:ro"]
+services:
+  fake27: { <<: *fake, networks: { n27: { aliases: [fake] } }, ports: ["21080:8080"] }
+  fake29: { <<: *fake, networks: { n29: { aliases: [fake] } }, ports: ["21081:8080"] }
+  fake34: { <<: *fake, networks: { n34: { aliases: [fake] } }, ports: ["21082:8080"] }
+  am27: { <<: *am, image: "prom/alertmanager:v0.27.0", networks: [n27], ports: ["21093:9093"] }
+  am29: { <<: *am, image: "prom/alertmanager:v0.29.0", networks: [n29], ports: ["21094:9093"] }
+  am34: { <<: *am, image: "prom/alertmanager:v0.34.2", networks: [n34], ports: ["21095:9093"] }
+  # exp-am-window：抓三台的 metric，每 1s 一次
+  prom:
+    image: prom/prometheus:v3.13.5
+    command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.path=/prometheus]
+    volumes: [./configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro, ./configs/window-rules.yml:/etc/prometheus/window-rules.yml:ro]
+    networks: [n27, n29, n34]
+    ports: ["21090:9090"]
+    profiles: [window]
+networks: { n27: {}, n29: {}, n34: {} }

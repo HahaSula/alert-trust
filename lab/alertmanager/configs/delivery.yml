@@ -1,0 +1,27 @@
+# exp-am-delivery：每種失敗各一個 group；group_interval 縮短到 15s 以便觀察。
+global:
+  smtp_smarthost: fake:2526      # DATA 結尾回 554
+  smtp_from: am@example.test
+  smtp_require_tls: false
+route:
+  receiver: wh-ok
+  group_by: [alertname]
+  group_wait: 1s
+  group_interval: 15s
+  repeat_interval: 1h
+  routes:
+    - { matchers: ['alertname="Wh400"'],     receiver: wh-400 }
+    - { matchers: ['alertname="Wh500"'],     receiver: wh-500 }
+    - { matchers: ['alertname="WhRefused"'], receiver: wh-refused }
+    - { matchers: ['alertname="Mail554"'],   receiver: mail-554 }
+receivers:
+  - name: wh-ok
+    webhook_configs: [{ url: 'http://fake:8080/status/200' }]
+  - name: wh-400
+    webhook_configs: [{ url: 'http://fake:8080/status/400' }]
+  - name: wh-500
+    webhook_configs: [{ url: 'http://fake:8080/status/500' }]
+  - name: wh-refused
+    webhook_configs: [{ url: 'http://fake:9/refused' }]
+  - name: mail-554
+    email_configs: [{ to: 'oncall@example.test' }]

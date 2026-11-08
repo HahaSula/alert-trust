@@ -1,0 +1,8 @@
+# 查詢 slot 實驗用：一條便宜、永遠成立的 alert，for 很長，所以會一直停在 pending。
+groups:
+  - name: slot
+    interval: 1s
+    rules:
+      - alert: SlotProbe
+        expr: count_over_time(vector(1)[2s:10ms]) > 0
+        for: 1h

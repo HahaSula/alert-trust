@@ -1,0 +1,11 @@
+global: { scrape_interval: 1s, evaluation_interval: 5s }
+rule_files: [/etc/prometheus/window-rules.yml]
+scrape_configs:
+  - job_name: alertmanager
+    static_configs:
+      - targets: ['am27:9093']
+        labels: { version: "0.27.0" }
+      - targets: ['am29:9093']
+        labels: { version: "0.29.0" }
+      - targets: ['am34:9093']
+        labels: { version: "0.34.2" }

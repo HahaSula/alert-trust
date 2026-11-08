@@ -1,0 +1,9 @@
+# 等比例縮小：group_interval 120s。
+groups:
+  - name: window
+    rules:
+      - alert: WindowRate            # 對應 rate(...[5m]) > 0 for: 5m
+        expr: rate(alertmanager_notifications_failed_total{integration="webhook",reason="clientError"}[20s]) > 0
+        for: 20s
+      - alert: WindowIncrease        # 對應 increase(...[2 × group_interval]) > 0
+        expr: increase(alertmanager_notifications_failed_total{integration="webhook",reason="clientError"}[240s]) > 0

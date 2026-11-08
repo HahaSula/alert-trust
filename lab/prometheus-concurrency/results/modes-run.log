@@ -1,0 +1,7 @@
+{"case": "seq", "desc": "2.55.1 預設，1 group × 8 條", "rule_evals": 96, "rule_ms_median": 74, "group_ms_median": 585, "group_iterations": 12, "peak_global": 1, "peak_per_group": {"g0": 1}}
+{"case": "k1", "desc": "2.55.1 concurrent-rule-eval，K=1，1 group × 8 條", "rule_evals": 96, "rule_ms_median": 103, "group_ms_median": 458, "group_iterations": 12, "peak_global": 2, "peak_per_group": {"g0": 2}}
+{"case": "k2", "desc": "2.55.1 concurrent-rule-eval，K=2，1 group × 8 條", "rule_evals": 96, "rule_ms_median": 160, "group_ms_median": 479, "group_iterations": 12, "peak_global": 3, "peak_per_group": {"g0": 3}}
+{"case": "k4", "desc": "2.55.1 concurrent-rule-eval，K=4，1 group × 8 條", "rule_evals": 96, "rule_ms_median": 203, "group_ms_median": 446, "group_iterations": 12, "peak_global": 5, "peak_per_group": {"g0": 5}}
+{"case": "v3k2", "desc": "3.13.5 concurrent-rule-eval，K=2，1 group × 8 條", "rule_evals": 96, "rule_ms_median": 108, "group_ms_median": 340, "group_iterations": 12, "peak_global": 3, "peak_per_group": {"g0": 3}}
+{"case": "multi", "desc": "2.55.1 預設，5 group × 8 條", "rule_evals": 477, "rule_ms_median": 76, "group_ms_median": 665, "group_iterations": 60, "peak_global": 4, "peak_per_group": {"g0": 1, "g1": 1, "g2": 1, "g3": 1, "g4": 1}}
+{"case": "multik2", "desc": "2.55.1 concurrent-rule-eval，K=2，5 group × 8 條", "rule_evals": 475, "rule_ms_median": 103, "group_ms_median": 487, "group_iterations": 59, "peak_global": 5, "peak_per_group": {"g0": 3, "g1": 3, "g2": 3, "g3": 3, "g4": 3}}

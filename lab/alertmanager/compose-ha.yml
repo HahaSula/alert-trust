@@ -1,0 +1,32 @@
+# exp-am-ha：兩台 0.34.2 組成叢集；mixed profile 再加一台 0.27.0。設定目錄由 ha_lab.py 準備在 .run/。
+name: at-am-ha
+x-am: &am
+  image: prom/alertmanager:v0.34.2
+  command:
+    - --config.file=/etc/am/am.yml
+    - --storage.path=/alertmanager
+    - --cluster.listen-address=0.0.0.0:9094
+    - --cluster.peer=am1:9094
+    - --cluster.peer=am2:9094
+services:
+  fake:
+    image: python:3.12.7-alpine
+    command: [python3, -u, /fake.py]
+    volumes: [./fake.py:/fake.py:ro]
+    ports: ["21180:8080"]
+  am1:
+    <<: *am
+    volumes: [./.run/am1:/etc/am:ro, am1data:/alertmanager]
+    ports: ["21193:9093"]
+  am2:
+    <<: *am
+    volumes: [./.run/am2:/etc/am:ro, am2data:/alertmanager]
+    ports: ["21194:9093"]
+  am3old:
+    <<: *am
+    image: prom/alertmanager:v0.27.0
+    command: [--config.file=/etc/am/am.yml, --storage.path=/alertmanager, --cluster.listen-address=0.0.0.0:9094, --cluster.peer=am1:9094]
+    volumes: [./.run/am2:/etc/am:ro]
+    ports: ["21195:9093"]
+    profiles: [mixed]
+volumes: { am1data: {}, am2data: {} }

@@ -1,0 +1,7 @@
+am34-1  | time=2026-11-08T14:57:42.748Z level=INFO source=app.go:194 msg="Starting Alertmanager" version="(version=0.34.2, branch=HEAD, revision=e8349048265ccc0871c3d0d668b05eacc68baf50)"
+am34-1  | time=2026-11-08T14:57:42.748Z level=INFO source=app.go:196 msg="Build context" build_context="(go=go1.26.10, platform=linux/amd64, user=root@bb54f2fc4768, date=20261029-09:50:10, tags=netgo)"
+am34-1  | time=2026-11-08T14:57:42.786Z level=INFO source=tls_config.go:372 msg="Listening on" address=[::]:9093
+am34-1  | time=2026-11-08T14:57:42.786Z level=INFO source=tls_config.go:375 msg="TLS is disabled." http2=false address=[::]:9093
+am34-1  | time=2026-11-08T14:57:50.287Z level=ERROR source=dispatch.go:589 msg="Notify for alerts failed" component=dispatcher aggrGroup="{}:{alertname=\"Wh400\"}" num_alerts=1 err="wh-400/webhook[0]: notify retry canceled due to unrecoverable error after 1 attempts: unexpected status code 400: ok"
+am34-1  | time=2026-11-08T15:00:03.627Z level=ERROR source=dispatch.go:589 msg="Notify for alerts failed" component=dispatcher aggrGroup="{}:{alertname=\"Wh400\"}" num_alerts=1 err="wh-400/webhook[0]: notify retry canceled due to unrecoverable error after 1 attempts: unexpected status code 400: ok"
+am34-1  | time=2026-11-08T15:02:16.966Z level=ERROR source=dispatch.go:589 msg="Notify for alerts failed" component=dispatcher aggrGroup="{}:{alertname=\"Wh400\"}" num_alerts=1 err="wh-400/webhook[0]: notify retry canceled due to unrecoverable error after 1 attempts: unexpected status code 400: ok"

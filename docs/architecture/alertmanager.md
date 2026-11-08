@@ -56,4 +56,5 @@ Reload 時設定有效就停掉舊的 dispatcher 和 inhibitor，進行中的通
 
 - **每個 ruler 都要直接送給每一台 Alertmanager。**Alert 本身不會 gossip，中間不要放負載平衡。
 - 每台都跑完整流程，靠等待和 nflog 去重：第 N 順位先等 N × `--cluster.peer-timeout`（預設 15s）再查 nflog。[^am-peertimeout][^am-wait]
+- `alertmanager_cluster_failed_peers` 在存活那台重啟後會歸零，即使另一台仍停機，所以 peer 停機要同時看 `up == 0`。<span class="at-chip at-ev-tested">實測</span>[^exp-am-ha]
 - 它偏向重複，不偏向遺漏。Gossip 中斷時各台都會送，叢集分裂的症狀通常是重複通知。
