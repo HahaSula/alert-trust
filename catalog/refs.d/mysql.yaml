@@ -1,0 +1,154 @@
+# MySQL／MariaDB 目標頁與 mysqld_exporter 卡的參考。行號已用 tag 上的檔案核對。
+# 原始碼：mysqld_exporter v0.21.0、MySQL 8.4.7、MariaDB 11.4.13（和實驗用的映像同版）。
+refs:
+  my-default-collectors:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "config/config.go"
+    line: 182
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/config/config.go#L182"
+  my-global-status-re:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/global_status.go"
+    line: 38
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/global_status.go#L38"
+  my-global-status-skip:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/global_status.go"
+    line: 138
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/global_status.go#L138"
+  my-global-variables-parse:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/global_variables.go"
+    line: 171
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/global_variables.go#L171"
+  my-parse-status:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/collector.go"
+    line: 46
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/collector.go#L46"
+  my-parse-connecting:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/collector.go"
+    line: 54
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/collector.go#L54"
+  my-slave-queries:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/slave_status.go"
+    line: 35
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/slave_status.go#L35"
+  my-slave-skip:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/slave_status.go"
+    line: 139
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/slave_status.go#L139"
+  my-heartbeat-query:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/heartbeat.go"
+    line: 36
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/heartbeat.go#L36"
+  my-innodb-trx-query:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/info_schema_innodb_trx.go"
+    line: 28
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/info_schema_innodb_trx.go#L28"
+  my-innodb-metrics-enabled:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/info_schema_innodb_metrics.go"
+    line: 44
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/info_schema_innodb_metrics.go#L44"
+  my-innodb-metrics-name:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/info_schema_innodb_metrics.go"
+    line: 174
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/info_schema_innodb_metrics.go#L174"
+  my-processlist-query:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/info_schema_processlist.go"
+    line: 30
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/info_schema_processlist.go#L30"
+  my-sys-user-summary:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/sys_user_summary.go"
+    line: 24
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/sys_user_summary.go#L24"
+  my-mysql-user-maxconn:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/mysql_user.go"
+    line: 90
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/mysql_user.go#L90"
+  my-applier-worker:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/perf_schema_replication_applier_status_by_worker.go"
+    line: 25
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/perf_schema_replication_applier_status_by_worker.go#L25"
+  mysql-sbs-null:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/rpl_replica.cc"
+    line: 3566
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/rpl_replica.cc#L3566"
+  mysql-sbs-compute:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/rpl_replica.cc"
+    line: 3598
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/rpl_replica.cc#L3598"
+  mysql-conn-reserved:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/conn_handler/connection_handler_manager.cc"
+    line: 109
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/conn_handler/connection_handler_manager.cc#L109"
+  mariadb-innodb-deadlocks:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 944
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/handler/ha_innodb.cc#L944"
+  mariadb-conn-errors:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sql_connect.cc"
+    line: 1579
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sql_connect.cc#L1579"
+  exp-mysql-ha:
+    kind: experiment
+    title: "MySQL 8.4／MariaDB 11.4 實驗：replication 中斷、延遲、failover、連線打滿、長交易"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/mysql/ha/results/run-20261108.md"

@@ -4,7 +4,7 @@ kind: target
 family: database
 status: draft
 stages: [source]
-versions_checked: ["mysqld_exporter 0.21.0", "MariaDB 11.4"]
+versions_checked: ["mysqld_exporter 0.21.0", "MariaDB 11.4.13", "MySQL 8.4.7"]
 architecture: architecture/exporters.md
 role: >-
   Exporter 有三層「活著」：Prometheus 抓得到 exporter（up）、exporter 連得到資料庫（mysql_up）、
@@ -12,6 +12,8 @@ role: >-
   而是整組消失，所以用 != 1 或 == 0 寫的規則會回傳空。
   MySQL 與 MariaDB 用同一張卡；只適用其中一種、或只在 replication、Galera、/probe 模式下才有的訊號用 applies_when 標示。
   規則範例在 rules/targets/mysql.yml，job="mysql" 是佔位符。
+  訊號分四組（aspect 欄位）：exporter（它真的在量嗎）、stability（穩定）、usage（使用）、ha（replication 與角色）。
+  資料庫本身該監控什麼、每個訊號由哪個 collector 提供、需要什麼權限，整理在 docs/targets/mysql.md。
 
 silent_failures:
   - text: >-
@@ -82,6 +84,68 @@ silent_failures:
       可能超過 README 建議的 MAX_USER_CONNECTIONS 3，mysql_up 間歇變 0，而且只在其中一台 Prometheus 上看得到。
     evidence: inferred
     source: mysqld-exporter-readme
+  - text: >-
+      連線數打滿 max_connections 時，exporter 一般帳號也收到 Error 1040，mysql_up 變 0、threads_connected 消失，
+      「連線數 / max_connections > 0.8」這類規則在最需要時回傳空；只有 mysql_up 規則與事後的
+      connection_errors_total{error="max_connections"} 看得到。
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, mysql-conn-reserved]
+  - text: >-
+      給 exporter CONNECTION_ADMIN 可以用保留的那一條連線（max_connections + 1），mysql_up 回到 1，
+      但 exporter 預設開兩條連線，第二條仍被拒，MySQL 上有 7 個 collector（含 global_variables）失敗，max_connections 跟著消失。
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, mysql-conn-reserved]
+  - text: >-
+      IO thread 停止、SQL thread 追完時 Seconds_Behind 是 NULL，exporter 不輸出；heartbeat 延遲同時持續變大。
+      只看 Seconds_Behind 的延遲規則在 replica 斷線時安靜。
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, mysql-sbs-null]
+  - text: >-
+      heartbeat 寫入程式若是 primary 上的 EVENT，failover 後在新 primary 上是 SLAVESIDE_DISABLED，heartbeat 停住；
+      寫入程式要跟著 primary 角色走（例如 pt-heartbeat 由 HA 工具啟動）。
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha]
+  - text: >-
+      靜態的 role="primary" label 在 failover 後指向舊節點，MySQLPrimaryReadOnly 之類的規則查不到任何東西；
+      舊 primary 回來時兩台都可寫，只有從 metric 推角色的規則（MySQLMultipleWritable）看得到。
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha]
+  - text: >-
+      gtid_executed、gtid_binlog_pos 是字串，global_variables 解析失敗就跳過；在 replica 上誤寫造成的 errant GTID
+      沒有任何 metric 會變。gtid_mode 的 ON_PERMISSIVE、OFF_PERMISSIVE 也一樣被跳過。
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-global-variables-parse, my-global-status-skip]
+  - text: >-
+      Semi-sync 等 ACK 逾時後退回 async，commit 照常成功，只有 rpl_semi_sync_*_status 從 1 變 0。
+      MariaDB 內建 semi-sync，沒開時 status 也是 0，所以 status == 0 一定要和 enabled == 1 一起看。
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha]
+  - text: >-
+      同一個 InnoDB 計數器在兩種資料庫的 metric 名稱不同：deadlock 在 MySQL 是 mysql_info_schema_innodb_metrics_lock_lock_deadlocks_total，
+      在 MariaDB 是 ..._lock_deadlocks（沒有 _total）；MySQL 沒有 Innodb_deadlocks、Innodb_history_list_length 這兩個 status，
+      只寫一種名稱的規則在另一種資料庫上回傳空。
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-innodb-metrics-name]
+  - text: >-
+      MariaDB 預設 performance_schema=OFF，sys.user_summary 與 perf_schema.* collector 回報成功但沒有任何 series；
+      perf_schema.replication_applier_status_by_worker 在 MariaDB 直接失敗（表不存在）。
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha]
+  - text: >-
+      innodb_trx collector 在沒有交易時不輸出任何 series（不是 0），沒開 collector 和「沒有長交易」看起來一樣；
+      要靠 collector_success 確認它在跑。
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-innodb-trx-query]
 
 contracts:
   - scrape-within-interval
@@ -89,7 +153,9 @@ contracts:
   - exporter-deadline
 
 signals:
+  # ---------- Exporter：它真的在量嗎 ----------
   - id: exporter-up
+    aspect: exporter
     tier: 1
     question: Exporter 抓得到嗎
     signal: up{job="mysql"} == 0，加上 absent(up{job="mysql"})；不能只靠 mysql_up
@@ -103,6 +169,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLExporterDown, rules/targets/mysql.yml#MySQLExporterMissing]
 
   - id: db-up
+    aspect: exporter
     tier: 1
     question: Exporter 連得到資料庫嗎
     signal: mysql_up == 0（只代表連線與 ping 成功，不代表查詢或寫入可用）
@@ -115,6 +182,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLNotReachable]
 
   - id: collectors-present
+    aspect: exporter
     tier: 1
     question: Exporter 有回應，collector 的結果還在嗎
     signal: up == 1 但 mysql_exporter_collector_success 完全沒有 series
@@ -128,6 +196,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLCollectorsMissing]
 
   - id: collector-success
+    aspect: exporter
     tier: 1
     question: 關鍵 collector 都成功嗎
     signal: mysql_exporter_collector_success == 0；權限不足、表不存在（例如 heartbeat）時會變 0
@@ -140,37 +209,8 @@ signals:
     upstream: { status: no, note: "mixin 與 awesome 都沒有" }
     rules: [rules/targets/mysql.yml#MySQLCollectorFailed]
 
-  - id: replication-running
-    tier: 1
-    question: Replication thread 在跑嗎
-    signal: 新舊名稱一起比對：{__name__=~"mysql_slave_status_(slave|replica)_(io|sql)_running"} 取最小值 == 0
-    metrics:
-      - mysql_slave_status_slave_io_running
-      - mysql_slave_status_slave_sql_running
-      - mysql_slave_status_replica_io_running
-      - mysql_slave_status_replica_sql_running
-    evaluate_on: self
-    applies_when: replication
-    evidence: code
-    source: mysqld-exporter-slave-status
-    upstream: { status: partial, note: "mixin 與 awesome 只寫 slave_*，MySQL 8.4 的 replica_* 不會響" }
-    rules: [rules/targets/mysql.yml#MySQLReplicationNotRunning]
-
-  - id: replica-status-present
-    tier: 1
-    question: Replica 的狀態資料還在嗎
-    signal: 一小時前有 *_sql_running、現在沒有，且 mysql_up == 1；長期作法是用 role label 標出 replica，再用 absent
-    metrics: [mysql_slave_status_slave_sql_running, mysql_slave_status_replica_sql_running, mysql_up]
-    evaluate_on: self
-    applies_when: replication
-    silent_failure: 權限被收回、RESET REPLICA ALL、升版改名時，所有 replication 規則同時回傳空
-    evidence: tested
-    source: art-mysql
-    refs: [exp-mysql]
-    upstream: { status: no }
-    rules: [rules/targets/mysql.yml#MySQLReplicaStatusMissing]
-
   - id: probe-blast-radius
+    aspect: exporter
     tier: 1
     question: 多 target 模式下是 exporter 壞還是資料庫壞
     signal: 同一個 job 超過一半的 up 同時是 0；另外用一個 job 抓 exporter 自己的 /metrics
@@ -183,6 +223,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLProbeExporterDown]
 
   - id: exporter-grants
+    aspect: exporter
     tier: 1
     question: Exporter 帳號的權限與連線上限夠嗎
     signal: >-
@@ -198,6 +239,7 @@ signals:
     rules: []
 
   - id: collector-set
+    aspect: exporter
     tier: 2
     question: 回報的 collector 數量有沒有變少
     signal: count(mysql_exporter_collector_success) 比一小時前少；搭配盤點每種資料庫應有的 collector 清單
@@ -209,6 +251,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLCollectorSetShrunk]
 
   - id: scrape-budget
+    aspect: exporter
     tier: 2
     question: Scrape 來得及在 timeout 內完成嗎
     signal: >-
@@ -225,6 +268,7 @@ signals:
     contract: exporter-deadline
 
   - id: db-up-flapping
+    aspect: exporter
     tier: 2
     question: mysql_up 有沒有間歇掉下來
     signal: changes(mysql_up[15m]) > 2；常見原因是連線數超過 MAX_USER_CONNECTIONS 或 max_connections
@@ -235,13 +279,286 @@ signals:
     upstream: { status: no }
     rules: [rules/targets/mysql.yml#MySQLUpFlapping]
 
+  # ---------- 穩定：資料庫自己會不會停、卡住、進救援模式 ----------
+  - id: restarts
+    aspect: stability
+    tier: 3
+    question: 資料庫重啟過或在救援模式嗎
+    signal: >-
+      uptime < 300（crash、OOM kill、手動重啟都會歸零）；innodb_force_recovery != 0。
+      停機短於 MySQLNotReachable 的 for 時只有 uptime 看得出來；OOM 的原因要看 kernel log 或容器事件，exporter 看不到
+    metrics: [mysql_global_status_uptime, mysql_global_variables_innodb_force_recovery]
+    evaluate_on: self
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha]
+    upstream: { status: yes, note: "awesome 用 uptime < 60，短於一個 scrape 週期加 for 時容易漏" }
+    rules: [rules/targets/mysql.yml#MySQLRestarted, rules/targets/mysql.yml#MySQLInnoDBForceRecovery]
+
+  - id: disk-space
+    aspect: stability
+    tier: 2
+    question: 資料目錄與 binlog 的磁碟還夠嗎
+    signal: >-
+      node_exporter 看資料目錄所在的檔案系統剩餘比例；binlog 用量用 --collect.binlog_size。
+      磁碟滿時 MySQL 不回錯誤，寫入卡住、每分鐘重試一次並寫 error log，所以 mysql_up 仍是 1
+    metrics: [node_filesystem_avail_bytes, node_filesystem_size_bytes, mysql_binlog_size_bytes]
+    evaluate_on: self
+    silent_failure: mysqld_exporter 沒有任何磁碟用量的 metric；寫入卡住時 up、mysql_up 都正常，threads_running 慢慢變高
+    evidence: upstream
+    source: mysql-full-disk
+    upstream: { status: no, note: "mixin 與 awesome 都沒有；要靠 node_exporter 的通用磁碟規則，且要知道資料目錄在哪個掛載點" }
+    rules: [rules/targets/mysql.yml#MySQLDataDiskFilling]
+
+  - id: long-transactions
+    aspect: stability
+    tier: 2
+    question: 有沒有開太久的交易
+    signal: >-
+      max(mysql_info_schema_innodb_trx_oldest_transaction_age_seconds) > 300。
+      要 --collect.info_schema.innodb_trx（預設關）與 PROCESS；沒有交易時這個 metric 整個不存在，不是 0
+    metrics: [mysql_info_schema_innodb_trx_oldest_transaction_age_seconds, mysql_info_schema_innodb_trx_transactions]
+    evaluate_on: self
+    silent_failure: 沒有 PROCESS 時只看得到自己的交易；沒開 collector 時沒有任何訊號
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-innodb-trx-query]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有長交易規則" }
+    rules: [rules/targets/mysql.yml#MySQLLongTransaction]
+
+  - id: undo-history
+    aspect: stability
+    tier: 2
+    question: Undo history 有沒有被擋住無法 purge
+    signal: >-
+      MariaDB 用 global status 的 Innodb_history_list_length（預設就有）；
+      MySQL 沒有這個 status，只能用 innodb_metrics 的 trx_rseg_history_len（要開 collector 與 PROCESS）。兩者用 or 合併
+    metrics:
+      - mysql_global_status_innodb_history_list_length
+      - mysql_info_schema_innodb_metrics_transaction_trx_rseg_history_len
+    evaluate_on: self
+    applies_when: "MariaDB 預設可用；MySQL 要 --collect.info_schema.innodb_metrics"
+    silent_failure: MySQL 上沒開 innodb_metrics 時規則回傳空；交易結束後 MySQL 的 history 不會馬上降（實驗中結束後仍是 500）
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, mariadb-innodb-deadlocks]
+    upstream: { status: partial, note: "awesome 只寫 innodb_metrics 的名稱，MySQL 沒開 collector 時不會響" }
+    rules: [rules/targets/mysql.yml#MySQLInnoDBHistoryLength]
+
+  - id: deadlocks
+    aspect: stability
+    tier: 3
+    question: Deadlock 變多了嗎
+    signal: >-
+      MariaDB：mysql_global_status_innodb_deadlocks（預設就有）。
+      MySQL：只有 innodb_metrics 的 lock_deadlocks，metric 名稱在 MySQL 是 ..._lock_deadlocks_total，
+      在 MariaDB 是 ..._lock_deadlocks（沒有 _total），因為兩邊回報的計數器類型不同
+    metrics:
+      - mysql_global_status_innodb_deadlocks
+      - mysql_info_schema_innodb_metrics_lock_lock_deadlocks_total
+    evaluate_on: self
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-innodb-metrics-name, mariadb-innodb-deadlocks]
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLDeadlocks]
+
+  # ---------- 使用：連線、鎖、快取與暫存表 ----------
+  - id: connections
+    aspect: usage
+    tier: 3
+    question: 連線數接近上限了嗎
+    signal: >-
+      threads_connected / max_connections > 0.8；threads_running / max_connections > 0.6；
+      真的被拒絕時看 connection_errors_total{error="max_connections"} 的增加量（滿載當下 exporter 自己也被擋，
+      這個計數要等連線降下來才抓得到）
+    metrics:
+      - mysql_global_status_threads_connected
+      - mysql_global_status_threads_running
+      - mysql_global_variables_max_connections
+      - mysql_global_status_connection_errors_total
+      - mysql_global_status_max_used_connections
+    evaluate_on: self
+    silent_failure: 連線打滿時 exporter 一般帳號也連不上，mysql_up 變 0、threads_connected 消失，比例規則回傳空，只剩 MySQLNotReachable
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, mysql-conn-reserved, mariadb-conn-errors]
+    upstream: { status: partial, note: "awesome 有比例規則，沒有被拒絕的計數，也沒提到打滿時規則回傳空" }
+    rules:
+      - rules/targets/mysql.yml#MySQLTooManyConnections
+      - rules/targets/mysql.yml#MySQLHighThreadsRunning
+      - rules/targets/mysql.yml#MySQLConnectionsRefused
+
+  - id: user-connection-limits
+    aspect: usage
+    tier: 3
+    question: 個別帳號快碰到 MAX_USER_CONNECTIONS 了嗎
+    signal: >-
+      sys.user_summary 的 current_connections 除以 mysql.user 的 max_user_connections（> 0 的才算）。
+      兩個 collector 都預設關；帳號 label 一個叫 user、一個叫 mysql_user，要 label_replace。
+      超過上限的連線算進 Aborted_connects，不算進 Connection_errors_*
+    metrics: [mysql_sys_current_connections, mysql_mysql_max_user_connections, mysql_global_status_aborted_connects]
+    evaluate_on: self
+    applies_when: "MySQL（performance_schema 預設開）；MariaDB 要先開 performance_schema"
+    silent_failure: MariaDB 預設 performance_schema=OFF，sys.user_summary 回報成功但沒有任何 series
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-sys-user-summary, my-mysql-user-maxconn]
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLUserConnectionLimit]
+
+  - id: lock-waits
+    aspect: usage
+    tier: 3
+    question: 有很多 session 在等鎖嗎
+    signal: >-
+      InnoDB row lock：innodb_row_lock_current_waits（預設就有）。
+      Metadata lock（DDL 卡住）不在任何 status 變數裡，只能從 processlist collector 的
+      state="waiting_for_table_metadata_lock" 看到（預設關，要 PROCESS）
+    metrics:
+      - mysql_global_status_innodb_row_lock_current_waits
+      - mysql_global_status_innodb_row_lock_time
+      - mysql_info_schema_processlist_threads
+    evaluate_on: self
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-processlist-query]
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLRowLockWaits]
+
+  - id: slow-queries
+    aspect: usage
+    tier: 3
+    question: 有新的慢查詢嗎
+    signal: >-
+      increase(slow_queries[5m]) > 0。Slow_queries 依 long_query_time（預設 10 秒）計數，不管 slow log 有沒有開；
+      要知道是哪個查詢，用 perf_schema.eventsstatements（預設關）或 slow log
+    metrics: [mysql_global_status_slow_queries]
+    evaluate_on: self
+    evidence: upstream
+    source: mysql-status-vars
+    upstream: { status: yes }
+    rules: [rules/targets/mysql.yml#MySQLSlowQueries]
+
+  - id: innodb-pressure
+    aspect: usage
+    tier: 3
+    question: InnoDB 在等磁碟或等 buffer pool 嗎
+    signal: rate(innodb_log_waits) > 10；rate(innodb_buffer_pool_wait_free) > 0 持續 15 分鐘
+    metrics:
+      - mysql_global_status_innodb_log_waits
+      - mysql_global_status_innodb_buffer_pool_wait_free
+      - mysql_global_status_buffer_pool_pages
+    evaluate_on: self
+    evidence: code
+    source: mysqld-exporter-src
+    refs: [my-global-status-re]
+    upstream: { status: partial, note: "mixin 有 log waits；buffer pool wait_free 沒有規則" }
+    rules: [rules/targets/mysql.yml#MySQLInnoDBLogWaits, rules/targets/mysql.yml#MySQLBufferPoolWaitFree]
+
+  - id: tmp-tables
+    aspect: usage
+    tier: 3
+    question: 暫存表常常落到磁碟嗎
+    signal: rate(created_tmp_disk_tables) / rate(created_tmp_tables) > 0.25
+    metrics: [mysql_global_status_created_tmp_disk_tables, mysql_global_status_created_tmp_tables]
+    evaluate_on: self
+    evidence: upstream
+    source: mysql-status-vars
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLTmpDiskTables]
+
+  - id: table-open-cache
+    aspect: usage
+    tier: 3
+    question: table_open_cache 夠用嗎
+    signal: rate(table_open_cache_overflows) > 1；也可看 table_open_cache_misses 與 opened_tables 的增加速度
+    metrics:
+      - mysql_global_status_table_open_cache_overflows
+      - mysql_global_status_table_open_cache_misses
+      - mysql_global_status_opened_tables
+    evaluate_on: self
+    evidence: upstream
+    source: mysql-status-vars
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLTableOpenCacheOverflows]
+
+  - id: aborted-connects
+    aspect: usage
+    tier: 3
+    question: 連線建立失敗變多了嗎
+    signal: >-
+      rate(aborted_connects) > 1；包含密碼錯、超過 MAX_USER_CONNECTIONS、握手逾時。
+      max_connections 被拒在 MariaDB 也會加 Aborted_connects，原因細分看 connection_errors_total{error}
+    metrics: [mysql_global_status_aborted_connects, mysql_global_status_aborted_clients, mysql_global_status_connection_errors_total]
+    evaluate_on: self
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, mariadb-conn-errors]
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLAbortedConnects]
+
+  # ---------- HA：replication、角色、semi-sync、Galera ----------
+  - id: replication-running
+    aspect: ha
+    tier: 1
+    question: Replication thread 在跑嗎
+    signal: >-
+      新舊名稱一起比對：{__name__=~"mysql_slave_status_(slave|replica)_(io|sql)_running"} 取最小值 == 0。
+      IO thread 在重連（Connecting）時 exporter 也輸出 0
+    metrics:
+      - mysql_slave_status_slave_io_running
+      - mysql_slave_status_slave_sql_running
+      - mysql_slave_status_replica_io_running
+      - mysql_slave_status_replica_sql_running
+    evaluate_on: self
+    applies_when: replication
+    silent_failure: IO 或 SQL thread 停止時 Seconds_Behind 是 NULL、metric 消失，只看延遲的規則不會響
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-parse-connecting, mysql-sbs-null]
+    upstream: { status: partial, note: "mixin 與 awesome 只寫 slave_*，MySQL 8.4 的 replica_* 不會響" }
+    rules: [rules/targets/mysql.yml#MySQLReplicationNotRunning]
+
+  - id: replication-error
+    aspect: ha
+    tier: 2
+    question: Replication 是因為錯誤停下的嗎
+    signal: >-
+      mysql_slave_status_last_sql_errno > 0（例如 1062 重複鍵）。SQL thread 因錯誤停下時不會自己恢復，
+      要人處理；errno 讓告警直接帶出原因。錯誤訊息文字（Last_SQL_Error）是字串，exporter 不輸出
+    metrics: [mysql_slave_status_last_sql_errno, mysql_slave_status_last_io_errno]
+    evaluate_on: self
+    applies_when: replication
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-slave-skip]
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLReplicationError]
+
+  - id: replica-status-present
+    aspect: ha
+    tier: 1
+    question: Replica 的狀態資料還在嗎
+    signal: 一小時前有 *_sql_running、現在沒有，且 mysql_up == 1；長期作法是用 role label 標出 replica，再用 absent
+    metrics: [mysql_slave_status_slave_sql_running, mysql_slave_status_replica_sql_running, mysql_up]
+    evaluate_on: self
+    applies_when: replication
+    silent_failure: 權限被收回、RESET REPLICA ALL（升級成 primary）、升版改名時，所有 replication 規則同時回傳空
+    evidence: tested
+    source: art-mysql
+    refs: [exp-mysql, exp-mysql-ha]
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLReplicaStatusMissing]
+
   - id: replication-lag
+    aspect: ha
     tier: 2
     question: Replication 延遲量的是真的嗎
     signal: >-
       用 heartbeat 表（--collect.heartbeat，pt-heartbeat 格式）：now - stored > 30。
-      Seconds_Behind 在長交易時凍結、SQL thread 停止時消失，只當輔助。
-      heartbeat 在 primary 上也會變大，代表寫入程式停了
+      Seconds_Behind 只在 IO 與 SQL thread 都在跑時有值，IO thread 停了而 SQL 追完時是 NULL，只當輔助。
+      heartbeat 在每台都會變大時，代表 primary 上的寫入程式停了，不是 replica 延遲
     metrics:
       - mysql_heartbeat_now_timestamp_seconds
       - mysql_heartbeat_stored_timestamp_seconds
@@ -250,17 +567,56 @@ signals:
       - mysql_slave_status_sql_delay
     evaluate_on: self
     applies_when: replication
-    evidence: code
-    source: mysqld-mixin
+    silent_failure: >-
+      IO thread 停止時 Seconds_Behind 消失，heartbeat 卻持續變大；
+      failover 後若寫入程式是 primary 上的 EVENT，它在升級的 replica 上是停用的，heartbeat 從此停住
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-heartbeat-query, mysql-sbs-null, mysql-sbs-compute]
     upstream: { status: partial, note: "mixin 有 MySQLHeartbeatLag 與 MySQLReplicationLag；後者只用 seconds_behind_master" }
     rules: [rules/targets/mysql.yml#MySQLHeartbeatLag, rules/targets/mysql.yml#MySQLReplicationLag]
 
+  - id: replica-read-only
+    aspect: ha
+    tier: 2
+    question: Replica 擋得住寫入嗎
+    signal: >-
+      正在複製的節點 read_only == 0，或 MySQL 的 super_read_only == 0。
+      MariaDB 沒有 super_read_only（有 READ ONLY ADMIN 權限的帳號可以繞過 read_only）
+    metrics: [mysql_global_variables_read_only, mysql_global_variables_super_read_only]
+    evaluate_on: self
+    applies_when: replication
+    silent_failure: 在 replica 上寫入時 replication 照常；要等 primary 寫到同一筆資料才會 1062 停下，MySQL 還會多出 primary 沒有的 GTID
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha]
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLReplicaWritable]
+
+  - id: role-detection
+    aspect: ha
+    tier: 2
+    question: 每個叢集剛好有一台可寫的 primary 嗎
+    signal: >-
+      從 metric 推角色：可寫（read_only == 0）且沒有 slave_status series 的就是 primary。
+      每個 cluster 數量 == 0 代表沒有 primary，> 1 代表 failover 後舊 primary 回來、兩邊都能寫。
+      cluster 是要自己加的 label；靜態的 role label 在 failover 後就是錯的
+    metrics: [mysql_global_variables_read_only, mysql_slave_status_replica_sql_running, mysql_slave_status_slave_sql_running, mysql_up]
+    evaluate_on: self
+    applies_when: replication
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha]
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLNoWritablePrimary, rules/targets/mysql.yml#MySQLMultipleWritable]
+
   - id: primary-writable
+    aspect: ha
     tier: 2
     question: Primary 寫得進去嗎
     signal: >-
       標成 primary 的節點 read_only == 1；mysql_up 只做 ping，真正的寫入要外部探測
-      （例如應用層或 heartbeat 寫入程式自己回報）
+      （例如應用層或 heartbeat 寫入程式自己回報）。role label 要跟著 failover 更新，否則改用 role-detection
     metrics: [mysql_global_variables_read_only]
     evaluate_on: self
     applies_when: replication
@@ -269,7 +625,48 @@ signals:
     upstream: { status: no }
     rules: [rules/targets/mysql.yml#MySQLPrimaryReadOnly]
 
+  - id: gtid-consistency
+    aspect: ha
+    tier: 2
+    question: Replica 有沒有 primary 沒有的交易（errant GTID）
+    signal: >-
+      exporter 看不到：gtid_executed、gtid_purged（MySQL）與 gtid_binlog_pos、gtid_slave_pos（MariaDB）都是字串，
+      global_variables 解析失敗就跳過；gtid_mode 只有 ON／OFF 會輸出 1／0，ON_PERMISSIVE、OFF_PERMISSIVE 也被跳過。
+      要另外跑查詢：MySQL 用 GTID_SUBSET(replica 的 gtid_executed, primary 的 gtid_executed)，
+      MariaDB 比對 replica 的 gtid_binlog_pos 是否出現 replica 自己的 server_id。failover 前一定要檢查
+    metrics: [mysql_global_variables_gtid_mode, mysql_global_variables_enforce_gtid_consistency, mysql_global_variables_gtid_strict_mode]
+    evaluate_on: external
+    applies_when: "GTID replication"
+    silent_failure: 在 replica 上寫一筆（暫時關 super_read_only）後，GTID_SUBSET 變 0，但 exporter 沒有任何 metric 改變
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-global-variables-parse]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有；Orchestrator 等 HA 工具自己會檢查" }
+    rules: []
+
+  - id: semi-sync
+    aspect: ha
+    tier: 3
+    question: Semi-sync 有沒有退回 async
+    signal: >-
+      rpl_semi_sync_master_status（MariaDB 內建、MySQL 8.4 是 rpl_semi_sync_source_status，要先裝 plugin）== 0
+      且 enabled == 1。等 ACK 逾時後 commit 照常成功，只有這個狀態變 0
+    metrics:
+      - mysql_global_status_rpl_semi_sync_master_status
+      - mysql_global_status_rpl_semi_sync_source_status
+      - mysql_global_variables_rpl_semi_sync_master_enabled
+      - mysql_global_variables_rpl_semi_sync_source_enabled
+    evaluate_on: self
+    applies_when: semi-sync replication
+    silent_failure: MySQL 沒裝 plugin 時這組 metric 不存在；MariaDB 沒開 semi-sync 時 status 也是 0，所以一定要和 enabled 一起看
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha]
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLSemiSyncDegraded]
+
   - id: galera-state
+    aspect: ha
     tier: 3
     question: Galera 節點可以服務嗎
     signal: >-
@@ -284,55 +681,6 @@ signals:
     applies_when: mariadb galera
     evidence: tested
     source: art-mysql
-    refs: [exp-mysql]
+    refs: [exp-mysql, exp-mysql-ha]
     upstream: { status: partial, note: "mixin 與 awesome 有，但沒用 wsrep_on 過濾，普通 MariaDB 會誤報" }
     rules: [rules/targets/mysql.yml#MySQLGaleraNotReady, rules/targets/mysql.yml#MySQLGaleraOutOfSync]
-
-  - id: connections
-    tier: 3
-    question: 連線數接近上限了嗎
-    signal: threads_connected / max_connections > 0.8；threads_running / max_connections > 0.6
-    metrics:
-      - mysql_global_status_threads_connected
-      - mysql_global_status_threads_running
-      - mysql_global_variables_max_connections
-    evaluate_on: self
-    evidence: upstream
-    source: awesome
-    upstream: { status: yes, note: "awesome 有兩條" }
-    rules: [rules/targets/mysql.yml#MySQLTooManyConnections, rules/targets/mysql.yml#MySQLHighThreadsRunning]
-
-  - id: innodb-pressure
-    tier: 3
-    question: InnoDB 在等磁碟或累積 undo 嗎
-    signal: rate(innodb_log_waits) > 10；rseg_history_len > 50000（要 innodb_metrics collector 與 PROCESS）
-    metrics:
-      - mysql_global_status_innodb_log_waits
-      - mysql_info_schema_innodb_metrics_transaction_trx_rseg_history_len
-    evaluate_on: self
-    evidence: upstream
-    source: awesome
-    upstream: { status: yes, note: "mixin 有 log waits；awesome 兩條都有" }
-    rules: [rules/targets/mysql.yml#MySQLInnoDBLogWaits, rules/targets/mysql.yml#MySQLInnoDBHistoryLength]
-
-  - id: slow-queries
-    tier: 3
-    question: 有新的慢查詢嗎
-    signal: increase(slow_queries[5m]) > 0；細節看 perf_schema.eventsstatements（預設關閉）
-    metrics: [mysql_global_status_slow_queries]
-    evaluate_on: self
-    evidence: upstream
-    source: awesome
-    upstream: { status: yes }
-    rules: [rules/targets/mysql.yml#MySQLSlowQueries]
-
-  - id: restarts
-    tier: 3
-    question: 資料庫重啟過或在救援模式嗎
-    signal: uptime < 300；innodb_force_recovery != 0
-    metrics: [mysql_global_status_uptime, mysql_global_variables_innodb_force_recovery]
-    evaluate_on: self
-    evidence: upstream
-    source: awesome
-    upstream: { status: yes, note: "awesome 用 uptime < 60，短於一個 scrape 週期加 for 時容易漏" }
-    rules: [rules/targets/mysql.yml#MySQLRestarted, rules/targets/mysql.yml#MySQLInnoDBForceRecovery]

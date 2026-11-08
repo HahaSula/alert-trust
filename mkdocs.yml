@@ -69,6 +69,8 @@ nav:
       - Target：資料庫:
           - MySQL／MariaDB: components/mysqld_exporter.md
           - PostgreSQL: components/postgres_exporter.md
+  - Target 怎麼監控:
+      - MySQL／MariaDB: targets/mysql.md
   - 內部架構:
       - 總覽：單序點對照: architecture/index.md
       - Prometheus: architecture/prometheus.md

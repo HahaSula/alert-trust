@@ -1,6 +1,6 @@
 # mysqld_exporter＋MySQL／MariaDB 的建議規則。放在抓這個 exporter 的 Prometheus 上評估。
 # job="mysql" 是佔位符，請換成實際的 job 名稱；多 target（/probe）模式下 instance 是資料庫位址。
-# 其他佔位符：role="primary"（要自己用 relabel 加上）、scrape 耗時門檻 8 秒（假設 scrape_timeout 10s）。
+# 其他佔位符：role="primary" 與 cluster（要自己用 relabel 加上）、node_exporter 的 job="node" 與 mountpoint、scrape 耗時門檻 8 秒（假設 scrape_timeout 10s）。
 # 門檻以 scrape 30s 為基準，請依環境調整。
 # Replication 規則同時比對舊欄位名（slave_*、seconds_behind_master，MariaDB 與 MySQL 8.0）
 # 和新欄位名（replica_*、seconds_behind_source，MySQL 8.4 只剩 SHOW REPLICA STATUS）。
@@ -99,8 +99,19 @@ groups:
         for: 2m
         labels: { severity: critical, component: mysqld_exporter, tier: "1" }
         annotations:
-          summary: "Replication IO 或 SQL thread 停止；Seconds_Behind 這時是 NULL，延遲規則回傳空"
+          summary: "Replication IO 或 SQL thread 停止（IO 在 Connecting 也算 0）；Seconds_Behind 這時消失，延遲規則回傳空"
           runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#replication-running
+          absence_covered_by: "MySQLReplicaStatusMissing"
+      - alert: MySQLReplicationError
+        expr: |
+          max by (instance, channel_name, connection_name) (
+            mysql_slave_status_last_sql_errno{job="mysql"}
+          ) > 0
+        for: 1m
+        labels: { severity: critical, component: mysqld_exporter, tier: "2" }
+        annotations:
+          summary: "Replica 的 SQL thread 因錯誤 {{ $value }} 停下（例如 1062 重複鍵），要人處理，不會自己恢復"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#replication-error
       - alert: MySQLReplicaStatusMissing
         expr: |
           (
@@ -112,7 +123,7 @@ groups:
         for: 5m
         labels: { severity: critical, component: mysqld_exporter, tier: "1" }
         annotations:
-          summary: "一小時前是 replica，現在沒有 replica 狀態；權限被收回、RESET REPLICA ALL 或升版改了欄位名，所有 replication 規則回傳空"
+          summary: "一小時前是 replica，現在沒有 replica 狀態；權限被收回、RESET REPLICA ALL（升級成 primary）或升版改了欄位名，所有 replication 規則回傳空"
           runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#replica-status-present
       - alert: MySQLHeartbeatLag
         expr: |
@@ -121,7 +132,7 @@ groups:
         for: 2m
         labels: { severity: critical, component: mysqld_exporter, tier: "2" }
         annotations:
-          summary: "Heartbeat 表超過 30 秒沒更新；replica 延遲，或 primary 上的 heartbeat 寫入程式停了"
+          summary: "Heartbeat 表超過 30 秒沒更新；replica 延遲、IO thread 停了，或 primary 上的 heartbeat 寫入程式停了（這時每台都會響）"
           runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#replication-lag
       - alert: MySQLReplicationLag
         expr: |
@@ -132,15 +143,71 @@ groups:
         for: 2m
         labels: { severity: warning, component: mysqld_exporter, tier: "2" }
         annotations:
-          summary: "Seconds_Behind 扣掉 SQL_Delay 超過 30 秒；這個值在長交易時會凍結，SQL thread 停止時消失"
+          summary: "Seconds_Behind 扣掉 SQL_Delay 超過 30 秒；IO thread 或 SQL thread 停止時這個值消失，只能當輔助"
           runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#replication-lag
+
+  - name: mysql-ha
+    rules:
       - alert: MySQLPrimaryReadOnly
         expr: mysql_global_variables_read_only{job="mysql", role="primary"} == 1
         for: 2m
         labels: { severity: critical, component: mysqld_exporter, tier: "2" }
         annotations:
-          summary: "標成 primary 的節點是 read_only，寫入會失敗，但 up 與 mysql_up 都是 1"
+          summary: "標成 primary 的節點是 read_only，寫入會失敗，但 up 與 mysql_up 都是 1；role 是靜態 label，failover 後要跟著改"
           runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#primary-writable
+      - alert: MySQLReplicaWritable
+        expr: |
+          (
+            mysql_global_variables_read_only{job="mysql"} == 0
+              or mysql_global_variables_super_read_only{job="mysql"} == 0
+          )
+          and on (instance) count by (instance) ({__name__=~"mysql_slave_status_(slave|replica)_sql_running", job="mysql"})
+        for: 5m
+        labels: { severity: warning, component: mysqld_exporter, tier: "2" }
+        annotations:
+          summary: "正在複製的節點可以寫入（read_only=0，或 MySQL 的 super_read_only=0）；寫進去的資料會和 primary 衝突，GTID 也會多出 primary 沒有的交易"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#replica-read-only
+      - alert: MySQLNoWritablePrimary
+        expr: |
+          count by (cluster) (mysql_up{job="mysql"} == 1)
+            unless on (cluster)
+          count by (cluster) (
+            mysql_global_variables_read_only{job="mysql"} == 0
+              unless on (instance) {__name__=~"mysql_slave_status_(slave|replica)_sql_running", job="mysql"}
+          )
+          unless on (cluster) count by (cluster) (mysql_up{job="mysql"} == 0)
+        for: 2m
+        labels: { severity: critical, component: mysqld_exporter, tier: "2" }
+        annotations:
+          summary: "叢集 {{ $labels.cluster }} 所有節點都連得上，卻沒有任何可寫、且不是 replica 的節點；有節點連不上時交給 MySQLNotReachable（連線打滿時 read_only 會消失，不排除會誤報）；cluster 是佔位 label"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#role-detection
+      - alert: MySQLMultipleWritable
+        expr: |
+          count by (cluster) (
+            mysql_global_variables_read_only{job="mysql"} == 0
+              unless on (instance) {__name__=~"mysql_slave_status_(slave|replica)_sql_running", job="mysql"}
+          ) > 1
+        for: 1m
+        labels: { severity: critical, component: mysqld_exporter, tier: "2" }
+        annotations:
+          summary: "叢集 {{ $labels.cluster }} 有 {{ $value }} 台可寫且不在複製的節點；failover 後舊 primary 回來時常見，兩邊都能寫"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#role-detection
+      - alert: MySQLSemiSyncDegraded
+        expr: |
+          (
+            mysql_global_status_rpl_semi_sync_master_status{job="mysql"} == 0
+              and on (instance) mysql_global_variables_rpl_semi_sync_master_enabled{job="mysql"} == 1
+          )
+          or
+          (
+            mysql_global_status_rpl_semi_sync_source_status{job="mysql"} == 0
+              and on (instance) mysql_global_variables_rpl_semi_sync_source_enabled{job="mysql"} == 1
+          )
+        for: 2m
+        labels: { severity: warning, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "Semi-sync 開著但已退回 async（等 ACK 逾時）；commit 照常成功，只有這個狀態會變"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#semi-sync
 
   - name: mysql-galera
     rules:
@@ -165,7 +232,61 @@ groups:
           runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#galera-state
           absence_covered_by: "MySQLExporterDown, MySQLCollectorsMissing"
 
-  - name: mysql-service
+
+  - name: mysql-stability
+    rules:
+      - alert: MySQLRestarted
+        expr: mysql_global_status_uptime{job="mysql"} < 300
+        labels: { severity: info, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "MySQL 五分鐘內重啟過（含 crash、OOM kill）；停機時間短於 for 的話 mysql_up 規則不會響"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#restarts
+      - alert: MySQLInnoDBForceRecovery
+        expr: mysql_global_variables_innodb_force_recovery{job="mysql"} != 0
+        for: 2m
+        labels: { severity: warning, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "innodb_force_recovery 開著，資料庫在救援模式（≥4 時 InnoDB 唯讀）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#restarts
+      - alert: MySQLDataDiskFilling
+        expr: |
+          node_filesystem_avail_bytes{job="node", mountpoint="/var/lib/mysql"}
+            / node_filesystem_size_bytes{job="node", mountpoint="/var/lib/mysql"} < 0.10
+        for: 10m
+        labels: { severity: warning, component: mysqld_exporter, tier: "2" }
+        annotations:
+          summary: "資料目錄剩不到 10%；寫滿時 MySQL 不報錯而是卡住等空間，mysqld_exporter 看不到磁碟，要靠 node_exporter（job、mountpoint 是佔位符）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#disk-space
+      - alert: MySQLLongTransaction
+        expr: max by (instance) (mysql_info_schema_innodb_trx_oldest_transaction_age_seconds{job="mysql"}) > 300
+        for: 1m
+        labels: { severity: warning, component: mysqld_exporter, tier: "2" }
+        annotations:
+          summary: "有交易開了超過 5 分鐘；需要 --collect.info_schema.innodb_trx 與 PROCESS，沒有交易時這個 metric 不存在"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#long-transactions
+      - alert: MySQLInnoDBHistoryLength
+        expr: |
+          max by (instance) (
+            mysql_global_status_innodb_history_list_length{job="mysql"}
+              or mysql_info_schema_innodb_metrics_transaction_trx_rseg_history_len{job="mysql"}
+          ) > 50000
+        for: 5m
+        labels: { severity: warning, component: mysqld_exporter, tier: "2" }
+        annotations:
+          summary: "Undo history 太長（purge 被長交易擋住）；MariaDB 預設就有，MySQL 要 innodb_metrics collector 與 PROCESS"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#undo-history
+      - alert: MySQLDeadlocks
+        expr: |
+          (
+            sum by (instance) (increase(mysql_global_status_innodb_deadlocks{job="mysql"}[10m]))
+              or sum by (instance) (increase(mysql_info_schema_innodb_metrics_lock_lock_deadlocks_total{job="mysql"}[10m]))
+          ) > 5
+        labels: { severity: info, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "10 分鐘內超過 5 次 deadlock；MariaDB 用 global status，MySQL 只有 innodb_metrics（要開 collector）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#deadlocks
+
+  - name: mysql-usage
     rules:
       - alert: MySQLTooManyConnections
         expr: |
@@ -174,7 +295,13 @@ groups:
         for: 2m
         labels: { severity: warning, component: mysqld_exporter, tier: "3" }
         annotations:
-          summary: "連線數超過 max_connections 的 80%；滿了之後 exporter 也連不上，mysql_up 變 0"
+          summary: "連線數超過 max_connections 的 80%；真的滿了之後 exporter 也連不上，這條規則反而回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#connections
+      - alert: MySQLConnectionsRefused
+        expr: increase(mysql_global_status_connection_errors_total{job="mysql", error="max_connections"}[10m]) > 0
+        labels: { severity: warning, component: mysqld_exporter, tier: "2" }
+        annotations:
+          summary: "有連線因為 max_connections 被拒；滿載當下 exporter 也被擋，這個計數在連線降下來後才看得到"
           runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#connections
       - alert: MySQLHighThreadsRunning
         expr: |
@@ -185,36 +312,65 @@ groups:
         annotations:
           summary: "執行中的 thread 超過 max_connections 的 60%"
           runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#connections
+      - alert: MySQLUserConnectionLimit
+        expr: |
+          max by (instance, user) (mysql_sys_current_connections{job="mysql"})
+            / on (instance, user)
+          max by (instance, user) (
+            label_replace(mysql_mysql_max_user_connections{job="mysql"} > 0, "user", "$1", "mysql_user", "(.*)")
+          ) > 0.8
+        for: 5m
+        labels: { severity: warning, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "帳號 {{ $labels.user }} 用了 MAX_USER_CONNECTIONS 的 80% 以上；要 sys.user_summary 與 mysql.user collector；兩者的帳號 label 不同名（user／mysql_user）；MariaDB 預設關 performance_schema，所以沒有資料"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#user-connection-limits
+      - alert: MySQLRowLockWaits
+        expr: mysql_global_status_innodb_row_lock_current_waits{job="mysql"} > 10
+        for: 2m
+        labels: { severity: warning, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "超過 10 個 session 在等 InnoDB row lock；metadata lock 不算在內，要看 processlist"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#lock-waits
       - alert: MySQLInnoDBLogWaits
         expr: rate(mysql_global_status_innodb_log_waits{job="mysql"}[15m]) > 10
         labels: { severity: warning, component: mysqld_exporter, tier: "3" }
         annotations:
-          summary: "InnoDB log 寫入在等磁碟"
+          summary: "InnoDB log buffer 太小或 redo 寫入在等磁碟"
           runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#innodb-pressure
-      - alert: MySQLInnoDBHistoryLength
-        expr: mysql_info_schema_innodb_metrics_transaction_trx_rseg_history_len{job="mysql"} > 50000
-        for: 2m
+      - alert: MySQLBufferPoolWaitFree
+        expr: rate(mysql_global_status_innodb_buffer_pool_wait_free{job="mysql"}[5m]) > 0
+        for: 15m
         labels: { severity: warning, component: mysqld_exporter, tier: "3" }
         annotations:
-          summary: "Undo history 太長，通常有長交易；需要 innodb_metrics collector 與 PROCESS 權限，否則回傳空"
+          summary: "Buffer pool 找不到乾淨的頁，查詢在等 flush"
           runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#innodb-pressure
+      - alert: MySQLTmpDiskTables
+        expr: |
+          rate(mysql_global_status_created_tmp_disk_tables{job="mysql"}[15m])
+            / rate(mysql_global_status_created_tmp_tables{job="mysql"}[15m]) > 0.25
+        for: 30m
+        labels: { severity: info, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "超過四分之一的內部暫存表落到磁碟"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#tmp-tables
+      - alert: MySQLTableOpenCacheOverflows
+        expr: rate(mysql_global_status_table_open_cache_overflows{job="mysql"}[15m]) > 1
+        for: 30m
+        labels: { severity: info, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "table_open_cache 不夠，表一直被關掉再打開"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#table-open-cache
+      - alert: MySQLAbortedConnects
+        expr: rate(mysql_global_status_aborted_connects{job="mysql"}[5m]) > 1
+        for: 10m
+        labels: { severity: info, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "連線建立失敗（密碼錯、超過 MAX_USER_CONNECTIONS、握手逾時）每秒超過 1 次"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#aborted-connects
       - alert: MySQLSlowQueries
         expr: increase(mysql_global_status_slow_queries{job="mysql"}[5m]) > 0
         for: 2m
         labels: { severity: info, component: mysqld_exporter, tier: "3" }
         annotations:
-          summary: "有新的慢查詢"
+          summary: "有新的慢查詢（超過 long_query_time，不管 slow log 有沒有開都會計數）"
           runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#slow-queries
-      - alert: MySQLRestarted
-        expr: mysql_global_status_uptime{job="mysql"} < 300
-        labels: { severity: info, component: mysqld_exporter, tier: "3" }
-        annotations:
-          summary: "MySQL 五分鐘內重啟過；停機時間短於 for 的話 mysql_up 規則不會響"
-          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#restarts
-      - alert: MySQLInnoDBForceRecovery
-        expr: mysql_global_variables_innodb_force_recovery{job="mysql"} != 0
-        for: 2m
-        labels: { severity: warning, component: mysqld_exporter, tier: "3" }
-        annotations:
-          summary: "innodb_force_recovery 開著，資料庫在救援模式"
-          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#restarts

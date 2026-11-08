@@ -31,6 +31,7 @@ FAMILIES = {
     "database": "Target：資料庫",
 }
 STATUS = {"stable", "draft"}
+ASPECTS = {"exporter": "Exporter 有沒有真的在量", "stability": "穩定", "usage": "使用與飽和", "ha": "高可用"}
 ID_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 COMPONENT_ID_RE = re.compile(r"^[a-z0-9_]+$")
 

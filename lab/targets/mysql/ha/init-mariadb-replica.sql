@@ -1,0 +1,7 @@
+SET SESSION sql_log_bin = 0;
+CREATE USER 'exporter'@'%' IDENTIFIED BY 'exporterpw' WITH MAX_USER_CONNECTIONS 3;
+GRANT PROCESS, REPLICATION CLIENT, SLAVE MONITOR, SELECT ON *.* TO 'exporter'@'%';
+CREATE USER 'repl'@'%' IDENTIFIED BY 'replpw';
+GRANT REPLICATION SLAVE ON *.* TO 'repl'@'%';
+CREATE USER 'app'@'%' IDENTIFIED BY 'apppw';
+GRANT ALL ON app.* TO 'app'@'%';

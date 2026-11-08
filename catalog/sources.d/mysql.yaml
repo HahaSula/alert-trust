@@ -37,3 +37,78 @@ sources:
     kind: upstream-doc
     visibility: public
     url: https://mariadb.com/docs/server/reference/sql-statements/administrative-sql-statements/show/show-replica-status
+  art-mysql-ha:
+    title: MySQL 8.4／MariaDB 11.4 target-facing 實驗（primary + async replica）
+    kind: experiment
+    visibility: public
+    url: https://github.com/HahaSula/alert-trust/tree/main/lab/targets/mysql/ha
+    checked: "2026-11-08, mariadb:11.4（11.4.13）、mysql:8.4.7、prom/mysqld-exporter:v0.21.0、prom/prometheus:v3.13.5"
+    note: 長交易、deadlock、三種延遲、replication 中斷、semi-sync 退回、連線打滿、primary 被 kill、failover；結果在 ha/results/
+  mysql-server-src:
+    title: MySQL Server 8.4.7 原始碼（Seconds_Behind_Source、保留連線）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/mysql/mysql-server/tree/mysql-8.4.7
+    checked: "2026-11-08, mysql-8.4.7"
+  mariadb-server-src:
+    title: MariaDB Server 11.4.13 原始碼（Innodb_deadlocks、Connection_errors_max_connections）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/MariaDB/server/tree/mariadb-11.4.13
+    checked: "2026-11-08, mariadb-11.4.13"
+  mysql-full-disk:
+    title: MySQL 8.4 手冊：磁碟滿時 MySQL 怎麼處理
+    kind: upstream-doc
+    visibility: public
+    url: https://dev.mysql.com/doc/refman/8.4/en/full-disk.html
+    checked: "2026-11-08"
+    note: 寫入不報錯，每分鐘檢查一次空間並寫 error log；binlog 或 relay log 也一樣
+  mysql-force-recovery:
+    title: MySQL 8.4 手冊：innodb_force_recovery
+    kind: upstream-doc
+    visibility: public
+    url: https://dev.mysql.com/doc/refman/8.4/en/forcing-innodb-recovery.html
+    checked: "2026-11-08"
+  mysql-status-vars:
+    title: MySQL 8.4 手冊：server status variables
+    kind: upstream-doc
+    visibility: public
+    url: https://dev.mysql.com/doc/refman/8.4/en/server-status-variables.html
+    checked: "2026-11-08"
+    note: Slow_queries 不管 slow log 有沒有開都計數；Connection_errors_max_connections；Created_tmp_disk_tables
+  mysql-show-replica-status:
+    title: MySQL 8.4 手冊：SHOW REPLICA STATUS（Seconds_Behind_Source 的定義）
+    kind: upstream-doc
+    visibility: public
+    url: https://dev.mysql.com/doc/refman/8.4/en/show-replica-status.html
+    checked: "2026-11-08"
+  mysql-semisync:
+    title: MySQL 8.4 手冊：semisynchronous replication 監控
+    kind: upstream-doc
+    visibility: public
+    url: https://dev.mysql.com/doc/refman/8.4/en/replication-semisync-monitoring.html
+    checked: "2026-11-08"
+  mysql-too-many-connections:
+    title: MySQL 8.4 手冊：Too many connections 與保留的管理連線
+    kind: upstream-doc
+    visibility: public
+    url: https://dev.mysql.com/doc/refman/8.4/en/too-many-connections.html
+    checked: "2026-11-08"
+  mysql-gtid-functions:
+    title: MySQL 8.4 手冊：GTID_SUBSET 與 errant transaction 檢查
+    kind: upstream-doc
+    visibility: public
+    url: https://dev.mysql.com/doc/refman/8.4/en/gtid-functions.html
+    checked: "2026-11-08"
+  mariadb-gtid:
+    title: MariaDB GTID（gtid_slave_pos、gtid_strict_mode）
+    kind: upstream-doc
+    visibility: public
+    url: https://mariadb.com/kb/en/gtid/
+    checked: "2026-11-08"
+  mariadb-perfschema:
+    title: MariaDB Performance Schema 概觀（預設關閉）
+    kind: upstream-doc
+    visibility: public
+    url: https://mariadb.com/kb/en/performance-schema-overview/
+    checked: "2026-11-08"

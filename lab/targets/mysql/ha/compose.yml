@@ -1,0 +1,114 @@
+# Target-facing 實驗：MariaDB 11.4 與 MySQL 8.4 各一組 primary + async replica，
+# 每個節點一台 mysqld_exporter v0.21.0，Prometheus v3.13.5 載入 rules/targets/mysql.yml。
+# 執行：./run.sh；結束後自動 docker compose down -v。只開一個 host port：127.0.0.1:22090（Prometheus）。
+name: at-my-ha
+x-exporter: &exporter
+  image: prom/mysqld-exporter:v0.21.0
+  environment:
+    MYSQLD_EXPORTER_PASSWORD: exporterpw
+x-mdb: &mdb
+  image: mariadb:11.4
+  environment:
+    MARIADB_ROOT_PASSWORD: rootpw
+  healthcheck:
+    test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+    interval: 3s
+    retries: 40
+  mem_limit: 512m
+x-my: &my
+  image: mysql:8.4.7
+  environment:
+    MYSQL_ROOT_PASSWORD: rootpw
+  healthcheck:
+    test: ["CMD", "mysqladmin", "ping", "-uroot", "-prootpw", "--silent"]
+    interval: 3s
+    retries: 60
+  mem_limit: 768m
+services:
+  mdb1:
+    <<: *mdb
+    command: [--server-id=1, --log-bin=mysql-bin, --binlog-format=ROW, --event-scheduler=ON, --max-connections=30, --log-slave-updates=ON]
+    volumes: [./init-mariadb-primary.sql:/docker-entrypoint-initdb.d/init.sql:ro]
+  mdb2:
+    <<: *mdb
+    command: [--server-id=2, --log-bin=mysql-bin, --binlog-format=ROW, --max-connections=30, --log-slave-updates=ON]
+    volumes: [./init-mariadb-replica.sql:/docker-entrypoint-initdb.d/init.sql:ro]
+  my1:
+    <<: *my
+    command: [--server-id=11, --gtid-mode=ON, --enforce-gtid-consistency=ON, --max-connections=30]
+    volumes: [./init-mysql-primary.sql:/docker-entrypoint-initdb.d/init.sql:ro]
+  my2:
+    <<: *my
+    command: [--server-id=12, --gtid-mode=ON, --enforce-gtid-consistency=ON, --max-connections=30]
+    volumes: [./init-mysql-replica.sql:/docker-entrypoint-initdb.d/init.sql:ro]
+  ex-mdb1:
+    <<: *exporter
+    command:
+      - --mysqld.address=mdb1:3306
+      - --mysqld.username=exporter
+      - --collect.info_schema.processlist
+      - --collect.info_schema.innodb_metrics
+      - --collect.info_schema.innodb_trx
+      - --collect.heartbeat
+      - --collect.heartbeat.database=heartbeat
+      - --collect.heartbeat.table=heartbeat
+      - --collect.sys.user_summary
+      - --collect.mysql.user
+      - --collect.binlog_size
+      - --collect.perf_schema.replication_applier_status_by_worker
+    depends_on: { mdb1: { condition: service_healthy } }
+  ex-mdb2:
+    <<: *exporter
+    command:
+      - --mysqld.address=mdb2:3306
+      - --mysqld.username=exporter
+      - --collect.info_schema.processlist
+      - --collect.info_schema.innodb_metrics
+      - --collect.info_schema.innodb_trx
+      - --collect.heartbeat
+      - --collect.heartbeat.database=heartbeat
+      - --collect.heartbeat.table=heartbeat
+      - --collect.sys.user_summary
+      - --collect.mysql.user
+      - --collect.binlog_size
+      - --collect.perf_schema.replication_applier_status_by_worker
+    depends_on: { mdb2: { condition: service_healthy } }
+  ex-my1:
+    <<: *exporter
+    command:
+      - --mysqld.address=my1:3306
+      - --mysqld.username=exporter
+      - --collect.info_schema.processlist
+      - --collect.info_schema.innodb_metrics
+      - --collect.info_schema.innodb_trx
+      - --collect.heartbeat
+      - --collect.heartbeat.database=heartbeat
+      - --collect.heartbeat.table=heartbeat
+      - --collect.sys.user_summary
+      - --collect.mysql.user
+      - --collect.binlog_size
+      - --collect.perf_schema.replication_applier_status_by_worker
+    depends_on: { my1: { condition: service_healthy } }
+  ex-my2:
+    <<: *exporter
+    command:
+      - --mysqld.address=my2:3306
+      - --mysqld.username=exporter
+      - --collect.info_schema.processlist
+      - --collect.info_schema.innodb_metrics
+      - --collect.info_schema.innodb_trx
+      - --collect.heartbeat
+      - --collect.heartbeat.database=heartbeat
+      - --collect.heartbeat.table=heartbeat
+      - --collect.sys.user_summary
+      - --collect.mysql.user
+      - --collect.binlog_size
+      - --collect.perf_schema.replication_applier_status_by_worker
+    depends_on: { my2: { condition: service_healthy } }
+  prometheus:
+    image: prom/prometheus:v3.13.5
+    command: [--config.file=/etc/prometheus/prometheus.yml]
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../../../../rules/targets/mysql.yml:/etc/prometheus/mysql.yml:ro
+    ports: ["127.0.0.1:22090:9090"]

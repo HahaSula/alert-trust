@@ -86,6 +86,8 @@ def validate(root: str = C.ROOT) -> tuple[list[str], list[str]]:
             for field in ("tier", "question", "signal", "metrics", "evaluate_on", "evidence", "source", "upstream", "rules"):
                 if field not in s:
                     errors.append(f"{at}: 缺少 {field}")
+            if s.get("aspect") is not None and s.get("aspect") not in C.ASPECTS:
+                errors.append(f"{at}: aspect {s.get('aspect')!r} 要是 {', '.join(C.ASPECTS)} 之一")
             if s.get("tier") not in C.TIERS:
                 errors.append(f"{at}: tier 要是 1、2 或 3")
             if s.get("evaluate_on") not in C.EVALUATE_ON:

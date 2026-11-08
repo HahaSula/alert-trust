@@ -91,23 +91,31 @@ def component_page(card: dict, sources: dict, contracts: dict) -> str:
         out.append("")
 
     signals = card.get("signals", [])
+    use_aspect = any(s.get("aspect") for s in signals)
     out.append("## 訊號總覽\n")
-    out.append("| 級 | 要回答的問題 | 在哪裡評估 | 上游 | 規則 |")
-    out.append("|---|---|---|---|---|")
+    out.append("| 級 |" + (" 面向 |" if use_aspect else "") + " 要回答的問題 | 在哪裡評估 | 上游 | 規則 |")
+    out.append("|---|" + ("---|" if use_aspect else "") + "---|---|---|---|")
     for s in signals:
         n = len(s.get("rules", []))
-        out.append(f"| {chip(str(s['tier']), 't' + str(s['tier']))} | [{esc(s['question'])}](#{s['id']}) | "
+        asp = f" {C.ASPECTS.get(s.get('aspect'), '—')} |" if use_aspect else ""
+        out.append(f"| {chip(str(s['tier']), 't' + str(s['tier']))} |{asp} [{esc(s['question'])}](#{s['id']}) | "
                    f"{C.EVALUATE_ON[s['evaluate_on']]} | {up(s['upstream']['status'])} | {n if n else '—'} |")
     out.append("")
 
-    for tier in (1, 2, 3):
-        group = [s for s in signals if s["tier"] == tier]
+    if use_aspect:
+        sections = [(C.ASPECTS[a], sorted([s for s in signals if s.get("aspect") == a], key=lambda s: s["tier"]))
+                    for a in C.ASPECTS]
+        sections.append(("其他", [s for s in signals if s.get("aspect") not in C.ASPECTS]))
+    else:
+        sections = [(TIER_TITLE[t], [s for s in signals if s["tier"] == t]) for t in (1, 2, 3)]
+    for title, group in sections:
         if not group:
             continue
-        out.append(f"## {TIER_TITLE[tier]}\n")
+        out.append(f"## {title}\n")
         for s in group:
             out.append(f"### {s['question']} {{#{s['id']}}}\n")
-            rows = [("訊號", esc(codeify(s["signal"])))]
+            rows = [("級別", chip(str(s["tier"]), "t" + str(s["tier"])) + " " + TIER_TITLE[s["tier"]].split("：")[1]),
+                    ("訊號", esc(codeify(s["signal"])))]
             if s.get("metrics"):
                 rows.append(("Metric", "、".join(f"`{m}`" for m in s["metrics"])))
             where = C.EVALUATE_ON[s["evaluate_on"]]
