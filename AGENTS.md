@@ -1,0 +1,88 @@
+# AGENTS.md
+
+給在 alert-trust 上工作的 AI agent（與人）的指引。先讀這份，再讀 `STATUS.md` 看目前進度。
+
+## 這個專案在做什麼
+
+alert-trust 回答兩個問題：
+
+1. **整條 alert 鏈壞在哪一段時，有沒有人知道？**（monitor of monitor）每個監控元件與 target 一張「元件卡」，列出分級訊號。
+2. **在實際尖峰下，rule 還能不能信？**（信任契約）一組時間不等式，例如 Prometheus `R ≥ (2+k)·I + d`、vmalert `R ≥ I + L − D`。
+
+產出是：目錄（YAML）、規則範本、工具（collect、coverage、validate）、Claude Code skill、MkDocs 網站（GitHub Pages）、可重現的小型 lab。
+
+## 目錄結構
+
+| 路徑 | 內容 | 誰產生 |
+|---|---|---|
+| `catalog/components/*.yaml` | 監控元件卡：prometheus、alertmanager、vmalert、vmagent、victoriametrics、victorialogs、observer | 手寫 |
+| `catalog/targets/*.yaml` | Target 卡：mysqld_exporter、postgres_exporter | 手寫 |
+| `catalog/target-pattern.yaml` | 每張 target 卡必須回答的標準問題（validate 強制） | 手寫 |
+| `catalog/contracts.yaml` | 信任契約；每個 id 在 `docs/contracts.md` 要有 `{#id}` 錨點 | 手寫 |
+| `catalog/terms.yaml` | 名詞表：每個設定與 metric 的設定位置、預設值、觀察方式；頁面中反引號名稱自動連結到這裡 | 手寫 |
+| `catalog/sources.yaml`、`sources.d/*.yaml` | 來源（文章、上游規則、工具） | 手寫 |
+| `catalog/refs-code.yaml` | 釘在版本與行號的原始碼參考 | **產生**：`tools/gen_code_refs.py` 讀 `refs-code.src.json` |
+| `catalog/refs.yaml`、`refs.d/*.yaml` | 實驗參考，也可放手動核對過的原始碼參考 | 手寫 |
+| `rules/<component>/*.yml`、`rules/targets/*.yml` | 規則範本；每條都有 `labels.tier` 與 `annotations.runbook_url` | 手寫 |
+| `tools/` | `validate.py`、`build_pages.py`、`check_coverage.py`、`collect.py`、`check_metrics.py`、`gen_code_refs.py`、`catalog.py`（loader） | 手寫 |
+| `hooks/refs.py` | MkDocs hook：`[^key]` 變註腳、反引號名稱連到名詞表、`<!-- figure: name -->` 內嵌 SVG | 手寫 |
+| `docs/` | 網站；`docs/components/*.md`、`docs/reference/*.md` 由 `build_pages.py` 產生，不 commit | 混合 |
+| `docs/assets/figures/*.svg` | 圖；顏色用 class，由 `docs/assets/extra.css` 對應主題 | 手寫 |
+| `skills/`、`.claude-plugin/` | Claude Code plugin（repo 根目錄就是 plugin） | 手寫 |
+| `lab/` | 小型實驗：每個子目錄有 README、compose、腳本、`results/` | 手寫 |
+| `env/env.example.yaml` | 環境描述範例；真實的 `env/*.yaml` 在 `.gitignore` | 手寫 |
+
+## 每次改完都要跑
+
+```bash
+python3 tools/validate.py              # 0 個錯誤；--refs 列出還沒有參考的項目
+python3 tools/build_pages.py
+python3 -m unittest discover -s tests
+promtool check rules rules/**/*.yml    # vmalert 的 vlogs 規則用 vmalert -dryRun
+docker run --rm -u $(id -u):$(id -g) -v "$PWD":/docs squidfunk/mkdocs-material:9.5.39 build --strict -d /tmp/site
+```
+
+本機預覽：`docker run -d --name alert-trust-docs -u $(id -u):$(id -g) -p 8000:8000 -v "$PWD":/docs squidfunk/mkdocs-material:9.5.39 serve --dev-addr=0.0.0.0:8000`，網址 `http://localhost:8000/alert-trust/`。改了 `hooks/refs.py` 或 `mkdocs.yml` 要重啟容器。
+
+## 證據規則（最重要）
+
+- **每個結論都要有依據並附參考**：原始碼（釘在 tag 與行號）或可重現的實驗結果。頁面用 `[^key]`，元件卡用 `refs: [key]`。
+- 證據等級：`tested`（實驗量到）、`code`（讀原始碼或官方文件）、`upstream`（上游規則）、`inferred`（未單獨驗證）。只有親眼觀察到的才標 `tested`。沒有實測就降級，不要沿用舊說法。
+- 原始碼參考：加到 `catalog/refs-code.src.json`（`[repo, tag, path, 關鍵字, 第幾個]`）再跑 `python3 tools/gen_code_refs.py`。關鍵字找不到時腳本會失敗，代表程式碼移動了，要重新核對。
+- 圖說要分開寫**機制**（原始碼）與**這組數據**（實驗條件）。圖上的數字只是一組情境，多組數據放 lab。
+- 不要改寫實驗數字。參數要換（例如 30m 改 1h）就重跑實驗。
+- 寫「interval」時要指名是哪一個：`scrape_interval`、`evaluation_interval`、group `interval`、`group_interval`。名稱用反引號，會自動連到名詞表。
+
+## 公開範圍
+
+repo 與網站是公開的。
+
+- **可以放**：可重現的 lab、版本比較、機制、通用規則範本、標明「例子」的假設值。
+- **不能放**：特定環境的數字、主機名稱、拓撲、內部決策、事件細節、接收端 URL，以及 `env/*.yaml` 和對真實環境的報告。
+- 原始研究文章是未公開的 claude.ai artifact，只能當資料讀，不能連結。
+
+## 實驗規則
+
+- 本機只做**輕量**實驗：小容器、短時間、不做負載測試（例如不要 CPU ×10）。
+- 每個 lab 用自己的 compose project 名稱與 port 區段，結束後 `docker compose down -v`，確認沒有殘留容器。
+- 已用過的 port：19091–19093、19191–19192、19301–19303、19880（alert-trust 本身）；20000–24999 依 agent 分段（vm 20xxx、am 21xxx、mysql 22xxx、pg 23xxx、skills 24xxx）。
+- 已知限制：用 HTTP 延遲模擬 scrape 耗時只能做 `d < S`；WSL2 上 `process_start_time_seconds` 會無故跳動，crash loop 測不了。
+- 截圖：`zenika/alpine-chrome:124`，一定要加 `timeout` 並在之後確認容器已移除；深色模式用 `--blink-settings=preferredColorScheme=0`；頁面太長（>3500px）會失敗。
+
+## 平行分工（多個 agent）
+
+- 每個 agent 只寫自己負責的檔案。共用檔案用分檔：`catalog/sources.d/`、`catalog/refs.d/`。
+- `mkdocs.yml`、`AGENTS.md`、`STATUS.md` 由協調者改；agent 在回報中提議。
+- Commit 時只 `git add` 已完成那一份的檔案，不要把別人還在改的一起 commit。
+- 協調者要親自核對 agent 的結果（讀結果檔、跑 validate、grep 環境資訊），不要直接採信回報。
+
+## 寫作
+
+- 文件用繁體中文（zh-Hant），直接、平實，不用比喻和誇飾。
+- 結論在前；表格比長段落好；每個 section 一個重點。
+- YAML 裡 `upstream.note` 之類的字串要加引號；`yes`／`no` 會被 YAML 1.1 讀成布林值（loader 已處理 `upstream.status`）。重複的 key 會被 loader 拒絕。
+
+## Commit
+
+- 只有使用者要求時才 push。尚未建立 GitHub repo（見 `STATUS.md`）。
+- Commit 訊息用英文，結尾加：`Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`

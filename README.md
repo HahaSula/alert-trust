@@ -18,7 +18,8 @@ alert-trust 是一份 **monitor of monitor 元件目錄**，加上檢查 **rule 
 | `catalog/contracts.yaml` | 信任契約（時間不等式） |
 | `catalog/sources.yaml`、`catalog/sources.d/` | 每個結論的來源 |
 | `rules/` | 依元件分的規則範本，每條都有 `runbook_url` 連到網站上的對應訊號 |
-| `tools/` | 驗證目錄、產生網站頁面、比對 metric 名稱 |
+| `tools/` | 驗證目錄、產生網站頁面、蒐集快照（`collect.py`）、覆蓋檢查（`check_coverage.py`）、比對 metric 名稱 |
+| `skills/`、`.claude-plugin/` | Claude Code plugin：每個元件一包 skill |
 | `lab/` | 輕量實驗 |
 | `docs/` | 網站內容；`docs/components/` 由目錄產生 |
 
@@ -39,6 +40,23 @@ python3 tools/check_metrics.py prometheus=http://localhost:9090/metrics
 ```bash
 python3 tools/build_pages.py
 docker run --rm -it -p 8000:8000 -v "$PWD":/docs squidfunk/mkdocs-material:9.5.39
+```
+
+## Claude Code plugin
+
+```text
+/plugin marketplace add HahaSula/alert-trust
+/plugin install alert-trust@alert-trust
+/alert-trust:selfcheck
+```
+
+`selfcheck` 會先建立環境描述（`env-profile`），再唯讀蒐集快照、檢查覆蓋缺口，依元件交給 `prometheus`、`victoriametrics`、`alertmanager`、`database-targets` 各包處理，最後輸出報告。前身 prometheus-selfcheck-skills 的使用者可以直接改用這個 plugin。
+
+不用 Claude 也能跑：
+
+```bash
+python3 tools/collect.py --out snapshot --prom prom-a=http://localhost:9090 --am am=http://localhost:9093
+python3 tools/check_coverage.py --env env/<name>.yaml --snapshot snapshot --out report --live
 ```
 
 ## 新增一個元件或 target
@@ -70,6 +88,10 @@ docker run --rm -it -p 8000:8000 -v "$PWD":/docs squidfunk/mkdocs-material:9.5.3
 實驗都是小規模的單機 Docker，**驗證的是機制和訊號出現的順序**，門檻和時間不能直接套到大型環境。
 
 前身是 [prometheus-selfcheck-skills](https://github.com/HahaSula/prometheus-selfcheck-skills)，只涵蓋 Prometheus 與 Alertmanager。
+
+## 給 AI agent
+
+在這個 repo 工作前先讀 [AGENTS.md](AGENTS.md) 與 [STATUS.md](STATUS.md)。
 
 ## License
 

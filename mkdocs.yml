@@ -92,3 +92,4 @@ nav:
       - VictoriaMetrics Rule 信任邊際: reports/victoriametrics-trust.md
       - Alertmanager 監控指南: reports/alertmanager.md
   - 來源: reference/sources.md
+  - 參與與擴充: contributing.md
