@@ -123,15 +123,15 @@ groups:
         for: 5m
         labels: { severity: critical, component: postgres_exporter, tier: "2" }
         annotations:
-          summary: "複本沒有 WAL receiver（斷線或 collector 沒開）；這時 pg_replication_lag_seconds 可能是 0"
-          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#replication-semantics
+          summary: "複本沒有 WAL receiver（斷線或 collector 沒開）；這時 pg_replication_lag_seconds 是 0。v0.20.1 對沒有用 replication slot 的複本不輸出這組 metric，這類複本要用 label 排除"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#wal-receiver
       - alert: PostgresWalReceiverStale
         expr: time() - pg_stat_wal_receiver_last_msg_receipt_time{job="postgres"} > 120
         for: 2m
         labels: { severity: warning, component: postgres_exporter, tier: "2" }
         annotations:
           summary: "複本超過 2 分鐘沒有收到主庫的任何訊息"
-          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#replication-semantics
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#wal-receiver
       - alert: PostgresPrimaryWithoutStandby
         expr: |
           pg_replication_is_replica{job="postgres"} == 0
@@ -139,15 +139,15 @@ groups:
         for: 5m
         labels: { severity: warning, component: postgres_exporter, tier: "2" }
         annotations:
-          summary: "主庫上看不到任何複本連線；只對應該有複本的主庫啟用（用 label 限定）"
-          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#replication-semantics
+          summary: "主庫上看不到任何複本連線；只對應該有複本的主庫啟用（用 label 限定）。exporter 沒有 pg_monitor 時也會響（看不到 LSN）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#standby-streaming
       - alert: PostgresReplicationLagBytes
         expr: pg_stat_replication_pg_wal_lsn_diff{job="postgres"} > 1e9
         for: 5m
         labels: { severity: warning, component: postgres_exporter, tier: "2" }
         annotations:
           summary: "複本 {{ $labels.application_name }} 的 replay 落後主庫超過 1GB WAL"
-          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#replication-semantics
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#replication-lag
       - alert: PostgresReplicationSlotInactive
         expr: pg_replication_slots_active{job="postgres"} == 0
         for: 30m
@@ -156,6 +156,21 @@ groups:
           summary: "replication slot {{ $labels.slot_name }} 沒有人用，主庫的 WAL 會一直累積"
           runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#replication-slots
           absence_covered_by: "PostgresCollectorsMissing"
+      - alert: PostgresReplicationSlotRetainingWal
+        expr: |
+          pg_replication_slots_pg_wal_lsn_diff{job="postgres"} > 10e9
+            or pg_replication_slots_safe_wal_size_bytes{job="postgres"} < 1e9
+        for: 10m
+        labels: { severity: warning, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "replication slot {{ $labels.slot_name }} 保留超過 10GB WAL，或離 max_slot_wal_keep_size 不到 1GB"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#replication-slots
+      - alert: PostgresReplicationSlotLost
+        expr: pg_replication_slots_wal_status{job="postgres", wal_status=~"unreserved|lost"} == 1
+        labels: { severity: critical, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "replication slot {{ $labels.slot_name }} 的 WAL 狀態是 {{ $labels.wal_status }}；lost 之後用這個 slot 的複本永遠追不上，要重建"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#replication-slots
       - alert: PostgresXidWraparoundRisk
         expr: pg_database_wraparound_age_datfrozenxid_seconds{job="postgres"} > 1e9
         for: 30m
@@ -178,11 +193,15 @@ groups:
             > 0.8 * (
               min by (job, instance) (pg_settings_max_connections{job="postgres"})
               - min by (job, instance) (pg_settings_superuser_reserved_connections{job="postgres"})
+              - (
+                  min by (job, instance) (pg_settings_reserved_connections{job="postgres"})
+                  or 0 * min by (job, instance) (pg_settings_max_connections{job="postgres"})
+                )
             )
         for: 5m
         labels: { severity: warning, component: postgres_exporter, tier: "2" }
         annotations:
-          summary: "連線數超過可用上限的 80%；額滿時 exporter 也連不進去，看起來像資料庫停機"
+          summary: "連線數超過一般使用者可用上限的 80%（已扣 superuser_reserved_connections 與 16 起的 reserved_connections）；額滿時沒有保留位子的 exporter 也連不進去"
           runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#connection-headroom
 
   - name: postgres-service
@@ -193,13 +212,13 @@ groups:
         labels: { severity: warning, component: postgres_exporter, tier: "3" }
         annotations:
           summary: "資料庫 {{ $labels.datname }} 有交易超過 5 分鐘，會擋住 vacuum；exporter 沒有 pg_monitor 時這條看不到"
-          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#service-health
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#xmin-horizon
       - alert: PostgresDeadlocks
         expr: increase(pg_stat_database_deadlocks{job="postgres", datname!~"template.*"}[5m]) > 5
         labels: { severity: warning, component: postgres_exporter, tier: "3" }
         annotations:
           summary: "資料庫 {{ $labels.datname }} 5 分鐘內 deadlock 超過 5 次"
-          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#service-health
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#deadlocks-rollbacks
       - alert: PostgresHighRollbackRatio
         expr: |
           sum by (job, instance, datname) (rate(pg_stat_database_xact_rollback{job="postgres", datname!~"template.*"}[5m]))
@@ -211,7 +230,7 @@ groups:
         labels: { severity: warning, component: postgres_exporter, tier: "3" }
         annotations:
           summary: "資料庫 {{ $labels.datname }} rollback 比例超過 10%"
-          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#service-health
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#deadlocks-rollbacks
       - alert: PostgresTooManyDeadTuples
         expr: |
           pg_stat_user_tables_n_dead_tup{job="postgres"} > 10000
@@ -221,16 +240,132 @@ groups:
         labels: { severity: warning, component: postgres_exporter, tier: "3" }
         annotations:
           summary: "資料表 {{ $labels.relname }} dead tuple 超過 10%，autovacuum 可能跟不上或被長交易擋住"
-          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#service-health
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#autovacuum
       - alert: PostgresRestarted
         expr: changes(pg_postmaster_start_time_seconds{job="postgres"}[15m]) > 0
         labels: { severity: info, component: postgres_exporter, tier: "3" }
         annotations:
           summary: "PostgreSQL 15 分鐘內重啟過（需要 --collector.postmaster）"
-          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#service-health
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#restart-and-crash
       - alert: PostgresRoleChanged
         expr: changes(pg_replication_is_replica{job="postgres"}[5m]) > 0
         labels: { severity: warning, component: postgres_exporter, tier: "3" }
         annotations:
           summary: "主從角色改變（failover）；依 is_replica 分流的複製規則要重新對位"
-          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#service-health
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#promotion
+
+  # ---------- PostgreSQL 本體：穩定 ----------
+  - name: postgres-target-stability
+    rules:
+      - alert: PostgresCrashRecovery
+        expr: |
+          resets(pg_stat_database_xact_commit{job="postgres", datname="postgres"}[10m]) > 0
+            unless on (job, instance) changes(pg_postmaster_start_time_seconds{job="postgres"}[10m]) > 0
+        labels: { severity: warning, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "交易 counter 被歸零但 postmaster 沒有重啟：很可能是 backend 當掉後的 crash recovery（crash recovery 會丟棄累積統計）；手動 pg_stat_reset() 也會觸發"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#restart-and-crash
+      - alert: PostgresWalRetained
+        expr: |
+          pg_wal_size_bytes{job="postgres"}
+            > on (job, instance) (2 * pg_settings_max_wal_size_bytes{job="postgres"})
+        for: 15m
+        labels: { severity: warning, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "pg_wal 超過 max_wal_size 的兩倍，有東西擋住 WAL 回收（inactive slot、archive 失敗）；磁碟剩餘空間要看 node_exporter"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#wal-disk
+      - alert: PostgresIdleInTransaction
+        expr: |
+          max by (job, instance, datname) (
+            pg_stat_activity_max_tx_duration{job="postgres", state=~"idle in transaction.*"}
+          ) > 300
+        for: 2m
+        labels: { severity: warning, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "資料庫 {{ $labels.datname }} 有 idle in transaction 超過 5 分鐘，它持有的 XID 讓 vacuum 無法清掉 dead tuple；可設 idle_in_transaction_session_timeout"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#xmin-horizon
+      - alert: PostgresXidWraparoundCritical
+        expr: pg_database_wraparound_age_datfrozenxid_seconds{job="postgres"} > 1.5e9
+        for: 5m
+        labels: { severity: critical, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "資料庫 {{ $labels.datname }} 的 XID age 超過 15 億；約 2^31 − 4000 萬時開始警告，− 300 萬時拒絕新的 XID"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#wraparound
+      - alert: PostgresMultixactWraparoundRisk
+        expr: pg_database_wraparound_age_datminmxid_seconds{job="postgres"} > 1e9
+        for: 30m
+        labels: { severity: warning, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "資料庫 {{ $labels.datname }} 的 multixact age 超過 10 億（SELECT ... FOR SHARE、外鍵檢查會消耗 multixact）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#wraparound
+      - alert: PostgresCheckpointsMostlyRequested
+        expr: |
+          (
+            rate(pg_stat_bgwriter_checkpoints_req_total{job="postgres"}[30m])
+              / (rate(pg_stat_bgwriter_checkpoints_req_total{job="postgres"}[30m]) + rate(pg_stat_bgwriter_checkpoints_timed_total{job="postgres"}[30m]))
+            or
+            rate(pg_stat_checkpointer_num_requested_total{job="postgres"}[30m])
+              / (rate(pg_stat_checkpointer_num_requested_total{job="postgres"}[30m]) + rate(pg_stat_checkpointer_num_timed_total{job="postgres"}[30m]))
+          ) > 0.5
+        for: 30m
+        labels: { severity: warning, component: postgres_exporter, tier: "3" }
+        annotations:
+          summary: "半數以上的 checkpoint 是被 WAL 量逼出來的，max_wal_size 可能太小；17 以上需要 --collector.stat_checkpointer"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#checkpoint-pressure
+
+  # ---------- PostgreSQL 本體：使用 ----------
+  - name: postgres-target-usage
+    rules:
+      - alert: PostgresLockWaits
+        expr: sum by (job, instance, datname) (pg_stat_activity_count{job="postgres", wait_event_type="Lock"}) > 5
+        for: 5m
+        labels: { severity: warning, component: postgres_exporter, tier: "3" }
+        annotations:
+          summary: "資料庫 {{ $labels.datname }} 有超過 5 個 session 在等鎖；ACCESS EXCLUSIVE 鎖會讓沒設 lock_timeout 的 exporter 整個卡住，這時看到的是 PostgresExporterDown"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#sessions-and-locks
+
+  # ---------- PostgreSQL 本體：HA ----------
+  # 需要在 target 上加 cluster label（同一組主從共用一個值）；沒有 cluster label 的 target 不納入角色計數。
+  - name: postgres-target-ha
+    rules:
+      - alert: PostgresStandbyCountDropped
+        expr: |
+          count by (job, instance) (pg_stat_replication_pg_wal_lsn_diff{job="postgres", state="streaming"})
+            < max_over_time(count by (job, instance) (pg_stat_replication_pg_wal_lsn_diff{job="postgres", state="streaming"})[1d:5m])
+        for: 5m
+        labels: { severity: warning, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "主庫上 streaming 的複本比過去一天的最大值少；全部消失時由 PostgresPrimaryWithoutStandby 接手"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#standby-streaming
+      - alert: PostgresMultiplePrimaries
+        expr: count by (cluster) (pg_replication_is_replica{job="postgres", cluster!=""} == 0) > 1
+        for: 1m
+        labels: { severity: critical, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "cluster {{ $labels.cluster }} 有 {{ $value }} 台不在 recovery 的 PostgreSQL（split brain，或舊主庫沒有被隔離）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#promotion
+          absence_covered_by: "PostgresCollectorsMissing, PostgresExporterDown"
+      - alert: PostgresNoPrimary
+        expr: |
+          count by (cluster) (pg_replication_is_replica{job="postgres", cluster!=""})
+            unless count by (cluster) (pg_replication_is_replica{job="postgres", cluster!=""} == 0)
+        for: 2m
+        labels: { severity: critical, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "cluster {{ $labels.cluster }} 看得到的 PostgreSQL 全都在 recovery，沒有主庫（主庫停機時也可能是 exporter 抓不到，先看 PostgresExporterDown）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#promotion
+      - alert: PostgresArchiveFailing
+        expr: |
+          increase(pg_stat_archiver_failed_count{job="postgres"}[15m]) > 0
+            and on (job, instance) increase(pg_stat_archiver_archived_count{job="postgres"}[15m]) == 0
+        for: 5m
+        labels: { severity: warning, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "archive_command 15 分鐘內只有失敗沒有成功；WAL 會一直留在 pg_wal，接著是磁碟寫滿"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#archiver
+      - alert: PostgresStandbyQueryConflicts
+        expr: increase(pg_stat_database_conflicts{job="postgres", datname!~"template.*"}[10m]) > 0
+        labels: { severity: info, component: postgres_exporter, tier: "3" }
+        annotations:
+          summary: "複本上資料庫 {{ $labels.datname }} 有查詢被 recovery 取消（max_standby_streaming_delay 到期）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#standby-conflicts

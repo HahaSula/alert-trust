@@ -69,3 +69,46 @@ sources:
     kind: upstream-doc
     visibility: public
     url: https://www.postgresql.org/docs/current/routine-vacuuming.html#VACUUM-FOR-WRAPAROUND
+  pg-target-lab:
+    title: PostgreSQL 本體監控實驗（lab/targets/postgres/target：主從、slot、archive、連線、crash、promote、WAL 寫滿）
+    kind: experiment
+    visibility: public
+    url: https://github.com/HahaSula/alert-trust/tree/main/lab/targets/postgres/target
+    checked: "2026-11-08, exporter v0.20.1, PostgreSQL 16.15 與 17.11, Prometheus v3.13.5"
+    note: "results/summary.txt 是摘要；run-20261108.txt、run2-20261108.txt、run3-20261108.txt 是原始輸出"
+  pg-docs-monitoring:
+    title: PostgreSQL 文件：The Cumulative Statistics System（pg_stat_replication、pg_stat_wal_receiver、pg_stat_archiver、pg_stat_checkpointer）
+    kind: upstream-doc
+    visibility: public
+    url: https://www.postgresql.org/docs/17/monitoring-stats.html
+  pg-docs-replication:
+    title: PostgreSQL 文件：Replication 設定（synchronous_standby_names、max_slot_wal_keep_size）
+    kind: upstream-doc
+    visibility: public
+    url: https://www.postgresql.org/docs/17/runtime-config-replication.html
+  pg-docs-archiving:
+    title: PostgreSQL 文件：Continuous Archiving（archive_command 失敗時 WAL 不會回收）
+    kind: upstream-doc
+    visibility: public
+    url: https://www.postgresql.org/docs/17/continuous-archiving.html
+  pg-docs-connections:
+    title: PostgreSQL 文件：Connection Settings（max_connections、superuser_reserved_connections、reserved_connections）
+    kind: upstream-doc
+    visibility: public
+    url: https://www.postgresql.org/docs/17/runtime-config-connection.html
+  pg-docs-statements:
+    title: PostgreSQL 文件：pg_stat_statements
+    kind: upstream-doc
+    visibility: public
+    url: https://www.postgresql.org/docs/17/pgstatstatements.html
+  pg-docs-amcheck:
+    title: PostgreSQL 文件：amcheck 與 pg_index.indisvalid（索引損毀、建索引失敗）
+    kind: upstream-doc
+    visibility: public
+    url: https://www.postgresql.org/docs/17/amcheck.html
+  pg-source:
+    title: PostgreSQL 原始碼（REL_17_11、REL_16_15）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/postgres/postgres/tree/REL_17_11
+    checked: "2026-11-08, REL_17_11 與 REL_16_15"

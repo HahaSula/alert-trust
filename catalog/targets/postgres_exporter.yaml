@@ -4,13 +4,15 @@ kind: target
 family: database
 status: draft
 stages: [source]
-versions_checked: ["0.20.1"]
+versions_checked: ["0.20.1", "PostgreSQL 16.15", "PostgreSQL 17.11"]
 architecture: architecture/exporters.md
 role: >-
   Exporter 裡有兩套程式：舊的 exporter 套件產生 pg_up、pg_exporter_* 與 queries.yaml 自訂查詢，
   新的 collector 套件產生大部分 pg_* 與 pg_scrape_collector_*。兩套各自連資料庫、各自記錯誤，互不相通。
   「活著」因此有四層：Prometheus 抓得到 exporter（up）、舊連線還能用（pg_up）、新連線開得起來（collector 有結果）、
   每個 collector 查得到該看的資料（權限、版本、extension）。任何一層壞掉，上一層都可能仍顯示正常。
+  問題前面標「穩定｜」「使用｜」「HA｜」的訊號是 PostgreSQL 本體該看的項目，PG 來源、collector、權限與版本的對照見
+  [PostgreSQL 本體怎麼監控](../targets/postgres.md)。
 
 silent_failures:
   - text: >-
@@ -48,8 +50,10 @@ silent_failures:
   - text: >-
       pg_replication_lag_seconds 在 receive_lsn 等於 replay_lsn 時直接回 0。複本的 WAL receiver 斷線後不再收到新 WAL，
       兩者相等，lag 顯示 0；主庫完全沒有寫入時同樣是 0，而 pg_replication_last_replay_seconds 會一直變大。
-    evidence: code
-    source: pg-exporter-replication
+      但複本重啟後 receiver 從未連上時 receive_lsn 是 NULL，lag 改成顯示「距最後套用多久」（實測 103 秒）：同一個 metric 在兩種斷線下行為不同。
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-c-replication-lag]
   - text: >-
       mixin 的 PostgresReplicationLaggingMore1Hour 用 pg_replication_lag，這個名字在目前的 exporter 不存在（只有 pg_replication_lag_seconds），規則永遠回傳空。
     evidence: tested
@@ -65,10 +69,29 @@ silent_failures:
     evidence: code
     source: pg-exporter-legacy
   - text: >-
-      連線額滿時 exporter 用一般帳號也連不進去，表現成 pg_up=0 或 collector 消失，像是資料庫停機；
-      superuser_reserved_connections 保留給 superuser，exporter 用不到。PostgreSQL 16 起可以用 reserved_connections 加 pg_use_reserved_connections 留位子給 exporter。
-    evidence: inferred
-    source: pg-docs-roles
+      連線額滿時，沒有保留位子的 exporter：pg_up 仍是 1（舊架構的連線早就建立），新架構每次 scrape 開新連線失敗，collector 結果整組消失。
+      superuser_reserved_connections 只給 superuser；PostgreSQL 16 起授予 pg_use_reserved_connections 並設 reserved_connections，exporter 額滿時仍連得進去。
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-src-reserved]
+  - text: >-
+      stat_user_tables（預設開）對每張表呼叫 pg_table_size()／pg_indexes_size()，要拿 AccessShareLock。任何一張表被 ACCESS EXCLUSIVE 鎖住時，
+      exporter 唯一的連線卡在等鎖，整次 scrape 超時，up=0、所有 pg_* 消失；每次 scrape 再多一條等鎖的連線（5 秒 scrape 時一個 exporter 25 秒累積 5 條）。
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target-raw, pg-c-user-tables-size]
+  - text: >-
+      stat_wal_receiver 在 slot_name、status 或 upstream host 為 NULL 時整列跳過：沒有用 replication slot 的複本、沒有 pg_monitor 的帳號，
+      都得到 success=1 與零條 series。沒有 pg_monitor 時 pg_stat_replication 只回 pid，pg_stat_replication_pg_wal_lsn_diff 也不存在。
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-c-walrecv-slotnull, pg-src-walsnd-privs, pg-src-walrcv-privs]
+  - text: >-
+      單一 backend 當掉觸發的 crash recovery 只花 0.3 秒，pg_up 一直是 1，pg_postmaster_start_time_seconds 不變；
+      看得出來的只有 pg_stat_database 的 counter 歸零（crash recovery 會丟棄累積統計，13～17 都一樣）。
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-src-starttime, pg-src-crash-stats]
 
 contracts: [exporter-deadline]
 
@@ -209,7 +232,7 @@ signals:
     question: Replication 延遲量的是真的嗎
     signal: >-
       不要只看 pg_replication_lag_seconds（複本斷線時是 0）。複本端打開 --collector.stat_wal_receiver，
-      檢查 receiver 存在且 last_msg_receipt_time 夠新；主庫端看 pg_stat_replication 有沒有複本、pg_wal_lsn_diff 的位元組落後
+      檢查 receiver 存在且 last_msg_receipt_time 夠新（只對用 slot 的複本有效）；主庫端看 pg_stat_replication 有沒有複本、pg_wal_lsn_diff 的位元組落後。細節見 HA 組的 standby-streaming、wal-receiver、replication-lag
     metrics:
       - pg_replication_lag_seconds
       - pg_replication_is_replica
@@ -218,8 +241,9 @@ signals:
       - pg_stat_replication_pg_wal_lsn_diff
     evaluate_on: self
     applies_when: replica
-    evidence: code
-    source: pg-exporter-replication
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-c-replication-lag, pg-c-walrecv-slotnull]
     upstream: { status: partial, note: "mixin 用不存在的 pg_replication_lag；awesome 用 pg_replication_lag_seconds > 5，複本斷線時是 0" }
     rules:
       - rules/targets/postgres.yml#PostgresStandbyWalReceiverMissing
@@ -228,79 +252,368 @@ signals:
       - rules/targets/postgres.yml#PostgresReplicationLagBytes
 
   - id: replication-slots
+    aspect: ha
     tier: 2
     question: 有沒有沒人用的 replication slot 在累積 WAL
-    signal: pg_replication_slots_active == 0；搭配 safe_wal_size_bytes 看離 max_slot_wal_keep_size 還有多遠
-    metrics: [pg_replication_slots_active, pg_replication_slots_safe_wal_size_bytes, pg_replication_slots_wal_status]
+    signal: >-
+      pg_replication_slots_active == 0 持續一段時間；保留量看 pg_replication_slots_pg_wal_lsn_diff，
+      有設 max_slot_wal_keep_size 時看 safe_wal_size_bytes（負數＝已超過）與 wal_status（reserved → extended → unreserved → lost）。
+      slot 變成 lost 時 pg_wal_lsn_diff 與 safe_wal_size 的 series 會消失，只剩 wal_status{wal_status="lost"}
+    metrics: [pg_replication_slots_active, pg_replication_slots_pg_wal_lsn_diff, pg_replication_slots_safe_wal_size_bytes, pg_replication_slots_wal_status]
     evaluate_on: self
     applies_when: replication slot
-    evidence: upstream
-    source: pg-mixin
-    upstream: { status: yes, note: "mixin 與 awesome 都有 slots_active == 0" }
-    rules: [rules/targets/postgres.yml#PostgresReplicationSlotInactive]
-
+    silent_failure: >-
+      用 pg_wal_lsn_diff > X 的保留量規則在 slot lost 時回傳空；沒設 max_slot_wal_keep_size 時 safe_wal_size 根本不存在。
+      複本重啟後回報「requested WAL segment has already been removed」，pg_up=1、is_replica=1，只是永遠追不上
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-c-slots-query, pg-src-wal-avail]
+    upstream: { status: partial, note: "mixin 與 awesome 都有 slots_active == 0；都沒有 wal_status 或保留量" }
+    rules:
+      - rules/targets/postgres.yml#PostgresReplicationSlotInactive
+      - rules/targets/postgres.yml#PostgresReplicationSlotRetainingWal
+      - rules/targets/postgres.yml#PostgresReplicationSlotLost
   - id: wraparound
+    aspect: stability
     tier: 2
-    question: XID wraparound 還有多遠
+    question: XID 與 multixact wraparound 還有多遠
     signal: >-
-      pg_database_wraparound_age_datfrozenxid_seconds > 1e9（名稱是 seconds，實際是交易數；上限約 21 億）。
-      collector 預設關閉，沒打開時規則也要響
+      pg_database_wraparound_age_datfrozenxid_seconds > 1e9 預警、> 1.5e9 critical（名稱是 seconds，實際是交易數）。
+      PostgreSQL 在 2^31 − 4000 萬時開始警告、− 300 萬時拒絕新的 XID（16、17 相同）；multixact 看 datminmxid。
+      collector 預設關閉，沒打開時規則也要響。它量的是凍結進度，不是「現在被誰擋住」，那是 xmin-horizon
     metrics: [pg_database_wraparound_age_datfrozenxid_seconds, pg_database_wraparound_age_datminmxid_seconds]
     evaluate_on: self
     evidence: code
     source: pg-exporter-collectors
+    refs: [pg-c-wraparound-default, pg-c-wraparound-query, pg-src-xid-warn, pg-src-xid-stop]
     upstream: { status: no, note: "mixin 與 awesome 都沒有；awesome 的 low XID consumption 要自訂查詢 pg_txid_current" }
-    rules: [rules/targets/postgres.yml#PostgresXidWraparoundRisk, rules/targets/postgres.yml#PostgresWraparoundNotCollected]
+    rules:
+      - rules/targets/postgres.yml#PostgresXidWraparoundRisk
+      - rules/targets/postgres.yml#PostgresXidWraparoundCritical
+      - rules/targets/postgres.yml#PostgresMultixactWraparoundRisk
+      - rules/targets/postgres.yml#PostgresWraparoundNotCollected
+
+  # ---------- 以下是 PostgreSQL 本體（target-facing）的訊號，依「穩定、使用、HA」分組 ----------
+  # aspect 欄位目前只用來分組，頁面產生器還沒讀它；question 前綴「穩定｜」「使用｜」「HA｜」方便在總覽表辨識。
+
+  - id: restart-and-crash
+    aspect: stability
+    tier: 2
+    question: PostgreSQL 重啟過或經歷 crash recovery 嗎
+    signal: >-
+      postmaster 重啟看 changes(pg_postmaster_start_time_seconds)（--collector.postmaster 預設關閉）。
+      單一 backend 當掉觸發的 crash recovery 不會改變 postmaster 啟動時間，要看 pg_stat_database 的 counter 被歸零
+      （crash recovery 會丟棄累積統計，13～17 都一樣）：resets(pg_stat_database_xact_commit) > 0。stats_reset 在 crash 後仍是 NULL（輸出 0），幫不上忙；
+      手動 pg_stat_reset() 也會讓 counter 歸零
+    metrics: [pg_postmaster_start_time_seconds, pg_stat_database_xact_commit, pg_stat_database_stats_reset, pg_up]
+    evaluate_on: self
+    silent_failure: 只看 postmaster 啟動時間的 PostgresRestarted 在 crash recovery 時不會響；實測整個 recovery 0.3 秒，pg_up 一直是 1
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-src-starttime, pg-src-crash-reinit, pg-src-crash-stats]
+    upstream: { status: partial, note: "awesome 的 PostgresqlRestarted 用 time() - pg_postmaster_start_time_seconds < 60，同樣看不到 crash recovery" }
+    rules: [rules/targets/postgres.yml#PostgresRestarted, rules/targets/postgres.yml#PostgresCrashRecovery]
+
+  - id: wal-disk
+    aspect: stability
+    tier: 2
+    question: pg_wal 會不會把磁碟寫滿
+    signal: >-
+      pg_wal_size_bytes 遠大於 max_wal_size 表示有東西擋住 WAL 回收（inactive slot、archive 失敗、wal_keep_size）。
+      exporter 看不到磁碟剩餘空間，要配 node_exporter 的 filesystem metric；寫滿時 PostgreSQL PANIC，exporter 跟著失聯
+    metrics: [pg_wal_size_bytes, pg_wal_segments, pg_settings_max_wal_size_bytes]
+    evaluate_on: self
+    silent_failure: wal collector 需要 pg_monitor（pg_ls_waldir）；沒有權限時 collector 失敗，WAL 增長完全看不到
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-c-wal-query]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有 WAL 大小規則" }
+    rules: [rules/targets/postgres.yml#PostgresWalRetained]
+
+  - id: xmin-horizon
+    aspect: stability
+    tier: 2
+    question: 有沒有長交易或 idle in transaction 擋住 vacuum
+    signal: >-
+      pg_stat_activity_max_tx_duration 依 state 分開看，state="idle in transaction" 超過幾分鐘就該處理；
+      --collector.long_running_transactions 另有 pg_long_running_transactions_oldest_timestamp_seconds。
+      exporter 只給「秒數」，不給 backend_xid／backend_xmin 的 XID age，也不看 prepared transaction 與 slot 的 xmin
+    metrics: [pg_stat_activity_max_tx_duration, pg_long_running_transactions, pg_long_running_transactions_oldest_timestamp_seconds, pg_stat_user_tables_n_dead_tup]
+    evaluate_on: self
+    silent_failure: >-
+      沒有 pg_monitor 時看不到別人的 session，idle in transaction 數為 0；
+      pg_database_wraparound_age_datfrozenxid_seconds 是 datfrozenxid 的 age，不會因為交易卡住而反映出來
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-exp-target-raw, pg-c-activity-query, pg-c-longtx-query, pg-src-activity-privs]
+    upstream: { status: partial, note: "awesome 的 long running transaction 不分 state；mixin 沒有" }
+    rules: [rules/targets/postgres.yml#PostgresLongRunningTransaction, rules/targets/postgres.yml#PostgresIdleInTransaction]
+
+  - id: deadlocks-rollbacks
+    aspect: stability
+    tier: 3
+    question: deadlock 與 rollback 比例
+    signal: increase(pg_stat_database_deadlocks[5m])、rollback 佔交易的比例；兩者都是每個資料庫一條 counter
+    metrics: [pg_stat_database_deadlocks, pg_stat_database_xact_rollback, pg_stat_database_xact_commit]
+    evaluate_on: self
+    silent_failure: crash recovery 後 counter 歸零，increase() 會自動處理，但 offset 比較的規則會誤判
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-c-database-columns]
+    upstream: { status: yes, note: "mixin 與 awesome 都有 deadlock 規則" }
+    rules: [rules/targets/postgres.yml#PostgresDeadlocks, rules/targets/postgres.yml#PostgresHighRollbackRatio]
+
+  - id: checkpoint-pressure
+    aspect: stability
+    tier: 3
+    question: checkpoint 是不是大多被 WAL 量逼出來的
+    signal: >-
+      requested／(requested + timed) 的比例。PostgreSQL 16 以下用 pg_stat_bgwriter_checkpoints_*（預設開），
+      17 以上用 pg_stat_checkpointer_num_*（--collector.stat_checkpointer 預設關），規則要用 or 把兩邊接起來。
+      手動 CHECKPOINT、pg_basebackup 也算 requested
+    metrics: [pg_stat_bgwriter_checkpoints_req_total, pg_stat_bgwriter_checkpoints_timed_total, pg_stat_checkpointer_num_requested_total, pg_stat_checkpointer_num_timed_total, pg_settings_max_wal_size_bytes]
+    evaluate_on: self
+    applies_when: "PostgreSQL 17 以上要打開 --collector.stat_checkpointer"
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-c-bgwriter-17, pg-c-checkpointer-17, pg-src-checkpointer-view, pg-src-bgwriter16]
+    upstream: { status: partial, note: "mixin 與 awesome 的 TooManyCheckpointsRequested 只用 bgwriter 名稱，17 以上回傳空" }
+    rules: [rules/targets/postgres.yml#PostgresCheckpointsMostlyRequested, rules/targets/postgres.yml#PostgresCheckpointMetricsMissing]
+
+  - id: autovacuum
+    aspect: stability
+    tier: 3
+    question: autovacuum 跟得上嗎（dead tuple、bloat）
+    signal: >-
+      pg_stat_user_tables_n_dead_tup 佔比與 last_autovacuum 距今多久。只涵蓋 DSN 指定的那一個資料庫；
+      沒有 bloat 估算，table_size 持續成長只能當間接訊號。VACUUM 跑了但 dead tuple 沒減少，通常是 xmin-horizon 被擋住
+    metrics: [pg_stat_user_tables_n_dead_tup, pg_stat_user_tables_n_live_tup, pg_stat_user_tables_last_autovacuum, pg_stat_user_tables_table_size_bytes, pg_stat_progress_vacuum_heap_blks_scanned]
+    evaluate_on: self
+    silent_failure: >-
+      stat_user_tables 對每張表呼叫 pg_table_size()，要拿 AccessShareLock。任何一張表被 ACCESS EXCLUSIVE 鎖住（ALTER TABLE、VACUUM FULL）
+      時整次 scrape 卡住，up 變 0，而且每次 scrape 都留下一條等鎖的連線
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-exp-target-raw, pg-c-user-tables-size]
+    upstream: { status: partial, note: "mixin 的 TablesNotVaccumed 實際上不會響；awesome 的 bloat 規則需要自訂查詢" }
+    rules: [rules/targets/postgres.yml#PostgresTooManyDeadTuples]
+
+  - id: lock-blocks-exporter
+    aspect: stability
+    tier: 2
+    question: 一個表鎖會不會讓監控整個消失
+    signal: >-
+      給 exporter 帳號設 ALTER ROLE ... SET lock_timeout（例如 1s），讓 stat_user_tables 在等鎖時失敗而不是卡住；
+      同時把 --collection-timeout 設得比 scrape_timeout 短。訊號是 pg_scrape_collector_success{collector="stat_user_tables"} == 0 與 up == 0 同時出現
+    metrics: [up, scrape_duration_seconds, pg_scrape_collector_success, pg_stat_activity_count]
+    evaluate_on: self
+    silent_failure: >-
+      預設設定下表鎖期間 up=0、所有 pg_* 消失，看起來像 exporter 壞了；
+      exporter 自己的查詢在 PostgreSQL 裡排隊，5 秒 scrape 時一個 exporter 25 秒內累積 5 條等鎖連線，反過來吃掉 max_connections
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-exp-target-raw, pg-c-user-tables-size, pg-timeout-flag]
+    upstream: { status: no, note: "README 沒有提；mixin 與 awesome 都沒有" }
+    rules: [rules/targets/postgres.yml#PostgresExporterDown, rules/targets/postgres.yml#PostgresLockWaits]
+
+  - id: invalid-indexes
+    aspect: stability
+    tier: 3
+    question: 有沒有失效或損毀的索引
+    signal: >-
+      exporter 沒有任何 collector 看 pg_index.indisvalid（CREATE INDEX CONCURRENTLY 失敗留下的索引）或資料頁 checksum 失敗。
+      要用 queries.yaml（已棄用）或 sql_exporter 之類自訂查詢，或排程跑 amcheck，把結果當 metric 送出
+    metrics: []
+    evaluate_on: inventory
+    evidence: code
+    source: pg-exporter-collectors
+    refs: [pg-c-statio-indexes-default, pg-c-database-columns]
+    upstream: { status: partial, note: "awesome 的 invalid index 規則依賴自訂查詢 pg_genaral_index_info_pg_relation_size" }
+    rules: []
 
   - id: connection-headroom
+    aspect: usage
     tier: 2
     question: 連線還有餘裕嗎（包括留給 exporter 的）
     signal: >-
-      pg_stat_activity_count 加總對照 max_connections 減保留連線；額滿時 exporter 一起連不進去。
-      給 exporter 帳號設 CONNECTION LIMIT，16 以上可授予 pg_use_reserved_connections
-    metrics: [pg_stat_activity_count, pg_settings_max_connections, pg_settings_superuser_reserved_connections, pg_settings_reserved_connections]
+      pg_stat_activity_count 加總對照 max_connections 減 superuser_reserved_connections，16 以上再減 reserved_connections。
+      給 exporter 帳號授予 pg_use_reserved_connections（16 以上），額滿時它仍連得進去
+    metrics: [pg_stat_activity_count, pg_stat_database_numbackends, pg_settings_max_connections, pg_settings_superuser_reserved_connections, pg_settings_reserved_connections]
     evaluate_on: self
-    evidence: upstream
-    source: pg-mixin
-    upstream: { status: yes, note: "mixin 與 awesome 都有；都沒扣 16 起的 reserved_connections" }
+    silent_failure: >-
+      額滿時舊連線還在的 pg_up 仍是 1，新架構的 collector 結果整組消失；
+      沒有保留位子的 exporter 在最需要看連線數的時候看不到
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-src-reserved]
+    upstream: { status: partial, note: "mixin 與 awesome 都有；都沒扣 16 起的 reserved_connections" }
     rules: [rules/targets/postgres.yml#PostgresConnectionsNearLimit]
 
-  - id: pg-stat-statements
+  - id: sessions-and-locks
+    aspect: usage
     tier: 3
-    question: 查詢層級的統計收得到嗎
+    question: active、idle、等鎖的 session 各有多少
     signal: >-
-      --collector.stat_statements 預設關閉；打開後需要 shared_preload_libraries 與 CREATE EXTENSION，
-      缺了會讓 pg_scrape_collector_success{collector="stat_statements"} 變 0（由 collector-success 抓）
-    metrics: [pg_stat_statements_calls_total, pg_stat_statements_seconds_total, pg_scrape_collector_success]
+      pg_stat_activity_count 依 state 與 wait_event_type 分：active 太多是 CPU 或 I/O 不夠，wait_event_type="Lock" 是鎖等待。
+      pg_locks_count 只有各 mode 的數量，看不出誰擋誰；要 pg_blocking_pids() 的自訂查詢
+    metrics: [pg_stat_activity_count, pg_locks_count]
+    evaluate_on: self
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-c-activity-labels, pg-c-locks-query]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有鎖等待規則" }
+    rules: [rules/targets/postgres.yml#PostgresLockWaits]
+
+  - id: pg-stat-statements
+    aspect: usage
+    tier: 3
+    question: 查詢延遲：pg_stat_statements 收得到嗎
+    signal: >-
+      平均延遲 = rate(pg_stat_statements_seconds_total) / rate(pg_stat_statements_calls_total)，依 queryid。
+      collector 預設關閉，需要 shared_preload_libraries（每一台，包括複本）與 CREATE EXTENSION；
+      只輸出總耗時前 N 名（預設 100）並排除最快的 10%，series 會隨排名進出，沒有百分位數
+    metrics: [pg_stat_statements_calls_total, pg_stat_statements_seconds_total, pg_stat_statements_rows_total, pg_scrape_collector_success]
     evaluate_on: inventory
     applies_when: pg_stat_statements
+    silent_failure: 沒有 pg_read_all_stats 時只看得到自己的查詢，series 少了大半，collector 仍回報成功
     evidence: tested
-    source: pg-lab
-    refs: [exp-pg]
+    source: pg-target-lab
+    refs: [pg-exp-target, exp-pg, pg-c-statements-default, pg-c-statements-topn, pg-c-statements-pg17]
+    upstream: { status: partial, note: "mixin 的 SlowQueries 對 gauge 取 rate，實際上不會響" }
+    rules: []
+
+  - id: cache-and-temp
+    aspect: usage
+    tier: 3
+    question: cache hit 與 temp file
+    signal: >-
+      blks_hit／(blks_hit + blks_read) 只看 shared_buffers，OS page cache 命中也算 read，比例偏低不一定是問題；
+      rate(pg_stat_database_temp_bytes) 持續偏高表示 work_mem 不夠。適合畫圖，不適合當 alert
+    metrics: [pg_stat_database_blks_hit, pg_stat_database_blks_read, pg_stat_database_temp_files, pg_stat_database_temp_bytes]
+    evaluate_on: self
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-c-database-columns]
+    upstream: { status: partial, note: "awesome 有 cache hit 與 temp file 規則；門檻與 workload 綁得很緊" }
+    rules: []
+
+  - id: standby-streaming
+    aspect: ha
+    tier: 2
+    question: 主庫看得到每一台複本在 streaming 嗎
+    signal: >-
+      主庫端 pg_stat_replication_pg_wal_lsn_diff{state="streaming"} 的 series 數等於預期的複本數。
+      這是最可靠的一邊：複本停機、receiver 被斷、認證失敗，主庫上那一列都會消失
+    metrics: [pg_stat_replication_pg_wal_lsn_diff, pg_stat_replication_pg_current_wal_lsn_bytes, pg_replication_is_replica]
+    evaluate_on: self
+    applies_when: "有複本的主庫"
+    silent_failure: >-
+      沒有 pg_read_all_stats（pg_monitor）時，pg_stat_replication 只回 pid，state 與 LSN 是 NULL，
+      exporter 不輸出 pg_wal_lsn_diff，「主庫沒有複本」的規則會誤響，lag 規則則永遠回傳空
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-c-statrep-query, pg-src-walsnd-privs]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有「複本不見了」的規則" }
+    rules: [rules/targets/postgres.yml#PostgresPrimaryWithoutStandby, rules/targets/postgres.yml#PostgresStandbyCountDropped]
+
+  - id: wal-receiver
+    aspect: ha
+    tier: 2
+    question: 複本端的 WAL receiver 還在收嗎
+    signal: >-
+      --collector.stat_wal_receiver（預設關閉）的 last_msg_receipt_time 要夠新。
+      v0.20.1 在 slot_name 為 NULL 時整列跳過：沒有用 replication slot 的複本永遠沒有這組 metric
+    metrics: [pg_stat_wal_receiver_last_msg_receipt_time, pg_stat_wal_receiver_received_tli, pg_replication_is_replica]
+    evaluate_on: self
+    applies_when: "設了 primary_slot_name 的複本"
+    silent_failure: >-
+      沒有 slot 的複本與沒有 pg_monitor 的帳號都得到 success=1、零條 series，
+      「複本沒有 receiver」的規則在正常 streaming 時也會響
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-c-walrecv-default, pg-c-walrecv-slotnull, pg-c-walrecv-statusnull, pg-src-walrcv-privs]
+    upstream: { status: no }
+    rules: [rules/targets/postgres.yml#PostgresStandbyWalReceiverMissing, rules/targets/postgres.yml#PostgresWalReceiverStale]
+
+  - id: replication-lag
+    aspect: ha
+    tier: 2
+    question: 複本落後多少（位元組與時間）
+    signal: >-
+      用主庫端的位元組：pg_stat_replication_pg_wal_lsn_diff（current_wal_lsn − replay_lsn）。
+      時間延遲 pg_replication_lag_seconds 在 receive_lsn 等於 replay_lsn 時固定是 0：主庫沒寫入時是 0，複本斷線時也是 0。
+      exporter 不輸出 write_lag／flush_lag／replay_lag 與 sync_state；要時間延遲就自訂查詢或寫 heartbeat 表
+    metrics: [pg_stat_replication_pg_wal_lsn_diff, pg_replication_lag_seconds, pg_replication_last_replay_seconds]
+    evaluate_on: self
+    applies_when: replica
+    silent_failure: 複本斷線 40 秒、主庫持續寫入，pg_replication_lag_seconds 一直是 0
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-c-replication-lag, pg-c-statrep-query, pg-src-lag-clear]
+    upstream: { status: partial, note: "awesome 用 pg_replication_lag_seconds > 5；mixin 用不存在的 pg_replication_lag" }
+    rules: [rules/targets/postgres.yml#PostgresReplicationLagBytes]
+
+  - id: standby-conflicts
+    aspect: ha
+    tier: 3
+    question: 複本上的查詢被 recovery 取消了嗎
+    signal: >-
+      複本上 increase(pg_stat_database_conflicts[10m]) > 0，細項在 pg_stat_database_conflicts_confl_*（舊架構預設輸出）。
+      常見原因是 max_standby_streaming_delay 到期；打開 hot_standby_feedback 會把複本的 xmin 帶回主庫，換成主庫 bloat
+    metrics: [pg_stat_database_conflicts, pg_stat_database_conflicts_confl_snapshot, pg_stat_database_conflicts_confl_lock]
+    evaluate_on: self
+    applies_when: "有讀取流量的 hot standby"
+    evidence: code
+    source: pg-exporter-legacy
+    refs: [pg-c-conflicts-legacy, pg-c-database-columns]
+    upstream: { status: no }
+    rules: [rules/targets/postgres.yml#PostgresStandbyQueryConflicts]
+
+  - id: sync-replication
+    aspect: ha
+    tier: 2
+    question: 同步複寫的 standby 還在嗎
+    signal: >-
+      synchronous_standby_names 是字串、sync_state 是 pg_stat_replication 的欄位，exporter 都不輸出（settings 只輸出 bool／integer／real）。
+      同步 standby 消失時，commit 會卡住等待；要自訂查詢 sync_state 或至少用 standby-streaming 的 series 數判斷
+    metrics: [pg_stat_replication_pg_wal_lsn_diff]
+    evaluate_on: inventory
+    applies_when: synchronous_standby_names
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-c-settings-query, pg-c-statrep-query]
     upstream: { status: no }
     rules: []
 
-  - id: service-health
-    tier: 3
-    question: 服務本身與容量
-    signal: 長交易、deadlock、rollback 比例、dead tuple、重啟、主從角色改變
-    metrics:
-      - pg_stat_activity_max_tx_duration
-      - pg_stat_database_deadlocks
-      - pg_stat_database_xact_rollback
-      - pg_stat_database_xact_commit
-      - pg_stat_user_tables_n_dead_tup
-      - pg_stat_user_tables_n_live_tup
-      - pg_postmaster_start_time_seconds
-      - pg_replication_is_replica
+  - id: promotion
+    aspect: ha
+    tier: 2
+    question: 誰是主庫？有沒有兩個主庫
+    signal: >-
+      pg_replication_is_replica 依 cluster label 計數：is_replica == 0 的數量 > 1 是 split brain，= 0 是沒有主庫；
+      changes(pg_replication_is_replica) 抓 failover。需要在 target 上加 cluster label；timeline 不在 exporter 裡
+    metrics: [pg_replication_is_replica, pg_stat_replication_pg_wal_lsn_diff]
     evaluate_on: self
-    evidence: upstream
-    source: pg-awesome
-    upstream: { status: partial, note: "mixin 的 SlowQueries 對 gauge 取 rate、TablesNotVaccumed 拿 timestamp() 比 time() - 36000，實際上都不會響；awesome 的 restart、bloat、txid、invalid index 需要預設關閉的 collector 或自訂查詢" }
-    rules:
-      - rules/targets/postgres.yml#PostgresLongRunningTransaction
-      - rules/targets/postgres.yml#PostgresDeadlocks
-      - rules/targets/postgres.yml#PostgresHighRollbackRatio
-      - rules/targets/postgres.yml#PostgresTooManyDeadTuples
-      - rules/targets/postgres.yml#PostgresRestarted
-      - rules/targets/postgres.yml#PostgresRoleChanged
+    applies_when: "streaming replication；target 要有 cluster label"
+    silent_failure: 提升後舊主庫仍在跑，兩邊 is_replica 都是 0，各自的規則都正常；只有跨 instance 的計數看得出來
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-c-replication-lag]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有角色規則" }
+    rules: [rules/targets/postgres.yml#PostgresRoleChanged, rules/targets/postgres.yml#PostgresMultiplePrimaries, rules/targets/postgres.yml#PostgresNoPrimary]
+
+  - id: archiver
+    aspect: ha
+    tier: 2
+    question: WAL archive 有在成功嗎
+    signal: >-
+      increase(pg_stat_archiver_failed_count) > 0 且 archived_count 沒有增加。last_archive_age 在第一次成功前不存在，
+      閒置且沒設 archive_timeout 時本來就會變大。exporter 不輸出 last_failed_wal 與 .ready 檔數；失敗時 WAL 不能回收，接到 wal-disk
+    metrics: [pg_stat_archiver_failed_count, pg_stat_archiver_archived_count, pg_stat_archiver_last_archive_age, pg_wal_segments]
+    evaluate_on: self
+    applies_when: archive_mode=on
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-c-archiver-query]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有 archiver 規則" }
+    rules: [rules/targets/postgres.yml#PostgresArchiveFailing]

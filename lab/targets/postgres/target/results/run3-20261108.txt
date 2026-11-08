@@ -1,0 +1,41 @@
+補跑 archive：postgres 16.15-alpine、postgres-exporter v0.20.1；scrape 5s
+  $ [p16] SHOW archive_command
+    /archive.sh
+
+## G3 archive_command 開始失敗（23:11:28）
+  > pg_stat_archiver_failed_count{instance="e-p16"}
+    e-p16        pg_stat_archiver_failed_count{} = 0
+  > pg_stat_archiver_archived_count{instance="e-p16"}
+    e-p16        pg_stat_archiver_archived_count{} = 1
+  > pg_stat_archiver_last_archive_age{instance="e-p16"}
+    e-p16        pg_stat_archiver_last_archive_age{} = 32.67396
+  > pg_stat_archiver_failed_count{instance="e-p16"}
+    e-p16        pg_stat_archiver_failed_count{} = 9
+  > pg_stat_archiver_archived_count{instance="e-p16"}
+    e-p16        pg_stat_archiver_archived_count{} = 1
+  > pg_stat_archiver_last_archive_age{instance="e-p16"}
+    e-p16        pg_stat_archiver_last_archive_age{} = 122.72414
+  > pg_wal_segments{instance="e-p16"}
+    e-p16        pg_wal_segments{} = 7
+  > pg_wal_size_bytes{instance="e-p16"}
+    e-p16        pg_wal_size_bytes{} = 117440512
+  > increase(pg_stat_archiver_failed_count{instance="e-p16"}[1m])
+    e-p16        {} = 3.1762837480148223
+  > increase(pg_stat_archiver_archived_count{instance="e-p16"}[1m])
+    e-p16        {} = 0
+  $ [p16] select archived_count, failed_count, last_failed_wal, now() - last_failed_time as since_fail, now() - last_archived_time as since_ok from pg_stat_archiver
+    1|9|000000010000000000000002|00:00:10.018228|00:02:04.100892
+    .ready 檔數：6
+
+## G3 恢復（23:12:55）
+  > pg_stat_archiver_failed_count{instance="e-p16"}
+    e-p16        pg_stat_archiver_failed_count{} = 9
+  > pg_stat_archiver_archived_count{instance="e-p16"}
+    e-p16        pg_stat_archiver_archived_count{} = 1
+  > pg_stat_archiver_last_archive_age{instance="e-p16"}
+    e-p16        pg_stat_archiver_last_archive_age{} = 156.051251
+  > pg_wal_segments{instance="e-p16"}
+    e-p16        pg_wal_segments{} = 7
+    .ready 檔數：6
+
+## 結束（23:13:29）

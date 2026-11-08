@@ -1,0 +1,84 @@
+# PostgreSQL 本體監控實驗（穩定／使用／HA）：
+#   PG16：p16 主庫 + s16a（用 slot standby_a）+ s16b（不用 slot）
+#   PG17：p17 主庫（WAL 放在 160MB tmpfs）+ s17
+# 每台 PostgreSQL 一個 exporter（pg_monitor，打開預設關閉的 collector），另加沒有 pg_monitor 與沒有保留連線的對照。
+# 只對外開 Prometheus：127.0.0.1:23090。執行 ./run.sh，結束會 docker compose down -v。
+name: at-pg-target
+x-exp: &exp
+  image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+  command:
+    - --collector.stat_wal_receiver
+    - --collector.database_wraparound
+    - --collector.postmaster
+    - --collector.stat_checkpointer
+    - --collector.stat_statements
+    - --collector.long_running_transactions
+    - --collector.stat_activity_autovacuum
+x-pg16: &pg16
+  image: postgres:16.15-alpine
+  environment: { POSTGRES_PASSWORD: postgres }
+x-pg17: &pg17
+  image: postgres:17.11-alpine
+  environment: { POSTGRES_PASSWORD: postgres }
+x-standby: &standby
+  user: postgres
+  entrypoint: ["/bin/sh", "/standby.sh"]
+services:
+  p16:
+    <<: *pg16
+    volumes: ["./init-primary.sh:/docker-entrypoint-initdb.d/init.sh:ro", "./archive.sh:/archive.sh:ro"]
+    # run3.sh 用 ARCHIVE_COMMAND=/archive.sh 啟動，靠 /tmp/archive_fail 切換成敗；命令列 -c 的優先權高於 ALTER SYSTEM
+    command: >-
+      postgres -c shared_preload_libraries=pg_stat_statements -c archive_mode=on -c archive_command=${ARCHIVE_COMMAND:-/bin/true}
+      -c max_connections=30 -c deadlock_timeout=500ms -c log_checkpoints=on -c wal_keep_size=0
+  s16a:
+    <<: [*pg16, *standby]
+    volumes: ["./standby.sh:/standby.sh:ro"]
+    command: [p16, standby_a, standby_a]
+    depends_on: [p16]
+  s16b:
+    <<: [*pg16, *standby]
+    volumes: ["./standby.sh:/standby.sh:ro"]
+    command: [p16, standby_b, ""]
+    depends_on: [p16]
+  p17:
+    <<: *pg17
+    environment: { POSTGRES_PASSWORD: postgres, POSTGRES_INITDB_WALDIR: /pgwal/wal }
+    tmpfs: ["/pgwal:size=160m,uid=70,gid=70,mode=0700"]
+    volumes: ["./init-primary.sh:/docker-entrypoint-initdb.d/init.sh:ro"]
+    command: >-
+      postgres -c shared_preload_libraries=pg_stat_statements
+      -c max_connections=20 -c superuser_reserved_connections=3 -c reserved_connections=2
+  s17:
+    <<: [*pg17, *standby]
+    volumes: ["./standby.sh:/standby.sh:ro"]
+    command: [p17, standby_17, ""]
+    depends_on: [p17]
+  e-p16:
+    <<: *exp
+    environment: { DATA_SOURCE_NAME: "postgresql://exporter:exporter@p16:5432/postgres?sslmode=disable" }
+  e-p16-nomon:
+    <<: *exp
+    environment: { DATA_SOURCE_NAME: "postgresql://nomon:nomon@p16:5432/postgres?sslmode=disable" }
+  e-s16a:
+    <<: *exp
+    environment: { DATA_SOURCE_NAME: "postgresql://exporter:exporter@s16a:5432/postgres?sslmode=disable" }
+  e-s16a-nomon:
+    <<: *exp
+    environment: { DATA_SOURCE_NAME: "postgresql://nomon:nomon@s16a:5432/postgres?sslmode=disable" }
+  e-s16b:
+    <<: *exp
+    environment: { DATA_SOURCE_NAME: "postgresql://exporter:exporter@s16b:5432/postgres?sslmode=disable" }
+  e-p17:
+    <<: *exp
+    environment: { DATA_SOURCE_NAME: "postgresql://exporter_rsv:exporter@p17:5432/postgres?sslmode=disable" }
+  e-p17-norsv:
+    <<: *exp
+    environment: { DATA_SOURCE_NAME: "postgresql://exporter:exporter@p17:5432/postgres?sslmode=disable" }
+  e-s17:
+    <<: *exp
+    environment: { DATA_SOURCE_NAME: "postgresql://exporter:exporter@s17:5432/postgres?sslmode=disable" }
+  prometheus:
+    image: prom/prometheus:v3.13.5
+    ports: ["127.0.0.1:23090:9090"]
+    volumes: ["./prometheus.yml:/etc/prometheus/prometheus.yml:ro"]

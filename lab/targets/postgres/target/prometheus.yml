@@ -1,0 +1,14 @@
+global: { scrape_interval: 5s, scrape_timeout: 4s, evaluation_interval: 5s }
+scrape_configs:
+  - job_name: postgres
+    static_configs:
+      - { targets: ["e-p16:9187", "e-s16a:9187", "e-s16b:9187"], labels: { cluster: pg16 } }
+      - { targets: ["e-p17:9187", "e-s17:9187"], labels: { cluster: pg17 } }
+    relabel_configs: &inst
+      - { source_labels: [__address__], regex: "([^:]+):.*", target_label: instance }
+  - job_name: postgres-nomon
+    static_configs: [{ targets: ["e-p16-nomon:9187", "e-s16a-nomon:9187"], labels: { cluster: pg16 } }]
+    relabel_configs: *inst
+  - job_name: postgres-norsv
+    static_configs: [{ targets: ["e-p17-norsv:9187"], labels: { cluster: pg17 } }]
+    relabel_configs: *inst

@@ -1,0 +1,283 @@
+# PostgreSQL target 的參考：原始碼位置（在 tag 上取檔、依關鍵字找行號）與實驗結果。
+refs:
+  pg-c-activity-query:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_activity.go"
+    line: 90
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_activity.go#L90"
+  pg-c-activity-labels:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_activity.go"
+    line: 37
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_activity.go#L37"
+  pg-c-locks-query:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_locks.go"
+    line: 51
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_locks.go#L51"
+  pg-c-replication-lag:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_replication.go"
+    line: 67
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_replication.go#L67"
+  pg-c-statrep-query:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_replication.go"
+    line: 69
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_replication.go#L69"
+  pg-c-slots-query:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_replication_slots.go"
+    line: 136
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_replication_slots.go#L136"
+  pg-c-walrecv-default:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_walreceiver.go"
+    line: 25
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_walreceiver.go#L25"
+  pg-c-walrecv-slotnull:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_walreceiver.go"
+    line: 163
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_walreceiver.go#L163"
+  pg-c-walrecv-statusnull:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_walreceiver.go"
+    line: 168
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_walreceiver.go#L168"
+  pg-c-archiver-query:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_archiver.go"
+    line: 59
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_archiver.go#L59"
+  pg-c-wal-query:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_wal.go"
+    line: 60
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_wal.go#L60"
+  pg-c-wraparound-default:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_database_wraparound.go"
+    line: 27
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_database_wraparound.go#L27"
+  pg-c-wraparound-query:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_database_wraparound.go"
+    line: 55
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_database_wraparound.go#L55"
+  pg-c-postmaster-query:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_postmaster.go"
+    line: 47
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_postmaster.go#L47"
+  pg-c-longtx-query:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_long_running_transactions.go"
+    line: 58
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_long_running_transactions.go#L58"
+  pg-c-statements-default:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_statements.go"
+    line: 45
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_statements.go#L45"
+  pg-c-statements-topn:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_statements.go"
+    line: 195
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_statements.go#L195"
+  pg-c-statements-pg17:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_statements.go"
+    line: 211
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_statements.go#L211"
+  pg-c-bgwriter-17:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_bgwriter.go"
+    line: 128
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_bgwriter.go#L128"
+  pg-c-checkpointer-17:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_checkpointer.go"
+    line: 113
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_checkpointer.go#L113"
+  pg-c-checkpointer-default:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_checkpointer.go"
+    line: 30
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_checkpointer.go#L30"
+  pg-c-settings-query:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_setting.go"
+    line: 55
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_setting.go#L55"
+  pg-c-database-columns:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_database.go"
+    line: 229
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_database.go#L229"
+  pg-c-user-tables-size:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_user_tables.go"
+    line: 190
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_user_tables.go#L190"
+  pg-c-conflicts-legacy:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "exporter/postgres_exporter.go"
+    line: 171
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/exporter/postgres_exporter.go#L171"
+  pg-c-statio-indexes-default:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_statio_user_indexes.go"
+    line: 24
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_statio_user_indexes.go#L24"
+  pg-src-walsnd-privs:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/replication/walsender.c"
+    line: 4026
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/replication/walsender.c#L4026"
+  pg-src-walrcv-privs:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/replication/walreceiver.c"
+    line: 1547
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/replication/walreceiver.c#L1547"
+  pg-src-lag-clear:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/replication/walsender.c"
+    line: 2498
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/replication/walsender.c#L2498"
+  pg-src-starttime:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/postmaster/postmaster.c"
+    line: 1352
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/postmaster/postmaster.c#L1352"
+  pg-src-crash-reinit:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/postmaster/postmaster.c"
+    line: 3363
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/postmaster/postmaster.c#L3363"
+  pg-src-crash-stats:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/access/transam/xlog.c"
+    line: 5637
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/access/transam/xlog.c#L5637"
+  pg-src-xid-stop:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/access/transam/varsup.c"
+    line: 405
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/access/transam/varsup.c#L405"
+  pg-src-xid-warn:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/access/transam/varsup.c"
+    line: 419
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/access/transam/varsup.c#L419"
+  pg-src-reserved:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/init/postinit.c"
+    line: 956
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/init/postinit.c#L956"
+  pg-src-checkpointer-view:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1141
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_views.sql#L1141"
+  pg-src-bgwriter16:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1111
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/catalog/system_views.sql#L1111"
+  pg-src-wal-avail:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/access/transam/xlog.c"
+    line: 7905
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/access/transam/xlog.c#L7905"
+  pg-src-activity-privs:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/adt/pgstatfuncs.c"
+    line: 362
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/adt/pgstatfuncs.c#L362"
+  pg-exp-target:
+    kind: experiment
+    title: "PostgreSQL 本體監控實驗：主從、slot、archive、連線額滿、crash、promote、WAL 寫滿（PostgreSQL 16.15／17.11）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/postgres/target/results/summary.txt"
+  pg-exp-target-raw:
+    kind: experiment
+    title: "PostgreSQL 本體監控實驗：原始輸出（run、run2、run3）"
+    url: "https://github.com/HahaSula/alert-trust/tree/main/lab/targets/postgres/target/results"

@@ -1,0 +1,116 @@
+PostgreSQL 本體監控實驗：結果摘要（2026-11-08）
+
+環境：postgres 16.15-alpine 與 17.11-alpine、postgres-exporter v0.20.1、prom/prometheus v3.13.5，scrape_interval 5s、scrape_timeout 4s。
+拓撲見 ../compose.yml：PG16 主庫 p16 + s16a（slot standby_a）+ s16b（沒有 slot）；PG17 主庫 p17（pg_wal 在 160MB tmpfs）+ s17（沒有 slot）。
+每台一個 exporter（pg_monitor，打開 stat_wal_receiver、database_wraparound、postmaster、stat_checkpointer、stat_statements、
+long_running_transactions、stat_activity_autovacuum），另有 e-p16-nomon / e-s16a-nomon（沒有 pg_monitor）、
+e-p17-norsv（pg_monitor，沒有 pg_use_reserved_connections；e-p17 有）。
+
+原始輸出：
+  run-20261108.txt   run.sh 的 A～O。G 與 D 兩段把 ALTER SYSTEM 和其他語句放在同一個 psql -c，被包成一個交易而失敗
+                     （輸出裡看得到 ERROR）：archive 沒有真的失敗、slot 也沒有限制大小。其餘段落有效。
+  run2-20261108.txt  run2.sh 補跑 G、D（每個語句分開送），加上 F2（XID horizon）與 I2（lock_timeout 對照）。
+  names-e-p16.txt、names-e-p17.txt  兩個版本的 metric 名稱。nomon-errors.txt  沒有 pg_monitor 的 exporter 的錯誤。
+
+==== 穩定 ====
+
+L) kill -9 一個 backend（PG17）
+  - log：terminated by signal 9 -> all server processes terminated; reinitializing -> ready，共 0.3 秒。
+  - pg_up 一直是 1；pg_postmaster_start_time_seconds 不變（changes()[2m]=0）。
+  - pg_stat_database_xact_commit 6188 -> 241（resets()[2m]=1）；pg_stat_database_stats_reset 前後都是 0（NULL）。
+  => crash recovery 只能從 counter 歸零看出來；只看 postmaster 啟動時間的規則不會響。
+
+O) pg_wal 寫滿（PG17，160MB tmpfs，slot 擋住回收）
+  - 建 slot 後約 2 秒：PANIC could not write to file "pg_wal/xlogtemp": No space left -> reinitializing
+    -> automatic recovery -> FATAL 同樣原因 -> database system is shut down，容器退出。
+  - exporter：up=1、pg_up=0、collector 全部消失。
+  => WAL 寫滿等於停機；事前只有 pg_wal_size_bytes（與 node_exporter 的磁碟空間）可以預警。
+
+F) idle in transaction + 燒 3000 XID + UPDATE 全表 + VACUUM（PG16）
+  - VACUUM VERBOSE：10000 are dead but not yet removable；removable cutoff 3003 XIDs old。
+  - exporter：max_tx_duration{state="idle in transaction"}=36.6、pg_long_running_transactions=1、n_dead_tup=10001、
+    datfrozenxid age=3116；nomon 的 idle in transaction 數是 0。
+F2) 同上，直接查 pg_stat_activity（run2）
+  - idle in transaction 那列 age(backend_xid)=3001、backend_xmin 是 NULL；exporter 的 max_tx_duration=18.4。
+  => exporter 看得到「多久」，看不到「擋了幾個 XID」。READ COMMITTED 下擋住 vacuum 的是 backend_xid，自訂查詢要看兩欄。
+
+H) deadlock：pg_stat_database_deadlocks 0 -> 1。
+
+I) 一個 session 持有 ACCESS EXCLUSIVE（PG16，沒有設 lock_timeout）
+  - 兩個 exporter（有、沒有 pg_monitor）up=0、scrape_duration=4.0（timeout），pg_up 與所有 pg_* 消失。
+  - PostgreSQL 裡 11 條 exporter 的 stat_user_tables 查詢（兩個 exporter 合計）在等 relation lock（25 秒內），外加 1 條真的在等的 SELECT。
+  => 表鎖期間監控整個消失，exporter 還在累積連線。I2 見 run2。
+
+M) 手動 CHECKPOINT
+  - PG16 pg_stat_bgwriter_checkpoints_req_total 4 -> 5；PG17 pg_stat_checkpointer_num_requested_total 2 -> 3；
+    s17 pg_stat_checkpointer_restartpoints_done_total 1 -> 2。
+
+A2) metric 名稱差異
+  - 只在 17：pg_stat_checkpointer_* 9 個。只在 16：pg_stat_bgwriter_checkpoints_*、buffers_backend*、checkpoint_*_time_total。
+  - 名單裡 pg_replication_slots_pg_wal_lsn_diff、wal_status、pg_stat_archiver_last_archive_age 也只在 16，
+    原因是 p17 的 slot 從未保留 WAL（restart_lsn NULL）、p17 沒開 archive，不是版本差異。
+  - 字串與 enum 設定（synchronous_standby_names、archive_mode、archive_command、wal_level）都沒有 pg_settings_* metric。
+
+==== 使用 ====
+
+K) 16 條 app 連線（PG17，max_connections=20、superuser_reserved=3、reserved=2）
+  - app 連進 13 條，加上兩個 exporter 的舊架構常駐連線（exporter、exporter_rsv）= 15 個一般位子用完（另 1 條是 superuser 的 psql）；
+    再連：remaining connection slots are reserved for roles with privileges of the "pg_use_reserved_connections" role。
+  - e-p17-norsv：up=1、pg_up=1、collector 結果 0 條（log：remaining connection slots are reserved）。
+  - e-p17（有 pg_use_reserved_connections）：collector 22 條、sum(pg_stat_activity_count)=15。
+  => 一般使用者可用 = max_connections - superuser_reserved - reserved；exporter 要有保留位子。
+
+J) work_mem=64kB 排序 50 萬筆：temp_files=2、temp_bytes=13053888；cache hit 0.9988。
+J) pg_stat_statements series 數：e-p16 83、e-p16-nomon 27（沒有 pg_read_all_stats 只看到一部分，collector 仍回報成功）。
+
+==== HA ====
+
+A1) 基線
+  - s16a 有 pg_stat_wal_receiver_*；s16b、s17（沒有 slot）沒有，collector success=1。
+  - nomon 看 pg_stat_replication：只有 application_name，state、replay_lsn 是 NULL；看 pg_stat_wal_receiver：整列 NULL。
+  - e-p16-nomon 有 pg_stat_replication_pg_current_wal_lsn_bytes、沒有 pg_wal_lsn_diff。
+  => 沒有 slot 的複本沒有 receiver metric；沒有 pg_monitor 時 lag 規則回傳空、「主庫沒有複本」規則誤響。
+
+B) 閒置 60 秒：複本 lag_seconds=0、last_replay_seconds=46～50；主庫 pg_wal_lsn_diff=0；replay_lag NULL。
+C) 每秒一筆 commit：lag_seconds=0、last_replay_seconds=0.01～0.7、pg_wal_lsn_diff=0；replay_lag 約 0.0017s。
+
+E) repl 改 NOLOGIN 並中斷 walsender，主庫寫入 40 秒
+  - 所有複本 lag_seconds=0、last_replay_seconds 約 37；pg_stat_wal_receiver_* 消失；主庫 pg_stat_replication_* 消失；
+    slot standby_a active=0、pg_wal_lsn_diff=3976。
+  - 複本直接查：receive_lsn = replay_lsn、receiver 0 列、最後套用 39.9 秒前。
+  => 斷線時 lag_seconds=0；主庫那一列消失才是可靠訊號。
+
+D)（run.sh 版，slot 沒有上限）停 s16a、產生約 100MB WAL
+  - slot standby_a active=0、pg_wal_lsn_diff 33MB -> 100MB、wal_status=reserved、safe_wal_size_bytes 不存在
+    （max_slot_wal_keep_size=-1 時 safe_wal_size 是 NULL）、pg_wal_size_bytes 151MB -> 201MB。s16a 重啟後追上。
+
+N) PG17 提升 s17，p17 不動
+  - 兩台 is_replica=0；count by (cluster)(is_replica==0)：pg17=2、pg16=1（fmt.py 沒印 cluster label，順序是 pg16、pg17）。
+  - changes(is_replica[2m]) 只有 s17=1；p17 的 pg_stat_replication 消失；所有 lag_seconds=0。
+  - timeline：s17=2、p17=1（只能直接查 pg_control_checkpoint()）。
+  => split brain 要跨 instance 計數；timeline 不在 exporter 裡。
+
+==== 補跑（run2-20261108.txt、run3-20261108.txt） ====
+
+D2) 停 s16a，max_slot_wal_keep_size=64MB，另建從未使用的 slot orphan（immediately_reserve），產生約 120MB WAL（run2）
+  - 第一次量：standby_a pg_wal_lsn_diff=33MB、safe_wal_size=50MB、wal_status=reserved；
+    orphan pg_wal_lsn_diff=117MB、safe_wal_size=-33MB、wal_status=unreserved；pg_wal_size_bytes=134MB。
+  - 再產生 90MB 並 CHECKPOINT：兩個 slot wal_status=lost，pg_wal_lsn_diff 與 safe_wal_size_bytes 的 series 都消失
+    （restart_lsn 變 NULL）；pg_wal_size_bytes=235MB（下一次 checkpoint 才回收）。
+  - s16a 重啟：log 重複 FATAL requested WAL segment 000000010000000000000008 has already been removed；
+    up=1、pg_up=1、is_replica=1、沒有 wal receiver metric、主庫沒有它那一列；pg_replication_lag_seconds=103
+    （receive_lsn 為 NULL，公式走 now - 最後套用時間；和 E 的 0 不同）。
+  => 保留量規則在 slot lost 時回傳空，要另看 wal_status；同一個 lag metric 在兩種斷線下行為不同。
+
+I2) 鎖等待對照（run2）
+  - 預設：持有 ACCESS EXCLUSIVE 25 秒，up=0、collector 0 條、PostgreSQL 裡 5 條 exporter 等鎖。
+  - ALTER ROLE exporter SET lock_timeout='1s' 之後：up=1、scrape 1.05 秒、只有 stat_user_tables success=0，
+    pg_locks_count{mode="accessexclusivelock"}=1 照常。
+  => 給 exporter 帳號設 lock_timeout 可以把「整個消失」縮小成「一個 collector 失敗」。
+
+G) archive（run2 的 G 無效：ALTER SYSTEM SET archive_command 被 compose 命令列 -c 蓋掉，archived_count 照常增加）
+G3) archive_command=/archive.sh，touch /tmp/archive_fail 讓它失敗，產生 3 個 WAL 後等 75 秒（run3）
+  - failed_count 0 -> 9，increase(failed_count[1m]) 約 3.2；archived_count 停在 1；last_archive_age 32 -> 123 秒。
+  - 直接查：last_failed_wal=000000010000000000000002，.ready 檔 6 個（exporter 都不輸出）。
+  - 移除失敗旗標後 30 秒內 archived_count 仍是 1、.ready 仍 6 個（archiver 在失敗後休息約 60 秒）。
+  => 規則用「failed 增加且 archived 沒增加」，for 至少 1～2 分鐘；last_archive_age 在閒置時本來就會變大。

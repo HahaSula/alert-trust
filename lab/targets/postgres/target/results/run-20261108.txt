@@ -1,0 +1,496 @@
+環境：postgres 16.15-alpine / 17.11-alpine、postgres-exporter v0.20.1、prometheus v3.13.5；scrape 5s、timeout 4s
+PostgreSQL 16.15 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+
+## A1 基線：角色、collector 失敗、複寫（22:54:27）
+  > up
+    e-p16        up{} = 1
+    e-p16-nomon  up{} = 1
+    e-s16a       up{} = 1
+    e-s16a-nomon up{} = 1
+    e-s16b       up{} = 1
+    e-p17        up{} = 1
+    e-p17-norsv  up{} = 1
+    e-s17        up{} = 1
+  > pg_replication_is_replica
+    e-p16        pg_replication_is_replica{} = 0
+    e-p16-nomon  pg_replication_is_replica{} = 0
+    e-s16a       pg_replication_is_replica{} = 1
+    e-s16a-nomon pg_replication_is_replica{} = 1
+    e-s16b       pg_replication_is_replica{} = 1
+    e-p17        pg_replication_is_replica{} = 0
+    e-p17-norsv  pg_replication_is_replica{} = 0
+    e-s17        pg_replication_is_replica{} = 1
+  > pg_scrape_collector_success == 0
+    e-p16-nomon  pg_scrape_collector_success{collector=wal} = 0
+    e-s16a-nomon pg_scrape_collector_success{collector=wal} = 0
+  > pg_stat_replication_pg_wal_lsn_diff
+    e-p17        pg_stat_replication_pg_wal_lsn_diff{state=streaming,application_name=standby_17} = 0
+    e-p17-norsv  pg_stat_replication_pg_wal_lsn_diff{state=streaming,application_name=standby_17} = 0
+    e-p16        pg_stat_replication_pg_wal_lsn_diff{state=streaming,application_name=standby_a,slot_name=standby_a} = 0
+    e-p16        pg_stat_replication_pg_wal_lsn_diff{state=streaming,application_name=standby_b} = 0
+  > pg_stat_wal_receiver_last_msg_receipt_time
+    e-s16a       pg_stat_wal_receiver_last_msg_receipt_time{slot_name=standby_a,status=streaming,upstream_host=p16} = 1794149654.733953
+  > pg_replication_slots_active
+    e-p16        pg_replication_slots_active{slot_name=standby_a} = 1
+    e-p16-nomon  pg_replication_slots_active{slot_name=standby_a} = 1
+    e-p17        pg_replication_slots_active{slot_name=standby_a} = 0
+    e-p17-norsv  pg_replication_slots_active{slot_name=standby_a} = 0
+  > pg_replication_slots_pg_wal_lsn_diff
+    e-p16        pg_replication_slots_pg_wal_lsn_diff{slot_name=standby_a} = 0
+    e-p16-nomon  pg_replication_slots_pg_wal_lsn_diff{slot_name=standby_a} = 0
+  $ [p16] select application_name, state, sync_state, write_lag, flush_lag, replay_lag from pg_stat_replication
+    standby_a|streaming|async|||
+    standby_b|streaming|async|||
+  $ [s16b] select status, slot_name, sender_host from pg_stat_wal_receiver
+    streaming||p16
+  沒有 pg_monitor 的帳號看 pg_stat_replication／pg_stat_wal_receiver：
+    standby_a|NULL|NULL
+    standby_b|NULL|NULL
+    NULL|NULL
+
+## A2 版本差異：PG16 與 PG17 的 checkpoint 與 settings metric（22:54:28）
+  只在 PG16 有的 metric（不含 settings）：
+    pg_replication_slots_pg_wal_lsn_diff
+    pg_replication_slots_slot_confirmed_flush_lsn
+    pg_replication_slots_wal_status
+    pg_stat_archiver_last_archive_age
+    pg_stat_bgwriter_buffers_backend_fsync_total
+    pg_stat_bgwriter_buffers_backend_total
+    pg_stat_bgwriter_buffers_checkpoint_total
+    pg_stat_bgwriter_checkpoint_sync_time_total
+    pg_stat_bgwriter_checkpoint_write_time_total
+    pg_stat_bgwriter_checkpoints_req_total
+    pg_stat_bgwriter_checkpoints_timed_total
+  只在 PG17 有的 metric（不含 settings）：
+    pg_stat_checkpointer_buffers_written_total
+    pg_stat_checkpointer_num_requested_total
+    pg_stat_checkpointer_num_timed_total
+    pg_stat_checkpointer_restartpoints_done_total
+    pg_stat_checkpointer_restartpoints_req_total
+    pg_stat_checkpointer_restartpoints_timed_total
+    pg_stat_checkpointer_stats_reset_total
+    pg_stat_checkpointer_sync_time_total
+    pg_stat_checkpointer_write_time_total
+  > pg_settings_reserved_connections
+    e-p16        pg_settings_reserved_connections{} = 0
+    e-p16-nomon  pg_settings_reserved_connections{} = 0
+    e-s16a       pg_settings_reserved_connections{} = 0
+    e-s16a-nomon pg_settings_reserved_connections{} = 0
+    e-s16b       pg_settings_reserved_connections{} = 0
+    e-p17        pg_settings_reserved_connections{} = 2
+    e-p17-norsv  pg_settings_reserved_connections{} = 2
+    e-s17        pg_settings_reserved_connections{} = 0
+  > pg_settings_superuser_reserved_connections
+    e-p16        pg_settings_superuser_reserved_connections{} = 3
+    e-p16-nomon  pg_settings_superuser_reserved_connections{} = 3
+    e-s16a       pg_settings_superuser_reserved_connections{} = 3
+    e-s16a-nomon pg_settings_superuser_reserved_connections{} = 3
+    e-s16b       pg_settings_superuser_reserved_connections{} = 3
+    e-p17        pg_settings_superuser_reserved_connections{} = 3
+    e-p17-norsv  pg_settings_superuser_reserved_connections{} = 3
+    e-s17        pg_settings_superuser_reserved_connections{} = 3
+  > pg_settings_max_connections{instance=~"e-p1.*"}
+    e-p16        pg_settings_max_connections{} = 30
+    e-p16-nomon  pg_settings_max_connections{} = 30
+    e-p17        pg_settings_max_connections{} = 20
+    e-p17-norsv  pg_settings_max_connections{} = 20
+  字串型設定（synchronous_standby_names、archive_mode）有沒有 metric：
+    (若上面只有 archive_timeout 之類，表示字串與 enum 設定都不會輸出)
+
+## B 沒有寫入時的延遲（閒置 60 秒）（22:54:28）
+  > pg_replication_lag_seconds{instance=~"e-s.*"}
+    e-s16a       pg_replication_lag_seconds{} = 0
+    e-s16a-nomon pg_replication_lag_seconds{} = 0
+    e-s16b       pg_replication_lag_seconds{} = 0
+    e-s17        pg_replication_lag_seconds{} = 0
+  > pg_replication_last_replay_seconds{instance=~"e-s.*"}
+    e-s16a       pg_replication_last_replay_seconds{} = 50.265624
+    e-s16a-nomon pg_replication_last_replay_seconds{} = 45.989151
+    e-s16b       pg_replication_last_replay_seconds{} = 46.380264
+    e-s17        pg_replication_last_replay_seconds{} = 46.824288
+  > pg_stat_replication_pg_wal_lsn_diff{job="postgres"}
+    e-p17        pg_stat_replication_pg_wal_lsn_diff{state=streaming,application_name=standby_17} = 0
+    e-p16        pg_stat_replication_pg_wal_lsn_diff{state=streaming,application_name=standby_a,slot_name=standby_a} = 0
+    e-p16        pg_stat_replication_pg_wal_lsn_diff{state=streaming,application_name=standby_b} = 0
+  $ [p16] select application_name, replay_lag from pg_stat_replication
+    standby_a|
+    standby_b|
+
+## C 持續寫入（每秒一筆 commit，40 秒）（22:55:35）
+  > pg_replication_lag_seconds{instance=~"e-s.*"}
+    e-s16a       pg_replication_lag_seconds{} = 0
+    e-s16a-nomon pg_replication_lag_seconds{} = 0
+    e-s16b       pg_replication_lag_seconds{} = 0
+    e-s17        pg_replication_lag_seconds{} = 0
+  > pg_replication_last_replay_seconds{instance=~"e-s.*"}
+    e-s16a       pg_replication_last_replay_seconds{} = 0.008399
+    e-s16a-nomon pg_replication_last_replay_seconds{} = 0.735648
+    e-s16b       pg_replication_last_replay_seconds{} = 0.144554
+    e-s17        pg_replication_last_replay_seconds{} = 0.071778
+  > pg_stat_replication_pg_wal_lsn_diff{job="postgres"}
+    e-p17        pg_stat_replication_pg_wal_lsn_diff{state=streaming,application_name=standby_17} = 0
+    e-p16        pg_stat_replication_pg_wal_lsn_diff{state=streaming,application_name=standby_a,slot_name=standby_a} = 0
+    e-p16        pg_stat_replication_pg_wal_lsn_diff{state=streaming,application_name=standby_b} = 0
+  $ [p16] select application_name, write_lag, flush_lag, replay_lag from pg_stat_replication
+    standby_a|00:00:00.000473|00:00:00.001649|00:00:00.001726
+    standby_b|00:00:00.000209|00:00:00.001075|00:00:00.001134
+
+## E 切斷 WAL receiver（repl 改 NOLOGIN 並中斷 walsender），主庫繼續寫入 40 秒（22:56:21）
+  $ [p16] ALTER ROLE repl NOLOGIN; SELECT count(pg_terminate_backend(pid)) FROM pg_stat_replication;
+    2
+  > pg_replication_lag_seconds{cluster="pg16"}
+    e-p16        pg_replication_lag_seconds{} = 0
+    e-p16-nomon  pg_replication_lag_seconds{} = 0
+    e-s16a       pg_replication_lag_seconds{} = 0
+    e-s16a-nomon pg_replication_lag_seconds{} = 0
+    e-s16b       pg_replication_lag_seconds{} = 0
+  > pg_replication_last_replay_seconds{cluster="pg16"}
+    e-p16        pg_replication_last_replay_seconds{} = 0
+    e-p16-nomon  pg_replication_last_replay_seconds{} = 0
+    e-s16a       pg_replication_last_replay_seconds{} = 36.297978
+    e-s16a-nomon pg_replication_last_replay_seconds{} = 37.031638
+    e-s16b       pg_replication_last_replay_seconds{} = 37.461971
+  > pg_stat_wal_receiver_last_msg_receipt_time
+    (空)
+  > time() - pg_stat_wal_receiver_last_msg_receipt_time
+    (空)
+  > pg_stat_replication_pg_wal_lsn_diff{cluster="pg16"}
+    (空)
+  > pg_replication_slots_active{cluster="pg16",job="postgres"}
+    e-p16        pg_replication_slots_active{slot_name=standby_a} = 0
+  > pg_replication_slots_pg_wal_lsn_diff{cluster="pg16",job="postgres"}
+    e-p16        pg_replication_slots_pg_wal_lsn_diff{slot_name=standby_a} = 3976
+  $ [s16a] select pg_last_wal_receive_lsn() = pg_last_wal_replay_lsn() as receive_eq_replay, now() - pg_last_xact_replay_timestamp() as replay_age, (select count(*) from pg_stat_wal_receiver) as receivers
+    t|00:00:39.871864|0
+  $ [p16] ALTER ROLE repl LOGIN
+  > pg_stat_replication_pg_wal_lsn_diff{cluster="pg16",job="postgres"}
+    e-p16        pg_stat_replication_pg_wal_lsn_diff{state=streaming,application_name=standby_a,slot_name=standby_a} = 0
+    e-p16        pg_stat_replication_pg_wal_lsn_diff{state=streaming,application_name=standby_b} = 0
+
+## F idle in transaction 持有 xmin：燒 XID、製造 dead tuple、VACUUM（22:57:23）
+  > pg_stat_activity_max_tx_duration{instance="e-p16",datname="postgres",state=~"idle in transaction|active"} > 0
+    e-p16        pg_stat_activity_max_tx_duration{datname=postgres,state=idle in transaction,application_name=psql,wait_event_type=Client,usename=postgres} = 36.598214
+  > pg_long_running_transactions{instance="e-p16"}
+    e-p16        pg_long_running_transactions{} = 1
+  > pg_long_running_transactions_oldest_timestamp_seconds{instance="e-p16"}
+    e-p16        pg_long_running_transactions_oldest_timestamp_seconds{} = 36.582556
+  > pg_database_wraparound_age_datfrozenxid_seconds{instance="e-p16",datname="postgres"}
+    e-p16        pg_database_wraparound_age_datfrozenxid_seconds{datname=postgres} = 3116
+  > pg_stat_user_tables_n_dead_tup{instance="e-p16",relname="t"}
+    e-p16        pg_stat_user_tables_n_dead_tup{datname=postgres} = 10001
+  > pg_stat_user_tables_n_live_tup{instance="e-p16",relname="t"}
+    e-p16        pg_stat_user_tables_n_live_tup{datname=postgres} = 10000
+  > pg_stat_activity_count{instance="e-p16-nomon",datname="postgres",state="idle in transaction"}
+    e-p16-nomon  pg_stat_activity_count{datname=postgres,state=idle in transaction} = 0
+  $ [p16] select state, age(backend_xmin) as xmin_age, now() - xact_start as xact_age from pg_stat_activity where backend_xmin is not null and backend_type = 'client backend' order by 2 desc limit 3
+    active|3003|00:00:00
+  $ [p16] select n_dead_tup, last_vacuum is not null as vacuumed from pg_stat_user_tables where relname = 't'
+    10001|t
+    tuples: 0 removed, 20000 remain, 10000 are dead but not yet removable
+    removable cutoff: 836, which was 3003 XIDs old when operation ended
+    tuples: 0 removed, 0 remain, 0 are dead but not yet removable
+    removable cutoff: 836, which was 3003 XIDs old when operation ended
+  （idle in transaction session 在背景，100 秒後結束）
+
+## G archive_command 失敗（22:58:01）
+  $ [p16] ALTER SYSTEM SET archive_command = '/bin/false'; SELECT pg_reload_conf();
+    ERROR:  ALTER SYSTEM cannot run inside a transaction block
+  > pg_stat_archiver_failed_count{instance="e-p16"}
+    e-p16        pg_stat_archiver_failed_count{} = 0
+  > pg_stat_archiver_archived_count{instance="e-p16"}
+    e-p16        pg_stat_archiver_archived_count{} = 10
+  > pg_stat_archiver_last_archive_age{instance="e-p16"}
+    e-p16        pg_stat_archiver_last_archive_age{} = 25.72233
+  > pg_wal_segments{instance="e-p16"}
+    e-p16        pg_wal_segments{} = 7
+  > pg_wal_size_bytes{instance="e-p16"}
+    e-p16        pg_wal_size_bytes{} = 117440512
+  $ [p16] select archived_count, failed_count, last_failed_wal, now() - last_failed_time as since_fail, now() - last_archived_time as since_ok from pg_stat_archiver
+    10|0|||00:00:28.85584
+    .ready 檔數：0
+  $ [p16] ALTER SYSTEM RESET archive_command; SELECT pg_reload_conf();
+    ERROR:  ALTER SYSTEM cannot run inside a transaction block
+
+## H deadlock（22:58:32）
+  > pg_stat_database_deadlocks{instance="e-p16",datname="postgres"}
+    e-p16        pg_stat_database_deadlocks{datname=postgres} = 1
+
+## I 鎖等待：一個 session 持有 ACCESS EXCLUSIVE 45 秒，另一個在等（22:58:50）
+  > up{instance=~"e-p16.*"}
+    e-p16        up{} = 0
+    e-p16-nomon  up{} = 0
+  > scrape_duration_seconds{instance=~"e-p16.*"}
+    e-p16        scrape_duration_seconds{} = 4.00057326
+    e-p16-nomon  scrape_duration_seconds{} = 4.000951358
+  > pg_up{instance=~"e-p16.*"}
+    (空)
+  > sum by (instance) (pg_stat_activity_count{instance=~"e-p16.*",wait_event_type="Lock"})
+    (空)
+  > pg_locks_count{instance=~"e-p16.*",datname="postgres",mode="accessexclusivelock"}
+    (空)
+  $ [p16] select backend_type, state, wait_event_type, wait_event, left(query, 60) from pg_stat_activity where usename in ('exporter','nomon') or wait_event_type = 'Lock'
+    client backend|idle|Client|ClientRead|SELECT * FROM pg_stat_database_conflicts;
+    client backend|idle|Client|ClientRead|SELECT * FROM pg_stat_database_conflicts;
+    client backend|active|Lock|relation|SELECT
+    		current_database() datname,
+    		schemaname,
+    		relname
+    client backend|active|Lock|relation|SELECT
+    		current_database() datname,
+    		schemaname,
+    		relname
+    client backend|active|Lock|relation|SELECT count(*) FROM t
+    client backend|active|Lock|relation|SELECT
+    		current_database() datname,
+    		schemaname,
+    		relname
+    client backend|active|Lock|relation|SELECT
+    		current_database() datname,
+    		schemaname,
+    		relname
+    client backend|active|Lock|relation|SELECT
+    		current_database() datname,
+    		schemaname,
+    		relname
+    client backend|active|Lock|relation|SELECT
+    		current_database() datname,
+    		schemaname,
+    		relname
+    client backend|active|Lock|relation|SELECT
+    		current_database() datname,
+    		schemaname,
+    		relname
+    client backend|active|Lock|relation|SELECT
+    		current_database() datname,
+    		schemaname,
+    		relname
+    client backend|active|Lock|relation|SELECT
+    		current_database() datname,
+    		schemaname,
+    		relname
+    client backend|active|Lock|relation|SELECT
+    		current_database() datname,
+    		schemaname,
+    		relname
+    client backend|active|Lock|relation|SELECT
+    		current_database() datname,
+    		schemaname,
+    		relname
+
+## J temp file（22:59:46）
+  > pg_stat_database_temp_files{instance="e-p16",datname="postgres"}
+    e-p16        pg_stat_database_temp_files{datname=postgres} = 2
+  > pg_stat_database_temp_bytes{instance="e-p16",datname="postgres"}
+    e-p16        pg_stat_database_temp_bytes{datname=postgres} = 13053888
+  > pg_stat_database_blks_hit{instance="e-p16",datname="postgres"} / (pg_stat_database_blks_hit{instance="e-p16",datname="postgres"} + pg_stat_database_blks_read{instance="e-p16",datname="postgres"})
+    e-p16        {datname=postgres} = 0.9988169891741857
+  > topk(3, pg_stat_statements_seconds_total{instance="e-p16"})
+    e-p16        pg_stat_statements_seconds_total{datname=postgres} = 81.970847578
+    e-p16        pg_stat_statements_seconds_total{datname=postgres} = 214.977761854
+    e-p16        pg_stat_statements_seconds_total{datname=postgres} = 195.270869414
+  > count by (instance) (pg_stat_statements_calls_total)
+    e-p16        {} = 83
+    e-p16-nomon  {} = 27
+    e-p17        {} = 62
+    e-p17-norsv  {} = 62
+    e-s16a       {} = 47
+    e-s16a-nomon {} = 23
+    e-s16b       {} = 24
+    e-s17        {} = 24
+
+## D 停掉 s16a，主庫限制 max_slot_wal_keep_size=64MB，再產生 WAL（23:00:02）
+ Container at-pg-target-s16a-1 Stopping 
+ Container at-pg-target-s16a-1 Stopped 
+  $ [p16] ALTER SYSTEM SET max_slot_wal_keep_size = '64MB'; SELECT pg_reload_conf(); SELECT pg_create_physical_replication_slot('orphan', true);
+    ERROR:  ALTER SYSTEM cannot run inside a transaction block
+  > pg_replication_slots_active{instance="e-p16"}
+    e-p16        pg_replication_slots_active{slot_name=standby_a} = 0
+  > pg_replication_slots_pg_wal_lsn_diff{instance="e-p16"}
+    e-p16        pg_replication_slots_pg_wal_lsn_diff{slot_name=standby_a} = 33237696
+  > pg_replication_slots_safe_wal_size_bytes{instance="e-p16"}
+    (空)
+  > pg_replication_slots_wal_status{instance="e-p16"}
+    e-p16        pg_replication_slots_wal_status{slot_name=standby_a,slot_type=physical,wal_status=reserved} = 1
+  > pg_stat_replication_pg_wal_lsn_diff{instance="e-p16"}
+    e-p16        pg_stat_replication_pg_wal_lsn_diff{state=streaming,application_name=standby_b} = 0
+  > pg_wal_size_bytes{instance="e-p16"}
+    e-p16        pg_wal_size_bytes{} = 150994944
+  $ [p16] CHECKPOINT
+  產生更多 WAL 並 CHECKPOINT 之後：
+  > pg_replication_slots_pg_wal_lsn_diff{instance="e-p16"}
+    e-p16        pg_replication_slots_pg_wal_lsn_diff{slot_name=standby_a} = 100346912
+  > pg_replication_slots_safe_wal_size_bytes{instance="e-p16"}
+    (空)
+  > pg_replication_slots_wal_status{instance="e-p16"}
+    e-p16        pg_replication_slots_wal_status{slot_name=standby_a,slot_type=physical,wal_status=reserved} = 1
+  > pg_wal_size_bytes{instance="e-p16"}
+    e-p16        pg_wal_size_bytes{} = 201326592
+  $ [p16] select slot_name, active, wal_status, safe_wal_size, pg_size_pretty(pg_current_wal_lsn() - restart_lsn) from pg_replication_slots
+    standby_a|f|reserved||96 MB
+ Container at-pg-target-s16a-1 Starting 
+ Container at-pg-target-s16a-1 Started 
+  s16a 重新啟動之後（slot 已 lost）：
+  > pg_stat_wal_receiver_last_msg_receipt_time{instance="e-s16a"}
+    e-s16a       pg_stat_wal_receiver_last_msg_receipt_time{slot_name=standby_a,status=streaming,upstream_host=p16} = 1794150037.605094
+  > pg_replication_lag_seconds{instance="e-s16a"}
+    e-s16a       pg_replication_lag_seconds{} = 0
+  > pg_replication_last_replay_seconds{instance="e-s16a"}
+    e-s16a       pg_replication_last_replay_seconds{} = 33.835141
+  > pg_up{instance="e-s16a"}
+    e-s16a       pg_up{} = 1
+  > pg_stat_replication_pg_wal_lsn_diff{instance="e-p16"}
+    e-p16        pg_stat_replication_pg_wal_lsn_diff{state=streaming,application_name=standby_a,slot_name=standby_a} = 0
+    e-p16        pg_stat_replication_pg_wal_lsn_diff{state=streaming,application_name=standby_b} = 0
+      1 2026-11-08 15:00:40.642 UTC [15] ERROR:  permission denied for function pg_ls_waldir
+      1 2026-11-08 15:00:45.558 UTC [18] ERROR:  permission denied for function pg_ls_waldir
+      1 2026-11-08 15:00:50.610 UTC [20] ERROR:  permission denied for function pg_ls_waldir
+
+## M checkpoint：PG16 與 PG17（23:00:54）
+  > pg_stat_bgwriter_checkpoints_req_total
+    e-p16        pg_stat_bgwriter_checkpoints_req_total{} = 4
+    e-p16-nomon  pg_stat_bgwriter_checkpoints_req_total{} = 4
+    e-s16a       pg_stat_bgwriter_checkpoints_req_total{} = 1
+    e-s16a-nomon pg_stat_bgwriter_checkpoints_req_total{} = 1
+    e-s16b       pg_stat_bgwriter_checkpoints_req_total{} = 0
+  > pg_stat_checkpointer_num_requested_total
+    e-p17        pg_stat_checkpointer_num_requested_total{} = 2
+    e-p17-norsv  pg_stat_checkpointer_num_requested_total{} = 2
+    e-s17        pg_stat_checkpointer_num_requested_total{} = 0
+  > pg_stat_checkpointer_restartpoints_done_total
+    e-p17        pg_stat_checkpointer_restartpoints_done_total{} = 0
+    e-p17-norsv  pg_stat_checkpointer_restartpoints_done_total{} = 0
+    e-s17        pg_stat_checkpointer_restartpoints_done_total{} = 1
+  $ [p16] CHECKPOINT
+  $ [p17] CHECKPOINT
+  $ [s17] CHECKPOINT
+  > pg_stat_bgwriter_checkpoints_req_total
+    e-p16        pg_stat_bgwriter_checkpoints_req_total{} = 5
+    e-p16-nomon  pg_stat_bgwriter_checkpoints_req_total{} = 5
+    e-s16a       pg_stat_bgwriter_checkpoints_req_total{} = 1
+    e-s16a-nomon pg_stat_bgwriter_checkpoints_req_total{} = 1
+    e-s16b       pg_stat_bgwriter_checkpoints_req_total{} = 0
+  > pg_stat_checkpointer_num_requested_total
+    e-p17        pg_stat_checkpointer_num_requested_total{} = 3
+    e-p17-norsv  pg_stat_checkpointer_num_requested_total{} = 3
+    e-s17        pg_stat_checkpointer_num_requested_total{} = 0
+  > pg_stat_checkpointer_restartpoints_done_total
+    e-p17        pg_stat_checkpointer_restartpoints_done_total{} = 0
+    e-p17-norsv  pg_stat_checkpointer_restartpoints_done_total{} = 0
+    e-s17        pg_stat_checkpointer_restartpoints_done_total{} = 2
+
+## K 連線用完（p17：max_connections=20、superuser_reserved=3、reserved=2）（23:01:10）
+  > sum by (instance) (pg_stat_activity_count{instance=~"e-p17.*"})
+    e-p17        {} = 2
+    e-p17-norsv  {} = 2
+  > pg_stat_database_numbackends{instance="e-p17",datname="postgres"}
+    e-p17        pg_stat_database_numbackends{datname=postgres} = 3
+  $ [p17] select usename, count(*) from pg_stat_activity where backend_type = 'client backend' group by 1 order by 1
+    app|13
+    exporter|1
+    exporter_rsv|1
+    postgres|1
+    app 再連一次：psql: error: connection to server at "127.0.0.1", port 5432 failed: FATAL:  remaining connection slots are reserved for roles with privileges of the "pg_use_reserved_connections" role
+  > up{cluster="pg17"}
+    e-p17        up{} = 1
+    e-p17-norsv  up{} = 1
+    e-s17        up{} = 1
+  > pg_up{cluster="pg17"}
+    e-p17        pg_up{} = 1
+    e-p17-norsv  pg_up{} = 1
+    e-s17        pg_up{} = 1
+  > count by (instance) (pg_scrape_collector_success{cluster="pg17"})
+    e-p17        {} = 22
+    e-s17        {} = 22
+  > sum by (instance) (pg_stat_activity_count{instance=~"e-p17.*"})
+    e-p17        {} = 15
+      5 remaining connection slots are reserved for roles with privileges of the \
+
+## L 一個 backend 被 kill -9（crash recovery，postmaster 沒有重啟）（23:02:23）
+  > pg_postmaster_start_time_seconds{instance="e-p17"}
+    e-p17        pg_postmaster_start_time_seconds{} = 1794149620.55498
+  > pg_stat_database_xact_commit{instance="e-p17",datname="postgres"}
+    e-p17        pg_stat_database_xact_commit{datname=postgres} = 6188
+  > pg_stat_database_stats_reset{instance="e-p17",datname="postgres"}
+    e-p17        pg_stat_database_stats_reset{datname=postgres} = 0
+  kill -9 428
+  > pg_up{instance="e-p17"}
+    e-p17        pg_up{} = 1
+  > count(pg_scrape_collector_success{instance="e-p17"})
+    -            {} = 22
+  > pg_up{instance="e-p17"}
+    e-p17        pg_up{} = 1
+  > pg_postmaster_start_time_seconds{instance="e-p17"}
+    e-p17        pg_postmaster_start_time_seconds{} = 1794149620.55498
+  > pg_stat_database_xact_commit{instance="e-p17",datname="postgres"}
+    e-p17        pg_stat_database_xact_commit{datname=postgres} = 241
+  > pg_stat_database_stats_reset{instance="e-p17",datname="postgres"}
+    e-p17        pg_stat_database_stats_reset{datname=postgres} = 0
+  > resets(pg_stat_database_xact_commit{instance="e-p17",datname="postgres"}[2m])
+    e-p17        {datname=postgres} = 1
+  > changes(pg_postmaster_start_time_seconds{instance="e-p17"}[2m])
+    e-p17        {} = 0
+  > pg_replication_is_replica{cluster="pg17"}
+    e-p17        pg_replication_is_replica{} = 0
+    e-p17-norsv  pg_replication_is_replica{} = 0
+    e-s17        pg_replication_is_replica{} = 1
+2026-11-08 15:02:26.536 UTC [1] LOG:  server process (PID 428) was terminated by signal 9: Killed
+2026-11-08 15:02:26.538 UTC [1] LOG:  all server processes terminated; reinitializing
+2026-11-08 15:02:26.558 UTC [444] LOG:  database system was interrupted; last known up at 2026-11-08 15:00:55 UTC
+2026-11-08 15:02:26.817 UTC [1] LOG:  database system is ready to accept connections
+
+## N 提升 s17（p17 仍在跑：split brain）（23:02:53）
+  $ [s17] SELECT pg_promote()
+    t
+  > pg_replication_is_replica{cluster="pg17"}
+    e-p17        pg_replication_is_replica{} = 0
+    e-p17-norsv  pg_replication_is_replica{} = 0
+    e-s17        pg_replication_is_replica{} = 0
+  > count by (cluster) (pg_replication_is_replica{job="postgres"} == 0)
+    -            {} = 1
+    -            {} = 2
+  > changes(pg_replication_is_replica{cluster="pg17"}[2m])
+    e-p17        {} = 0
+    e-p17-norsv  {} = 0
+    e-s17        {} = 1
+  > pg_stat_replication_pg_wal_lsn_diff{cluster="pg17"}
+    (空)
+  > pg_stat_wal_receiver_last_msg_receipt_time{cluster="pg17"}
+    (空)
+  > pg_replication_lag_seconds{cluster="pg17"}
+    e-p17        pg_replication_lag_seconds{} = 0
+    e-p17-norsv  pg_replication_lag_seconds{} = 0
+    e-s17        pg_replication_lag_seconds{} = 0
+  $ [s17] select pg_is_in_recovery(), timeline_id from pg_control_checkpoint()
+    f|2
+  $ [p17] select pg_is_in_recovery(), timeline_id from pg_control_checkpoint()
+    f|1
+
+## O WAL 磁碟寫滿（p17 的 pg_wal 是 160MB tmpfs，用 slot 擋住回收）（23:03:17）
+  $ [p17] SELECT pg_create_physical_replication_slot('hold', true)
+    (hold,0/305C6B8)
+  > pg_wal_size_bytes{instance="e-p17"}
+    e-p17        pg_wal_size_bytes{} = 33554432
+    cannot exec in a stopped state
+  > up{instance="e-p17"}
+    e-p17        up{} = 1
+  > pg_up{instance="e-p17"}
+    e-p17        pg_up{} = 0
+  > pg_wal_size_bytes{instance="e-p17"}
+    (空)
+  > count(pg_scrape_collector_success{instance="e-p17"})
+    (空)
+      1 2026-11-08 15:03:19.844 UTC [527] PANIC:  could not write to file "pg_wal/xlogtemp.527": No space left on device
+      1 2026-11-08 15:03:20.453 UTC [1] LOG:  server process (PID 527) was terminated by signal 6: Aborted
+      1 2026-11-08 15:03:20.454 UTC [1] LOG:  all server processes terminated; reinitializing
+      1 2026-11-08 15:03:20.770 UTC [528] LOG:  database system was not properly shut down; automatic recovery in progress
+      1 2026-11-08 15:03:21.195 UTC [528] FATAL:  could not write to file "pg_wal/xlogtemp.528": No space left on device
+      1 2026-11-08 15:03:21.229 UTC [1] LOG:  database system is shut down
+  > up{instance="e-p17"}
+    e-p17        up{} = 1
+  > pg_up{instance="e-p17"}
+    e-p17        pg_up{} = 0
+  > count(pg_scrape_collector_success{instance="e-p17"})
+    (空)
+
+## 結束（23:04:00）

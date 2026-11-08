@@ -1,0 +1,128 @@
+補跑：postgres 16.15-alpine、postgres-exporter v0.20.1；scrape 5s
+
+## F2 idle in transaction 持有的是 backend_xid（不是 backend_xmin）（23:06:15）
+  $ [p16] select state, age(backend_xid) as xid_age, age(backend_xmin) as xmin_age, now() - xact_start as xact_age from pg_stat_activity where backend_type = 'client backend' and pid <> pg_backend_pid()
+    idle|||
+    idle in transaction|3001||00:00:18.542152
+  > pg_stat_activity_max_tx_duration{instance="e-p16",datname="postgres",state="idle in transaction"}
+    e-p16        pg_stat_activity_max_tx_duration{datname=postgres,state=idle in transaction,application_name=psql,wait_event_type=Client,usename=postgres} = 18.374825
+  > pg_database_wraparound_age_datfrozenxid_seconds{instance="e-p16",datname="postgres"}
+    e-p16        pg_database_wraparound_age_datfrozenxid_seconds{datname=postgres} = 3031
+
+## G archive_command 失敗（23:06:34）
+  > pg_stat_archiver_failed_count{instance="e-p16"}
+    e-p16        pg_stat_archiver_failed_count{} = 0
+  > pg_stat_archiver_archived_count{instance="e-p16"}
+    e-p16        pg_stat_archiver_archived_count{} = 4
+  > pg_stat_archiver_last_archive_age{instance="e-p16"}
+    e-p16        pg_stat_archiver_last_archive_age{} = 58.025221
+  $ [p16] ALTER SYSTEM SET archive_command = '/bin/false'
+  $ [p16] SELECT pg_reload_conf()
+    t
+  > pg_stat_archiver_failed_count{instance="e-p16"}
+    e-p16        pg_stat_archiver_failed_count{} = 0
+  > pg_stat_archiver_archived_count{instance="e-p16"}
+    e-p16        pg_stat_archiver_archived_count{} = 8
+  > pg_stat_archiver_last_archive_age{instance="e-p16"}
+    e-p16        pg_stat_archiver_last_archive_age{} = 75.354113
+  > pg_wal_segments{instance="e-p16"}
+    e-p16        pg_wal_segments{} = 6
+  > pg_wal_size_bytes{instance="e-p16"}
+    e-p16        pg_wal_size_bytes{} = 100663296
+  > increase(pg_stat_archiver_failed_count{instance="e-p16"}[1m])
+    e-p16        {} = 0
+  $ [p16] select archived_count, failed_count, last_failed_wal, now() - last_failed_time as since_fail, now() - last_archived_time as since_ok from pg_stat_archiver
+    8|0|||00:01:17.041274
+    .ready 檔數：0
+  $ [p16] ALTER SYSTEM RESET archive_command
+  $ [p16] SELECT pg_reload_conf()
+    t
+  恢復 archive_command 之後：
+  > pg_stat_archiver_archived_count{instance="e-p16"}
+    e-p16        pg_stat_archiver_archived_count{} = 8
+  > pg_stat_archiver_last_archive_age{instance="e-p16"}
+    e-p16        pg_stat_archiver_last_archive_age{} = 90.31829
+  > pg_wal_segments{instance="e-p16"}
+    e-p16        pg_wal_segments{} = 6
+
+## D 停掉 s16a，主庫限制 max_slot_wal_keep_size=64MB，再產生 WAL（23:08:08）
+ Container at-pg-target-s16a-1 Stopping 
+ Container at-pg-target-s16a-1 Stopped 
+  $ [p16] ALTER SYSTEM SET max_slot_wal_keep_size = '64MB'
+  $ [p16] SELECT pg_reload_conf()
+  $ [p16] SELECT pg_create_physical_replication_slot('orphan', true)
+    t
+    (orphan,0/3000028)
+  > pg_replication_slots_active{instance="e-p16"}
+    e-p16        pg_replication_slots_active{slot_name=orphan} = 0
+    e-p16        pg_replication_slots_active{slot_name=standby_a} = 0
+  > pg_replication_slots_pg_wal_lsn_diff{instance="e-p16"}
+    e-p16        pg_replication_slots_pg_wal_lsn_diff{slot_name=orphan} = 117440552
+    e-p16        pg_replication_slots_pg_wal_lsn_diff{slot_name=standby_a} = 33508840
+  > pg_replication_slots_safe_wal_size_bytes{instance="e-p16"}
+    e-p16        pg_replication_slots_safe_wal_size_bytes{slot_name=orphan,slot_type=physical} = -33554512
+    e-p16        pg_replication_slots_safe_wal_size_bytes{slot_name=standby_a,slot_type=physical} = 50331568
+  > pg_replication_slots_wal_status{instance="e-p16"}
+    e-p16        pg_replication_slots_wal_status{slot_name=orphan,slot_type=physical,wal_status=unreserved} = 1
+    e-p16        pg_replication_slots_wal_status{slot_name=standby_a,slot_type=physical,wal_status=reserved} = 1
+  > pg_wal_size_bytes{instance="e-p16"}
+    e-p16        pg_wal_size_bytes{} = 134217728
+  $ [p16] CHECKPOINT
+  再產生約 90MB WAL 並 CHECKPOINT 之後：
+  > pg_replication_slots_active{instance="e-p16"}
+    e-p16        pg_replication_slots_active{slot_name=orphan} = 0
+    e-p16        pg_replication_slots_active{slot_name=standby_a} = 0
+  > pg_replication_slots_pg_wal_lsn_diff{instance="e-p16"}
+    (空)
+  > pg_replication_slots_safe_wal_size_bytes{instance="e-p16"}
+    (空)
+  > pg_replication_slots_wal_status{instance="e-p16"}
+    e-p16        pg_replication_slots_wal_status{slot_name=orphan,slot_type=physical,wal_status=lost} = 1
+    e-p16        pg_replication_slots_wal_status{slot_name=standby_a,slot_type=physical,wal_status=lost} = 1
+  > pg_wal_size_bytes{instance="e-p16"}
+    e-p16        pg_wal_size_bytes{} = 234881024
+  $ [p16] select slot_name, active, wal_status, safe_wal_size, restart_lsn, pg_size_pretty(pg_current_wal_lsn() - restart_lsn) from pg_replication_slots
+    standby_a|f|lost|||
+    orphan|f|lost|||
+ Container at-pg-target-s16a-1 Starting 
+ Container at-pg-target-s16a-1 Started 
+  s16a 重新啟動之後：
+  > up{instance="e-s16a"}
+    e-s16a       up{} = 1
+  > pg_up{instance="e-s16a"}
+    e-s16a       pg_up{} = 1
+  > pg_replication_is_replica{instance="e-s16a"}
+    e-s16a       pg_replication_is_replica{} = 1
+  > pg_stat_wal_receiver_last_msg_receipt_time{instance="e-s16a"}
+    (空)
+  > pg_replication_lag_seconds{instance="e-s16a"}
+    e-s16a       pg_replication_lag_seconds{} = 103.1375
+  > pg_replication_last_replay_seconds{instance="e-s16a"}
+    e-s16a       pg_replication_last_replay_seconds{} = 103.1375
+  > pg_stat_replication_pg_wal_lsn_diff{instance="e-p16"}
+    (空)
+      6 FATAL:  could not receive data from WAL stream: ERROR:  requested WAL segment 000000010000000000000008 has already been removed
+
+## I2 鎖等待對照：預設 vs exporter 帳號設 lock_timeout=1s（23:09:07）
+  [預設] 持有 ACCESS EXCLUSIVE 30 秒：
+  > up{instance="e-p16"}
+    e-p16        up{} = 0
+  > count(pg_scrape_collector_success{instance="e-p16"})
+    (空)
+  $ [p16] select usename, count(*) from pg_stat_activity where wait_event_type = 'Lock' group by 1
+    exporter|5
+  $ [p16] ALTER ROLE exporter SET lock_timeout = '1s'
+  [lock_timeout=1s] 持有 ACCESS EXCLUSIVE 30 秒：
+  > up{instance="e-p16"}
+    e-p16        up{} = 1
+  > scrape_duration_seconds{instance="e-p16"}
+    e-p16        scrape_duration_seconds{} = 1.053483385
+  > pg_scrape_collector_success{instance="e-p16"} == 0
+    e-p16        pg_scrape_collector_success{collector=stat_user_tables} = 0
+  > sum(pg_stat_activity_count{instance="e-p16",wait_event_type="Lock"})
+    (空)
+  > pg_locks_count{instance="e-p16",datname="postgres",mode="accessexclusivelock"}
+    e-p16        pg_locks_count{datname=postgres,mode=accessexclusivelock} = 1
+  $ [p16] select usename, count(*) from pg_stat_activity where wait_event_type = 'Lock' group by 1
+
+## 結束（23:10:35）

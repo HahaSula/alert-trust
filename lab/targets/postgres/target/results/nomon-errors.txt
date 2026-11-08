@@ -1,0 +1,8 @@
+     64 e-p16-nomon-1    msg="collector failed" name=wal err="pq: permission denied for function pg_ls_waldir"
+     47 e-p16-nomon-1   msg="collector failed" name=wal err="pq: permission denied for function pg_ls_waldir"
+      1 e-s16a-nomon-1   msg="Error opening connection to database" err="error querying postgresql version: dial tcp 172.25.0.14:5432: connect: connection refused"
+      5 e-s16a-nomon-1   msg="Error opening connection to database" err="error querying postgresql version: dial tcp: lookup s16a on 127.0.0.11:53: no such host"
+    105 e-s16a-nomon-1   msg="collector failed" name=wal err="pq: permission denied for function pg_ls_waldir"
+      1 e-s16a-nomon-1   msg="error scraping dsn" err="Error opening connection to database (postgresql://nomon:PASSWORD_REMOVED@s16a:5432/postgres?sslmode=disable): dial tcp 172.25.0.14:5432: connect: connection refused" dsn="postgresql://nomon:PASSWORD_REMOVED@s16a:5432/postgres?sslmode=disable"
+      4 e-s16a-nomon-1   msg="error scraping dsn" err="Error opening connection to database (postgresql://nomon:PASSWORD_REMOVED@s16a:5432/postgres?sslmode=disable): dial tcp: lookup s16a on 127.0.0.11:53: no such host" dsn="postgresql://nomon:PASSWORD_REMOVED@s16a:5432/postgres?sslmode=disable"
+      1 e-s16a-nomon-1   msg="error scraping dsn" err="Error opening connection to database (postgresql://nomon:PASSWORD_REMOVED@s16a:5432/postgres?sslmode=disable): driver: bad connection" dsn="postgresql://nomon:PASSWORD_REMOVED@s16a:5432/postgres?sslmode=disable"
