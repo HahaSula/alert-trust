@@ -17,8 +17,11 @@ _CACHE: dict = {}
 
 def load_refs() -> dict:
     if not _CACHE:
-        for name in ("refs-code.yaml", "refs.yaml"):
-            with open(os.path.join(ROOT, "catalog", name), encoding="utf-8") as f:
+        import glob
+        paths = [os.path.join(ROOT, "catalog", n) for n in ("refs-code.yaml", "refs.yaml")]
+        paths += sorted(glob.glob(os.path.join(ROOT, "catalog", "refs.d", "*.yaml")))
+        for path in paths:
+            with open(path, encoding="utf-8") as f:
                 _CACHE.update((yaml.safe_load(f) or {}).get("refs") or {})
     return _CACHE
 

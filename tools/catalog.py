@@ -71,8 +71,9 @@ def load_sources(root: str = ROOT) -> dict:
 def load_refs(root: str = ROOT) -> dict:
     """catalog/refs-code.yaml (generated, pinned source lines) plus catalog/refs.yaml (experiments)."""
     out: dict = {}
-    for name in ("refs-code.yaml", "refs.yaml"):
-        path = os.path.join(root, "catalog", name)
+    paths = [os.path.join(root, "catalog", n) for n in ("refs-code.yaml", "refs.yaml")]
+    paths += sorted(glob.glob(os.path.join(root, "catalog", "refs.d", "*.yaml")))
+    for path in paths:
         if os.path.exists(path):
             for key, val in ((_load(path) or {}).get("refs") or {}).items():
                 if key in out:
