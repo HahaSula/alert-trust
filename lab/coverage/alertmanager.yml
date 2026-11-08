@@ -1,0 +1,2 @@
+route: { receiver: devnull }
+receivers: [{ name: devnull }]

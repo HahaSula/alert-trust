@@ -1,0 +1,18 @@
+# 覆蓋檢查器的驗證環境：受測 Prometheus、外部觀察者、Alertmanager，刻意埋了三種缺口。
+name: alert-trust-coverage
+services:
+  prom-a:
+    image: prom/prometheus:v3.13.5
+    command: [--config.file=/etc/prometheus/prometheus.yml]
+    volumes: [./prom-a.yml:/etc/prometheus/prometheus.yml:ro, ./rules-prom-a.yml:/etc/prometheus/rules.yml:ro]
+    ports: ["19301:9090"]
+  meta:
+    image: prom/prometheus:v3.13.5
+    command: [--config.file=/etc/prometheus/prometheus.yml]
+    volumes: [./meta.yml:/etc/prometheus/prometheus.yml:ro, ./rules-meta.yml:/etc/prometheus/rules.yml:ro]
+    ports: ["19302:9090"]
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    command: [--config.file=/etc/alertmanager/alertmanager.yml]
+    volumes: [./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro]
+    ports: ["19303:9093"]

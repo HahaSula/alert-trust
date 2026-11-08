@@ -1,0 +1,8 @@
+global: { scrape_interval: 10s, evaluation_interval: 10s }
+rule_files: [/etc/prometheus/rules.yml]
+scrape_configs:
+  # 刻意用不含 "prometheus" 的 job 名稱：規則的 job=~".*prometheus.*" 對不上，應判為「規則在但沒資料」
+  - job_name: prom-a-self
+    static_configs: [{ targets: ['prom-a:9090'] }]
+  - job_name: alertmanager
+    static_configs: [{ targets: ['alertmanager:9093'] }]

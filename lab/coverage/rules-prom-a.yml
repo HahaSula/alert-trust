@@ -1,0 +1,46 @@
+groups:
+- name: canary
+  rules:
+  - alert: Watchdog
+    expr: vector(1)
+    labels:
+      severity: none
+      component: prometheus
+      tier: '1'
+      scope: pipeline
+    annotations:
+      summary: 送到外部 dead man's switch，停止抵達就要告警
+      runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#watchdog
+  - alert: DataHeartbeatMyJob
+    expr: time() - max(timestamp(M{job="my-job"})) < 300
+    labels:
+      severity: none
+      component: prometheus
+      tier: '1'
+      scope: pipeline
+    annotations:
+      summary: my-job 的資料管線活著；停止抵達代表 scrape、寫入或查詢斷了
+      runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#job-freshness
+  - alert: KnownTrueCanary
+    expr: rate(M{job="my-job"}[10m]) >= 0
+    for: 5m
+    labels:
+      severity: none
+      component: prometheus
+      tier: '1'
+      scope: pipeline
+    annotations:
+      summary: 帶 for 的判斷能成立；停止抵達代表 for 在重置或行程在重啟
+      runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#known-true-canary
+- name: self
+  rules:
+  - alert: RuleEvaluationFailures
+    expr: increase(prometheus_rule_evaluation_failures_total[10m]) > 0
+    labels:
+      severity: critical
+      component: prometheus
+      tier: '1'
+      scope: rule_group
+    annotations:
+      summary: Rule 查詢或寫入失敗，請查 /api/v1/rules 的 lastError
+      runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#rule-failures
