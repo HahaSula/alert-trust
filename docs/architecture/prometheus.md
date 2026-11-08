@@ -57,7 +57,7 @@ Series 表分 16384 個 stripe[^p-head-stripe]，每條 series 一把鎖，chunk
 
 <!-- figure: query-slots -->
 
-**圖**　一條 rule 的查詢要過兩次同一組 slot：解析完先釋放，執行時再搶一次。實驗中 `--query.timeout` 設 300 ms、只有 1 個 slot：在 ② 被佔住時 300 ms 回傳 context deadline exceeded；在 ① 被佔住 2 秒時不受 timeout 影響，2001 ms 後成功。② 失敗屬於查詢失敗，pending 狀態不變。[^p-engine-queue][^p-maxconc][^exp-pend]
+**圖**　**機制**（原始碼）：一條 rule 的查詢要過兩次同一組 slot，解析完先釋放，執行時再搶一次。**一組實驗數據**： `--query.timeout` 設 300 ms、只有 1 個 slot：在 ② 被佔住時 300 ms 回傳 context deadline exceeded；在 ① 被佔住 2 秒時不受 timeout 影響，2001 ms 後成功。② 失敗屬於查詢失敗，pending 狀態不變。[^p-engine-queue][^p-maxconc][^exp-pend]
 {: .at-caption }
 
 Grafana 的重查詢會讓 rule group 變慢，實驗中從幾秒變成 40 秒，scrape 不受影響。<span class="at-chip at-ev-tested">實測</span>[^exp-prom-query]
@@ -77,7 +77,7 @@ Grafana 的重查詢會讓 rule group 變慢，實驗中從幾秒變成 40 秒�
 
 <!-- figure: rule-group-modes -->
 
-**圖**　Rule group 的三種執行情況。A：預設，group 內依序。B：2.55 起開 `concurrent-rule-eval`，K 個 slot 搶不到時不等，直接在 group 的 goroutine 裡跑，所以 K 不是硬上限。C：不同 group 各自一條 goroutine，起跑點依 hash 錯開。A、B 的時間與峰值是每條 rule 100 ms 時量到的數字，C 是示意。[^p-group-eval][^p255-max-concurrent][^p255-concurrency-ctrl][^exp-pend]
+**圖**　Rule group 的三種執行情況。A：預設，group 內依序。B：2.55 起開 `concurrent-rule-eval`，K 個 slot 搶不到時不等，直接在 group 的 goroutine 裡跑，所以 K 不是硬上限。C：不同 group 各自一條 goroutine，起跑點依 hash 錯開。**機制**來自原始碼：group 內依序、並行 slot 搶不到時不等待。A、B 的時間與峰值是**一組實驗數據**（每條 rule 100 ms），C 是示意。[^p-group-eval][^p255-max-concurrent][^p255-concurrency-ctrl][^exp-pend]
 {: .at-caption }
 
 相關契約：[Rule group 要在 interval 內跑完](../contracts.md#group-within-interval)。

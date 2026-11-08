@@ -1,0 +1,17 @@
+# 輕量 lab：1 個假 exporter、2 個 Prometheus（2.51.2、3.13.5），跑約 25 分鐘。不做負載測試。
+name: alert-trust-jitter
+services:
+  exporter:
+    image: python:3.12.7-alpine
+    command: [python3, -u, /app/exporter.py]
+    volumes: [./exporter.py:/app/exporter.py:ro]
+  prom251:
+    image: prom/prometheus:v2.51.2
+    command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.path=/prometheus]
+    volumes: [./prometheus.yml:/etc/prometheus/prometheus.yml:ro, ./rules.yml:/etc/prometheus/rules.yml:ro]
+    ports: ["19191:9090"]
+  prom313:
+    image: prom/prometheus:v3.13.5
+    command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.path=/prometheus]
+    volumes: [./prometheus.yml:/etc/prometheus/prometheus.yml:ro, ./rules.yml:/etc/prometheus/rules.yml:ro]
+    ports: ["19192:9090"]

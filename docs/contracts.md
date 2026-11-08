@@ -66,13 +66,15 @@ Sample 帶的是 scrape 開始的時間，要等寫入完成才查得到。Rule 
 
 <!-- figure: scrape-window-timeline -->
 
-**圖**　實際間隔 I = 120 秒、scrape 耗時 d ≈ 100 秒時（實驗用的條件）。綠點是 rule 執行當下已寫入的 sample，空心紅點是時間戳在視窗內但還沒寫入的 sample。Evaluation 落在 scrape 開始後 0–60 秒（A）看得到 2 點；60–100 秒（B）只剩 1 點，`rate` 回傳空；加上 2 分鐘 offset（C）後，視窗移到已寫入的區段。[^exp-prom-silent][^exp-prom-range][^p-scrape-report]
+**圖**　**機制**（原始碼）：sample 的時間戳是 scrape 開始的時間，寫入後才查得到；視窗內不足 2 點時 `rate` 回傳空。**這組數據**：I = 120 秒、d ≈ 100 秒。綠點是 rule 執行當下已寫入的 sample，空心紅點是時間戳在視窗內但還沒寫入的 sample。Evaluation 落在 scrape 開始後 0–60 秒（A）看得到 2 點；60–100 秒（B）只剩 1 點；100–120 秒最新一點已寫入，又回到 2 點；加上 2 分鐘 offset（C）後，視窗移到已寫入的區段。10 組不同參數的實測見[多組數據](https://github.com/HahaSula/alert-trust/blob/main/lab/jitter/results/run-20261108.md)。[^p-scrape-report][^p-extrapolated][^exp-prom-silent][^exp-jitter]
 {: .at-caption }
 
 <!-- figure: pending-reset -->
 
-**圖**　`evaluation_interval` 30 秒、I = 120 秒時，看得到的 sample 數依「成立、成立、空、空」循環。每次空結果都把 pending 刪掉，`ActiveAt` 跟著重設；`for: 3m` 需要連續 7 次成立，永遠到不了。實驗中這條 alert 跑 25 分鐘重置 9 次，從未 firing。[^p-alert-delete][^exp-prom-silent]
+**圖**　**機制**（原始碼）：evaluation 成功但結果裡沒有這個 alert 時，pending 被刪除，`ActiveAt` 重設。**這組數據**：`evaluation_interval` 30 秒、I = 120 秒時，每個 scrape 週期只有 4 個固定的 evaluation 時間點，看得到的 sample 數依「成立、成立、空、空」循環；`for: 3m` 需要連續 7 次成立，永遠到不了。依相位不同，空結果是 25% 或 50%（平均 33%）；多組數據中這個條件在兩個版本都量到約 50%，pending 重新開始 10–11 次，從未 firing。[^p-alert-delete][^exp-prom-silent][^exp-jitter]
 {: .at-caption }
+
+**多組數據的結論。**10 組參數在 2.51.2 與 3.13.5 各跑一次[^exp-jitter]：留有餘裕的組合（`O ≥ d`，或 `R ≥ 3I`）全部 0% 空結果並 firing；視窗剛好等於 2S 的組合即使加了 offset 仍有約 20% 空結果，因為 scrape 時間戳有毫秒級抖動；`s120-d60-r5m` 在 2.51.2 會 firing、在 3.13.5 從未 firing，這是 3.x 視窗改成左開區間造成的。
 
 **換成 `irate` 沒有用。**兩個函式都至少要 2 個 sample，視窗內只剩 1 點時一樣回傳空。差別只在有值時怎麼算：
 

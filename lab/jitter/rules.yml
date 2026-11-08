@@ -1,0 +1,101 @@
+groups:
+  - name: s120-d100-r5m
+    interval: 30s
+    rules:
+      - record: probe:visible_samples
+        expr: count_over_time(demo_requests_total{job="s120-d100-r5m"}[5m])
+        labels: { combo: s120-d100-r5m }
+      - alert: KnownTrue_s120_d100_r5m
+        expr: rate(demo_requests_total{job="s120-d100-r5m"}[5m]) >= 0
+        for: 3m
+        labels: { combo: s120-d100-r5m }
+  - name: s120-d100-r5m-o2m
+    interval: 30s
+    rules:
+      - record: probe:visible_samples
+        expr: count_over_time(demo_requests_total{job="s120-d100-r5m-o2m"}[5m] offset 2m)
+        labels: { combo: s120-d100-r5m-o2m }
+      - alert: KnownTrue_s120_d100_r5m_o2m
+        expr: rate(demo_requests_total{job="s120-d100-r5m-o2m"}[5m] offset 2m) >= 0
+        for: 3m
+        labels: { combo: s120-d100-r5m-o2m }
+  - name: s120-d100-r10m-o2m
+    interval: 30s
+    rules:
+      - record: probe:visible_samples
+        expr: count_over_time(demo_requests_total{job="s120-d100-r10m-o2m"}[10m] offset 2m)
+        labels: { combo: s120-d100-r10m-o2m }
+      - alert: KnownTrue_s120_d100_r10m_o2m
+        expr: rate(demo_requests_total{job="s120-d100-r10m-o2m"}[10m] offset 2m) >= 0
+        for: 3m
+        labels: { combo: s120-d100-r10m-o2m }
+  - name: s120-d60-r5m
+    interval: 30s
+    rules:
+      - record: probe:visible_samples
+        expr: count_over_time(demo_requests_total{job="s120-d60-r5m"}[5m])
+        labels: { combo: s120-d60-r5m }
+      - alert: KnownTrue_s120_d60_r5m
+        expr: rate(demo_requests_total{job="s120-d60-r5m"}[5m]) >= 0
+        for: 3m
+        labels: { combo: s120-d60-r5m }
+  - name: s60-d40-r2m
+    interval: 30s
+    rules:
+      - record: probe:visible_samples
+        expr: count_over_time(demo_requests_total{job="s60-d40-r2m"}[2m])
+        labels: { combo: s60-d40-r2m }
+      - alert: KnownTrue_s60_d40_r2m
+        expr: rate(demo_requests_total{job="s60-d40-r2m"}[2m]) >= 0
+        for: 3m
+        labels: { combo: s60-d40-r2m }
+  - name: s60-d40-r2m-o1m
+    interval: 30s
+    rules:
+      - record: probe:visible_samples
+        expr: count_over_time(demo_requests_total{job="s60-d40-r2m-o1m"}[2m] offset 1m)
+        labels: { combo: s60-d40-r2m-o1m }
+      - alert: KnownTrue_s60_d40_r2m_o1m
+        expr: rate(demo_requests_total{job="s60-d40-r2m-o1m"}[2m] offset 1m) >= 0
+        for: 3m
+        labels: { combo: s60-d40-r2m-o1m }
+  - name: s60-d40-r3m
+    interval: 30s
+    rules:
+      - record: probe:visible_samples
+        expr: count_over_time(demo_requests_total{job="s60-d40-r3m"}[3m])
+        labels: { combo: s60-d40-r3m }
+      - alert: KnownTrue_s60_d40_r3m
+        expr: rate(demo_requests_total{job="s60-d40-r3m"}[3m]) >= 0
+        for: 3m
+        labels: { combo: s60-d40-r3m }
+  - name: s60-d5-r2m
+    interval: 30s
+    rules:
+      - record: probe:visible_samples
+        expr: count_over_time(demo_requests_total{job="s60-d5-r2m"}[2m])
+        labels: { combo: s60-d5-r2m }
+      - alert: KnownTrue_s60_d5_r2m
+        expr: rate(demo_requests_total{job="s60-d5-r2m"}[2m]) >= 0
+        for: 3m
+        labels: { combo: s60-d5-r2m }
+  - name: s30-d25-r1m
+    interval: 30s
+    rules:
+      - record: probe:visible_samples
+        expr: count_over_time(demo_requests_total{job="s30-d25-r1m"}[1m])
+        labels: { combo: s30-d25-r1m }
+      - alert: KnownTrue_s30_d25_r1m
+        expr: rate(demo_requests_total{job="s30-d25-r1m"}[1m]) >= 0
+        for: 2m
+        labels: { combo: s30-d25-r1m }
+  - name: s30-d25-r2m
+    interval: 30s
+    rules:
+      - record: probe:visible_samples
+        expr: count_over_time(demo_requests_total{job="s30-d25-r2m"}[2m])
+        labels: { combo: s30-d25-r2m }
+      - alert: KnownTrue_s30_d25_r2m
+        expr: rate(demo_requests_total{job="s30-d25-r2m"}[2m]) >= 0
+        for: 2m
+        labels: { combo: s30-d25-r2m }

@@ -1,0 +1,6 @@
+# Pending 抖動的多組數據（lab/jitter）。
+refs:
+  exp-jitter:
+    kind: experiment
+    title: "Pending 抖動實驗：10 組 S、d、R、offset，2.51.2 與 3.13.5，預測對照實測"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/jitter/results/run-20261108.md"
