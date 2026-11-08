@@ -53,8 +53,13 @@
   --f-line: var(--md-default-fg-color--lighter); --f-bg: var(--md-default-bg-color);
   --f-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
   --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace; }
-.at-fig-scroll { overflow-x: auto; }
-.at-fig svg { display: block; width: 100%; min-width: 760px; height: auto; color: var(--f-fg); }
+.md-typeset figure.at-fig { display: block; width: auto; max-width: none; }
+.at-fig-scroll { overflow-x: auto; width: 100%; }
+.at-fig svg { display: block; width: 100%; height: auto; color: var(--f-fg); }
+/* 桌面版縮放到欄寬；手機上維持可讀的寬度並橫向捲動 */
+@media (max-width: 60em) { .at-fig svg { min-width: 680px; } }
+/* 連續的註腳用逗號分開，不要黏成一個數字 */
+.md-typeset sup[id^="fnref"] + sup[id^="fnref"]::before { content: ","; }
 .md-typeset p.at-caption { color: var(--md-default-fg-color--light); font-size: .72rem; margin-top: .3rem; }
 /* Prometheus 架構圖 */
 .at-fig .box { fill: var(--f-bg); stroke: currentColor; stroke-width: 1.2; }
