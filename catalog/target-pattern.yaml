@@ -41,3 +41,7 @@ required_signals:
     min_tier: 2
     question: 每個叢集剛好有一台可寫入的主節點嗎
     why: Failover 之後靜態的 role label 會指錯節點；舊主節點回來時可能兩邊都能寫。要用 cluster label 跨 instance 計數「可寫入的節點數」，0 或大於 1 都要告警。沒有 HA 的服務寫在 not_applicable。
+
+# 每張 target 卡的訊號要涵蓋這些面向（signals[].aspect），
+# 或在卡片的 not_applicable_aspects 寫明理由與依據（例如「PostgreSQL 核心沒有共識機制」並附 refs）。
+required_aspects: [exporter, availability, workload, saturation, replication, cluster, maintenance, protection, capacity]

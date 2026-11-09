@@ -31,7 +31,17 @@ FAMILIES = {
     "database": "Target：資料庫",
 }
 STATUS = {"stable", "draft"}
-ASPECTS = {"exporter": "Exporter 有沒有真的在量", "stability": "穩定", "usage": "使用與飽和", "ha": "高可用"}
+ASPECTS = {
+    "exporter": "監測自檢：exporter 有沒有真的在量",
+    "availability": "可用性：活著、連得上、寫得進去",
+    "workload": "工作量與效能：吞吐、錯誤、延遲、慢 SQL",
+    "saturation": "資源與飽和：連線、執行緒、cache、IO、鎖等待",
+    "replication": "複寫與 HA：延遲、角色、failover",
+    "cluster": "叢集與共識：quorum、成員、flow control",
+    "maintenance": "資料維護與完整性：vacuum／purge、wraparound、損毀",
+    "protection": "資料保護：備份、log archive、可還原",
+    "capacity": "容量與成長：趨勢與預測",
+}
 ID_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 COMPONENT_ID_RE = re.compile(r"^[a-z0-9_]+$")
 

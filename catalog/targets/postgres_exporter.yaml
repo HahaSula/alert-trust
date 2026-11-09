@@ -256,7 +256,7 @@ signals:
       - rules/targets/postgres.yml#PostgresReplicationLagBytes
 
   - id: replication-slots
-    aspect: ha
+    aspect: replication
     tier: 2
     question: 有沒有沒人用的 replication slot 在累積 WAL
     signal: >-
@@ -278,7 +278,7 @@ signals:
       - rules/targets/postgres.yml#PostgresReplicationSlotRetainingWal
       - rules/targets/postgres.yml#PostgresReplicationSlotLost
   - id: wraparound
-    aspect: stability
+    aspect: availability
     tier: 2
     question: XID 與 multixact wraparound 還有多遠
     signal: >-
@@ -301,7 +301,7 @@ signals:
   # aspect 欄位目前只用來分組，頁面產生器還沒讀它；question 前綴「穩定｜」「使用｜」「HA｜」方便在總覽表辨識。
 
   - id: restart-and-crash
-    aspect: stability
+    aspect: availability
     tier: 2
     question: PostgreSQL 重啟過或經歷 crash recovery 嗎
     signal: >-
@@ -319,7 +319,7 @@ signals:
     rules: [rules/targets/postgres.yml#PostgresRestarted, rules/targets/postgres.yml#PostgresCrashRecovery]
 
   - id: wal-disk
-    aspect: stability
+    aspect: availability
     tier: 2
     question: pg_wal 會不會把磁碟寫滿
     signal: >-
@@ -335,7 +335,7 @@ signals:
     rules: [rules/targets/postgres.yml#PostgresWalRetained]
 
   - id: xmin-horizon
-    aspect: stability
+    aspect: availability
     tier: 2
     question: 有沒有長交易或 idle in transaction 擋住 vacuum
     signal: >-
@@ -354,7 +354,7 @@ signals:
     rules: [rules/targets/postgres.yml#PostgresLongRunningTransaction, rules/targets/postgres.yml#PostgresIdleInTransaction]
 
   - id: deadlocks-rollbacks
-    aspect: stability
+    aspect: availability
     tier: 3
     question: deadlock 與 rollback 比例
     signal: increase(pg_stat_database_deadlocks[5m])、rollback 佔交易的比例；兩者都是每個資料庫一條 counter
@@ -368,7 +368,7 @@ signals:
     rules: [rules/targets/postgres.yml#PostgresDeadlocks, rules/targets/postgres.yml#PostgresHighRollbackRatio]
 
   - id: checkpoint-pressure
-    aspect: stability
+    aspect: availability
     tier: 3
     question: checkpoint 是不是大多被 WAL 量逼出來的
     signal: >-
@@ -385,7 +385,7 @@ signals:
     rules: [rules/targets/postgres.yml#PostgresCheckpointsMostlyRequested, rules/targets/postgres.yml#PostgresCheckpointMetricsMissing]
 
   - id: autovacuum
-    aspect: stability
+    aspect: availability
     tier: 3
     question: autovacuum 跟得上嗎（dead tuple、bloat）
     signal: >-
@@ -403,7 +403,7 @@ signals:
     rules: [rules/targets/postgres.yml#PostgresTooManyDeadTuples]
 
   - id: lock-blocks-exporter
-    aspect: stability
+    aspect: availability
     tier: 2
     question: 一個表鎖會不會讓監控整個消失
     signal: >-
@@ -421,7 +421,7 @@ signals:
     rules: [rules/targets/postgres.yml#PostgresExporterDown, rules/targets/postgres.yml#PostgresLockWaits]
 
   - id: invalid-indexes
-    aspect: stability
+    aspect: availability
     tier: 3
     question: 有沒有失效或損毀的索引
     signal: >-
@@ -436,7 +436,7 @@ signals:
     rules: []
 
   - id: connection-headroom
-    aspect: usage
+    aspect: saturation
     tier: 2
     question: 連線還有餘裕嗎（包括留給 exporter 的）
     signal: >-
@@ -454,7 +454,7 @@ signals:
     rules: [rules/targets/postgres.yml#PostgresConnectionsNearLimit]
 
   - id: sessions-and-locks
-    aspect: usage
+    aspect: saturation
     tier: 3
     question: active、idle、等鎖的 session 各有多少
     signal: >-
@@ -471,7 +471,7 @@ signals:
     rules: [rules/targets/postgres.yml#PostgresLockWaits]
 
   - id: pg-stat-statements
-    aspect: usage
+    aspect: saturation
     tier: 3
     question: 查詢延遲：pg_stat_statements 收得到嗎
     signal: >-
@@ -489,7 +489,7 @@ signals:
     rules: []
 
   - id: cache-and-temp
-    aspect: usage
+    aspect: saturation
     tier: 3
     question: cache hit 與 temp file
     signal: >-
@@ -505,7 +505,7 @@ signals:
 
   # ---------- 效能與故障情境（lab/targets/postgres/perf）----------
   - id: slow-sql
-    aspect: usage
+    aspect: saturation
     tier: 3
     question: 使用｜慢 SQL 找得到嗎
     signal: >-
@@ -530,7 +530,7 @@ signals:
       - rules/targets/postgres.yml#PostgresLongRunningTransaction
 
   - id: lock-queue
-    aspect: usage
+    aspect: saturation
     tier: 3
     question: 使用｜鎖等待與 DDL 鎖佇列
     signal: >-
@@ -554,7 +554,7 @@ signals:
       - rules/targets/postgres.yml#PostgresExporterDown
 
   - id: throughput-drop
-    aspect: usage
+    aspect: saturation
     tier: 3
     question: 使用｜TPS／QPS 掉了嗎，原因在哪一層
     signal: >-
@@ -576,7 +576,7 @@ signals:
       - rules/targets/postgres.yml#PostgresCollectorsMissing
 
   - id: resource-pressure
-    aspect: usage
+    aspect: saturation
     tier: 3
     question: 使用｜CPU、shared_buffers、work_mem、checkpoint 不夠時哪個 metric 先動
     signal: >-
@@ -597,7 +597,7 @@ signals:
       - rules/targets/postgres.yml#PostgresScrapeNearTimeout
 
   - id: oom-crash
-    aspect: stability
+    aspect: availability
     tier: 2
     question: 穩定｜backend 被 OOM killer 殺掉時看得出來嗎
     signal: >-
@@ -618,7 +618,7 @@ signals:
       - rules/targets/postgres.yml#PostgresThroughputDrop
 
   - id: standby-streaming
-    aspect: ha
+    aspect: replication
     tier: 2
     question: 主庫看得到每一台複本在 streaming 嗎
     signal: >-
@@ -637,7 +637,7 @@ signals:
     rules: [rules/targets/postgres.yml#PostgresPrimaryWithoutStandby, rules/targets/postgres.yml#PostgresStandbyCountDropped]
 
   - id: wal-receiver
-    aspect: ha
+    aspect: replication
     tier: 2
     question: 複本端的 WAL receiver 還在收嗎
     signal: >-
@@ -656,7 +656,7 @@ signals:
     rules: [rules/targets/postgres.yml#PostgresStandbyWalReceiverMissing, rules/targets/postgres.yml#PostgresWalReceiverStale]
 
   - id: replication-lag
-    aspect: ha
+    aspect: replication
     tier: 2
     question: 複本落後多少（位元組與時間）
     signal: >-
@@ -674,7 +674,7 @@ signals:
     rules: [rules/targets/postgres.yml#PostgresReplicationLagBytes]
 
   - id: standby-conflicts
-    aspect: ha
+    aspect: replication
     tier: 3
     question: 複本上的查詢被 recovery 取消了嗎
     signal: >-
@@ -690,7 +690,7 @@ signals:
     rules: [rules/targets/postgres.yml#PostgresStandbyQueryConflicts]
 
   - id: sync-replication
-    aspect: ha
+    aspect: replication
     tier: 2
     question: 同步複寫的 standby 還在嗎
     signal: >-
@@ -706,7 +706,7 @@ signals:
     rules: []
 
   - id: promotion
-    aspect: ha
+    aspect: replication
     tier: 2
     question: 誰是主庫？有沒有兩個主庫
     signal: >-
@@ -723,7 +723,7 @@ signals:
     rules: [rules/targets/postgres.yml#PostgresRoleChanged, rules/targets/postgres.yml#PostgresMultiplePrimaries, rules/targets/postgres.yml#PostgresNoPrimary]
 
   - id: archiver
-    aspect: ha
+    aspect: replication
     tier: 2
     question: WAL archive 有在成功嗎
     signal: >-

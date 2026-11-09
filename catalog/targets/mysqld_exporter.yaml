@@ -296,7 +296,7 @@ signals:
 
   # ---------- 穩定：資料庫自己會不會停、卡住、進救援模式 ----------
   - id: restarts
-    aspect: stability
+    aspect: availability
     tier: 3
     question: 資料庫重啟過或在救援模式嗎
     signal: >-
@@ -311,7 +311,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLRestarted, rules/targets/mysql.yml#MySQLInnoDBForceRecovery]
 
   - id: crash-oom
-    aspect: stability
+    aspect: availability
     tier: 3
     question: 資料庫被 OOM kill 或 crash 後，看得出來嗎
     signal: >-
@@ -330,7 +330,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLRestarted, rules/targets/mysql.yml#MySQLRestartedRepeatedly, rules/targets/mysql.yml#MySQLNotReachable]
 
   - id: disk-space
-    aspect: stability
+    aspect: availability
     tier: 2
     question: 資料目錄與 binlog 的磁碟還夠嗎
     signal: >-
@@ -349,7 +349,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLDataDiskFilling]
 
   - id: long-transactions
-    aspect: stability
+    aspect: availability
     tier: 2
     question: 有沒有開太久的交易
     signal: >-
@@ -365,7 +365,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLLongTransaction]
 
   - id: undo-history
-    aspect: stability
+    aspect: availability
     tier: 2
     question: Undo history 有沒有被擋住無法 purge
     signal: >-
@@ -384,7 +384,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLInnoDBHistoryLength]
 
   - id: deadlocks
-    aspect: stability
+    aspect: availability
     tier: 3
     question: Deadlock 變多了嗎
     signal: >-
@@ -403,7 +403,7 @@ signals:
 
   # ---------- 使用：連線、鎖、快取與暫存表 ----------
   - id: connections
-    aspect: usage
+    aspect: saturation
     tier: 3
     question: 連線數接近上限了嗎
     signal: >-
@@ -428,7 +428,7 @@ signals:
       - rules/targets/mysql.yml#MySQLConnectionsRefused
 
   - id: user-connection-limits
-    aspect: usage
+    aspect: saturation
     tier: 3
     question: 個別帳號快碰到 MAX_USER_CONNECTIONS 了嗎
     signal: >-
@@ -446,7 +446,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLUserConnectionLimit]
 
   - id: lock-waits
-    aspect: usage
+    aspect: saturation
     tier: 3
     question: 有很多 session 在等鎖嗎
     signal: >-
@@ -468,7 +468,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLRowLockWaits, rules/targets/mysql.yml#MySQLRowLockWaitTime]
 
   - id: slow-queries
-    aspect: usage
+    aspect: saturation
     tier: 3
     question: 有新的慢查詢嗎
     signal: >-
@@ -484,7 +484,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLSlowQueries]
 
   - id: innodb-pressure
-    aspect: usage
+    aspect: saturation
     tier: 3
     question: InnoDB 在等磁碟或等 buffer pool 嗎
     signal: rate(innodb_log_waits) > 10；rate(innodb_buffer_pool_wait_free) > 0 持續 15 分鐘
@@ -500,7 +500,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLInnoDBLogWaits, rules/targets/mysql.yml#MySQLBufferPoolWaitFree]
 
   - id: tmp-tables
-    aspect: usage
+    aspect: saturation
     tier: 3
     question: 暫存表常常落到磁碟嗎
     signal: rate(created_tmp_disk_tables) / rate(created_tmp_tables) > 0.25
@@ -512,7 +512,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLTmpDiskTables]
 
   - id: table-open-cache
-    aspect: usage
+    aspect: saturation
     tier: 3
     question: table_open_cache 夠用嗎
     signal: rate(table_open_cache_overflows) > 1；也可看 table_open_cache_misses 與 opened_tables 的增加速度
@@ -527,7 +527,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLTableOpenCacheOverflows]
 
   - id: aborted-connects
-    aspect: usage
+    aspect: saturation
     tier: 3
     question: 連線建立失敗變多了嗎
     signal: >-
@@ -543,7 +543,7 @@ signals:
 
   # ---------- 效能情境（lab/targets/mysql/perf）----------
   - id: throughput-drop
-    aspect: usage
+    aspect: saturation
     tier: 3
     question: 吞吐量（TPS／QPS）掉下來了嗎
     signal: >-
@@ -566,7 +566,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLThroughputDrop]
 
   - id: metadata-locks
-    aspect: usage
+    aspect: saturation
     tier: 2
     question: 有 DDL 卡在長交易後面、把整張表的查詢都擋住嗎
     signal: >-
@@ -590,7 +590,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLMetadataLockWaits]
 
   - id: slow-sql-visibility
-    aspect: usage
+    aspect: saturation
     tier: 3
     question: 慢的是哪一種 SQL
     signal: >-
@@ -616,7 +616,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLSlowDigest, rules/targets/mysql.yml#MySQLSlowQueries]
 
   - id: statement-errors
-    aspect: usage
+    aspect: saturation
     tier: 3
     question: 語句錯誤（lock wait timeout、table is full）變多了嗎
     signal: >-
@@ -633,7 +633,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLStatementErrors]
 
   - id: buffer-pool-misses
-    aspect: usage
+    aspect: saturation
     tier: 3
     question: Buffer pool 放得下工作集嗎
     signal: >-
@@ -654,7 +654,7 @@ signals:
 
   # ---------- HA：replication、角色、semi-sync、Galera ----------
   - id: replication-running
-    aspect: ha
+    aspect: replication
     tier: 1
     question: Replication thread 在跑嗎
     signal: >-
@@ -675,7 +675,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLReplicationNotRunning]
 
   - id: replication-error
-    aspect: ha
+    aspect: replication
     tier: 2
     question: Replication 是因為錯誤停下的嗎
     signal: >-
@@ -691,7 +691,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLReplicationError]
 
   - id: replica-status-present
-    aspect: ha
+    aspect: replication
     tier: 1
     question: Replica 的狀態資料還在嗎
     signal: 一小時前有 *_sql_running、現在沒有，且 mysql_up == 1；長期作法是用 role label 標出 replica，再用 absent
@@ -706,7 +706,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLReplicaStatusMissing]
 
   - id: replication-lag
-    aspect: ha
+    aspect: replication
     tier: 2
     question: Replication 延遲量的是真的嗎
     signal: >-
@@ -732,7 +732,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLHeartbeatLag, rules/targets/mysql.yml#MySQLReplicationLag]
 
   - id: replica-read-only
-    aspect: ha
+    aspect: replication
     tier: 2
     question: Replica 擋得住寫入嗎
     signal: >-
@@ -749,7 +749,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLReplicaWritable]
 
   - id: role-detection
-    aspect: ha
+    aspect: replication
     tier: 2
     question: 每個叢集剛好有一台可寫的 primary 嗎
     signal: >-
@@ -766,7 +766,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLNoWritablePrimary, rules/targets/mysql.yml#MySQLMultipleWritable]
 
   - id: primary-writable
-    aspect: ha
+    aspect: replication
     tier: 2
     question: Primary 寫得進去嗎
     signal: >-
@@ -781,7 +781,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLPrimaryReadOnly]
 
   - id: gtid-consistency
-    aspect: ha
+    aspect: replication
     tier: 2
     question: Replica 有沒有 primary 沒有的交易（errant GTID）
     signal: >-
@@ -801,7 +801,7 @@ signals:
     rules: []
 
   - id: semi-sync
-    aspect: ha
+    aspect: replication
     tier: 3
     question: Semi-sync 有沒有退回 async
     signal: >-
@@ -822,7 +822,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLSemiSyncDegraded]
 
   - id: galera-state
-    aspect: ha
+    aspect: replication
     tier: 3
     question: Galera 節點可以服務嗎
     signal: >-

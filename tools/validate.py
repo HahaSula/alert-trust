@@ -125,7 +125,9 @@ def validate(root: str = C.ROOT) -> tuple[list[str], list[str]]:
         if tier not in ("1", "2", "3"):
             errors.append(f"{ref}: labels.tier 要是字串 \"1\"、\"2\" 或 \"3\"")
 
+    PENDING_ASPECTS.clear()
     errors += check_target_pattern(components, root)
+    warnings += list(PENDING_ASPECTS)
     ref_errors, missing_refs = check_refs(components, contracts, root)
     errors += ref_errors
     if missing_refs:
@@ -138,6 +140,7 @@ def validate(root: str = C.ROOT) -> tuple[list[str], list[str]]:
 
 
 MISSING_REFS: list[str] = []
+PENDING_ASPECTS: list[str] = []
 DOC_MARK = re.compile(r"\[\^([a-z0-9][a-z0-9-]*)\](?!:)")
 
 
@@ -204,13 +207,25 @@ def check_target_pattern(components: list[dict], root: str) -> list[str]:
     path = os.path.join(root, "catalog", "target-pattern.yaml")
     if not os.path.exists(path):
         return []
-    required = C._load(path)["required_signals"]
+    pattern = C._load(path)
+    required = pattern["required_signals"]
+    aspects_required = pattern.get("required_aspects", [])
     errors = []
     for card in components:
         if card.get("kind") != "target":
             continue
         by_id = {s["id"]: s for s in card.get("signals", [])}
         na = card.get("not_applicable") or {}
+        have = {s.get("aspect") for s in card.get("signals", [])}
+        na_asp = card.get("not_applicable_aspects") or {}
+        for asp in aspects_required:
+            if asp in have:
+                continue
+            reason = na_asp.get(asp)
+            if not reason:
+                PENDING_ASPECTS.append(f"{card['_path']}: 沒有 {asp} 面向的訊號，也沒有在 not_applicable_aspects 寫理由")
+            elif not (isinstance(reason, dict) and reason.get("why") and reason.get("refs")):
+                errors.append(f"{card['_path']}: not_applicable_aspects.{asp} 要有 why 與 refs")
         for req in required:
             rid = req["id"]
             found = next((a for a in [rid] + list(req.get("aliases", [])) if a in by_id), None)
