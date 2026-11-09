@@ -77,7 +77,7 @@ repo 與網站是公開的。
 
 - 本機只做**輕量**實驗：小容器、短時間、不做負載測試（例如不要 CPU ×10）。
 - 每個 lab 用自己的 compose project 名稱與 port 區段，結束後 `docker compose down -v`，確認沒有殘留容器。
-- 已用過的 port：19091–19093、19191–19192、19301–19303、19880（alert-trust 本身）；20000–24999 依 agent 分段（vm 20xxx、am 21xxx、mysql 22xxx、pg 23xxx、skills 24xxx、thanos 25xxx、grafana 26xxx、valkey 27xxx；之後的資料庫從 28xxx 起每個一段）。
+- 已用過的 port：19091–19093、19191–19192、19301–19303、19880（alert-trust 本身）；20000–24999 依 agent 分段（vm 20xxx、am 21xxx、mysql 22xxx、pg 23xxx、skills 24xxx、thanos 25xxx、grafana 26xxx、valkey 27xxx、etcd 28xxx、tidb 29xxx；之後的資料庫從 30xxx 起每個一段）。
 - 已知限制：用 HTTP 延遲模擬 scrape 耗時只能做 `d < S`；WSL2 上 `process_start_time_seconds` 會無故跳動，crash loop 測不了。
 - 截圖：`zenika/alpine-chrome:124`，一定要加 `timeout` 並在之後確認容器已移除；深色模式用 `--blink-settings=preferredColorScheme=0`；頁面太長（>3500px）會失敗。
 

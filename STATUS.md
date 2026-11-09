@@ -32,7 +32,7 @@
 
 ## 進行中
 
-（無）
+- TiDB target（`model: native`，TiDB／TiKV／PD）與「分散式 SQL」架構頁；驗證官方規則的三個問題
 
 之後的資料庫順序（使用者已同意）：TiDB → YugabyteDB → ClickHouse → MongoDB；CockroachDB（專有授權）不做。資料庫架構頁依類型分頁：關聯式、記憶體 KV、共識（Raft）、分散式 SQL、分析型、文件型。
 
