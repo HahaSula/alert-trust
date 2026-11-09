@@ -1,0 +1,28 @@
+PostgreSQL 九個面向補洞 — 摘要（2026-11-09）
+環境：postgres 16.15-alpine 與 17.11-alpine、postgres-exporter v0.20.1（預設 collector）；archive_mode=on、archive_timeout=30。
+原始輸出：run-20261109.txt。沒有 Prometheus，數字是 curl /metrics 當下的值。兩個版本結果相同，以下只寫一次。
+
+A 基線
+  - pg_settings 裡 archive_mode 的 vartype 是 enum、archive_command 與 synchronous_standby_names 是 string；
+    exporter 只輸出 pg_settings_archive_timeout_seconds 30，沒有 pg_settings_archive_mode、沒有 synchronous_standby_names。
+  - pg_stat_archiver_archived_count 1、failed_count 0、last_archive_age 22.5（啟動時已 archive 過一個 segment）。
+  - pg_database_size_bytes 每個資料庫一條（postgres、template0、template1，預設 collector 就有）。
+  - 沒有任何 pg_stat_database_sessions* series。
+
+B 容量
+  - 寫入 4 萬列 × 900 字元：pg_database_size('postgres') 7699479 → 48700439；exporter pg_database_size_bytes{datname="postgres"} 4.8700439e+07（相同）。
+  - pg_stat_user_tables_table_size_bytes{relname="grow"} 4.100096e+07，等於 pg_table_size('grow') 41000960。
+
+C archive 成功
+  - pg_switch_wal 後 archived_count 1 → 4、last_archive_age 5.2 秒。
+
+D archive 失敗 100 秒、持續寫入
+  - archived_count 停在 4、failed_count 0 → 3（pgarch 連續失敗 3 次後休息，不是每個 segment 一次）。
+  - last_archive_age 119.9 秒，超過 3 × archive_timeout（90 秒）；PostgresArchiveStale 的條件成立。
+  - psql：last_failed_wal 000000010000000000000005、.ready 檔 1 個；exporter 沒有 last_failed_wal 與 .ready 數。
+
+E session 錯誤
+  - pg_terminate_backend 一個 session 後，pg_stat_database.sessions_killed = 1；連不存在的資料庫得到 FATAL，沒有算進 postgres 的 sessions_fatal（連線沒進到任何資料庫）。
+  - exporter 沒有 sessions_killed／sessions_fatal／sessions_abandoned，只有 xact_rollback 等既有 counter。
+
+收尾：docker compose down -v，沒有殘留容器。

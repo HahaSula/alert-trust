@@ -428,3 +428,163 @@ groups:
         annotations:
           summary: "沒有 pg_stat_statements metric：--collector.stat_statements 沒開、extension 沒建在 DSN 的資料庫，或 shared_preload_libraries 沒載入；這時沒有任何 per-query 延遲可看"
           runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#slow-sql
+
+  # ---------- PostgreSQL 本體：資料保護（protection）。lab/targets/postgres/aspects ----------
+  # 備份工具的規則假設 pgbackrest_exporter（woblerr）在 job="pgbackrest"；WAL-G、Barman 請改成自己輸出的「最後成功時間」metric。
+  - name: postgres-protection
+    rules:
+      - alert: PostgresArchiveStale
+        expr: |
+          pg_stat_archiver_last_archive_age{job="postgres"}
+            > on (job, instance) 3 * (pg_settings_archive_timeout_seconds{job="postgres"} > 0)
+          and on (job, instance) pg_replication_is_replica{job="postgres"} == 0
+          and on (job, instance) sum by (job, instance) (
+                increase(pg_stat_database_tup_inserted{job="postgres"}[15m])
+              + increase(pg_stat_database_tup_updated{job="postgres"}[15m])
+              + increase(pg_stat_database_tup_deleted{job="postgres"}[15m])
+          ) > 0
+        for: 5m
+        labels: { severity: warning, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "主庫最後一次 archive 成功已超過 3 × archive_timeout，而這段時間有寫入：PITR 能回到的時間點停在 {{ $value | humanizeDuration }} 前。只在設了 archive_timeout 的主庫上會響；archive_mode 是 enum，exporter 不輸出，要在盤點時確認"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#archive-freshness
+          absence_covered_by: "PostgresCollectorsMissing, PostgresCollectorFailed, PostgresArchiveNeverSucceeded"
+      - alert: PostgresArchiveNeverSucceeded
+        expr: |
+          pg_stat_archiver_failed_count{job="postgres"} > 0
+            unless on (job, instance) pg_stat_archiver_last_archive_age{job="postgres"}
+        for: 15m
+        labels: { severity: warning, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "archive_command 有失敗紀錄，卻從來沒有成功過（last_archived_time 是 NULL，exporter 不輸出 last_archive_age）；PostgresArchiveStale 在這種情況回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#archive-freshness
+      - alert: PostgresBackupTooOld
+        expr: |
+          min by (stanza) (pgbackrest_backup_since_last_completion_seconds{job="pgbackrest"}) > 26 * 3600
+        for: 30m
+        labels: { severity: warning, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "stanza {{ $labels.stanza }} 超過 26 小時沒有完成任何備份（例子：每日備份）。門檻依備份排程調整；full 備份另看 backup_type=\"full\""
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#backup-freshness
+          absence_covered_by: "PostgresBackupExporterFailing"
+      - alert: PostgresBackupExporterFailing
+        expr: |
+          pgbackrest_exporter_status{job="pgbackrest"} == 0
+            or absent(pgbackrest_exporter_status{job="pgbackrest"})
+        for: 15m
+        labels: { severity: warning, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "pgbackrest_exporter 讀不到 pgbackrest info，或整個不存在；這時備份新鮮度規則回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#backup-freshness
+
+  # ---------- PostgreSQL 本體：容量（capacity） ----------
+  # 磁碟規則假設 node_exporter 在 job="node"、資料目錄掛在 /var/lib/postgresql；請換成實際的 job 與 mountpoint。
+  - name: postgres-capacity
+    rules:
+      - alert: PostgresDatabaseSizeDoubled
+        expr: |
+          pg_database_size_bytes{job="postgres"} > 1e9
+            and pg_database_size_bytes{job="postgres"} > 2 * (pg_database_size_bytes{job="postgres"} offset 7d)
+        for: 1h
+        labels: { severity: info, component: postgres_exporter, tier: "3" }
+        annotations:
+          summary: "資料庫 {{ $labels.datname }} 一週內大小翻倍（目前 {{ $value | humanize1024 }}B）；確認是預期的成長，還是 bloat、暫存表或批次寫錯"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#database-growth
+          absence_covered_by: "PostgresCollectorsMissing, PostgresCollectorFailed"
+      - alert: PostgresDataDiskFullSoon
+        expr: |
+          predict_linear(node_filesystem_avail_bytes{job="node", mountpoint="/var/lib/postgresql"}[6h], 4 * 86400) < 0
+            and node_filesystem_avail_bytes{job="node", mountpoint="/var/lib/postgresql"}
+              < 0.2 * node_filesystem_size_bytes{job="node", mountpoint="/var/lib/postgresql"}
+        for: 30m
+        labels: { severity: warning, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "{{ $labels.instance }} 的 PostgreSQL 資料目錄剩不到 20%，依過去 6 小時的速度 4 天內寫滿；寫滿時 PostgreSQL PANIC，exporter 跟著失聯"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#disk-forecast
+          absence_covered_by: "PostgresDataDiskNotMonitored"
+      - alert: PostgresDataDiskNotMonitored
+        expr: absent(node_filesystem_avail_bytes{job="node", mountpoint="/var/lib/postgresql"})
+        for: 15m
+        labels: { severity: warning, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "找不到 PostgreSQL 資料目錄所在檔案系統的 node_exporter metric（job 或 mountpoint 不對）；postgres_exporter 本身看不到磁碟剩餘空間"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#disk-forecast
+
+  # ---------- 叢集與共識（cluster）：只在用 Patroni 時適用 ----------
+  # 核心 PostgreSQL 沒有共識與自動選主；Patroni 把 leader lock 放在 DCS（etcd、Consul、ZooKeeper、Kubernetes）。
+  # 假設 Patroni REST API 的 /metrics 在 job="patroni"，每個 series 有 scope（叢集名）與 name（節點名）label。
+  - name: patroni-cluster
+    rules:
+      - alert: PatroniDown
+        expr: up{job="patroni"} == 0
+        for: 2m
+        labels: { severity: critical, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "抓不到 {{ $labels.instance }} 的 Patroni REST API；這台的 leader／replica 狀態與 DCS 聯絡時間都看不到"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#patroni-up
+      - alert: PatroniMissing
+        expr: absent(up{job="patroni"})
+        for: 5m
+        labels: { severity: critical, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "完全沒有 Patroni 的 target，叢集規則全部回傳空；不用 Patroni 的環境請刪掉這一組"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#patroni-up
+      - alert: PatroniClusterUnlocked
+        expr: max by (scope) (patroni_cluster_unlocked{job="patroni"}) == 1
+        for: 1m
+        labels: { severity: critical, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "Patroni 叢集 {{ $labels.scope }} 在 DCS 裡沒有 leader lock：正在選主，或沒有節點能拿到 lock（DCS 不通、所有節點都不健康）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#patroni-leader
+          absence_covered_by: "PatroniDown, PatroniMissing"
+      - alert: PatroniMultiplePrimaries
+        expr: count by (scope) (patroni_primary{job="patroni"} == 1) > 1
+        for: 1m
+        labels: { severity: critical, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "Patroni 叢集 {{ $labels.scope }} 有 {{ $value }} 台 PostgreSQL 不在 recovery（patroni_primary 看的是 pg_is_in_recovery()，不是 leader lock）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#patroni-leader
+          absence_covered_by: "PatroniDown, PatroniMissing"
+      - alert: PatroniNoPrimary
+        expr: |
+          sum by (scope) (patroni_primary{job="patroni"}) == 0
+            and on (scope) sum by (scope) (patroni_standby_leader{job="patroni"}) == 0
+        for: 2m
+        labels: { severity: critical, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "Patroni 叢集 {{ $labels.scope }} 抓得到的節點都不是主庫，也不是 standby leader；主庫那台抓不到時同時會有 PatroniDown"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#patroni-leader
+          absence_covered_by: "PatroniDown, PatroniMissing"
+      - alert: PatroniDcsUnreachable
+        expr: time() - patroni_dcs_last_seen{job="patroni"} > 60
+        for: 1m
+        labels: { severity: critical, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "{{ $labels.scope }}/{{ $labels.name }} 超過 60 秒（2 × 預設 ttl）沒有成功讀到 DCS；主庫在這種情況會自己降級（除非 failsafe_mode 生效）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#patroni-dcs
+          absence_covered_by: "PatroniDown, PatroniMissing"
+      - alert: PatroniFailsafeActive
+        expr: patroni_failsafe_mode_is_active{job="patroni"} == 1
+        labels: { severity: warning, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "{{ $labels.scope }} 的主庫因為 failsafe_mode 在 DCS 不通時繼續當主庫；DCS 恢復前不會有自動 failover"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#patroni-dcs
+          absence_covered_by: "PatroniDown, PatroniMissing"
+      - alert: PatroniPaused
+        expr: max by (scope) (patroni_is_paused{job="patroni"}) == 1
+        for: 1h
+        labels: { severity: warning, component: postgres_exporter, tier: "3" }
+        annotations:
+          summary: "Patroni 叢集 {{ $labels.scope }} 在維護模式（pause）超過 1 小時：主庫掛掉時不會自動 failover"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#patroni-paused
+          absence_covered_by: "PatroniDown, PatroniMissing"
+      - alert: PatroniTimelineDiverged
+        expr: |
+          max by (scope) (patroni_postgres_timeline{job="patroni"} > 0)
+            > min by (scope) (patroni_postgres_timeline{job="patroni"} > 0)
+        for: 10m
+        labels: { severity: warning, component: postgres_exporter, tier: "3" }
+        annotations:
+          summary: "Patroni 叢集 {{ $labels.scope }} 的節點 timeline 不一致超過 10 分鐘：failover 後有複本沒有跟上新主庫（常見是需要 pg_rewind 或重建）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#patroni-timeline
+          absence_covered_by: "PatroniDown, PatroniMissing"

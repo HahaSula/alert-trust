@@ -1,0 +1,523 @@
+# PostgreSQL 九個面向（cluster、protection、capacity、workload）的參考。key 一律以 pg-asp- 開頭。
+# 原始碼行號都在 tag 上取檔核對過（行內含關鍵字）：PostgreSQL REL_16_15／REL_17_11、postgres_exporter v0.20.1、
+# Patroni v4.1.5、pgbackrest_exporter v0.25.0、node_exporter v1.12.1。
+refs:
+  pg-asp-src16-doc-nofailover:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "doc/src/sgml/high-availability.sgml"
+    line: 1449
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/doc/src/sgml/high-availability.sgml#L1449"
+  pg-asp-src16-doc-quorum:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "doc/src/sgml/high-availability.sgml"
+    line: 1224
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/doc/src/sgml/high-availability.sgml#L1224"
+  pg-asp-src16-syncrep-wait:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/replication/syncrep.c"
+    line: 622
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/replication/syncrep.c#L622"
+  pg-asp-src16-syncrep-method:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/replication/syncrep.c"
+    line: 527
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/replication/syncrep.c#L527"
+  pg-asp-src16-promote:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/access/transam/xlogfuncs.c"
+    line: 698
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/access/transam/xlogfuncs.c#L698"
+  pg-asp-src17-doc-nofailover:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "doc/src/sgml/high-availability.sgml"
+    line: 1457
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/doc/src/sgml/high-availability.sgml#L1457"
+  pg-asp-src17-doc-quorum:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "doc/src/sgml/high-availability.sgml"
+    line: 1232
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/doc/src/sgml/high-availability.sgml#L1232"
+  pg-asp-src17-syncrep-wait:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/replication/syncrep.c"
+    line: 621
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/replication/syncrep.c#L621"
+  pg-asp-src17-syncrep-method:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/replication/syncrep.c"
+    line: 526
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/replication/syncrep.c#L526"
+  pg-asp-src17-promote:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/access/transam/xlogfuncs.c"
+    line: 688
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/access/transam/xlogfuncs.c#L688"
+  pg-asp-src16-is-in-recovery:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/access/transam/xlogfuncs.c"
+    line: 652
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/access/transam/xlogfuncs.c#L652"
+  pg-asp-src16-walfile-name:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/access/transam/xlogfuncs.c"
+    line: 447
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/access/transam/xlogfuncs.c#L447"
+  pg-asp-src16-syncrep-quorum-def:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/include/replication/syncrep.h"
+    line: 36
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/include/replication/syncrep.h#L36"
+  pg-asp-src17-doc-stonith:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "doc/src/sgml/high-availability.sgml"
+    line: 1441
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/doc/src/sgml/high-availability.sgml#L1441"
+  pg-asp-src16-archiver-view:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1097
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/catalog/system_views.sql#L1097"
+  pg-asp-src16-archiver-ok:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/utils/activity/pgstat_archiver.c"
+    line: 47
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/utils/activity/pgstat_archiver.c#L47"
+  pg-asp-src16-guc-archive-mode:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/utils/misc/guc_tables.c"
+    line: 4774
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/utils/misc/guc_tables.c#L4774"
+  pg-asp-src16-guc-archive-timeout:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/utils/misc/guc_tables.c"
+    line: 2021
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/utils/misc/guc_tables.c#L2021"
+  pg-asp-src16-archive-timeout-switch:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/postmaster/checkpointer.c"
+    line: 642
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/postmaster/checkpointer.c#L642"
+  pg-asp-src17-archiver-view:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1123
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_views.sql#L1123"
+  pg-asp-src17-archiver-ok:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/activity/pgstat_archiver.c"
+    line: 47
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/activity/pgstat_archiver.c#L47"
+  pg-asp-src17-guc-archive-mode:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/misc/guc_tables.c"
+    line: 4936
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/misc/guc_tables.c#L4936"
+  pg-asp-src17-guc-archive-timeout:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/misc/guc_tables.c"
+    line: 2049
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/misc/guc_tables.c#L2049"
+  pg-asp-src17-archive-timeout-switch:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/postmaster/checkpointer.c"
+    line: 657
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/postmaster/checkpointer.c#L657"
+  pg-asp-src16-guc-enum-table:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/utils/misc/guc_tables.c"
+    line: 4592
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/utils/misc/guc_tables.c#L4592"
+  pg-asp-src16-dbsize-acl:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/utils/adt/dbsize.c"
+    line: 134
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/utils/adt/dbsize.c#L134"
+  pg-asp-src17-dbsize-acl:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/adt/dbsize.c"
+    line: 133
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/adt/dbsize.c#L133"
+  pg-asp-src16-dbsize-calc:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/utils/adt/dbsize.c"
+    line: 119
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/utils/adt/dbsize.c#L119"
+  pg-asp-src16-statdb-commit:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1029
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/catalog/system_views.sql#L1029"
+  pg-asp-src16-statdb-sessions-fatal:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1052
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/catalog/system_views.sql#L1052"
+  pg-asp-src16-sessions-count:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/utils/activity/pgstat_database.c"
+    line: 227
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/utils/activity/pgstat_database.c#L227"
+  pg-asp-src16-func-xact-commit:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/utils/adt/pgstatfuncs.c"
+    line: 1082
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/utils/adt/pgstatfuncs.c#L1082"
+  pg-asp-src17-statdb-commit:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1055
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_views.sql#L1055"
+  pg-asp-src17-statdb-sessions-fatal:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1078
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_views.sql#L1078"
+  pg-asp-src17-sessions-count:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/activity/pgstat_database.c"
+    line: 227
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/activity/pgstat_database.c#L227"
+  pg-asp-src17-func-xact-commit:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/adt/pgstatfuncs.c"
+    line: 1076
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/adt/pgstatfuncs.c#L1076"
+  pg-asp-src16-pgss-store:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "contrib/pg_stat_statements/pg_stat_statements.c"
+    line: 1355
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/contrib/pg_stat_statements/pg_stat_statements.c#L1355"
+  pg-asp-c-dbsize-default:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_database.go"
+    line: 28
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_database.go#L28"
+  pg-asp-c-dbsize-query:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_database.go"
+    line: 68
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_database.go#L68"
+  pg-asp-c-dbsize-loop:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_database.go"
+    line: 125
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_database.go#L125"
+  pg-asp-c-statdb-columns:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_database.go"
+    line: 229
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_database.go#L229"
+  pg-asp-c-settings-vartype:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_setting.go"
+    line: 55
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_setting.go#L55"
+  pg-asp-c-settings-seconds:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_setting.go"
+    line: 147
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_setting.go#L147"
+  pg-asp-c-archiver-default:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_archiver.go"
+    line: 27
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_archiver.go#L27"
+  pg-asp-c-archiver-age:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_archiver.go"
+    line: 59
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_archiver.go#L59"
+  pg-asp-c-archiver-agenull:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_archiver.go"
+    line: 94
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_archiver.go#L94"
+  pg-asp-c-statements-calls:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_statements.go"
+    line: 114
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_statements.go#L114"
+  pg-asp-c-statements-seconds:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_statements.go"
+    line: 120
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_statements.go#L120"
+  pg-asp-c-user-tables-default:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_user_tables.go"
+    line: 27
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_user_tables.go#L27"
+  pg-asp-patroni-metrics:
+    kind: code
+    project: "Patroni"
+    version: "v4.1.5"
+    file: "patroni/api.py"
+    line: 584
+    url: "https://github.com/patroni/patroni/blob/v4.1.5/patroni/api.py#L584"
+  pg-asp-patroni-labels:
+    kind: code
+    project: "Patroni"
+    version: "v4.1.5"
+    file: "patroni/api.py"
+    line: 625
+    url: "https://github.com/patroni/patroni/blob/v4.1.5/patroni/api.py#L625"
+  pg-asp-patroni-primary:
+    kind: code
+    project: "Patroni"
+    version: "v4.1.5"
+    file: "patroni/api.py"
+    line: 644
+    url: "https://github.com/patroni/patroni/blob/v4.1.5/patroni/api.py#L644"
+  pg-asp-patroni-tl-lsn:
+    kind: code
+    project: "Patroni"
+    version: "v4.1.5"
+    file: "patroni/postgresql/__init__.py"
+    line: 70
+    url: "https://github.com/patroni/patroni/blob/v4.1.5/patroni/postgresql/__init__.py#L70"
+  pg-asp-patroni-unlocked:
+    kind: code
+    project: "Patroni"
+    version: "v4.1.5"
+    file: "patroni/api.py"
+    line: 1444
+    url: "https://github.com/patroni/patroni/blob/v4.1.5/patroni/api.py#L1444"
+  pg-asp-patroni-unlocked-metric:
+    kind: code
+    project: "Patroni"
+    version: "v4.1.5"
+    file: "patroni/api.py"
+    line: 710
+    url: "https://github.com/patroni/patroni/blob/v4.1.5/patroni/api.py#L710"
+  pg-asp-patroni-timeline:
+    kind: code
+    project: "Patroni"
+    version: "v4.1.5"
+    file: "patroni/api.py"
+    line: 719
+    url: "https://github.com/patroni/patroni/blob/v4.1.5/patroni/api.py#L719"
+  pg-asp-patroni-dcs-seen:
+    kind: code
+    project: "Patroni"
+    version: "v4.1.5"
+    file: "patroni/api.py"
+    line: 724
+    url: "https://github.com/patroni/patroni/blob/v4.1.5/patroni/api.py#L724"
+  pg-asp-patroni-dcs-seen-set:
+    kind: code
+    project: "Patroni"
+    version: "v4.1.5"
+    file: "patroni/dcs/__init__.py"
+    line: 1773
+    url: "https://github.com/patroni/patroni/blob/v4.1.5/patroni/dcs/__init__.py#L1773"
+  pg-asp-patroni-paused:
+    kind: code
+    project: "Patroni"
+    version: "v4.1.5"
+    file: "patroni/api.py"
+    line: 733
+    url: "https://github.com/patroni/patroni/blob/v4.1.5/patroni/api.py#L733"
+  pg-asp-patroni-failsafe:
+    kind: code
+    project: "Patroni"
+    version: "v4.1.5"
+    file: "patroni/api.py"
+    line: 712
+    url: "https://github.com/patroni/patroni/blob/v4.1.5/patroni/api.py#L712"
+  pg-asp-patroni-demote-nolock:
+    kind: code
+    project: "Patroni"
+    version: "v4.1.5"
+    file: "patroni/ha.py"
+    line: 1867
+    url: "https://github.com/patroni/patroni/blob/v4.1.5/patroni/ha.py#L1867"
+  pg-asp-patroni-demote-dcs:
+    kind: code
+    project: "Patroni"
+    version: "v4.1.5"
+    file: "patroni/ha.py"
+    line: 2362
+    url: "https://github.com/patroni/patroni/blob/v4.1.5/patroni/ha.py#L2362"
+  pg-asp-patroni-etcd-cas:
+    kind: code
+    project: "Patroni"
+    version: "v4.1.5"
+    file: "patroni/dcs/etcd3.py"
+    line: 979
+    url: "https://github.com/patroni/patroni/blob/v4.1.5/patroni/dcs/etcd3.py#L979"
+  pg-asp-patroni-doc-dcs:
+    kind: code
+    project: "Patroni"
+    version: "v4.1.5"
+    file: "docs/dcs_failsafe_mode.rst"
+    line: 9
+    url: "https://github.com/patroni/patroni/blob/v4.1.5/docs/dcs_failsafe_mode.rst#L9"
+  pg-asp-patroni-doc-ttl:
+    kind: code
+    project: "Patroni"
+    version: "v4.1.5"
+    file: "docs/dynamic_configuration.rst"
+    line: 12
+    url: "https://github.com/patroni/patroni/blob/v4.1.5/docs/dynamic_configuration.rst#L12"
+  pg-asp-pbe-since-last:
+    kind: code
+    project: "pgbackrest_exporter"
+    version: "v0.25.0"
+    file: "backrest/backrest_last_backup_metrics.go"
+    line: 19
+    url: "https://github.com/woblerr/pgbackrest_exporter/blob/v0.25.0/backrest/backrest_last_backup_metrics.go#L19"
+  pg-asp-pbe-since-last-calc:
+    kind: code
+    project: "pgbackrest_exporter"
+    version: "v0.25.0"
+    file: "backrest/backrest_last_backup_metrics.go"
+    line: 182
+    url: "https://github.com/woblerr/pgbackrest_exporter/blob/v0.25.0/backrest/backrest_last_backup_metrics.go#L182"
+  pg-asp-pbe-exporter-status:
+    kind: code
+    project: "pgbackrest_exporter"
+    version: "v0.25.0"
+    file: "backrest/backrest_exporter_metrics.go"
+    line: 12
+    url: "https://github.com/woblerr/pgbackrest_exporter/blob/v0.25.0/backrest/backrest_exporter_metrics.go#L12"
+  pg-asp-pbe-wal-status:
+    kind: code
+    project: "pgbackrest_exporter"
+    version: "v0.25.0"
+    file: "backrest/backrest_wal_metrics.go"
+    line: 12
+    url: "https://github.com/woblerr/pgbackrest_exporter/blob/v0.25.0/backrest/backrest_wal_metrics.go#L12"
+  pg-asp-patroni-replica-tl:
+    kind: code
+    project: "Patroni"
+    version: "v4.1.5"
+    file: "patroni/api.py"
+    line: 1423
+    url: "https://github.com/patroni/patroni/blob/v4.1.5/patroni/api.py#L1423"
+  pg-asp-patroni-standby-leader:
+    kind: code
+    project: "Patroni"
+    version: "v4.1.5"
+    file: "patroni/api.py"
+    line: 653
+    url: "https://github.com/patroni/patroni/blob/v4.1.5/patroni/api.py#L653"
+  pg-asp-ne-size:
+    kind: code
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/filesystem_common.go"
+    line: 103
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/filesystem_common.go#L103"
+  pg-asp-ne-avail:
+    kind: code
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/filesystem_common.go"
+    line: 115
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/filesystem_common.go#L115"
+  pg-asp-exp:
+    kind: experiment
+    title: "PostgreSQL 九個面向補洞實驗：archive 成敗、archive_mode 是否輸出、資料庫大小、session 錯誤計數（PostgreSQL 16.15／17.11）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/postgres/aspects/results/summary.txt"
+  pg-asp-exp-raw:
+    kind: experiment
+    title: "PostgreSQL 九個面向補洞實驗：原始輸出"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/postgres/aspects/results/run-20261109.txt"

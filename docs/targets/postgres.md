@@ -1,8 +1,8 @@
 # PostgreSQL 本體怎麼監控
 
-[元件卡](../components/postgres_exporter.md)回答「exporter 真的有在量嗎」。這頁回答另一個問題：**PostgreSQL 本身該看哪些訊號**，每個訊號從 PostgreSQL 的哪裡來、postgres_exporter v0.20.1 有沒有輸出、要什麼權限、在哪個版本會變。
+[元件卡](../components/postgres_exporter.md)回答「exporter 真的有在量嗎」。這頁回答另一個問題：**PostgreSQL 本身該看哪些訊號**，每個訊號從 PostgreSQL 的哪裡來、postgres_exporter v0.20.1 有沒有輸出、要什麼權限、在哪個版本會變。內容依九個面向排列：監測自檢、可用性、工作量、飽和、複寫、叢集與共識、資料維護、資料保護、容量。
 
-依據是 PostgreSQL 與 exporter 的原始碼，加上一組小實驗：PostgreSQL 16.15 與 17.11 各一組主從，切斷複寫、停複本、讓 archive 失敗、用完連線、kill 一個 backend、提升複本、把 pg_wal 寫滿。<span class="at-chip at-ev-tested">實測</span>[^pg-exp-target]
+依據是 PostgreSQL 與 exporter 的原始碼，加上幾組小實驗：PostgreSQL 16.15 與 17.11 各一組主從，切斷複寫、停複本、讓 archive 失敗、用完連線、kill 一個 backend、提升複本、把 pg_wal 寫滿<span class="at-chip at-ev-tested">實測</span>[^pg-exp-target]；另一組補 archive 新鮮度、`archive_mode`、資料庫大小與 session 錯誤計數<span class="at-chip at-ev-tested">實測</span>[^pg-asp-exp]。Patroni 與備份工具的部分只讀原始碼，沒有實驗。
 
 ## 先講結論
 
@@ -14,6 +14,23 @@
 6. **split brain 只有跨 instance 才看得出來。**提升複本後舊主庫仍在跑，兩台的 `pg_replication_is_replica` 都是 0，各自的規則都正常。要在 target 上加 cluster label，計算每個 cluster 有幾台不在 recovery。<span class="at-chip at-ev-tested">實測</span>[^pg-exp-target]
 7. **慢 SQL、鎖佇列、CPU、OOM 各有不同的第一個訊號。**執行中的慢查詢不在 pg_stat_statements 裡；DDL 鎖佇列要看「等鎖數 + ACCESS EXCLUSIVE」；CPU 不夠時 scrape 先變慢；OOM 只看得到 counter 歸零。見[效能與故障情境](#perf)。<span class="at-chip at-ev-tested">實測</span>[^pg-perf-exp]
 8. **很多關鍵欄位 exporter 根本不輸出**：`sync_state`、`write_lag`／`flush_lag`／`replay_lag`、`synchronous_standby_names`、`backend_xid` 的 age、`last_failed_wal`、索引是否有效、timeline、磁碟剩餘空間。見[盲點](#blind-spots)。
+9. **核心 PostgreSQL 沒有共識機制。**streaming replication 不選主、不偵測主庫故障，提升只在有人呼叫 `pg_promote()` 時發生；`synchronous_standby_names` 的 `ANY n` 只決定 commit 等幾台。要監控 leader、quorum，對象是 Patroni 這類 HA 工具和它的 DCS。見[叢集與共識](#cluster)。<span class="at-chip at-ev-code">讀碼</span>[^pg-asp-src17-doc-nofailover][^pg-asp-src17-promote][^pg-asp-src17-syncrep-wait]
+10. **archive 失敗時 `failed_count` 增加得很慢，`last_archive_age` 才是一直變大的那個。**失敗 100 秒、持續寫入，`failed_count` 只從 0 變 3，`last_archive_age` 到 120 秒。`archive_mode` 是 enum，exporter 不輸出，關掉時看起來和剛啟動一樣。見[資料保護](#protection)。<span class="at-chip at-ev-tested">實測</span>[^pg-asp-exp]
+11. **備份與磁碟都不在 postgres_exporter 裡。**base backup 多久以前成功要問備份工具（pgbackrest_exporter 或自己寫的 textfile metric），磁碟剩餘空間要問 node_exporter。見[資料保護](#protection)、[容量](#capacity)。<span class="at-chip at-ev-code">讀碼</span>[^pg-asp-pbe-since-last][^pg-asp-ne-avail]
+
+### 九個面向一覽 {#aspects}
+
+| 面向 | 這頁的重點 | 元件卡的訊號 | 證據 |
+|---|---|---|---|
+| [監測自檢](#exporter) | exporter 四層「活著」、表鎖讓 scrape 消失、版本讓 metric 消失 | exporter-up、collectors-present、collector-success、legacy-scrape-error、monitor-privilege、scrape-budget、series-volume、probe-blast-radius、version-semantics、lock-blocks-exporter、pg-stat-statements | <span class="at-chip at-ev-tested">實測</span> |
+| [可用性](#availability) | 重啟與 crash recovery、pg_wal 寫滿、OOM | db-up、restart-and-crash、wal-disk、oom-crash | <span class="at-chip at-ev-tested">實測</span> |
+| [工作量](#workload) | TPS、rollback、deadlock、慢 SQL、session 錯誤 | throughput-drop、deadlocks-rollbacks、slow-sql、session-errors | <span class="at-chip at-ev-tested">實測</span> |
+| [飽和](#saturation) | 連線上限、鎖等待、cache、temp、checkpoint | connection-headroom、sessions-and-locks、lock-queue、cache-and-temp、resource-pressure、checkpoint-pressure | <span class="at-chip at-ev-tested">實測</span> |
+| [複寫](#replication) | 位元組延遲、receiver、slot、角色與 split brain | replication-semantics、standby-streaming、wal-receiver、replication-lag、replication-slots、standby-conflicts、sync-replication、promotion | <span class="at-chip at-ev-tested">實測</span> |
+| [叢集與共識](#cluster) | 核心沒有；Patroni 的 leader lock、DCS、pause、timeline | patroni-up、patroni-leader、patroni-dcs、patroni-paused、patroni-timeline（`applies_when: patroni`） | <span class="at-chip at-ev-code">讀碼</span> |
+| [資料維護](#maintenance) | wraparound、xmin horizon、autovacuum、失效索引 | wraparound、xmin-horizon、autovacuum、invalid-indexes | <span class="at-chip at-ev-tested">實測</span> |
+| [資料保護](#protection) | archive 成敗與新鮮度、archive_mode、base backup | archiver、archive-freshness、archive-config、backup-freshness | <span class="at-chip at-ev-tested">實測</span>／<span class="at-chip at-ev-code">讀碼</span> |
+| [容量](#capacity) | 資料庫與表的成長、磁碟預測、連線趨勢 | database-growth、disk-forecast、connection-trend | <span class="at-chip at-ev-tested">實測</span>／<span class="at-chip at-ev-code">讀碼</span> |
 
 ## 誰看得到什麼
 
@@ -35,51 +52,73 @@ flowchart LR
   RL -->|"pg_replication_lag_seconds<br/>receive = replay 時固定 0"| M3((不可單獨用))
 ```
 
-## 穩定 {#stability}
+## 監測自檢 {#exporter}
+
+exporter 本身的訊號（`up`、`pg_up`、collector 成功與否、scrape 預算、權限、版本造成的 metric 消失）都在[元件卡](../components/postgres_exporter.md)。這頁只補兩點和 PostgreSQL 本體直接相關的：
+
+- **表鎖讓 scrape 消失。**`stat_user_tables` 對每張表呼叫 `pg_table_size()`，要拿 AccessShareLock；ACCESS EXCLUSIVE 期間整次 scrape 卡住。exporter 帳號設 `lock_timeout` 後只剩這個 collector 失敗。見[鎖](#perf-locks)與[建議設定](#recommended)。<span class="at-chip at-ev-tested">實測</span>[^pg-exp-target-raw][^pg-c-user-tables-size]
+- **其他面向依賴的外部 metric 也要有自檢。**Patroni 的 `/metrics`、pgbackrest_exporter、node_exporter 都是另外的 target；規則範本各配一條 `absent()` 或 `up == 0`（`PatroniMissing`、`PostgresBackupExporterFailing`、`PostgresDataDiskNotMonitored`），否則對應面向的規則在 job 名稱或 mountpoint 不對時回傳空。
+
+## 可用性 {#availability}
 
 | 要看什麼 | PostgreSQL 的來源 | exporter metric（collector） | 預設 | 權限／版本 | 證據 |
 |---|---|---|---|---|---|
 | 重啟 | `pg_postmaster_start_time()` | `pg_postmaster_start_time_seconds`（postmaster） | 關 | — | <span class="at-chip at-ev-tested">實測</span> |
 | crash recovery | log：`all server processes terminated; reinitializing`；crash recovery 丟棄累積統計[^pg-src-crash-reinit][^pg-src-crash-stats] | `resets(pg_stat_database_xact_commit)`（stat_database） | 開 | 16、17 已核對原始碼會歸零[^pg-trace-pg16-crash-stats]；13～15 沒有核對 | <span class="at-chip at-ev-tested">實測</span> |
 | pg_wal 大小 | `pg_ls_waldir()` | `pg_wal_size_bytes`、`pg_wal_segments`（wal）[^pg-c-wal-query] | 開 | 需要 pg_monitor | <span class="at-chip at-ev-tested">實測</span> |
-| 磁碟剩餘空間 | 作業系統 | 無 | — | 用 node_exporter | — |
-| XID／multixact age | `age(datfrozenxid)`、`mxid_age(datminmxid)` | `pg_database_wraparound_age_datfrozenxid_seconds`、`..._datminmxid_seconds`（database_wraparound）[^pg-c-wraparound-query] | 關 | 名稱是 seconds，實際是交易數 | <span class="at-chip at-ev-code">讀碼</span> |
-| 長交易、idle in transaction | `pg_stat_activity.xact_start`、`state` | `pg_stat_activity_max_tx_duration{state}`（stat_activity）[^pg-c-activity-query]；`pg_long_running_transactions*`（long_running_transactions）[^pg-c-longtx-query] | 開／關 | 看別人的 session 需要 pg_read_all_stats[^pg-src-activity-privs] | <span class="at-chip at-ev-tested">實測</span> |
-| 擋住 vacuum 的 XID | `pg_stat_activity.backend_xid`／`backend_xmin`、`pg_replication_slots.xmin`、`pg_prepared_xacts` | 無 | — | — | <span class="at-chip at-ev-tested">實測</span> |
-| deadlock | `pg_stat_database.deadlocks` | `pg_stat_database_deadlocks`（stat_database）[^pg-c-database-columns] | 開 | — | <span class="at-chip at-ev-tested">實測</span> |
-| checkpoint 壓力 | ≤16 `pg_stat_bgwriter`；17 `pg_stat_checkpointer`[^pg-src-bgwriter16][^pg-src-checkpointer-view] | ≤16 `pg_stat_bgwriter_checkpoints_*`（stat_bgwriter）；17 `pg_stat_checkpointer_num_*`（stat_checkpointer）[^pg-c-bgwriter-17][^pg-c-checkpointer-17] | 開／**關** | 17 起換 collector | <span class="at-chip at-ev-tested">實測</span> |
-| autovacuum、dead tuple | `pg_stat_user_tables` | `pg_stat_user_tables_n_dead_tup`、`last_autovacuum`（stat_user_tables） | 開 | 只有 DSN 那一個資料庫 | <span class="at-chip at-ev-tested">實測</span> |
-| bloat | 需要 pgstattuple 或估算查詢 | 無 | — | — | — |
-| 失效索引、checksum 失敗 | `pg_index.indisvalid`、`pg_stat_database.checksum_failures`、amcheck | 無 | — | — | <span class="at-chip at-ev-code">讀碼</span> |
+| 連得上 | 連線本身 | `pg_up`（舊架構）、collector 是否有結果 | 開 | 見元件卡 | <span class="at-chip at-ev-tested">實測</span> |
 
 重點：
 
-- **idle in transaction 擋住 vacuum。**實驗中一個 session 開了交易拿到 XID 後閒置，之後燒掉 3000 個 XID、更新整張表再 VACUUM：VACUUM 回報「10000 are dead but not yet removable，removable cutoff 是 3003 XIDs old」。exporter 這時能看到的是 `max_tx_duration{state="idle in transaction"}=36s` 與 `n_dead_tup=10001`，看不到「卡住幾個 XID」。<span class="at-chip at-ev-tested">實測</span>[^pg-exp-target-raw]
-- **`database_wraparound` 量的不是卡住的交易。**它是 `datfrozenxid` 的 age，代表 vacuum 凍結到哪裡；卡住的交易會讓它長期無法下降，但短期看不出來。PostgreSQL 在 2^31 − 4000 萬時開始警告、− 300 萬時拒絕新的 XID（16 與 17 相同）。<span class="at-chip at-ev-code">讀碼</span>[^pg-src-xid-warn][^pg-src-xid-stop]
-- **WAL 寫滿時 PostgreSQL 直接停機。**pg_wal 放在 160MB tmpfs、用 slot 擋住回收：寫 WAL 的 backend PANIC，postmaster 重新初始化，recovery 寫不進 WAL 又 FATAL，最後 `database system is shut down`，容器退出。exporter 看到的是 `pg_up=0`、所有 collector 消失；之前的 `pg_wal_size_bytes` 是唯一的預警。<span class="at-chip at-ev-tested">實測</span>[^pg-exp-target-raw]
-- **16 的複本 checkpoint 數包含 restartpoint。**16 在複本上把 restartpoint 算進 `checkpoints_req`／`checkpoints_timed`，17 分到 `restartpoints_*`；同一條規則在升級前後對複本的意義不同。<span class="at-chip at-ev-code">讀碼</span>[^pg-trace-pg16-ckpt-req][^pg-trace-pg17-rstpt-req]
-- **checkpoint 規則要接兩個名字。**同一個 `CHECKPOINT` 指令，16 讓 `pg_stat_bgwriter_checkpoints_req_total` 加 1，17 讓 `pg_stat_checkpointer_num_requested_total` 加 1；17 的複本另有 `restartpoints_*`。17 沒開 stat_checkpointer 時兩個名字都不存在。<span class="at-chip at-ev-tested">實測</span>[^pg-exp-target]
+- **WAL 寫滿時 PostgreSQL 直接停機。**pg_wal 放在 160MB tmpfs、用 slot 擋住回收：寫 WAL 的 backend PANIC，postmaster 重新初始化，recovery 寫不進 WAL 又 FATAL，最後 `database system is shut down`，容器退出。exporter 看到的是 `pg_up=0`、所有 collector 消失；之前的 `pg_wal_size_bytes` 是唯一的預警。磁碟的長期趨勢見[容量](#capacity)。<span class="at-chip at-ev-tested">實測</span>[^pg-exp-target-raw]
+- **OOM kill 只讓 counter 歸零。**kernel 殺的是 backend，不是 postmaster，啟動時間不變。見[讓 TPS 下降或當掉的內部因素](#perf-internal)。<span class="at-chip at-ev-tested">實測</span>[^pg-perf-exp]
 
-## 使用 {#usage}
+## 工作量與效能 {#workload}
+
+| 要看什麼 | PostgreSQL 的來源 | exporter metric（collector） | 預設 | 權限／版本 | 證據 |
+|---|---|---|---|---|---|
+| TPS | `pg_stat_database.xact_commit`（`pg_stat_get_db_xact_commit()`）[^pg-asp-src16-statdb-commit][^pg-asp-src16-func-xact-commit] | `pg_stat_database_xact_commit`（stat_database）[^pg-c-database-columns] | 開 | 包含 exporter 自己的交易 | <span class="at-chip at-ev-tested">實測</span> |
+| 寫入量 | `tup_inserted`／`tup_updated`／`tup_deleted` | `pg_stat_database_tup_*` | 開 | — | <span class="at-chip at-ev-tested">實測</span> |
+| rollback、deadlock | `xact_rollback`、`deadlocks` | `pg_stat_database_xact_rollback`、`pg_stat_database_deadlocks` | 開 | rollback 含應用主動 ROLLBACK | <span class="at-chip at-ev-tested">實測</span> |
+| 查詢延遲、QPS | `pg_stat_statements` | `pg_stat_statements_seconds_total`、`calls_total`（stat_statements）[^pg-asp-c-statements-calls][^pg-asp-c-statements-seconds] | 關 | 每台都要 `shared_preload_libraries`；17 欄位改名[^pg-c-statements-pg17] | <span class="at-chip at-ev-tested">實測</span> |
+| session 被斷、FATAL、客戶端沒說再見 | `pg_stat_database.sessions_killed`／`sessions_fatal`／`sessions_abandoned`（14 起）[^pg-asp-src16-statdb-sessions-fatal][^pg-asp-src16-sessions-count] | **無**：stat_database 的欄位清單沒有 `sessions_*`[^pg-asp-c-statdb-columns] | — | — | <span class="at-chip at-ev-tested">實測</span>[^pg-asp-exp] |
+| SQL 錯誤（ERROR） | 只有 log，沒有任何 view 計數 | 無 | — | 用 log 管線計數 | <span class="at-chip at-ev-code">讀碼</span> |
+
+重點：
+
+- **QPS 用 `rate(pg_stat_statements_calls_total)` 加總。**只涵蓋前 100 名、排除總耗時最低的 10%，所以是下限，不是精確值。collector 先排除最低的 10%，queryid 會隨排名進出，`rate()` 會斷斷續續；沒有 pg_read_all_stats 的帳號看到的 series 只有三分之一（27 vs 83），collector 仍回報成功。<span class="at-chip at-ev-tested">實測</span>[^pg-exp-target][^pg-c-statements-topn]
+- **TPS 掉到 0 時 exporter 不會顯示 0。**規則用「不到昨天同時段一半」（`PostgresThroughputDrop`），見[效能與故障情境](#perf)。
+- **session 錯誤計數要自訂查詢。**實驗中 `pg_terminate_backend()` 一個 session 後 `sessions_killed=1`，exporter 沒有任何 `sessions_*`；連一個不存在的資料庫得到 FATAL，沒有算進任何資料庫的 `sessions_fatal`（連線沒進到資料庫）。補法：sql_exporter 查 `SELECT datname, sessions_fatal, sessions_killed, sessions_abandoned FROM pg_stat_database` 輸出成 counter，對 `increase()` 告警。<span class="at-chip at-ev-tested">實測</span>[^pg-asp-exp][^pg-asp-exp-raw]
+- 慢 SQL 與鎖造成的 TPS 下降見[慢 SQL 怎麼找](#perf-slow-sql)、[鎖](#perf-locks)。
+
+### 證據鏈 {#workload-chain}
+
+| 規則 | PostgreSQL 原始碼 | view／函式 | exporter 原始碼與 SQL | metric | 證據 |
+|---|---|---|---|---|---|
+| `PostgresThroughputDrop`、`PostgresHighRollbackRatio` | 交易結束時累加 commit／rollback（17 `pgstat_database.c:259`）[^pg-trace-pg17-xact-count]；`pgstatfuncs.c:1082`（16）／`:1076`（17） | `pg_stat_database.xact_commit`、`xact_rollback`（16 `system_views.sql:1029`、17:1055）[^pg-asp-src16-statdb-commit][^pg-asp-src17-statdb-commit] | `pg_stat_database.go:229` 欄位清單，`SELECT ... FROM pg_stat_database`[^pg-asp-c-statdb-columns][^pg-trace-ex-db-query] | `pg_stat_database_xact_commit`、`xact_rollback` | <span class="at-chip at-ev-tested">實測</span>[^pg-perf-exp] |
+| `PostgresSlowStatement` | 語句結束時 `calls += 1`、`total_time += total_time`（16 `pg_stat_statements.c:1355`）[^pg-asp-src16-pgss-store] | `pg_stat_statements.calls`、`total_exec_time` | `pg_stat_statements.go:188`（13 起的查詢）、`:114`／`:120` 輸出成 `calls_total`、`seconds_total`[^pg-perf-c-stmt-pg13-query][^pg-asp-c-statements-calls][^pg-asp-c-statements-seconds] | `pg_stat_statements_calls_total`、`seconds_total` | <span class="at-chip at-ev-tested">實測</span>[^pg-perf-exp] |
+| （無規則）session 錯誤 | `pgstat_database.c:227` 依斷線原因累加 `sessions_fatal` 等（16、17）[^pg-asp-src16-sessions-count][^pg-asp-src17-sessions-count] | `pg_stat_database.sessions_*`（16 `system_views.sql:1052`、17:1078）[^pg-asp-src17-statdb-sessions-fatal] | 沒有查這幾欄（`pg_stat_database.go:229`） | 無 | <span class="at-chip at-ev-tested">實測</span>[^pg-asp-exp] |
+
+## 資源與飽和 {#saturation}
 
 | 要看什麼 | PostgreSQL 的來源 | exporter metric（collector） | 預設 | 權限／版本 | 證據 |
 |---|---|---|---|---|---|
 | 連線數 vs 上限 | `pg_stat_activity`、`max_connections`、`superuser_reserved_connections`、`reserved_connections` | `pg_stat_activity_count`、`pg_settings_*`（stat_activity、settings） | 開 | `reserved_connections` 16 起 | <span class="at-chip at-ev-tested">實測</span> |
 | active／idle／等鎖 | `pg_stat_activity.state`、`wait_event_type` | `pg_stat_activity_count{state, wait_event_type}`[^pg-c-activity-labels] | 開 | 需要 pg_read_all_stats | <span class="at-chip at-ev-tested">實測</span> |
 | 鎖 | `pg_locks` | `pg_locks_count{mode}`（locks）[^pg-c-locks-query] | 開 | 看不出誰擋誰；不含 transactionid 鎖[^pg-trace-ex-locks-dbnotnull] | <span class="at-chip at-ev-tested">實測</span> |
-| 查詢延遲 | `pg_stat_statements` | `pg_stat_statements_seconds_total`、`calls_total`（stat_statements）[^pg-c-statements-topn] | 關 | 每台都要 `shared_preload_libraries`；17 欄位改名[^pg-c-statements-pg17] | <span class="at-chip at-ev-tested">實測</span> |
 | cache hit | `pg_stat_database.blks_hit／blks_read` | `pg_stat_database_blks_*` | 開 | 只算 shared_buffers | <span class="at-chip at-ev-tested">實測</span> |
 | temp file | `pg_stat_database.temp_files／temp_bytes` | `pg_stat_database_temp_*` | 開 | 暫存檔刪除時才計入[^pg-trace-pg17-temp-call] | <span class="at-chip at-ev-tested">實測</span> |
-| 複寫 slot 保留的 WAL | `pg_replication_slots` | `pg_replication_slots_pg_wal_lsn_diff`、`safe_wal_size_bytes`、`wal_status`（replication_slots）[^pg-c-slots-query] | 開 | `safe_wal_size`、`wal_status` 13 起 | <span class="at-chip at-ev-tested">實測</span> |
+| checkpoint 壓力 | ≤16 `pg_stat_bgwriter`；17 `pg_stat_checkpointer`[^pg-src-bgwriter16][^pg-src-checkpointer-view] | ≤16 `pg_stat_bgwriter_checkpoints_*`（stat_bgwriter）；17 `pg_stat_checkpointer_num_*`（stat_checkpointer）[^pg-c-bgwriter-17][^pg-c-checkpointer-17] | 開／**關** | 17 起換 collector | <span class="at-chip at-ev-tested">實測</span> |
 
 重點：
 
 - **連線上限要扣兩種保留。**一般使用者能用的是 `max_connections − superuser_reserved_connections − reserved_connections`。實驗中 20 − 3 − 2 = 15：app 用到第 15 條之後再連，得到「remaining connection slots are reserved for roles with privileges of the pg_use_reserved_connections role」。<span class="at-chip at-ev-tested">實測</span>[^pg-exp-target]
 - **`pg_stat_activity_count` 不等於連線數。**它排除的只是 collector 自己那條連線（舊架構的常駐 idle 連線照樣算進去），也排除 state 是 NULL 的 background process[^pg-trace-ex-activity-self]；和 `pg_stat_database_numbackends` 不會相等。
-- **pg_stat_statements 只給前 N 名。**collector 先排除總耗時最低的 10%，再取前 100 名（可調），queryid 會隨排名進出，`rate()` 會斷斷續續。沒有 pg_read_all_stats 的帳號看到的 series 只有三分之一（27 vs 83），collector 仍回報成功。<span class="at-chip at-ev-tested">實測</span>[^pg-exp-target][^pg-c-statements-topn]
 - **cache hit 比例只適合畫圖。**OS page cache 命中在 PostgreSQL 眼中也是 read，比例偏低不一定是問題。
+- **16 的複本 checkpoint 數包含 restartpoint。**16 在複本上把 restartpoint 算進 `checkpoints_req`／`checkpoints_timed`，17 分到 `restartpoints_*`；同一條規則在升級前後對複本的意義不同。<span class="at-chip at-ev-code">讀碼</span>[^pg-trace-pg16-ckpt-req][^pg-trace-pg17-rstpt-req]
+- **checkpoint 規則要接兩個名字。**同一個 `CHECKPOINT` 指令，16 讓 `pg_stat_bgwriter_checkpoints_req_total` 加 1，17 讓 `pg_stat_checkpointer_num_requested_total` 加 1；17 的複本另有 `restartpoints_*`。17 沒開 stat_checkpointer 時兩個名字都不存在。<span class="at-chip at-ev-tested">實測</span>[^pg-exp-target]
 
-## HA {#ha}
+## 複寫與 HA {#replication}
 
 | 要看什麼 | PostgreSQL 的來源 | exporter metric（collector） | 預設 | 權限／版本 | 證據 |
 |---|---|---|---|---|---|
@@ -92,7 +131,6 @@ flowchart LR
 | 角色 | `pg_is_in_recovery()` | `pg_replication_is_replica`（replication） | 開 | — | <span class="at-chip at-ev-tested">實測</span> |
 | timeline | `pg_control_checkpoint().timeline_id` | 無 | — | — | <span class="at-chip at-ev-tested">實測</span> |
 | inactive slot | `pg_replication_slots.active`、`wal_status` | `pg_replication_slots_active`、`pg_replication_slots_wal_status{wal_status}` | 開 | — | <span class="at-chip at-ev-tested">實測</span> |
-| archive | `pg_stat_archiver` | `pg_stat_archiver_failed_count`、`archived_count`、`last_archive_age`（stat_archiver）[^pg-c-archiver-query] | 開 | 沒有 `last_failed_wal` | <span class="at-chip at-ev-tested">實測</span> |
 | 複本查詢衝突 | `pg_stat_database_conflicts` | `pg_stat_database_conflicts_confl_*`（舊架構內建）[^pg-c-conflicts-legacy] | 開 | — | <span class="at-chip at-ev-code">讀碼</span> |
 
 ### 延遲：位元組與時間
@@ -120,7 +158,7 @@ flowchart LR
 
 規則寫法：`count by (cluster) (pg_replication_is_replica == 0) > 1`（split brain）與 `count by (cluster) (pg_replication_is_replica) unless count by (cluster) (pg_replication_is_replica == 0)`（沒有主庫）。前者要求每個 instance 只被一個 job 抓，否則同一台會被算兩次。
 
-### Replication slot 與 archive
+### Replication slot {#replication-slots}
 
 PostgreSQL 16 主庫，停掉用 slot `standby_a` 的複本，並建一個從未被使用的 slot `orphan`；設 `max_slot_wal_keep_size=64MB` 後產生約 120MB WAL 再 CHECKPOINT。<span class="at-chip at-ev-tested">實測</span>[^pg-exp-target-raw]
 
@@ -133,14 +171,138 @@ PostgreSQL 16 主庫，停掉用 slot `standby_a` 的複本，並建一個從未
 
 slot 一旦 lost，`restart_lsn` 變 NULL，保留量相關的 series 跟著消失，只看 `pg_wal_lsn_diff > X` 的規則在最嚴重的時候回傳空；要另外看 `wal_status{wal_status=~"unreserved|lost"}`。複本重新啟動後一直回報「requested WAL segment ... has already been removed」，但 `pg_up=1`、`is_replica=1`，主庫上沒有它那一列；這時它的 `pg_replication_lag_seconds` 是 103 秒（差別在 receiver 是第一次啟動還是斷線重連：斷線重連時 `flushedUpto` 不重設，receive 位置仍等於 replay 位置，lag 是 0；複本重啟後 receiver 第一次啟動，`flushedUpto` 被設成當前 WAL segment 的開頭，比 replay 位置小，公式改走「now − 最後套用時間」。這次實驗沒有直接查 `pg_last_wal_receive_lsn()`，原因是讀碼[^pg-trace-pg16-walrcv-flushinit][^pg-trace-pg16-walrcv-segstart]），和上面「切斷 receiver」時的 0 不同，**同一個 metric 在兩種斷線下行為不一樣**。
 
-archive：PostgreSQL 16，`archive_command` 換成一個會失敗的 script，產生 3 個 WAL 檔後等 75 秒。<span class="at-chip at-ev-tested">實測</span>[^pg-exp-target-raw]
+用 slot 的備份工具（pg_receivewal、Barman streaming）停掉時一樣會讓 WAL 在主庫累積，規則同上；archive 見[資料保護](#protection)。
 
-- `pg_stat_archiver_failed_count` 0 → 9，`increase(...[1m])` 約 3：archiver 每輪重試 3 次後休息約 60 秒。`archived_count` 停在 1，`last_archive_age` 一路變大。
-- 直接查才看得到 `last_failed_wal=000000010000000000000002` 與 6 個 `.ready` 檔；exporter 不輸出這兩項。
-- 修好之後 30 秒內 `archived_count` 仍沒有增加（archiver 還在休息），規則的 `for` 不要短於 1–2 分鐘。
-- `last_archive_age` 不能單獨當 alert：沒有寫入、也沒設 `archive_timeout` 時，它本來就會一直變大。規則寫成「failed 有增加且 archived 沒增加」。
+## 叢集與共識 {#cluster}
+
+**結論：核心 PostgreSQL 沒有共識、quorum 成員資格或自動選主。**「叢集與共識」只在部署了 HA 管理工具時才有對象可監控；這時要看的是那個工具與它的 DCS，不是 PostgreSQL 本身。沒有 HA 工具的部署，「誰是主庫、有沒有兩個主庫」由[複寫](#replication)的 promotion（cluster label 計數）回答，元件卡把 cluster 面向記在 `not_applicable_aspects`。
+
+### 為什麼核心 PostgreSQL 沒有共識 {#cluster-why}
+
+| 依據 | 內容 | 證據 |
+|---|---|---|
+| 文件 `high-availability.sgml`（16:1449、17:1457） | 「PostgreSQL does not provide the system software required to identify a failure on the primary and notify the standby database server.」同一節要求另外做 STONITH，避免兩邊都以為自己是主庫（17:1441） | <span class="at-chip at-ev-code">讀碼</span>[^pg-asp-src16-doc-nofailover][^pg-asp-src17-doc-nofailover][^pg-asp-src17-doc-stonith] |
+| `xlogfuncs.c` `pg_promote()`（16:698、17:688） | 提升只是寫一個 promote 信號檔，由呼叫者（人或外部工具）決定；複本之間沒有投票 | <span class="at-chip at-ev-code">讀碼</span>[^pg-asp-src16-promote][^pg-asp-src17-promote] |
+| `syncrep.c` `SyncRepGetSyncRecPtr()`（16:622／527、17:621／526）、`syncrep.h:36` | `ANY n`（`SYNC_REP_QUORUM`）與 `FIRST n`（`SYNC_REP_PRIORITY`）只決定「commit 的 WAL 要等哪幾台 standby 回報」；同步 standby 不夠時回傳 false，commit 等待，沒有任何選主或隔離 | <span class="at-chip at-ev-code">讀碼</span>[^pg-asp-src16-syncrep-wait][^pg-asp-src17-syncrep-wait][^pg-asp-src17-syncrep-method][^pg-asp-src16-syncrep-quorum-def] |
+| 文件 `high-availability.sgml`（17:1232） | 「The method ANY specifies a quorum-based synchronous replication and makes transaction commits wait until their WAL records are replicated to at least the requested number of synchronous standbys」：quorum commit 是耐久性設定 | <span class="at-chip at-ev-code">讀碼</span>[^pg-asp-src17-doc-quorum] |
+
+對照：YugabyteDB 這類 PostgreSQL 相容的分散式資料庫，每個 tablet 用 Raft 複寫，才有 leader、term、quorum 可以監控（只讀文件，見來源 `pg-yugabyte-raft`）。核心 PostgreSQL 的 streaming replication 是一主多從的 WAL 傳送，沒有這一層。
+
+### HA 工具各自把「共識」放在哪裡 {#cluster-tools}
+
+| 工具 | 誰決定主庫 | 該監控什麼 | 有沒有 Prometheus endpoint | 證據 |
+|---|---|---|---|---|
+| Patroni | DCS（etcd、Consul、ZooKeeper、Kubernetes）裡的 leader key；拿得到、續得了 lock 的節點才能當主庫，續不了就自己降級 | 每個叢集剛好一個 lock 持有者、DCS 聯絡時間、pause、timeline；DCS 本身的 quorum | 有：REST API `/metrics`（`patroni_*`，label `scope`、`name`） | <span class="at-chip at-ev-code">讀碼</span>[^pg-asp-patroni-doc-dcs][^pg-asp-patroni-etcd-cas][^pg-asp-patroni-demote-nolock] |
+| repmgr | repmgrd 在節點間互相探測，可選 witness 節點；沒有外部 DCS | `repmgr cluster show` 的狀態、repmgrd 是否在跑 | 沒有內建；要自訂查詢 repmgr 的 metadata 表 | 只讀文件（來源 `pg-repmgr`） |
+| pg_auto_failover | 一個 monitor 節點（本身是 PostgreSQL）跑狀態機，指揮 primary 與 secondary | 每個節點的 reported／goal state、monitor 本身活著 | 沒有內建；monitor 是單點，要另外監控 | 只讀文件（來源 `pg-autofailover`） |
+
+### Patroni：訊號與規則 {#cluster-patroni}
+
+`rules/targets/postgres.yml` 的 `patroni-cluster` 組，假設 Patroni 的 `/metrics` 在 `job="patroni"`。不用 Patroni 的環境整組刪掉（否則 `PatroniMissing` 會響）。
+
+| 規則 | PostgreSQL 原始碼 | view／函式／DCS | Patroni 原始碼與查詢（v4.1.5） | metric | 條件 |
+|---|---|---|---|---|---|
+| `PatroniDown`、`PatroniMissing` | — | — | `api.py:584` `do_GET_metrics`；`api.py:625` 每個 series 帶 `scope`、`name`[^pg-asp-patroni-metrics][^pg-asp-patroni-labels] | `up{job="patroni"}` | `== 0`、`absent()` |
+| `PatroniClusterUnlocked` | — | DCS 的 leader key；etcd3 用 `create_revision='0'` 的 compare-and-set 搶 lock（`etcd3.py:979`）[^pg-asp-patroni-etcd-cas] | `api.py:1444` `cluster.is_unlocked()` → `api.py:710`[^pg-asp-patroni-unlocked][^pg-asp-patroni-unlocked-metric] | `patroni_cluster_unlocked` | `max by (scope) == 1` 持續 1 分鐘 |
+| `PatroniMultiplePrimaries`、`PatroniNoPrimary` | `xlogfuncs.c:652`（REL_16_15）[^pg-asp-src16-is-in-recovery] | `pg_is_in_recovery()` | `postgresql/__init__.py:70` 的 `TL_LSN`：`CASE WHEN pg_is_in_recovery() THEN 0 ELSE ...`，決定 role → `api.py:644`；standby leader 在 `api.py:653`[^pg-asp-patroni-tl-lsn][^pg-asp-patroni-primary][^pg-asp-patroni-standby-leader] | `patroni_primary`、`patroni_standby_leader` | `count by (scope) (== 1) > 1`；主庫與 standby leader 都是 0 |
+| `PatroniDcsUnreachable` | — | 從 DCS 讀叢集狀態 | 讀到就更新 `_last_seen`（`dcs/__init__.py:1773`）→ `api.py:724`[^pg-asp-patroni-dcs-seen-set][^pg-asp-patroni-dcs-seen] | `patroni_dcs_last_seen` | `time() −` 它 `> 60`（2 × 預設 ttl 30 秒[^pg-asp-patroni-doc-ttl]） |
+| `PatroniFailsafeActive` | — | DCS 不通 | 主庫降級（`ha.py:2362`），failsafe 生效則不降級 → `api.py:712`[^pg-asp-patroni-demote-dcs][^pg-asp-patroni-failsafe] | `patroni_failsafe_mode_is_active` | `== 1` |
+| `PatroniPaused` | — | DCS 的 `/config` pause | `api.py:733`[^pg-asp-patroni-paused] | `patroni_is_paused` | `max by (scope) == 1` 持續 1 小時 |
+| `PatroniTimelineDiverged` | `xlogfuncs.c:447`（REL_16_15）[^pg-asp-src16-walfile-name] | `pg_walfile_name(pg_current_wal_lsn())` 的前 8 碼 | `__init__.py:70`；複本用 leader 的或快取的 timeline（`api.py:1423`）→ `api.py:719`[^pg-asp-patroni-tl-lsn][^pg-asp-patroni-replica-tl][^pg-asp-patroni-timeline] | `patroni_postgres_timeline` | 依 scope，大於 0 的最大值 > 最小值，持續 10 分鐘 |
+
+要注意的地方（讀碼，沒有實驗）：
+
+- **`patroni_primary` 不是「持有 leader lock」。**`api.py` 的說明寫「holds the leader lock」，程式卻是 `postgres['role'] == PRIMARY`，而 role 來自 `pg_is_in_recovery()`。所以它和 postgres_exporter 的 `pg_replication_is_replica == 0` 量的是同一件事；「lock 在誰手上」要看 `patroni_cluster_unlocked` 與 Patroni REST API 的 `/cluster`。這反而讓 `PatroniMultiplePrimaries` 抓得到「lock 只有一個、PostgreSQL 卻有兩台可寫」。<span class="at-chip at-ev-code">讀碼</span>[^pg-asp-patroni-primary][^pg-asp-patroni-tl-lsn]
+- **舊主庫的 Patroni 停了、PostgreSQL 還在跑時，Patroni 的 metric 看不到它。**這種 split brain 只有 postgres_exporter 那邊的 `PostgresMultiplePrimaries`（cluster label 計數）看得到，兩組規則要一起用。
+- **DCS 整個掛掉時，所有節點同時降級成唯讀。**PostgreSQL 與 postgres_exporter 都正常、`pg_up=1`，只有 `PatroniDcsUnreachable` 與寫入失敗看得出來。DCS 本身（例如 etcd 的 `etcd_server_has_leader`、Consul 的 raft metric）要有自己的監控，不在這張卡的範圍。<span class="at-chip at-ev-code">讀碼</span>[^pg-asp-patroni-demote-dcs][^pg-asp-patroni-doc-dcs]
+
+## 資料維護與完整性 {#maintenance}
+
+| 要看什麼 | PostgreSQL 的來源 | exporter metric（collector） | 預設 | 權限／版本 | 證據 |
+|---|---|---|---|---|---|
+| XID／multixact age | `age(datfrozenxid)`、`mxid_age(datminmxid)` | `pg_database_wraparound_age_datfrozenxid_seconds`、`..._datminmxid_seconds`（database_wraparound）[^pg-c-wraparound-query] | 關 | 名稱是 seconds，實際是交易數 | <span class="at-chip at-ev-code">讀碼</span> |
+| 長交易、idle in transaction | `pg_stat_activity.xact_start`、`state` | `pg_stat_activity_max_tx_duration{state}`（stat_activity）[^pg-c-activity-query]；`pg_long_running_transactions*`（long_running_transactions）[^pg-c-longtx-query] | 開／關 | 看別人的 session 需要 pg_read_all_stats[^pg-src-activity-privs] | <span class="at-chip at-ev-tested">實測</span> |
+| 擋住 vacuum 的 XID | `pg_stat_activity.backend_xid`／`backend_xmin`、`pg_replication_slots.xmin`、`pg_prepared_xacts` | 無 | — | — | <span class="at-chip at-ev-tested">實測</span> |
+| autovacuum、dead tuple | `pg_stat_user_tables` | `pg_stat_user_tables_n_dead_tup`、`last_autovacuum`（stat_user_tables） | 開 | 只有 DSN 那一個資料庫 | <span class="at-chip at-ev-tested">實測</span> |
+| bloat | 需要 pgstattuple 或估算查詢 | 無 | — | — | — |
+| 失效索引、checksum 失敗 | `pg_index.indisvalid`、`pg_stat_database.checksum_failures`、amcheck | 無 | — | — | <span class="at-chip at-ev-code">讀碼</span> |
+
+重點：
+
+- **idle in transaction 擋住 vacuum。**實驗中一個 session 開了交易拿到 XID 後閒置，之後燒掉 3000 個 XID、更新整張表再 VACUUM：VACUUM 回報「10000 are dead but not yet removable，removable cutoff 是 3003 XIDs old」。exporter 這時能看到的是 `max_tx_duration{state="idle in transaction"}=36s` 與 `n_dead_tup=10001`，看不到「卡住幾個 XID」。<span class="at-chip at-ev-tested">實測</span>[^pg-exp-target-raw]
+- **`database_wraparound` 量的不是卡住的交易。**它是 `datfrozenxid` 的 age，代表 vacuum 凍結到哪裡；卡住的交易會讓它長期無法下降，但短期看不出來。PostgreSQL 在 2^31 − 4000 萬時開始警告、− 300 萬時拒絕新的 XID（16 與 17 相同）。<span class="at-chip at-ev-code">讀碼</span>[^pg-src-xid-warn][^pg-src-xid-stop]
+
+## 資料保護 {#protection}
+
+能不能還原要三樣東西都在：一份 base backup、從那份備份之後連續的 WAL archive、還原時拿得到兩者。PostgreSQL 只知道第二樣的一半（archive_command 有沒有成功），postgres_exporter 只輸出其中三個數字。
+
+| 要看什麼 | PostgreSQL 的來源 | exporter metric（collector） | 預設 | 權限／版本 | 證據 |
+|---|---|---|---|---|---|
+| archive 成敗 | `pg_stat_archiver`（16:1097、17:1123）；`pgstat_report_archiver()` 成功時更新 `last_archived_timestamp`（`pgstat_archiver.c:47`）[^pg-asp-src16-archiver-view][^pg-asp-src16-archiver-ok] | `pg_stat_archiver_failed_count`、`archived_count`（stat_archiver）[^pg-asp-c-archiver-default] | 開 | 沒有 `last_failed_wal`、`.ready` 數 | <span class="at-chip at-ev-tested">實測</span> |
+| archive 新鮮度 | `pg_stat_archiver.last_archived_time` | `pg_stat_archiver_last_archive_age` = `extract(epoch from now() − last_archived_time)`[^pg-asp-c-archiver-age] | 開 | 從沒成功時是 NULL，不輸出[^pg-asp-c-archiver-agenull] | <span class="at-chip at-ev-tested">實測</span> |
+| `archive_timeout` | GUC，integer、單位秒（16 `guc_tables.c:2021`）[^pg-asp-src16-guc-archive-timeout] | `pg_settings_archive_timeout_seconds`（settings）[^pg-asp-c-settings-seconds] | 開 | — | <span class="at-chip at-ev-tested">實測</span> |
+| `archive_mode` | GUC，**enum**（16 `guc_tables.c:4774`、17:4936，位在 `ConfigureNamesEnum`）[^pg-asp-src16-guc-archive-mode][^pg-asp-src17-guc-archive-mode][^pg-asp-src16-guc-enum-table] | **無**：settings 只查 `vartype IN ('bool','integer','real')`[^pg-asp-c-settings-vartype] | — | — | <span class="at-chip at-ev-tested">實測</span> |
+| base backup 新鮮度 | PostgreSQL 不知道 | **無**；pgBackRest 用 pgbackrest_exporter 的 `pgbackrest_backup_since_last_completion_seconds`[^pg-asp-pbe-since-last] | — | 社群 exporter | <span class="at-chip at-ev-code">讀碼</span> |
+| 備份用的 slot | `pg_replication_slots` | `pg_replication_slots_active`、`pg_wal_lsn_diff`、`wal_status`（見[複寫](#replication)） | 開 | — | <span class="at-chip at-ev-tested">實測</span> |
+
+### archive 失敗時哪個數字在動
+
+兩組實驗，PostgreSQL 16 與 17 結果相同：<span class="at-chip at-ev-tested">實測</span>[^pg-exp-target-raw][^pg-asp-exp][^pg-asp-exp-raw]
+
+- `archive_command` 換成會失敗的 script、產生 3 個 WAL 檔後等 75 秒：`pg_stat_archiver_failed_count` 0 → 9，`increase(...[1m])` 約 3：archiver 每輪重試 3 次後休息約 60 秒[^pg-trace-pg17-arch-retries]。`archived_count` 停在 1，`last_archive_age` 一路變大。修好之後 30 秒內 `archived_count` 仍沒有增加（archiver 還在休息），規則的 `for` 不要短於 1–2 分鐘。
+- `archive_timeout=30`、失敗 100 秒且每 10 秒寫 1.8MB：`failed_count` 0 → 3、`archived_count` 停在 4、`last_archive_age` 120 秒（> 3 × 30）。直接查才看得到 `last_failed_wal=000000010000000000000005` 與 1 個 `.ready` 檔。
+- `pg_settings` 裡 `archive_mode|on|enum`、`archive_command|/archive.sh|string`；exporter 只有 `pg_settings_archive_timeout_seconds 30`。`archive_mode=off` 時 `pg_stat_archiver` 照樣存在、`archived_count=0`、沒有 `last_archive_age`，和「剛啟動還沒 archive」看起來一樣，要在盤點時 `SHOW archive_mode`。
+
+`last_archive_age` 不能單獨當 alert：`archive_timeout` 只在上次切換後有「重要」WAL 時才強制切 segment（16 `checkpointer.c:642`、17:657）[^pg-asp-src16-archive-timeout-switch][^pg-asp-src17-archive-timeout-switch]，閒置時 age 本來就會一直變大。所以 `PostgresArchiveStale` 要求這段時間有寫入，並以 `archive_timeout` 當尺度；從沒成功過的情況由 `PostgresArchiveNeverSucceeded` 補位。
+
+### base backup：備份工具的 metric
+
+PostgreSQL 與 postgres_exporter 都看不到 base backup。三種常見工具的做法：
+
+| 工具 | 最後成功時間從哪裡來 | 建議 |
+|---|---|---|
+| pgBackRest | `pgbackrest info --output=json`；pgbackrest_exporter（woblerr，v0.25.0）輸出 `pgbackrest_backup_since_last_completion_seconds{stanza, backup_type}` = 現在 − 最後一份備份的時間[^pg-asp-pbe-since-last-calc]，讀取失敗時 `pgbackrest_exporter_status=0`[^pg-asp-pbe-exporter-status]；另有 `pgbackrest_wal_archive_status`[^pg-asp-pbe-wal-status] | 用範本的 `PostgresBackupTooOld`、`PostgresBackupExporterFailing` |
+| WAL-G | `wal-g backup-list --json` | 備份 job 成功後用 node_exporter textfile collector 寫 `postgres_backup_last_success_timestamp_seconds`，對 `time() −` 它與 `absent()` 告警 |
+| Barman | `barman list-backups`、`barman check` | 同上；或用社群的 barman exporter（未核對） |
+
+WAL-G 與 Barman 的做法只是建議的模式，沒有讀它們的原始碼，也沒有實驗。
+
+### 證據鏈 {#protection-chain}
+
+| 規則 | PostgreSQL 原始碼 | view／函式 | exporter 原始碼與 SQL | metric | 證據 |
+|---|---|---|---|---|---|
+| `PostgresArchiveStale` | `pgstat_archiver.c:47`（16、17）成功時寫 `last_archived_timestamp`；`checkpointer.c:642`（16）／`:657`（17）只在有重要 WAL 時強制切換；`guc_tables.c:2021`（16）`archive_timeout` 單位秒 | `pg_stat_archiver.last_archived_time`；`pg_settings` | `pg_stat_archiver.go:59`：`extract(epoch from now() - last_archived_time) AS last_archive_age`；`pg_setting.go:147` 把 s 轉成 `_seconds` | `pg_stat_archiver_last_archive_age`、`pg_settings_archive_timeout_seconds`、`pg_stat_database_tup_*`、`pg_replication_is_replica` | <span class="at-chip at-ev-tested">實測</span>：失敗 100 秒時 age 120 秒[^pg-asp-exp] |
+| `PostgresArchiveNeverSucceeded` | `pgstat_archiver.c` 失敗時只更新 `failed_count`、`last_failed_*` | `pg_stat_archiver.failed_count`；`last_archived_time` 為 NULL | `pg_stat_archiver.go:94`：`lastArchiveAge.Valid` 才輸出 | `pg_stat_archiver_failed_count`、`last_archive_age`（不存在） | <span class="at-chip at-ev-code">讀碼</span>[^pg-asp-c-archiver-agenull] |
+| `PostgresBackupTooOld` | — | pgBackRest `info` | pgbackrest_exporter `backrest_last_backup_metrics.go:19`、`:182` | `pgbackrest_backup_since_last_completion_seconds` | <span class="at-chip at-ev-code">讀碼</span>[^pg-asp-pbe-since-last][^pg-asp-pbe-since-last-calc] |
+| `PostgresBackupExporterFailing` | — | — | `backrest_exporter_metrics.go:12` | `pgbackrest_exporter_status` | <span class="at-chip at-ev-code">讀碼</span>[^pg-asp-pbe-exporter-status] |
+
+## 容量與成長 {#capacity}
+
+| 要看什麼 | PostgreSQL 的來源 | exporter metric（collector） | 預設 | 權限／版本 | 證據 |
+|---|---|---|---|---|---|
+| 資料庫大小 | `pg_database_size()`：`calculate_database_size()` 走訪每個 tablespace 下的資料庫目錄（16 `dbsize.c:119`）[^pg-asp-src16-dbsize-calc] | `pg_database_size_bytes{datname}`（database）：先列出 `pg_database`，再對每個資料庫跑 `SELECT pg_database_size($1)`[^pg-asp-c-dbsize-default][^pg-asp-c-dbsize-query][^pg-asp-c-dbsize-loop] | 開 | 要有該資料庫的 CONNECT 或 pg_read_all_stats（16 `dbsize.c:134`、17:133）[^pg-asp-src16-dbsize-acl][^pg-asp-src17-dbsize-acl] | <span class="at-chip at-ev-tested">實測</span> |
+| 表大小 | `pg_table_size()` | `pg_stat_user_tables_table_size_bytes`（stat_user_tables）[^pg-asp-c-user-tables-default] | 開 | 只有 DSN 那一個資料庫；會等表鎖 | <span class="at-chip at-ev-tested">實測</span> |
+| 磁碟剩餘空間 | 作業系統 | 無；用 node_exporter `node_filesystem_avail_bytes`、`size_bytes`[^pg-asp-ne-avail][^pg-asp-ne-size] | — | 要知道資料目錄、pg_wal、tablespace 各在哪個掛載點 | <span class="at-chip at-ev-code">讀碼</span> |
+| 連線趨勢 | `pg_stat_activity` | `pg_stat_activity_count` 對照 `pg_settings_max_connections` | 開 | — | <span class="at-chip at-ev-tested">實測</span> |
+
+實驗：寫入 4 萬列 × 900 字元後，`pg_database_size('postgres')` 7699479 → 48700439，exporter 的 `pg_database_size_bytes{datname="postgres"}` 是 4.8700439e+07；`pg_stat_user_tables_table_size_bytes{relname="grow"}` 4.100096e+07 等於 `pg_table_size('grow')`。16 與 17 相同。<span class="at-chip at-ev-tested">實測</span>[^pg-asp-exp]
+
+重點：
+
+- **成長告警只抓異常。**範本 `PostgresDatabaseSizeDoubled` 是「大於 1GB 且一週內翻倍」；正常的成長趨勢用圖看。`offset 7d` 需要保留一週以上的資料。
+- **磁碟預測要配 `absent()`。**`PostgresDataDiskFullSoon` 用 `predict_linear(...[6h], 4d) < 0` 且剩餘不到 20%；mountpoint 或 job 不對時整條規則回傳空，由 `PostgresDataDiskNotMonitored` 補位。pg_wal 的突發成長（archive 失敗、slot）線性預測來不及，看[可用性](#availability)的 `PostgresWalRetained`。
+- **`pg_database_size()` 本身有成本。**它走訪整個資料庫目錄，資料庫多、檔案多時會吃掉 scrape 預算（看 `pg_scrape_collector_duration_seconds{collector="database"}`）；帳號沒有權限時 database collector 整個失敗。
+
+### 證據鏈 {#capacity-chain}
+
+| 規則 | PostgreSQL 原始碼 | view／函式 | exporter 原始碼與 SQL | metric | 證據 |
+|---|---|---|---|---|---|
+| `PostgresDatabaseSizeDoubled` | `dbsize.c:119`（16）`calculate_database_size()`；權限檢查 `:134`（16）／`:133`（17） | `pg_database_size(name)` | `pg_database.go:28` 預設開；`:68` `SELECT pg_database_size($1)`；`:125` 每個資料庫一次 | `pg_database_size_bytes` | <span class="at-chip at-ev-tested">實測</span>：值與 `pg_database_size()` 相同[^pg-asp-exp] |
+| `PostgresDataDiskFullSoon`、`PostgresDataDiskNotMonitored` | —（作業系統 statfs） | — | node_exporter v1.12.1 `filesystem_common.go:115`（avail）、`:103`（size） | `node_filesystem_avail_bytes`、`node_filesystem_size_bytes` | <span class="at-chip at-ev-code">讀碼</span>[^pg-asp-ne-avail][^pg-asp-ne-size] |
 
 ## 效能與故障情境 {#perf}
+
+這一節跨工作量、飽和、可用性三個面向，依情境排列。
 
 實驗：PostgreSQL 16.15 一台（1 CPU、768MB），pgbench scale 10、8 個 client、限速 200 tps；兩個 exporter，`e-plain` 的帳號沒設 `lock_timeout`，`e-lt` 的帳號設了 1 秒；scrape 5 秒。TPS 指 `sum(rate(pg_stat_database_xact_commit{datname="bench"}[15s]))`，它包含 exporter 自己的交易，閒置時也有每秒 7～14 筆。時間都是主機牆鐘；pgbench 的 `-T`／`-R` 用容器時鐘，這台機器的容器時鐘有時比牆鐘慢約 30%，這次量到的差距很小（容器 `sleep 10` = 10.2 秒）。<span class="at-chip at-ev-tested">實測</span>[^pg-perf-exp][^pg-perf-exp-raw]
 
@@ -158,7 +320,7 @@ archive：PostgreSQL 16，`archive_command` 換成一個會失敗的 script，�
 | idle in transaction 100 秒 | TPS 不變，延遲 2.4 → 3.4 ms | `n_dead_tup` 線性增加、表大小 2 倍 | 沒有 XID age（直接查是 12047） | `PostgresIdleInTransaction`、`PostgresTooManyDeadTuples` |
 | 連線風暴 | 已連上的照常；新連線被拒 | collector 結果全部消失（`up`、`pg_up` 仍是 1） | 最嚴重的 35 秒沒有任何 PostgreSQL metric | `PostgresCollectorsMissing` |
 | backend 被 OOM kill | 所有連線斷掉，之後 0 tps | `resets(xact_commit)`=1、`pg_up` 一個 scrape 是 0 | 啟動時間不變；沒有記憶體使用量 | `PostgresCrashRecovery`、`PostgresThroughputDrop` |
-| pg_wal 寫滿 | 停機 | 見[穩定](#stability)（另一組實驗） | — | `PostgresWalRetained`、`PostgresDown` |
+| pg_wal 寫滿 | 停機 | 見[可用性](#availability)（另一組實驗） | — | `PostgresWalRetained`、`PostgresDown` |
 
 ### 慢 SQL 怎麼找 {#perf-slow-sql}
 
@@ -201,7 +363,7 @@ FROM pg_stat_activity WHERE state = 'active' AND pid <> pg_backend_pid() ORDER B
 | 失敗的部分 | 全部；4 條連線卡在等 relation 鎖 | 只有 `stat_user_tables`（「canceling statement due to lock timeout」） |
 | 看得到的 | 無 | 等鎖 9 → 17、`accessexclusivelock`=1 |
 
-這就是[一個表鎖就能讓監控整個消失](#stability)那個結論的完整版：DDL 本身只是排隊，但 exporter 的 `pg_table_size()` 也排在它後面。
+這就是[一個表鎖就能讓監控整個消失](#exporter)那個結論的完整版：DDL 本身只是排隊，但 exporter 的 `pg_table_size()` 也排在它後面。
 
 **lock_timeout 與 deadlock_timeout。**B 先 `SET lock_timeout='2s'` 時，2 秒後「canceling statement due to lock timeout」[^pg-perf-src-lock-timeout]，pgbench 只有一個 5 秒區間延遲變 543 ms，exporter 只在一個 scrape 看到 9 個等鎖。`deadlock_timeout`（預設 1s）只決定何時做 deadlock 檢查，並在 `log_lock_waits=on` 時寫「still waiting for ... after 1000 ms」[^pg-perf-src-lock-wait-log]，不會取消等待。DDL 的標準做法是 `SET lock_timeout` 加重試。<span class="at-chip at-ev-tested">實測</span>
 
@@ -233,7 +395,7 @@ FROM pg_locks WHERE NOT granted GROUP BY 1, 2, 3, 4;
 - **TPS 掉到 0 時 exporter 不會顯示 0。**xact_commit 包含 exporter 自己的交易（實驗中閒置時 7～14/s）；規則用相對值（不到昨天一半），不要寫 `== 0`。
 - **CPU 不夠時 exporter 自己也變慢。**scrape 從 0.05 秒變 3.6 秒，再慢一點就超過 `scrape_timeout`，`up` 變 0，看起來像 exporter 壞了。
 - **OOM 之後要看應用有沒有重連。**PostgreSQL 1.6 秒內恢復，但被斷掉的連線不會自己回來；`PostgresThroughputDrop` 會在這時接手。
-- **沒有重做 pg_wal 寫滿**：另一組實驗已觀察到 PANIC 後停機，見[穩定](#stability)。
+- **沒有重做 pg_wal 寫滿**：另一組實驗已觀察到 PANIC 後停機，見[可用性](#availability)。
 
 ### 新增的規則
 
@@ -260,10 +422,10 @@ postgres_exporter v0.20.1。「預設」指沒有加 `--collector.<name>` 或 `-
 | `pg_locks` | locks | `pg_locks_count{datname, mode}` | 開 | — | — |
 | `pg_stat_database` | stat_database | `xact_*`、`blks_*`、`temp_*`、`deadlocks`、`conflicts`、`stats_reset`、`active_time_seconds_total` | 開 | — | `active_time` 14 起；沒有 `checksum_failures`、`sessions_*` |
 | `pg_stat_database_conflicts` | 舊架構內建 | `pg_stat_database_conflicts_confl_*` | 開 | — | — |
-| `pg_database` | database | `pg_database_size_bytes`、`connection_limit` | 開 | CONNECT 或 pg_read_all_stats | — |
+| `pg_database` | database | `pg_database_size_bytes`、`connection_limit` | 開 | CONNECT 或 pg_read_all_stats | 每個資料庫一次 `pg_database_size()` |
 | `pg_database.datfrozenxid／datminmxid` | database_wraparound | `pg_database_wraparound_age_*` | 關 | — | — |
 | `pg_postmaster_start_time()` | postmaster | `pg_postmaster_start_time_seconds` | 關 | — | — |
-| `pg_settings` | settings | `pg_settings_*`（只有 bool、integer、real） | 開 | — | `reserved_connections` 16 起 |
+| `pg_settings` | settings | `pg_settings_*`（只有 bool、integer、real；`archive_mode`、`synchronous_standby_names` 不在內） | 開 | — | `reserved_connections` 16 起 |
 | `pg_ls_waldir()` | wal | `pg_wal_size_bytes`、`pg_wal_segments` | 開 | pg_monitor | — |
 | `pg_stat_bgwriter` | stat_bgwriter | `pg_stat_bgwriter_checkpoints_*`、`buffers_*` | 開 | — | 17 起只剩 `buffers_clean`、`maxwritten_clean`、`buffers_alloc` |
 | `pg_stat_checkpointer` | stat_checkpointer | `pg_stat_checkpointer_num_*`、`restartpoints_*` | 關 | — | 只有 17 起；16 以下 success=1、沒有資料 |
@@ -279,6 +441,8 @@ postgres_exporter v0.20.1。「預設」指沒有加 `--collector.<name>` 或 `-
 | `pg_stat_statements` | stat_statements | `calls_total`、`seconds_total`、`rows_total`、`block_*_seconds_total` | 關 | pg_read_all_stats，否則只看到自己的查詢 | 13 起 `total_exec_time`；17 起 `shared_blk_*_time` |
 | `pg_buffercache_summary()` | buffercache_summary | `pg_buffercache_summary_*` | 關 | extension | 16 起 |
 | `pg_stat_wal`、`pg_stat_io`、`pg_stat_subscription` | 無 | — | — | — | 14／16 起才有的 view 都沒有 collector |
+| Patroni REST API | 不是 postgres_exporter | `patroni_*`（`/metrics`，label `scope`、`name`） | — | — | v4.1.5 讀碼 |
+| pgBackRest | 不是 postgres_exporter | `pgbackrest_*`（pgbackrest_exporter） | — | — | v0.25.0 讀碼 |
 
 ## 盲點與補法 {#blind-spots}
 
@@ -290,7 +454,12 @@ postgres_exporter v0.20.1。「預設」指沒有加 `--collector.<name>` 或 `-
 | `last_failed_wal`、`.ready` 檔數 | archive 卡在哪個檔、積了多少 | 自訂查詢 `pg_stat_archiver`；或看 log |
 | 失效索引、checksum 失敗 | 查詢計畫錯誤、資料損毀 | 自訂查詢 `pg_index WHERE NOT indisvalid`、`pg_stat_database.checksum_failures`；排程 amcheck |
 | timeline | 判斷誰是新主庫、是否分岔 | 自訂查詢 `pg_control_checkpoint()` |
-| 磁碟剩餘空間 | WAL 寫滿就停機 | node_exporter 的 `node_filesystem_avail_bytes` |
+| 磁碟剩餘空間 | WAL 寫滿就停機 | node_exporter 的 `node_filesystem_avail_bytes`（`PostgresDataDiskFullSoon`） |
+| `archive_mode`、`archive_command` | 關掉 archive 時看起來和剛啟動一樣 | 盤點時 `SHOW archive_mode`；或自訂查詢輸出 0／1 |
+| `sessions_fatal`／`sessions_killed`／`sessions_abandoned` | 連線被斷、認證後失敗的次數 | 自訂查詢 `pg_stat_database`（14 起） |
+| SQL 錯誤數 | 沒有任何 view 計數 | log 管線計數（VictoriaLogs、mtail） |
+| base backup 新鮮度 | 沒有備份時 archive 再正常也還原不了 | pgbackrest_exporter；WAL-G、Barman 用 textfile collector |
+| leader lock、DCS、timeline（Patroni） | 核心 PostgreSQL 沒有這些概念 | Patroni 的 `/metrics`（`patroni-cluster` 規則組） |
 | 其他資料庫的表 | stat_user_tables 只看 DSN 的資料庫 | 每個資料庫各設一個 DSN（或 `/probe`） |
 | `pg_stat_wal`、`pg_stat_io` | WAL 產生速度、I/O 來源 | 自訂查詢 |
 
@@ -303,7 +472,8 @@ postgres_exporter v0.20.1。「預設」指沒有加 `--collector.<name>` 或 `-
 - **逾時**：`--collection-timeout` 設得比 `scrape_timeout` 短（預設 1m）。
 - **collector**：主庫與複本都加 `--collector.database_wraparound --collector.postmaster --collector.long_running_transactions`；17 以上加 `--collector.stat_checkpointer`；複本加 `--collector.stat_wal_receiver`（且複本要用 replication slot）；有 pg_stat_statements 時加 `--collector.stat_statements`。
 - **label**：每組主從在 target 上加同一個 `cluster` label，才能寫 split brain 與「沒有主庫」的規則。
-- **規則**：[rules/targets/postgres.yml](https://github.com/HahaSula/alert-trust/blob/main/rules/targets/postgres.yml) 的 `postgres-target-*` 四組（穩定、使用、HA、效能與故障情境）。
+- **規則**：[rules/targets/postgres.yml](https://github.com/HahaSula/alert-trust/blob/main/rules/targets/postgres.yml)。`postgres-target-*` 四組之外，新增 `postgres-protection`（archive 新鮮度、備份）、`postgres-capacity`（資料庫成長、磁碟預測，需要 node_exporter）、`patroni-cluster`（只在用 Patroni 時）。每組開頭的註解列出要改的 job 名稱與 mountpoint。
+- **外部 metric**：Patroni 的 REST API `/metrics`、pgbackrest_exporter、node_exporter 各自設 job；三者都不經過 postgres_exporter。
 
 ## 版本陷阱（13–17） {#versions}
 
@@ -320,3 +490,5 @@ postgres_exporter v0.20.1。「預設」指沒有加 `--collector.<name>` 或 `-
 效能與故障情境的腳本與輸出在 [lab/targets/postgres/perf](https://github.com/HahaSula/alert-trust/tree/main/lab/targets/postgres/perf)：`run.sh`（S0–S9）、`run-s10.sh`（OOM），摘要 `results/summary.txt`。[^pg-perf-exp][^pg-perf-exp-raw]
 
 腳本與原始輸出在 [lab/targets/postgres/target](https://github.com/HahaSula/alert-trust/tree/main/lab/targets/postgres/target)：`run.sh` 是主要的十幾個情境，`run2.sh` 補跑 slot 失效、XID horizon 與 lock_timeout 對照，`run3.sh` 補跑 archive 失敗（前兩次用 ALTER SYSTEM 改 archive_command，被命令列設定蓋掉而沒有生效）。摘要在 `results/summary.txt`。[^pg-exp-target][^pg-exp-target-raw]
+
+九個面向補洞（archive 新鮮度、`archive_mode`、資料庫大小、session 錯誤計數）的腳本與輸出在 [lab/targets/postgres/aspects](https://github.com/HahaSula/alert-trust/tree/main/lab/targets/postgres/aspects)：`run.sh` 約 3 分鐘，摘要 `results/summary.txt`。Patroni、pgBackRest、node_exporter 的部分沒有實驗，只讀原始碼。[^pg-asp-exp][^pg-asp-exp-raw]

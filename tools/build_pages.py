@@ -102,6 +102,13 @@ def component_page(card: dict, sources: dict, contracts: dict) -> str:
                    f"{C.EVALUATE_ON[s['evaluate_on']]} | {up(s['upstream']['status'])} | {n if n else '—'} |")
     out.append("")
 
+    na_asp = card.get("not_applicable_aspects") or {}
+    if na_asp:
+        out.append("## 不適用的面向\n")
+        for asp, r in na_asp.items():
+            out.append(f"- **{C.ASPECTS.get(asp, asp)}**：{codeify(r.get('why', ''))}{marks(r)}")
+        out.append("")
+
     if use_aspect:
         sections = [(C.ASPECTS[a], sorted([s for s in signals if s.get("aspect") == a], key=lambda s: s["tier"]))
                     for a in C.ASPECTS]

@@ -1,0 +1,81 @@
+環境：postgres 16.15-alpine / 17.11-alpine、postgres-exporter v0.20.1（預設 collector）；archive_mode=on、archive_timeout=30
+PostgreSQL 16.15 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+
+## A 基線：archive 設定與 archiver 在 exporter 裡的樣子（還沒有任何 WAL 被 archive）（20:32:10）
+  > [:23801] grep -E '^pg_settings_archive|^pg_stat_archiver|^pg_database_size_bytes|^pg_stat_database_sessions|^pg_settings_synchronous'
+    pg_database_size_bytes{datname="postgres"} 7.699479e+06
+    pg_database_size_bytes{datname="template0"} 7.537167e+06
+    pg_database_size_bytes{datname="template1"} 7.537167e+06
+    pg_settings_archive_timeout_seconds 30
+    pg_stat_archiver_archived_count 1
+    pg_stat_archiver_failed_count 0
+    pg_stat_archiver_last_archive_age 22.550216
+  > [:23802] grep -E '^pg_settings_archive|^pg_stat_archiver|^pg_database_size_bytes|^pg_stat_database_sessions|^pg_settings_synchronous'
+    pg_database_size_bytes{datname="postgres"} 7.698099e+06
+    pg_database_size_bytes{datname="template0"} 7.537167e+06
+    pg_database_size_bytes{datname="template1"} 7.537167e+06
+    pg_settings_archive_timeout_seconds 30
+    pg_stat_archiver_archived_count 1
+    pg_stat_archiver_failed_count 0
+    pg_stat_archiver_last_archive_age 22.507414
+  $ [p16] select name, setting, vartype from pg_settings where name in ('archive_mode','archive_timeout','archive_command','synchronous_standby_names') order by 1
+    archive_command|/archive.sh|string
+    archive_mode|on|enum
+    archive_timeout|30|integer
+    synchronous_standby_names||string
+  $ [p16] select archived_count, failed_count, coalesce(last_archived_time::text,'NULL') from pg_stat_archiver
+    1|0|2026-11-09 12:31:48.320837+00
+
+## B 容量：寫入約 40MB，看 pg_database_size_bytes 與 table_size（20:32:11）
+  $ [p16] select pg_database_size('postgres')
+    7699479
+  $ [p16] select pg_database_size('postgres'), pg_table_size('grow')
+    48700439|41000960
+  > [:23801] grep -E '^pg_database_size_bytes\{datname="postgres"|^pg_stat_user_tables_table_size_bytes\{.*relname="grow"'
+    pg_database_size_bytes{datname="postgres"} 4.8700439e+07
+    pg_stat_user_tables_table_size_bytes{datname="postgres",relname="grow",schemaname="public"} 4.100096e+07
+  > [:23802] grep -E '^pg_database_size_bytes\{datname="postgres"|^pg_stat_user_tables_table_size_bytes\{.*relname="grow"'
+    pg_database_size_bytes{datname="postgres"} 4.8715443e+07
+    pg_stat_user_tables_table_size_bytes{datname="postgres",relname="grow",schemaname="public"} 4.100096e+07
+
+## C 保護：archive 成功（pg_switch_wal）（20:32:14）
+  > [:23801] grep -E '^pg_stat_archiver'
+    pg_stat_archiver_archived_count 4
+    pg_stat_archiver_failed_count 0
+    pg_stat_archiver_last_archive_age 5.196953
+  > [:23802] grep -E '^pg_stat_archiver'
+    pg_stat_archiver_archived_count 4
+    pg_stat_archiver_failed_count 0
+    pg_stat_archiver_last_archive_age 5.086651
+
+## D 保護：archive 失敗（touch /tmp/archive_fail），持續寫入 100 秒（20:32:19）
+  > [:23801] grep -E '^pg_stat_archiver|^pg_settings_archive_timeout|^pg_wal_segments'
+    pg_settings_archive_timeout_seconds 30
+    pg_stat_archiver_archived_count 4
+    pg_stat_archiver_failed_count 3
+    pg_stat_archiver_last_archive_age 119.920923
+    pg_wal_segments 5
+  > [:23802] grep -E '^pg_stat_archiver|^pg_settings_archive_timeout|^pg_wal_segments'
+    pg_settings_archive_timeout_seconds 30
+    pg_stat_archiver_archived_count 4
+    pg_stat_archiver_failed_count 3
+    pg_stat_archiver_last_archive_age 119.786437
+    pg_wal_segments 5
+  $ [p16] select archived_count, failed_count, last_archived_wal, last_failed_wal, round(extract(epoch from now()-last_archived_time)) age from pg_stat_archiver
+    4|3|000000010000000000000004|000000010000000000000005|120
+  $ [p16] select count(*) from pg_ls_archive_statusdir() where name like '%.ready'
+    1
+  規則 PostgresArchiveStale 的條件：last_archive_age > 3 × archive_timeout（90 秒）且這段時間有寫入
+
+## E 工作量：session 被 terminate 與 FATAL（PG 14 起 pg_stat_database 有 sessions_*）（20:34:14）
+  $ [p16] select pg_terminate_backend(pid) from pg_stat_activity where query like 'select pg_sleep(60)%' and pid <> pg_backend_pid()
+    t
+    psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  database "nosuchdb" does not exist
+  $ [p16] select datname, sessions, sessions_abandoned, sessions_fatal, sessions_killed from pg_stat_database where datname='postgres'
+    postgres|28|0|0|1
+  > [:23801] grep -E '^pg_stat_database_sessions|^pg_stat_database_xact_rollback\{.*datname="postgres"'
+    pg_stat_database_xact_rollback{datid="5",datname="postgres"} 1
+
+## F 收尾（20:34:24）
+結束（20:34:27）

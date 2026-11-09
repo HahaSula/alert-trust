@@ -112,3 +112,60 @@ sources:
     visibility: public
     url: https://github.com/postgres/postgres/tree/REL_17_11
     checked: "2026-11-08, REL_17_11 與 REL_16_15"
+  # ---------- 九個面向補洞（cluster、protection、capacity、workload），2026-11-09 ----------
+  pg-asp-lab:
+    title: PostgreSQL 九個面向補洞實驗（lab/targets/postgres/aspects：archive 成敗、archive_mode、資料庫大小、session 錯誤計數）
+    kind: experiment
+    visibility: public
+    url: https://github.com/HahaSula/alert-trust/tree/main/lab/targets/postgres/aspects
+    checked: "2026-11-09, exporter v0.20.1, PostgreSQL 16.15 與 17.11"
+    note: results/summary.txt 是摘要，run-20261109.txt 是原始輸出
+  pg-docs-ha:
+    title: PostgreSQL 文件：High Availability, Load Balancing, and Replication（failover 與 quorum commit）
+    kind: upstream-doc
+    visibility: public
+    url: https://www.postgresql.org/docs/17/high-availability.html
+    note: "原始檔 doc/src/sgml/high-availability.sgml；「PostgreSQL does not provide the system software required to identify a failure on the primary」"
+  pg-patroni:
+    title: Patroni（REST API /metrics、leader lock 與 DCS）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/patroni/patroni/tree/v4.1.5
+    checked: "2026-11-09, v4.1.5（235fdb3）"
+    note: "patroni/api.py 的 do_GET_metrics；patroni_primary 依 pg_is_in_recovery() 判斷，不是看誰拿到 leader lock"
+  pg-patroni-docs:
+    title: Patroni 文件：DCS failsafe mode、dynamic configuration（ttl、loop_wait）
+    kind: upstream-doc
+    visibility: public
+    url: https://patroni.readthedocs.io/en/latest/dcs_failsafe_mode.html
+  pg-repmgr:
+    title: repmgr 文件（repmgrd 自動 failover、witness、repmgr cluster show）
+    kind: upstream-doc
+    visibility: public
+    url: https://www.repmgr.org/docs/current/index.html
+    note: 只讀文件，沒有核對原始碼；repmgr 沒有內建 Prometheus endpoint
+  pg-autofailover:
+    title: pg_auto_failover 文件（monitor 節點、pgautofailover.node 狀態機）
+    kind: upstream-doc
+    visibility: public
+    url: https://pg-auto-failover.readthedocs.io/en/main/architecture.html
+    note: 只讀文件，沒有核對原始碼；monitor 本身是單點，要另外監控
+  pg-yugabyte-raft:
+    title: YugabyteDB 文件：DocDB replication（每個 tablet 用 Raft）
+    kind: upstream-doc
+    visibility: public
+    url: https://docs.yugabyte.com/preview/architecture/docdb-replication/replication/
+    note: 只用來對照：分散式 PostgreSQL 相容資料庫才有內建共識；核心 PostgreSQL 沒有
+  pg-pgbackrest-exporter:
+    title: pgbackrest_exporter（woblerr）：pgbackrest_backup_since_last_completion_seconds、pgbackrest_exporter_status
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/woblerr/pgbackrest_exporter/tree/v0.25.0
+    checked: "2026-11-09, v0.25.0（4cf845c）"
+    note: 社群 exporter，不是 pgBackRest 官方；WAL-G、Barman 沒有對等的 exporter 時用 textfile collector 輸出最後成功時間
+  pg-node-exporter-fs:
+    title: node_exporter collector/filesystem_common.go（node_filesystem_avail_bytes）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/filesystem_common.go
+    checked: "2026-11-09, v1.12.1"

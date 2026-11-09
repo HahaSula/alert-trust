@@ -1,0 +1,28 @@
+# 九個面向補洞用的小實驗：保護（archive）、容量（資料庫大小）、工作量（session 錯誤計數）在 exporter 看得到什麼。
+# 每個版本一台 PostgreSQL 加一個 postgres_exporter v0.20.1，不跑 Prometheus，直接 curl exporter 的 /metrics。
+# 只對外開 127.0.0.1:23801（PG16 的 exporter）與 127.0.0.1:23802（PG17 的 exporter）。執行 ./run.sh，結束會 docker compose down -v。
+name: at-pgasp
+x-pg: &pg
+  environment: { POSTGRES_PASSWORD: postgres }
+  volumes: ["./archive.sh:/archive.sh:ro"]
+  command: >-
+    postgres -c archive_mode=on -c archive_command=/archive.sh -c archive_timeout=30
+x-exp: &exp
+  image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+services:
+  p16:
+    <<: *pg
+    image: postgres:16.15-alpine
+  p17:
+    <<: *pg
+    image: postgres:17.11-alpine
+  e16:
+    <<: *exp
+    environment: { DATA_SOURCE_NAME: "postgresql://postgres:postgres@p16:5432/postgres?sslmode=disable" }
+    ports: ["127.0.0.1:23801:9187"]
+    depends_on: [p16]
+  e17:
+    <<: *exp
+    environment: { DATA_SOURCE_NAME: "postgresql://postgres:postgres@p17:5432/postgres?sslmode=disable" }
+    ports: ["127.0.0.1:23802:9187"]
+    depends_on: [p17]
