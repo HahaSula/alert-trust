@@ -1,0 +1,27 @@
+pgbench (16.15)
+progress: 5.0 s, 171.2 tps, lat 206.598 ms stddev 363.345, 0 failed, lag 179.755 ms
+progress: 10.0 s, 223.8 tps, lat 377.340 ms stddev 429.531, 0 failed, lag 359.890 ms
+progress: 15.0 s, 203.6 tps, lat 21.535 ms stddev 31.375, 0 failed, lag 11.749 ms
+progress: 20.0 s, 197.2 tps, lat 17.577 ms stddev 24.634, 0 failed, lag 8.573 ms
+progress: 25.0 s, 190.4 tps, lat 30.125 ms stddev 34.274, 0 failed, lag 16.696 ms
+progress: 30.0 s, 197.8 tps, lat 13.057 ms stddev 21.150, 0 failed, lag 4.890 ms
+progress: 35.0 s, 195.8 tps, lat 15.698 ms stddev 28.237, 0 failed, lag 7.885 ms
+progress: 40.1 s, 207.9 tps, lat 57.351 ms stddev 70.313, 0 failed, lag 38.444 ms
+progress: 45.0 s, 201.0 tps, lat 17.412 ms stddev 24.717, 0 failed, lag 8.734 ms
+progress: 50.0 s, 187.4 tps, lat 10.634 ms stddev 20.195, 0 failed, lag 4.171 ms
+progress: 55.0 s, 206.2 tps, lat 3.037 ms stddev 0.911, 0 failed, lag 0.069 ms
+progress: 60.0 s, 194.6 tps, lat 2.831 ms stddev 0.785, 0 failed, lag 0.068 ms
+transaction type: <builtin: TPC-B (sort of)>
+scaling factor: 10
+query mode: simple
+number of clients: 8
+number of threads: 2
+maximum number of tries: 1
+duration: 60 s
+number of transactions actually processed: 11886
+number of failed transactions: 0 (0.000%)
+latency average = 66.366 ms
+latency stddev = 200.758 ms
+rate limit schedule lag: avg 55.413 (max 1243.440) ms
+initial connection time = 75.255 ms
+tps = 198.340150 (without initial connection time)

@@ -369,3 +369,62 @@ groups:
         annotations:
           summary: "複本上資料庫 {{ $labels.datname }} 有查詢被 recovery 取消（max_standby_streaming_delay 到期）"
           runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#standby-conflicts
+
+  # ---------- PostgreSQL 本體：效能與故障情境（lab/targets/postgres/perf） ----------
+  - name: postgres-target-perf
+    rules:
+      - alert: PostgresThroughputDrop
+        expr: |
+          sum by (job, instance, datname) (rate(pg_stat_database_xact_commit{job="postgres", datname!~"template.*"}[5m]))
+            < 0.5 * sum by (job, instance, datname) (rate(pg_stat_database_xact_commit{job="postgres", datname!~"template.*"}[5m] offset 1d))
+          and on (job, instance, datname)
+          sum by (job, instance, datname) (rate(pg_stat_database_xact_commit{job="postgres", datname!~"template.*"}[5m] offset 1d)) > 10
+        for: 10m
+        labels: { severity: warning, component: postgres_exporter, tier: "3" }
+        annotations:
+          summary: "資料庫 {{ $labels.datname }} 的 commit 速率不到昨天同一時間的一半。可能是流量本身變少，也可能是鎖、CPU、連線額滿；先看 pg_stat_activity 的 wait_event_type"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#throughput-drop
+          absence_covered_by: "PostgresExporterDown, PostgresCollectorsMissing"
+      - alert: PostgresLockQueuePileUp
+        expr: |
+          sum by (job, instance, datname) (pg_stat_activity_count{job="postgres", wait_event_type="Lock"}) >= 5
+            and on (job, instance, datname)
+          sum by (job, instance, datname) (pg_locks_count{job="postgres", mode="accessexclusivelock"}) > 0
+        for: 1m
+        labels: { severity: critical, component: postgres_exporter, tier: "3" }
+        annotations:
+          summary: "資料庫 {{ $labels.datname }} 有 ACCESS EXCLUSIVE 鎖（ALTER TABLE、VACUUM FULL、TRUNCATE）且至少 5 個 session 在等鎖：DDL 排在長交易後面，之後所有讀寫都排在 DDL 後面。exporter 沒設 lock_timeout 時這條看不到，會變成 PostgresExporterDown"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#lock-queue
+          absence_covered_by: "PostgresExporterDown, PostgresCollectorsMissing"
+      - alert: PostgresLockWaitLong
+        expr: |
+          max by (job, instance, datname) (
+            pg_stat_activity_max_tx_duration{job="postgres", wait_event_type="Lock"}
+          ) > 60
+        for: 1m
+        labels: { severity: warning, component: postgres_exporter, tier: "3" }
+        annotations:
+          summary: "資料庫 {{ $labels.datname }} 有正在等鎖的 session，所在交易已開了超過 60 秒（值是交易年齡，不是等鎖時間）；擋住它的通常是 idle in transaction 或長交易，用 pg_blocking_pids() 找"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#lock-queue
+          absence_covered_by: "PostgresExporterDown, PostgresCollectorsMissing"
+      - alert: PostgresSlowStatement
+        expr: |
+          (
+            rate(pg_stat_statements_seconds_total{job="postgres"}[10m])
+              / rate(pg_stat_statements_calls_total{job="postgres"}[10m])
+          ) > 1
+          and rate(pg_stat_statements_calls_total{job="postgres"}[10m]) > 0.01
+        for: 15m
+        labels: { severity: info, component: postgres_exporter, tier: "3" }
+        annotations:
+          summary: "queryid {{ $labels.queryid }}（{{ $labels.datname }}、{{ $labels.user }}）平均執行時間超過 1 秒；只算總耗時前 100 名，查詢文字要用 queryid 到 pg_stat_statements 查"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#slow-sql
+      - alert: PostgresStatStatementsMissing
+        expr: |
+          pg_up{job="postgres"} == 1
+            unless on (job, instance) group by (job, instance) (pg_stat_statements_calls_total{job="postgres"})
+        for: 30m
+        labels: { severity: info, component: postgres_exporter, tier: "3" }
+        annotations:
+          summary: "沒有 pg_stat_statements metric：--collector.stat_statements 沒開、extension 沒建在 DSN 的資料庫，或 shared_preload_libraries 沒載入；這時沒有任何 per-query 延遲可看"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#slow-sql

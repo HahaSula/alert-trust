@@ -1,0 +1,151 @@
+# PostgreSQL 效能與故障情境（docs/targets/postgres.md「效能與故障情境」）的參考。
+# 原始碼行號都在 tag 上取檔核對過（行內含關鍵字）：postgres_exporter v0.20.1、PostgreSQL REL_16_15。
+refs:
+  pg-perf-c-stmt-disabled:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_statements.go"
+    line: 45
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_statements.go#L45"
+  pg-perf-c-stmt-limit:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_statements.go"
+    line: 30
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_statements.go#L30"
+  pg-perf-c-stmt-querylen:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_statements.go"
+    line: 55
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_statements.go#L55"
+  pg-perf-c-stmt-labels:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_statements.go"
+    line: 116
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_statements.go#L116"
+  pg-perf-c-stmt-queryid:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_statements.go"
+    line: 145
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_statements.go#L145"
+  pg-perf-c-stmt-pg13-query:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_statements.go"
+    line: 188
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_statements.go#L188"
+  pg-perf-c-stmt-percentile:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_statements.go"
+    line: 195
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_statements.go#L195"
+  pg-perf-c-activity-maxtx:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_activity.go"
+    line: 90
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_activity.go#L90"
+  pg-perf-c-activity-group:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_activity.go"
+    line: 93
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_activity.go#L93"
+  pg-perf-c-locks-nogranted:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_locks.go"
+    line: 73
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_locks.go#L73"
+  pg-perf-c-db-tempbytes:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_database.go"
+    line: 166
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_database.go#L166"
+  pg-perf-src-lock-waitmask:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/storage/lmgr/lock.c"
+    line: 1049
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/storage/lmgr/lock.c#L1049"
+  pg-perf-src-lock-wait-log:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/storage/lmgr/proc.c"
+    line: 1537
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/storage/lmgr/proc.c#L1537"
+  pg-perf-src-lock-timeout:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/tcop/postgres.c"
+    line: 3389
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/tcop/postgres.c#L3389"
+  pg-perf-src-duration-log:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/tcop/postgres.c"
+    line: 1374
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/tcop/postgres.c#L1374"
+  pg-perf-src-activity-size:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/utils/activity/backend_status.c"
+    line: 46
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/utils/activity/backend_status.c#L46"
+  pg-perf-src-pgss-max:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "contrib/pg_stat_statements/pg_stat_statements.c"
+    line: 395
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/contrib/pg_stat_statements/pg_stat_statements.c#L395"
+  pg-perf-src-ckpt-frequent:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/postmaster/checkpointer.c"
+    line: 434
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/postmaster/checkpointer.c#L434"
+  pg-perf-src-child-signal:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/postmaster/postmaster.c"
+    line: 3694
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/postmaster/postmaster.c#L3694"
+  pg-perf-src-reinit:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/postmaster/postmaster.c"
+    line: 3958
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/postmaster/postmaster.c#L3958"
+  pg-perf-exp:
+    kind: experiment
+    title: "PostgreSQL 效能與故障情境實驗：慢 SQL、列鎖、DDL 鎖佇列、CPU 限制、work_mem、shared_buffers、checkpoint、idle in transaction、連線風暴、OOM（PostgreSQL 16.15）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/postgres/perf/results/summary.txt"
+  pg-perf-exp-raw:
+    kind: experiment
+    title: "PostgreSQL 效能與故障情境實驗：原始輸出（run、pgbench 進度、PostgreSQL log）"
+    url: "https://github.com/HahaSula/alert-trust/tree/main/lab/targets/postgres/perf/results"

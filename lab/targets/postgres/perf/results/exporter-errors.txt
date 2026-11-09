@@ -1,0 +1,5 @@
+      8 e-plain-1   msg="Error opening connection to database" err="error querying postgresql version: pq: remaining connection slots are reserved for roles with the SUPERUSER attribute"
+      8 e-lt-1   msg="collector failed" name=stat_user_tables err="pq: canceling statement due to lock timeout"
+      7 e-lt-1   msg="Error opening connection to database" err="error querying postgresql version: pq: remaining connection slots are reserved for roles with the SUPERUSER attribute"
+      2 e-plain-1   msg="error scraping dsn" err="Error opening connection to database (postgresql://exporter:PASSWORD_REMOVED@pg:5432/bench?sslmode=disable): driver: bad connection" dsn="postgresql://exporte
+      2 e-lt-1   msg="error scraping dsn" err="Error opening connection to database (postgresql://exporter_lt:PASSWORD_REMOVED@pg:5432/bench?sslmode=disable): driver: bad connection" dsn="postgresql://exporte

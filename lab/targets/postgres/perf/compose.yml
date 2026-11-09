@@ -1,0 +1,38 @@
+# PostgreSQL 效能與故障情境（慢 SQL、鎖、CPU、shared_buffers、work_mem、checkpoint、vacuum、連線、OOM）。
+# 一台 PostgreSQL 16.15（1 CPU、768MB），兩個 exporter：
+#   e-plain：exporter 帳號沒有 lock_timeout（預設狀態）
+#   e-lt：exporter_lt 帳號 ALTER ROLE ... SET lock_timeout = '1s'，並打開 include_query
+# 只對外開 Prometheus：127.0.0.1:23690。執行 ./run.sh，結束會 docker compose down -v。
+# 注意：會用 ALTER SYSTEM 改的設定（shared_buffers、work_mem、max_wal_size、autovacuum_naptime）不能放在命令列 -c，
+# 命令列的優先權比 postgresql.auto.conf 高。
+name: at-pgperf-lab
+x-exp: &exp
+  image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+  restart: unless-stopped
+services:
+  pg:
+    image: postgres:16.15-alpine
+    environment: { POSTGRES_PASSWORD: postgres }
+    cpus: 1.0
+    mem_limit: 768m
+    memswap_limit: 768m
+    shm_size: 256m
+    volumes: ["./init.sh:/docker-entrypoint-initdb.d/init.sh:ro", "./sql:/sql:ro"]
+    command: >-
+      postgres -c shared_preload_libraries=pg_stat_statements -c max_connections=40
+      -c track_io_timing=on -c log_lock_waits=on -c deadlock_timeout=1s
+      -c log_min_duration_statement=500ms -c log_checkpoints=on -c log_autovacuum_min_duration=0
+      -c log_temp_files=0
+  e-plain:
+    <<: *exp
+    environment: { DATA_SOURCE_NAME: "postgresql://exporter:exporter@pg:5432/bench?sslmode=disable" }
+    command: [--collector.stat_statements, --collector.long_running_transactions, --collector.postmaster]
+  e-lt:
+    <<: *exp
+    environment: { DATA_SOURCE_NAME: "postgresql://exporter_lt:exporter@pg:5432/bench?sslmode=disable" }
+    command: [--collector.stat_statements, --collector.stat_statements.include_query,
+              --collector.long_running_transactions, --collector.postmaster]
+  prometheus:
+    image: prom/prometheus:v3.13.5
+    volumes: ["./prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    ports: ["127.0.0.1:23690:9090"]

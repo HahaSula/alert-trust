@@ -1,0 +1,18 @@
+pgbench (16.15)
+pgbench: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  sorry, too many clients already
+pgbench: error: client 0 aborted while establishing connection
+transaction type: <builtin: TPC-B (sort of)>
+scaling factor: 10
+query mode: simple
+number of clients: 2
+number of threads: 1
+maximum number of tries: 1
+duration: 20 s
+number of transactions actually processed: 425
+number of failed transactions: 0 (0.000%)
+latency average = 8.994 ms
+latency stddev = 4.058 ms
+rate limit schedule lag: avg 4.328 (max 28.658) ms
+average connection time = 3.314 ms
+tps = 21.349127 (including reconnection times)
+pgbench: error: Run was aborted; the above results are incomplete.

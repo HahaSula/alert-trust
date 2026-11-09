@@ -1,0 +1,86 @@
+PostgreSQL 效能與故障情境 — 摘要（2026-11-09）
+環境：postgres 16.15-alpine（cpus 1.0、mem 768m）、postgres-exporter v0.20.1 ×2（e-plain 沒設 lock_timeout；e-lt 帳號 lock_timeout=1s）、
+prometheus v3.13.5，scrape 5s／timeout 4s。負載 pgbench scale 10、8 client、-R 200。
+原始輸出：run-20261109.txt（S0–S9）、run-s10-20261109.txt（S10，另起環境）、pgbench-*.txt、pg-log*.txt、exporter-errors*.txt。
+TPS = sum(rate(pg_stat_database_xact_commit{datname="bench"}[15s]))，包含兩個 exporter 自己的交易（閒置時約 7–14/s）。
+時間：t+ 是主機牆鐘。這次容器內 sleep 10 = 主機 10.2 秒、pgbench -T 60 約 65 秒牆鐘，沒有出現其他 lab 看到的「容器時鐘慢 30%」；
+pgbench 進度檔的秒數仍以容器時鐘為準。每個情境裡大約每 30 秒有一次 TPS 掉到 110–150 的短暫低點（S0 基線也有，log 中有 END 等 6 秒），
+應是主機磁碟 fsync 抖動，不是情境造成的。
+
+S0 基線
+  TPS 216–223；tup_updated 約 620/s；pg_stat_statements calls 約 1400/s；cache hit 0.95–0.98；scrape 0.05–0.15 秒。
+  不限速 -c 4 20 秒：700 tps、平均延遲 5.7 ms。
+
+S1 慢 SQL（每秒一次全表掃描 0.43 秒、一個 pg_sleep(40)）
+  - exporter：rate(seconds_total)/rate(calls_total) 依 queryid 看得到全表掃描平均 0.33–0.45 秒；只有 user、datname、queryid 三個 label。
+  - include_query 時另有 pg_stat_statements_query_id{queryid, query}，query 截在 120 字元，常數被正規化成 $1；前幾名是 exporter 自己的查詢。
+  - 執行中的 pg_sleep(40) 在 pg_stat_statements 裡看不到（結束才記錄，事後 mean=40014 ms）；執行中只能從
+    pg_stat_activity_max_tx_duration{state="active"}=18.6 秒、pg_long_running_transactions_oldest_timestamp_seconds=18.6 看到，沒有查詢文字。
+  - 直接查 pg_stat_statements 才有 mean/max/stddev、shared_blks_read（88817）、temp_blks_written；exporter 只有 block_read_seconds_total（需要 track_io_timing）。
+  - log_min_duration_statement=500ms 的 log 有「duration: 575.653 ms statement: SELECT count(*) ...」；exporter 不讀 log，沒有計畫（plan）。
+  - series：e-lt 與 e-plain 各 52 條 calls_total（前 100 名、排除最低 10%）。
+
+S2 列鎖（一個交易 UPDATE branches bid=1 不 commit，30 秒）
+  - pgbench 15 秒內從 200 tps 掉到 0；exporter TPS 217 → 7.7（剩 exporter 自己的交易），tup_updated 611 → 0。
+  - 最先動的：pg_stat_activity_count{wait_event_type="Lock"} 0 → 8（第一個 scrape 就到 8）、active 0 → 8、
+    max_tx_duration{state="idle in transaction"} 與 {wait_event_type="Lock"} 一起每 5 秒加 5。
+  - pg_locks：transactionid ShareLock 未授予 3、tuple ExclusiveLock 未授予 5；exporter 的 pg_locks_count 沒有 sharelock（transactionid 被排除），
+    exclusivelock=8、rowexclusivelock=44、accesssharelock=17，看不出誰擋誰。pg_blocking_pids 直接查才看到 354←370、350←354 的鏈。
+  - log_lock_waits：deadlock_timeout=1s 後「still waiting for ShareLock on transaction」，放開後「acquired ... after 33122 ms」。
+  - 放開後 pgbench 補跑積壓，exporter TPS 衝到 656。
+
+S3 DDL 排在長交易後面（A 讀 accounts 不結束 45 秒，B ALTER TABLE 沒設 lock_timeout）
+  - DDL 等 AccessExclusiveLock 43.1 秒（log）；pgbench 從 t+20 起 0 tps 約 35 秒，exporter TPS 216 → 3.7–7.7。
+  - 直接查：13 個等鎖 session 全部 blocked；DDL 被 A 擋，8 個 pgbench UPDATE 都被 DDL 擋（pg_blocking_pids = DDL 的 pid）；
+    另外 4 個未授予的 AccessShareLock 對應 e-plain 的 4 條等鎖連線（usename=exporter、wait_event=relation）。
+    pgbench_accounts 上：AccessExclusiveLock 未授予 1、AccessShareLock 已授予 1／未授予 4、RowExclusiveLock 未授予 8。
+  - e-plain（沒設 lock_timeout）：up 1 → 0 共 40 秒，scrape_duration 4.0（timeout），4 條 exporter 連線在等 relation 鎖。
+  - e-lt（lock_timeout 1s）：up=1，scrape 1.05 秒，只有 stat_user_tables success=0（log「canceling statement due to lock timeout」8 次）；
+    看得到 Lock 等待 9 → 17、pg_locks_count{mode="accessexclusivelock"}=1。
+  - 規則 PostgresLockQueuePileUp 的條件（Lock 等待 ≥5 且 accessexclusivelock>0）在 e-lt 上 t+25 到 t+65 都成立；e-plain 上這段沒有資料。
+
+S3b 同上，但 DDL 先 SET lock_timeout='2s'
+  - DDL 2 秒後「ERROR: canceling statement due to lock timeout」；pgbench 只有一個 5 秒區間延遲變 543 ms，tps 沒掉；
+    exporter 只在一個 scrape 看到 9 個 Lock 等待，e-plain up 一直是 1。
+
+S4 CPU 限制（t+20 cpus 1.0 → 0.1，t+60 改回）
+  - exporter TPS 220 → 38–63（約 −75%）；pgbench 照排程送，延遲（含 lag）升到 30 秒。
+  - 最先動的：scrape_duration_seconds 0.05 → 3.6 秒（兩個 exporter 都是，離 4 秒 timeout 很近）與 TPS 同一個 scrape。
+  - active session 數在 1–8 之間跳動，wait_event_type 空白（在 CPU 上）只有 0–5，沒有清楚的飽和訊號；exporter 沒有 CPU 使用率。
+  - 改回後 TPS 衝到 741 補積壓。
+
+S5 work_mem（DISTINCT 10 萬列，64MB vs 64kB，各 30 秒）
+  - 64MB：temp_bytes rate 0、平均延遲 42 ms；64kB：temp_bytes 約 2–7.5 MB/s、temp_files 1.2–5.2/s、平均延遲 50 ms（+19%）。
+  - pg_stat_statements 的平均 0.04 → 0.05 秒；log_temp_files=0 每個暫存檔都記一行。資料在 OS cache 裡，差距小。
+
+S6 shared_buffers 16MB（ALTER SYSTEM 後 docker compose restart）
+  - cache hit 0.98 → 0.93（兩個 scrape 掉到 0.72），blks_read 100–200/s → 170–340/s（峰值 1930/s）。
+  - -R 200 時 TPS 不變；不限速 -c 4：700 → 623 tps（−11%），延遲 5.7 → 6.4 ms。
+  - 正常重啟：changes(pg_postmaster_start_time_seconds[5m])=1，resets(xact_commit)=0（正常關機會保存統計）。
+
+S7 checkpoint 太頻繁（max_wal_size 32MB，reload）
+  - pg_settings_max_wal_size_bytes 1.07e9 → 3.36e7；checkpoints_req 3 → 9（約 60 秒內 6 次，increase[30s] 約 2.5）；
+    buffers_checkpoint rate 50–80 → 120–190/s。log「checkpoints are occurring too frequently (10 seconds apart)」。
+  - -R 200 下 TPS 沒有明顯變化（216–227，加上週期性低點）；這組負載太輕，看不出 full page write 的成本。
+
+S8 idle in transaction 擋住 vacuum（拿到 XID 後閒置 100 秒，autovacuum_naptime 5s）
+  - n_dead_tup（branches、tellers）478 → 17899，線性增加；autovacuum_count 每 30 秒 +5，但 log「0 removed ... 564 are dead but not yet removable」。
+  - pgbench_branches table_size_bytes 352256 → 720896（2 倍）；放開後 dead_tup → 0，大小留在 704 kB（不會縮回）。
+  - TPS 不變（-R 200），延遲 2.4 → 3.4 ms。t+60 直接查 age(backend_xid)=12047；exporter 只有 max_tx_duration{state="idle in transaction"}=60–98 秒。
+
+S9 連線風暴（已連 8 條 pgbench；另開 36 條 pg_sleep(40)；再跑 pgbench -C）
+  - 已連上的 pgbench 一直 200 tps；新連線「FATAL: sorry, too many clients already」（psql 7 次，pgbench -C 第一個連線就 abort）。
+  - exporter：up=1、pg_up=1，但兩個 exporter 的 collector 結果在 t+25 到 t+60 全部消失（log「remaining connection slots are reserved for roles with the SUPERUSER attribute」），
+    這段沒有 TPS、沒有 numbackends、沒有 pg_stat_activity_count；消失前最後一筆 numbackends=32、active=36。
+  - PostgresConnectionsNearLimit 在最嚴重的時候沒有資料；接得到的是 PostgresCollectorsMissing（for 2m）。
+
+S10 OOM（run-s10.sh；cgroup 記憶體 400MB，一個 backend array_agg 1.5 億個整數）
+  - 查詢跑了約 40 秒：期間 pgbench 延遲升到 700–820 ms（記憶體壓力），TPS 大致維持。
+  - 「server process (PID 121) was terminated by signal 9: Killed」→「all server processes terminated; reinitializing」→ redo 1.61 秒；
+    docker inspect：OOMKilled=true、RestartCount=0、容器仍在跑（被殺的是 backend，不是 postmaster）。
+  - pgbench 8 個 client 全部 abort（「perhaps the backend died」），之後 TPS 剩 exporter 自己的 3–8/s；應用不重連就一直是 0。
+  - pg_up 1 → 0 一個 scrape（t+65）再回 1；up 一直是 1；pg_postmaster_start_time_seconds 不變；
+    xact_commit 10856 → 31，resets(...[1m])=1；「resets > 0 unless changes(start_time) > 0」（PostgresCrashRecovery 的條件）成立。
+
+沒有重做：pg_wal 寫滿（../target 的 O 段已做，PANIC 後停機）。
+run.sh 第一次執行在 S9 結尾的裸 wait 卡住（bash 連 process substitution 的 tee 一起等），手動中止；已改成只等 psql 的 pid，S10 移到 run-s10.sh。

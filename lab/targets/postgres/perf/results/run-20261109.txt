@@ -1,0 +1,493 @@
+環境：postgres 16.15-alpine（cpus 1.0、mem 768m）、postgres-exporter v0.20.1 ×2、prometheus v3.13.5；scrape 5s、timeout 4s
+  $ select version()
+    PostgreSQL 16.15 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+  容器時鐘對照（主機 date 前後 vs 容器內 sleep 10）：
+    容器 sleep 10 = 主機 10.21 秒
+    creating primary keys...
+    done in 3.20 s (drop tables 0.00 s, create tables 0.07 s, client-side generate 2.00 s, vacuum 0.23 s, primary keys 0.90 s).
+
+## S0 基線：pgbench -R 200 -c 8，60 秒（容器時鐘）（07:50:20）
+  >> up
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65
+    e-lt                                          1      1      1      1      1      1      1      1      1      1      1      1      1      1
+    e-plain                                       1      1      1      1      1      1      1      1      1      1      1      1      1      1
+  >> sum(rate(pg_stat_database_xact_commit{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65
+    -                                          7.10   9.05  65.68    139    220    217    221    216    151    111    154    214    221    223
+  >> sum(rate(pg_stat_database_tup_updated{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65
+    -                                             0      0    165    394    623    614    623    608    424    311    435    604    622    627
+  >> sum(rate(pg_stat_statements_calls_total{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65
+    -                                          6.20   2.40   4.67    889   1427   1390   1414   1422    995    813   1003   1389   1430   1449
+  >> sum(pg_stat_activity_count{instance="e-lt",datname="bench",state="active"})
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65
+    -                                             0      0      0      8      5      5      1      0      0      1      0      6      1      1
+  >> sum(pg_stat_activity_count{instance="e-lt",datname="bench",wait_event_type="Lock"})
+    t+秒（牆鐘）                                      15     20     25     55
+    -                                             1      1      1      2
+  >> scrape_duration_seconds
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65
+    e-lt                                       0.09   0.09   0.05   0.06   0.09   0.06   0.07   0.05   0.05   0.06   0.06   0.15   0.05   0.06
+    e-plain                                    0.06   0.07   0.06   0.07   0.07   0.07   0.06   0.05   0.05   0.05   0.06   0.06   0.05   0.05
+  >> sum(rate(pg_stat_database_blks_read{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65
+    -                                          0.20      0  96.98    192    278    224    198    176    115  70.79  89.50    121    118    106
+  >> sum(rate(pg_stat_database_blks_hit{instance="e-lt",datname="bench"}[15s])) / (sum(rate(pg_stat_database_blks_hit{instance="e-lt",datname="bench"}[15s])) + sum(rate(pg_stat_database_blks_read{instance="e-lt",datname="bench"}[15s])))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65
+    -                                          1.00      1   0.96   0.95   0.95   0.96   0.97   0.97   0.97   0.98   0.98   0.98   0.98   0.98
+    rate limit schedule lag: avg 2.471 (max 168.924) ms
+    initial connection time = 12.843 ms
+    tps = 200.127104 (without initial connection time)
+  不限速的容量（-c 4，20 秒，容器時鐘）：
+    latency average = 5.717 ms
+    tps = 699.673076 (without initial connection time)
+
+## S1 慢 SQL：背景 pgbench + 每秒一次全表掃描 + 一個 40 秒的 pg_sleep（07:51:51）
+  [t+35 直接查] pg_stat_activity 執行中最久的查詢：
+  $ select pid, state, wait_event_type, round(extract(epoch from now()-query_start)::numeric,1) as q_sec, left(query, 60) from pg_stat_activity where datname='bench' and state='active' and pid<>pg_backend_pid() order by query_start limit 3
+    237 | active | Timeout | 20.2 | SELECT pg_sleep(40) /* report */;
+    190 | active |  | 0.1 | SELECT count(*) FROM pgbench_accounts WHERE filler LIKE '%zz
+    289 | active |  | 0.1 | SELECT count(*) FROM pgbench_accounts WHERE filler LIKE '%zz
+  > pg_stat_activity_max_tx_duration{instance="e-lt",datname="bench",state="active"}
+    e-lt         pg_stat_activity_max_tx_duration{datname=bench,state=active,application_name=psql,wait_event_type=Timeout,usename=postgres} = 18.585819
+  > pg_long_running_transactions_oldest_timestamp_seconds{instance="e-lt"}
+    e-lt         pg_long_running_transactions_oldest_timestamp_seconds{} = 18.608418
+  >> sum(rate(pg_stat_database_xact_commit{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65
+    -                                           606    505    316    168    110    154    222    218    220    229    153    110    176    222
+  >> sum(pg_stat_activity_count{instance="e-lt",datname="bench",state="active"})
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65
+    -                                             3      8      1      1      5      4      7      1      1     10     10      2      1      1
+  >> topk(3, rate(pg_stat_statements_seconds_total{instance="e-lt",datname="bench"}[30s]) / rate(pg_stat_statements_calls_total{instance="e-lt",datname="bench"}[30s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65
+    e-lt,bench,-2565669271273608176               ·      ·      ·      ·      ·      ·   0.02   0.02   0.02   0.02   0.02      ·      ·      ·
+    e-lt,bench,-2980139756659112656               ·      ·      ·      ·   0.00   0.00   0.00      ·      ·      ·      ·      ·      ·      ·
+    e-lt,bench,-7238127496247095951               ·      ·   0.33   0.33   0.38   0.41   0.42   0.45   0.44   0.44   0.43   0.45   0.44   0.44
+    e-lt,bench,-7390902673174426915            0.00   0.00      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·   0.00
+    e-lt,bench,-7390902673174426915            0.00   0.00   0.00   0.00   0.00      ·      ·      ·      ·      ·      ·      ·      ·      ·
+    e-lt,bench,1097307767511328587                ·      ·      ·      ·      ·      ·      ·   0.02   0.02   0.02   0.02   0.02      ·      ·
+    e-lt,bench,8207445343163765616                ·      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·   0.01   0.01   0.01
+    e-lt,bench,8332100064811717391                ·      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·   0.00      ·
+    e-lt,bench,8332100064811717391             0.00   0.00   0.00   0.00      ·   0.00      ·      ·      ·      ·      ·      ·      ·      ·
+  exporter 的 per-query 平均（最後 1 分鐘，前 5 名）與 query_id 對照（include_query，query_length 預設 120）：
+  > topk(5, rate(pg_stat_statements_seconds_total{instance="e-lt",datname="bench"}[1m]) / rate(pg_stat_statements_calls_total{instance="e-lt",datname="bench"}[1m]))
+    e-lt         {datname=bench} = 0.009130481599999999
+    e-lt         {datname=bench} = 0.44152142314285714
+    e-lt         {datname=bench} = 0.0013556533000000002
+    e-lt         {datname=bench} = 0.0087790341
+    e-lt         {datname=bench} = 0.003356313550000001
+     4499419349976865785 120 'SELECT\n\t\t\t\tapplication_name,\n\t\t\t\tclient_addr::text,\n\t\t\t\tstate,\n\t\t\t\ts.slot_name,\n\t\t\t\t(case '
+     -1865429890013523065 120 'SELECT\n\t\t\t\tpg_database.datname,\n\t\t\t\ttmp.state,\n\t\t\t\ttmp2.usename,\n\t\t\t\ttmp2.application_name'
+     -7390902673174426915 120 'SELECT\n\t\tcurrent_database() datname,\n\t\tschemaname,\n\t\trelname,\n\t\tseq_scan,\n\t\tseq_tup_read,\n'
+     7883471954638489049 120 'SELECT\n    COUNT(*) as transactions,\n    MAX(EXTRACT($1 FROM clock_timestamp() - pg_stat_a'
+     4452344162736673220 40 'SELECT * FROM pg_stat_database_conflicts'
+     -416742667701294759 120 'SELECT datid,datname,numbackends,xact_commit,xact_rollback,blks_read,blks_hit,tup_returned'
+     series 數： 33
+  > count(pg_stat_statements_calls_total{instance="e-lt"})
+    -            {} = 52
+  > count(pg_stat_statements_calls_total{instance="e-plain"})
+    -            {} = 52
+  > pg_stat_statements_block_read_seconds_total{instance="e-lt",datname="bench"} > 0
+    e-lt         pg_stat_statements_block_read_seconds_total{datname=bench} = 0.000015327
+    e-lt         pg_stat_statements_block_read_seconds_total{datname=bench} = 0.00008971100000000001
+    e-lt         pg_stat_statements_block_read_seconds_total{datname=bench} = 0.00008584100000000001
+    e-lt         pg_stat_statements_block_read_seconds_total{datname=bench} = 0.000042668
+    e-lt         pg_stat_statements_block_read_seconds_total{datname=bench} = 0.9804078480000002
+    e-lt         pg_stat_statements_block_read_seconds_total{datname=bench} = 0.00003650299999999999
+    e-lt         pg_stat_statements_block_read_seconds_total{datname=bench} = 0.49103043800000135
+  PostgreSQL 有、exporter 沒輸出的欄位（mean/max/stddev、shared_blks_read、temp_blks_written）：
+  $ select queryid, calls, round(mean_exec_time::numeric,1) mean_ms, round(max_exec_time::numeric,1) max_ms, round(stddev_exec_time::numeric,1) sd_ms, shared_blks_read, temp_blks_written, left(query,50) from pg_stat_statements order by total_exec_time desc limit 4
+    -3416356442043621232 | 1 | 40014.5 | 40014.5 | 0.0 | 0 | 0 | SELECT pg_sleep($1) /* report */
+    -2980139756659112656 | 37895 | 0.8 | 211.5 | 6.4 | 6 | 0 | UPDATE pgbench_branches SET bbalance = bbalance + 
+    -7238127496247095951 | 43 | 431.1 | 792.4 | 134.0 | 88817 | 0 | SELECT count(*) FROM pgbench_accounts WHERE filler
+    -8809568118492557458 | 37895 | 0.1 | 128.8 | 2.1 | 5 | 0 | UPDATE pgbench_tellers SET tbalance = tbalance + $
+  log_min_duration_statement=500ms 寫到 log（exporter 不讀 log）：
+2026-11-08 23:51:51.959 UTC [190] LOG:  duration: 575.653 ms  statement: SELECT count(*) FROM pgbench_accounts WHERE filler LIKE '%zz%' OR abalance = -12345;
+2026-11-08 23:52:06.355 UTC [200] LOG:  duration: 6351.231 ms  statement: END;
+2026-11-08 23:52:06.355 UTC [193] LOG:  duration: 6351.422 ms  statement: END;
+2026-11-08 23:52:06.360 UTC [201] LOG:  duration: 6355.573 ms  statement: END;
+  $ select count(*) as track_activity_query_size from pg_settings where name='track_activity_query_size' and setting='1024'
+    1
+
+## S2 列鎖等待：一個交易更新 pgbench_branches bid=1 後不 commit，持有 30 秒（07:52:58）
+  [t+30 直接查] 等鎖的 session 與擋住它們的 pid：
+  $ select count(*) filter (where wait_event_type='Lock') as waiting, count(*) filter (where state='idle in transaction') as idle_in_tx, string_agg(distinct wait_event, ',') from pg_stat_activity where datname='bench'
+    8 | 1 | ClientRead,transactionid,tuple
+  $ select pid, pg_blocking_pids(pid), wait_event, round(extract(epoch from now()-state_change)::numeric,1) wait_sec, left(query,45) from pg_stat_activity where wait_event_type='Lock' order by state_change limit 3
+    354 | {370} | transactionid | 15.2 | UPDATE pgbench_branches SET bbalance = bbalan
+    350 | {354} | tuple | 15.2 | UPDATE pgbench_branches SET bbalance = bbalan
+    352 | {354,350} | tuple | 15.1 | UPDATE pgbench_branches SET bbalance = bbalan
+  $ select locktype, mode, granted, count(*) from pg_locks where locktype in ('transactionid','tuple','relation') and not granted group by 1,2,3
+    transactionid | ShareLock | f | 3
+    tuple | ExclusiveLock | f | 5
+  > sum(pg_stat_activity_count{instance="e-lt",datname="bench",wait_event_type="Lock"})
+    -            {} = 8
+  > pg_stat_activity_max_tx_duration{instance="e-lt",datname="bench",wait_event_type="Lock"}
+    e-lt         pg_stat_activity_max_tx_duration{datname=bench,state=active,application_name=pgbench,wait_event_type=Lock,usename=postgres} = 12.473516
+    e-lt         pg_stat_activity_max_tx_duration{datname=bench,state=active,application_name=pgbench,wait_event_type=Lock,usename=postgres} = 12.456903
+  > pg_locks_count{instance="e-lt",datname="bench"} > 0
+    e-lt         pg_locks_count{datname=bench,mode=accesssharelock} = 17
+    e-lt         pg_locks_count{datname=bench,mode=exclusivelock} = 8
+    e-lt         pg_locks_count{datname=bench,mode=rowexclusivelock} = 44
+  >> up
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75
+    e-lt                                          1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1
+    e-plain                                       1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1
+  >> sum(rate(pg_stat_database_xact_commit{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75
+    -                                           217    186    190    162    114  95.70  75.50  13.90  13.40  13.40   8.06   7.68    318    494    656    495
+  >> sum(rate(pg_stat_database_tup_updated{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75
+    -                                           611    515    526    458    319    260    186   1.30      0      0      0      0    916   1442   1929   1447
+  >> sum(rate(pg_stat_statements_calls_total{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75
+    -                                          1391   1206   1234   1053    870    546    393  11.30  10.50   8.82   5.54   6.96   2582   3579   4411   3146
+  >> sum(pg_stat_activity_count{instance="e-lt",datname="bench",state="active"})
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75
+    -                                             1      0      0      0      0      8      8      8      8      8      8      8      2      8      8      0
+  >> sum(pg_stat_activity_count{instance="e-lt",datname="bench",wait_event_type="Lock"})
+    t+秒（牆鐘）                                      25     30     35     40     45     50     55     60     65     70
+    -                                             8      8      8      8      8      8      8      1      3      1
+  >> max(pg_stat_activity_max_tx_duration{instance="e-lt",datname="bench",wait_event_type="Lock"})
+    t+秒（牆鐘）                                      25     30     35     40     45     50     55     60     65     70
+    -                                          2.44   7.44  12.47  17.46  22.44  22.44  30.77   0.00   0.00  -0.00
+  >> max(pg_stat_activity_max_tx_duration{instance="e-lt",datname="bench",state="idle in transaction"})
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75
+    -                                             0      0      0      0      0   2.46   7.46  12.49  17.48  22.46  22.46  30.79   0.00      0      0      0
+    progress: 10.0 s, 201.2 tps, lat 4.881 ms stddev 12.945, 0 failed, lag 1.274 ms
+    progress: 15.0 s, 199.8 tps, lat 2.852 ms stddev 1.531, 0 failed, lag 0.106 ms
+    progress: 20.0 s, 9.4 tps, lat 3.361 ms stddev 0.914, 0 failed, lag 0.120 ms
+    progress: 25.0 s, 0.0 tps, lat 0.000 ms stddev 0.000, 0 failed, lag 0.000 ms
+    progress: 30.0 s, 0.0 tps, lat 0.000 ms stddev 0.000, 0 failed, lag 0.000 ms
+    progress: 35.0 s, 0.0 tps, lat 0.000 ms stddev 0.000, 0 failed, lag 0.000 ms
+    progress: 40.0 s, 0.0 tps, lat 0.000 ms stddev 0.000, 0 failed, lag 0.000 ms
+    progress: 45.0 s, 36.1 tps, lat 29135.563 ms stddev 395.648, 0 failed, lag 27818.898 ms
+    progress: 50.0 s, 647.2 tps, lat 23474.961 ms stddev 2982.680, 0 failed, lag 23462.625 ms
+    progress: 55.0 s, 652.4 tps, lat 12839.288 ms stddev 3211.318, 0 failed, lag 12827.020 ms
+2026-11-08 23:53:18.513 UTC [354] LOG:  process 354 still waiting for ShareLock on transaction 41652 after 1000.053 ms
+2026-11-08 23:53:18.530 UTC [350] LOG:  process 350 still waiting for ExclusiveLock on tuple (35,77) of relation 16433 of database 16388 after 1000.073 ms
+2026-11-08 23:53:18.568 UTC [352] LOG:  process 352 still waiting for ExclusiveLock on tuple (35,77) of relation 16433 of database 16388 after 1000.083 ms
+2026-11-08 23:53:18.573 UTC [356] LOG:  process 356 still waiting for ExclusiveLock on tuple (35,77) of relation 16433 of database 16388 after 1000.071 ms
+
+## S3 DDL 排在長交易後面：A 讀 pgbench_accounts 不結束（45 秒），B 執行 ALTER TABLE（沒設 lock_timeout）（07:54:13）
+  [t+35 直接查] 等鎖的 session：誰擋 DDL、誰被 DDL 擋
+  $ select count(*) filter (where wait_event_type='Lock') waiting, count(*) filter (where wait_event_type='Lock' and pg_blocking_pids(pid) <> '{}') blocked from pg_stat_activity where datname='bench'
+    13 | 13
+  $ select pid, pg_blocking_pids(pid) blockers, wait_event, left(query,40) from pg_stat_activity where wait_event_type='Lock' order by state_change limit 4
+    455 | {444} | relation | ALTER TABLE pgbench_accounts ADD COLUMN 
+    427 | {455} | relation | UPDATE pgbench_accounts SET abalance = a
+    430 | {455} | relation | UPDATE pgbench_accounts SET abalance = a
+    429 | {455} | relation | UPDATE pgbench_accounts SET abalance = a
+  $ select mode, granted, count(*) from pg_locks where relation='pgbench_accounts'::regclass group by 1,2 order by 1,2
+    AccessExclusiveLock | f | 1
+    AccessShareLock | f | 4
+    AccessShareLock | t | 1
+    RowExclusiveLock | f | 8
+  > up
+    e-lt         up{} = 1
+    e-plain      up{} = 0
+  > scrape_duration_seconds
+    e-lt         scrape_duration_seconds{} = 1.051097922
+    e-plain      scrape_duration_seconds{} = 4.000551288
+  > pg_scrape_collector_success{collector="stat_user_tables"}
+    e-lt         pg_scrape_collector_success{collector=stat_user_tables} = 0
+  > sum(pg_stat_activity_count{instance="e-lt",datname="bench",wait_event_type="Lock"})
+    -            {} = 12
+  > pg_locks_count{instance="e-lt",datname="bench",mode="accessexclusivelock"}
+    e-lt         pg_locks_count{datname=bench,mode=accessexclusivelock} = 1
+  $ select usename, wait_event_type, wait_event, count(*) from pg_stat_activity where usename like 'exporter%' group by 1,2,3 order by 1
+    exporter | Client | ClientRead | 1
+    exporter | Lock | relation | 4
+    exporter_lt | Client | ClientRead | 1
+  >> up
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80     85     90     95    100    105
+    e-lt                                          1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1
+    e-plain                                       1      1      1      1      1      0      0      0      0      0      0      0      0      1      1      1      1      1      1      1      1      1
+  >> sum(rate(pg_stat_database_xact_commit{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80     85     90     95    100    105
+    -                                           495    279    142    144    216    174  70.30   7.50   3.71   5.16   6.33   7.70   5.50   6.80    174    214    424    651    625    440    249    215
+  >> sum(rate(pg_stat_database_tup_updated{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80     85     90     95    100    105
+    -                                          1447    797    395    400    607    482    176      0      0      0      0      0      0      0    434    547   1246   1915   1835   1281    707    605
+  >> sum(rate(pg_stat_statements_calls_total{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80     85     90     95    100    105
+    -                                          3146   1697    970    988   1381   1131    452   7.20   5.19   6.12   2.11   8.30   8.80   7.20    928   1163   2919   4800   4653   2944   1387   1377
+  >> sum(pg_stat_activity_count{instance="e-lt",datname="bench",state="active"})
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80     85     90     95    100    105
+    -                                             0      2      0      0      0      9     10     12     12     12     14     14     15     17      8      8      7      7      1      1      0      0
+  >> sum(pg_stat_activity_count{instance="e-lt",datname="bench",wait_event_type="Lock"})
+    t+秒（牆鐘）                                      25     30     35     40     45     50     55     60     65     70     75     80     85
+    -                                             9     10     12     12     12     14     14     15     17      2      2      2      1
+  >> scrape_duration_seconds
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80     85     90     95    100    105
+    e-lt                                       0.07   0.07   0.06   0.06   0.07   1.08   1.06   1.06   1.06   1.05   1.05   1.05   1.05   1.05   0.22   0.22   0.31   0.22   0.07   0.06   0.05   0.06
+    e-plain                                    0.07   0.07   0.06   0.07   0.07   4.00   4.00   4.00   4.00   4.00   4.00   4.00   4.00   2.91   0.13   0.13   0.30   0.22   0.05   0.06   0.07   0.05
+  >> sum by (instance) (pg_locks_count{datname="bench",mode="accessexclusivelock"})
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80     85     90     95    100    105
+    e-lt                                          0      0      0      0      0      1      1      1      1      1      1      1      1      1      0      0      0      0      0      0      0      0
+    e-plain                                       0      0      0      0      0      ·      ·      ·      ·      ·      ·      ·      ·      1      0      0      0      0      0      0      0      0
+    progress: 10.0 s, 195.6 tps, lat 2.850 ms stddev 0.807, 0 failed, lag 0.071 ms
+    progress: 15.0 s, 194.8 tps, lat 5.519 ms stddev 11.333, 0 failed, lag 1.342 ms
+    progress: 20.0 s, 3.0 tps, lat 3.731 ms stddev 1.689, 0 failed, lag 0.074 ms
+    progress: 25.0 s, 0.0 tps, lat 0.000 ms stddev 0.000, 0 failed, lag 0.000 ms
+    progress: 30.0 s, 0.0 tps, lat 0.000 ms stddev 0.000, 0 failed, lag 0.000 ms
+    progress: 35.0 s, 0.0 tps, lat 0.000 ms stddev 0.000, 0 failed, lag 0.000 ms
+    progress: 40.0 s, 0.0 tps, lat 0.000 ms stddev 0.000, 0 failed, lag 0.000 ms
+    progress: 45.0 s, 0.0 tps, lat 0.000 ms stddev 0.000, 0 failed, lag 0.000 ms
+    progress: 50.0 s, 0.0 tps, lat 0.000 ms stddev 0.000, 0 failed, lag 0.000 ms
+    progress: 55.0 s, 5.2 tps, lat 39773.986 ms stddev 28.615, 0 failed, lag 27509.842 ms
+    progress: 60.0 s, 689.4 tps, lat 33901.529 ms stddev 3543.262, 0 failed, lag 33889.947 ms
+    progress: 65.0 s, 673.8 tps, lat 21819.393 ms stddev 3294.742, 0 failed, lag 21807.519 ms
+2026-11-08 23:53:50.636 UTC [354] LOG:  process 354 acquired ShareLock on transaction 41652 after 33122.922 ms
+2026-11-08 23:53:50.636 UTC [350] LOG:  process 350 acquired ExclusiveLock on tuple (35,77) of relation 16433 of database 16388 after 33106.672 ms
+2026-11-08 23:53:50.639 UTC [352] LOG:  process 352 acquired ExclusiveLock on tuple (35,77) of relation 16433 of database 16388 after 33071.258 ms
+2026-11-08 23:53:50.639 UTC [356] LOG:  process 356 acquired ExclusiveLock on tuple (35,77) of relation 16433 of database 16388 after 33066.062 ms
+2026-11-08 23:53:50.639 UTC [357] LOG:  process 357 acquired ExclusiveLock on tuple (35,77) of relation 16433 of database 16388 after 32574.367 ms
+2026-11-08 23:53:50.646 UTC [351] LOG:  process 351 acquired ShareLock on transaction 41675 after 32813.944 ms
+
+## S3b 同上，但 DDL session 先 SET lock_timeout = '2s'（07:56:00）
+    DDL: ERROR:  canceling statement due to lock timeout
+  >> sum(rate(pg_stat_database_xact_commit{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65
+    -                                           154    127    140    210    206    226    226    152    162    211    216    217    219    223
+  >> sum(pg_stat_activity_count{instance="e-lt",datname="bench",wait_event_type="Lock"})
+    t+秒（牆鐘）                                      20
+    -                                             9
+  >> up
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65
+    e-lt                                          1      1      1      1      1      1      1      1      1      1      1      1      1      1
+    e-plain                                       1      1      1      1      1      1      1      1      1      1      1      1      1      1
+    progress: 10.0 s, 214.8 tps, lat 2.183 ms stddev 0.475, 0 failed, lag 0.064 ms
+    progress: 15.0 s, 201.4 tps, lat 5.327 ms stddev 12.830, 0 failed, lag 2.244 ms
+    progress: 20.0 s, 199.8 tps, lat 542.999 ms stddev 643.855, 0 failed, lag 520.446 ms
+    progress: 25.0 s, 193.0 tps, lat 2.571 ms stddev 3.263, 0 failed, lag 0.074 ms
+
+## S4 CPU 限制：pgbench 中途把 pg 的 cpus 從 1.0 改成 0.1，40 秒後改回（07:57:07）
+  t+20 cpus=0.1
+  t+60 cpus=1.0
+  >> up
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80     85
+    e-lt                                          1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1
+    e-plain                                       1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1
+  >> sum(rate(pg_stat_database_xact_commit{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80     85
+    -                                           155    110    167    223    222    216    123  37.79  43.86  49.40  55.30  63.41  59.51  55.40  30.71    464    741    598
+  >> sum(rate(pg_stat_database_tup_updated{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80     85
+    -                                           440    303    474    631    627    599    327  86.68    103    114    127    150    137    125  73.78   1369   2186   1755
+  >> sum(rate(pg_stat_statements_calls_total{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80     85
+    -                                          1001    801   1054   1435   1434   1344    769    220    256    317    289    318    329    321    680   3167   5054   3772
+  >> sum(pg_stat_activity_count{instance="e-lt",datname="bench",state="active"})
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80     85
+    -                                             0      0      1      0      1      4      5      7      1      8      0      6      4      4      8      7      8      0
+  >> sum(pg_stat_activity_count{instance="e-lt",datname="bench",wait_event_type="Lock"})
+    t+秒（牆鐘）                                      25     30     35     55     70     75     80
+    -                                             2      2      1      1      1      3      3
+  >> scrape_duration_seconds
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80     85
+    e-lt                                       0.05   0.05   0.07   0.06   0.05   3.61   3.01   2.91   3.11   2.11   1.81   3.01   2.01   2.01   0.22   0.23   0.22   0.05
+    e-plain                                    0.05   0.05   0.06   0.06   0.05   3.30   3.00   2.40   2.40   2.90   2.50   2.60   3.00   3.00   0.21   0.21   0.22   0.05
+  >> sum(pg_stat_activity_count{instance="e-lt",datname="bench",state="active",wait_event_type=""})
+    t+秒（牆鐘）                                       0      5     15     25     30     35     40     45     50     55     60     65     70     75     80     85
+    -                                             0      0      0      2      1      5      1      4      0      2      1      1      2      1      2      0
+  >> sum by (wait_event_type) (pg_stat_activity_count{instance="e-lt",datname="bench",state="active"})
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80     85
+    -                                             0      0      ·      0      ·      2      1      5      1      4      0      2      1      1      2      1      2      0
+    Client                                        ·      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·      2      ·      ·      ·      1      ·      ·
+    IO                                            ·      ·      1      ·      1      ·      1      1      ·      1      ·      1      1      1      1      1      1      ·
+    LWLock                                        ·      ·      ·      ·      ·      ·      1      ·      ·      3      ·      ·      2      2      4      1      2      ·
+    Lock                                          ·      ·      ·      ·      ·      2      2      1      ·      ·      ·      1      ·      ·      1      3      3      ·
+    progress: 5.0 s, 204.2 tps, lat 2.389 ms stddev 0.720, 0 failed, lag 0.062 ms
+    progress: 10.0 s, 205.8 tps, lat 2.588 ms stddev 1.302, 0 failed, lag 0.067 ms
+    progress: 15.0 s, 202.6 tps, lat 2.586 ms stddev 0.872, 0 failed, lag 0.066 ms
+    progress: 20.0 s, 188.2 tps, lat 2.661 ms stddev 1.750, 0 failed, lag 0.068 ms
+    progress: 25.0 s, 30.8 tps, lat 2286.268 ms stddev 1483.438, 0 failed, lag 2028.517 ms
+    progress: 30.0 s, 47.2 tps, lat 6322.536 ms stddev 1282.954, 0 failed, lag 6150.967 ms
+    progress: 35.0 s, 43.6 tps, lat 10191.898 ms stddev 1293.143, 0 failed, lag 10008.132 ms
+    progress: 40.0 s, 41.6 tps, lat 14025.829 ms stddev 1354.607, 0 failed, lag 13835.859 ms
+    progress: 45.0 s, 45.0 tps, lat 18029.623 ms stddev 1310.302, 0 failed, lag 17850.509 ms
+    progress: 50.0 s, 47.6 tps, lat 22134.024 ms stddev 1265.190, 0 failed, lag 21964.109 ms
+    progress: 55.0 s, 41.8 tps, lat 25927.712 ms stddev 1289.646, 0 failed, lag 25736.785 ms
+    progress: 60.0 s, 62.9 tps, lat 30270.508 ms stddev 1340.081, 0 failed, lag 30142.681 ms
+    progress: 65.0 s, 709.9 tps, lat 25013.434 ms stddev 3562.749, 0 failed, lag 25002.252 ms
+    progress: 70.0 s, 738.7 tps, lat 12469.731 ms stddev 3831.129, 0 failed, lag 12458.835 ms
+    progress: 75.0 s, 425.2 tps, lat 2230.926 ms stddev 1932.772, 0 failed, lag 2221.891 ms
+    progress: 80.0 s, 206.4 tps, lat 2.232 ms stddev 0.545, 0 failed, lag 0.065 ms
+
+## S5 work_mem：DISTINCT 10 萬列的查詢（2 client、-R 4），work_mem 64MB 與 64kB 各 30 秒（07:58:34）
+    64MB: latency average = 42.184 ms
+    64MB: tps = 3.657156 (without initial connection time)
+    64kB: latency average = 50.208 ms
+    64kB: tps = 4.721480 (without initial connection time)
+  切換點 t+34
+  >> sum(rate(pg_stat_database_xact_commit{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80
+    -                                           598    329    116  12.22  11.77  16.70  16.90  16.70  17.00  13.52  10.68  10.92  17.30  17.20  17.40  16.50   9.86
+  >> sum(rate(pg_stat_database_temp_bytes{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80
+    -                                             0      0      0      0      0      0      0      0 1.85e+06 2.59e+06 4.86e+06 4.06e+06 7.29e+06 7.13e+06 7.46e+06  6e+06 1.98e+06
+  >> sum(rate(pg_stat_database_temp_files{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80
+    -                                             0      0      0      0      0      0      0      0   1.21   1.70   3.36   2.90   5.10   5.00   5.20   4.30   1.62
+  >> topk(1, rate(pg_stat_statements_seconds_total{instance="e-lt",datname="bench"}[20s]) / rate(pg_stat_statements_calls_total{instance="e-lt",datname="bench"}[20s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80
+    e-lt,bench,-2368962164949084745               ·      ·      ·   0.04   0.04   0.04   0.04   0.04   0.05   0.05   0.05   0.04   0.05   0.05   0.05   0.05   0.05
+    e-lt,bench,-5630876385222011376               ·   0.03      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·
+    e-lt,bench,-7390902673174426915            0.03      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·
+    e-lt,bench,8332100064811717391                ·      ·   0.00      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·      ·
+2026-11-08 23:59:08.650 UTC [680] LOG:  temporary file: path "base/pgsql_tmp/pgsql_tmp680.0", size 76961
+2026-11-08 23:59:08.913 UTC [689] LOG:  temporary file: path "base/pgsql_tmp/pgsql_tmp689.0", size 1605632
+
+## S6 shared_buffers 16MB（重啟），同樣 pgbench -R 200，再跑 20 秒不限速（07:59:55）
+  $ show shared_buffers
+    16MB
+  >> up
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75
+    e-lt                                          1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1
+    e-plain                                       1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1
+  >> sum(rate(pg_stat_database_xact_commit{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75
+    -                                         10.87  10.65  12.90     98    203    221    168    109    145    213    217    219    211    135    117    169
+  >> sum(rate(pg_stat_database_tup_updated{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75
+    -                                          0.52   0.52      0    254    567    624    475    304    410    600    610    617    596    379    329    478
+  >> sum(rate(pg_stat_statements_calls_total{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75
+    -                                          8.62   6.97   9.40    681   1391   1426   1086    809    955   1369   1365   1394   1424    951    832   1107
+  >> sum(pg_stat_activity_count{instance="e-lt",datname="bench",state="active"})
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75
+    -                                             0      0      0      0      0      2      2      0      0      2      0      0      0      0      0      0
+  >> sum(pg_stat_activity_count{instance="e-lt",datname="bench",wait_event_type="Lock"})
+    (空)
+  >> sum(rate(pg_stat_database_blks_read{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75
+    -                                           312  16.05  25.40    180    332    340    260    171    233    339   1930   1938    342    217    186    271
+  >> sum(rate(pg_stat_database_blks_hit{instance="e-lt",datname="bench"}[15s])) / (sum(rate(pg_stat_database_blks_hit{instance="e-lt",datname="bench"}[15s])) + sum(rate(pg_stat_database_blks_read{instance="e-lt",datname="bench"}[15s])))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75
+    -                                          0.93   0.98   0.98   0.94   0.94   0.93   0.93   0.94   0.93   0.93   0.72   0.72   0.93   0.93   0.93   0.93
+  >> pg_postmaster_start_time_seconds{instance="e-lt"}
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75
+    e-lt                                     1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09
+  >> resets(pg_stat_database_xact_commit{instance="e-lt",datname="bench"}[2m])
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75
+    e-lt,bench                                    0      0      0      0      0      0      0      0      0      0      0      0      0      0      0      0
+    initial connection time = 15.153 ms
+    tps = 199.536433 (without initial connection time)
+  不限速的容量（-c 4，20 秒）：
+    latency average = 6.423 ms
+    tps = 622.783586 (without initial connection time)
+  > changes(pg_postmaster_start_time_seconds{instance="e-lt"}[5m])
+    e-lt         {} = 1
+
+## S7 checkpoint 太頻繁：max_wal_size 32MB（reload），pgbench -R 200，60 秒（08:01:44）
+  > pg_stat_bgwriter_checkpoints_req_total{instance="e-lt"}
+    e-lt         pg_stat_bgwriter_checkpoints_req_total{} = 3
+  > pg_stat_bgwriter_checkpoints_timed_total{instance="e-lt"}
+    e-lt         pg_stat_bgwriter_checkpoints_timed_total{} = 2
+  >> sum(rate(pg_stat_database_xact_commit{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65
+    -                                         72.60  92.60    196    223    227    109    132    214    216    224    224    158    108    156
+  >> increase(pg_stat_bgwriter_checkpoints_req_total{instance="e-lt"}[30s])
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65
+    e-lt                                       1.06   2.12   2.12   3.60      3   2.57   1.29   2.57   1.29   2.42   2.40   2.58   2.57   2.57
+  >> rate(pg_stat_bgwriter_buffers_checkpoint_total{instance="e-lt"}[15s])
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65
+    e-lt                                      64.50   3.50  48.30  79.90  70.20    123    116    187    190    188    187    139  98.48    145
+  >> pg_settings_max_wal_size_bytes{instance="e-lt"}
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65
+    e-lt                                     1.07e+09 3.36e+07 3.36e+07 3.36e+07 3.36e+07 3.36e+07 3.36e+07 3.36e+07 3.36e+07 3.36e+07 3.36e+07 3.36e+07 3.36e+07 3.36e+07
+  > pg_stat_bgwriter_checkpoints_req_total{instance="e-lt"}
+    e-lt         pg_stat_bgwriter_checkpoints_req_total{} = 9
+    initial connection time = 15.482 ms
+    tps = 199.289035 (without initial connection time)
+2026-11-09 00:01:49.589 UTC [27] LOG:  checkpoints are occurring too frequently (13 seconds apart)
+2026-11-09 00:01:49.589 UTC [27] LOG:  checkpoint starting: wal
+2026-11-09 00:01:59.886 UTC [27] LOG:  checkpoints are occurring too frequently (10 seconds apart)
+2026-11-09 00:01:59.887 UTC [27] LOG:  checkpoint starting: wal
+
+## S8 idle in transaction 擋住 vacuum：拿到 XID 後閒置 100 秒，autovacuum_naptime 5s，pgbench -R 200 90 秒（08:02:52）
+  [t+60 直接查] 擋住 vacuum 的 backend 與它的 XID age：
+  $ select pid, state, age(backend_xid) xid_age, age(backend_xmin) xmin_age, round(extract(epoch from now()-xact_start)::numeric) tx_sec from pg_stat_activity where backend_xid is not null and state like 'idle in%'
+    122 | idle in transaction | 12047 |  | 67
+  $ select relname, n_live_tup, n_dead_tup, autovacuum_count, pg_size_pretty(pg_table_size(relid)) from pg_stat_user_tables where relname in ('pgbench_branches','pgbench_tellers') order by 1
+    pgbench_branches | 10 | 12152 | 23 | 496 kB
+    pgbench_tellers | 100 | 12154 | 23 | 608 kB
+  >> sum(rate(pg_stat_database_xact_commit{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80     85     90     95    100
+    -                                           217    198    199    222    222    110    145    221    217    222    221    154    111    173    225    220    221    220    153    155    225
+  >> pg_stat_user_tables_n_dead_tup{instance="e-lt",relname=~"pgbench_(branches|tellers)"}
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80     85     90     95    100
+    e-lt,bench,pgbench_branches                 478    756   1802   2750   2750   3556   4601   5633   6778   7822   8834   8834   9650  10835  11818  12810  13824  14844  15695  16812  17899
+    e-lt,bench,pgbench_tellers                  825    756   1802   2750   2750   3556   4601   5609   6778   7824   8834   8834   9670  10835  11819  12812  13825  14850  15695  16812  17899
+  >> pg_stat_user_tables_table_size_bytes{instance="e-lt",relname="pgbench_branches"}
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80     85     90     95    100
+    e-lt,bench,pgbench_branches              352256 352256 352256 352256 352256 352256 352256 352256 352256 352256 352256 352256 393216 450560 507904 507904 565248 606208 606208 663552 720896
+  >> increase(pg_stat_user_tables_autovacuum_count{instance="e-lt",relname="pgbench_branches"}[30s])
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80     85     90     95    100
+    e-lt,bench,pgbench_branches                1.06   1.06   1.06   2.40      3   3.86   3.86   5.14   5.14   4.91      6   5.09   5.14   5.14   5.14   5.14   5.24      6   5.29   5.29   5.29
+  >> max(pg_stat_activity_max_tx_duration{instance="e-lt",datname="bench",state="idle in transaction"})
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80     85     90     95    100
+    -                                             0   3.57   8.56  13.59  13.59  21.92  26.92  31.90  36.93  41.90  46.95  46.95  55.23  60.27  65.23  70.25  75.23  80.25  88.56  93.56  98.58
+    progress: 5.0 s, 198.0 tps, lat 2.419 ms stddev 0.690, 0 failed, lag 0.064 ms
+    progress: 20.0 s, 201.6 tps, lat 2.224 ms stddev 0.602, 0 failed, lag 0.062 ms
+    progress: 35.0 s, 203.2 tps, lat 2.509 ms stddev 0.759, 0 failed, lag 0.065 ms
+    progress: 50.0 s, 200.2 tps, lat 3.156 ms stddev 2.182, 0 failed, lag 0.269 ms
+    progress: 65.0 s, 206.4 tps, lat 3.351 ms stddev 2.466, 0 failed, lag 0.245 ms
+    progress: 80.0 s, 199.2 tps, lat 2.321 ms stddev 0.601, 0 failed, lag 0.062 ms
+	tuples: 0 removed, 574 remain, 564 are dead but not yet removable
+	removable cutoff: 135491, which was 566 XIDs old when operation ended
+	tuples: 0 removed, 819 remain, 566 are dead but not yet removable
+	removable cutoff: 135491, which was 569 XIDs old when operation ended
+  $ select relname, n_dead_tup, pg_size_pretty(pg_table_size(relid)) from pg_stat_user_tables where relname in ('pgbench_branches','pgbench_tellers') order by 1
+    pgbench_branches | 0 | 704 kB
+    pgbench_tellers | 0 | 864 kB
+
+## S9 連線風暴：pgbench 已連 8 條；另開 36 條 pg_sleep(40)；再跑每筆交易重新連線的 pgbench -C（08:04:48）
+  $ select count(*) from pg_stat_activity where backend_type='client backend'
+    40
+  > up
+    e-lt         up{} = 1
+    e-plain      up{} = 1
+  > pg_up
+    e-lt         pg_up{} = 1
+    e-plain      pg_up{} = 1
+  > count by (instance) (pg_scrape_collector_success)
+    (空)
+  > sum by (instance) (pg_stat_activity_count)
+    (空)
+  >> up
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75     80     85
+    e-lt                                          1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1
+    e-plain                                       1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1
+  >> sum(rate(pg_stat_database_xact_commit{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     70     75     80     85
+    -                                            14  10.40  55.43    147    204    126    227    156    155    182
+  >> sum(rate(pg_stat_database_tup_updated{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     70     75     80     85
+    -                                             0      0    137    414    568    345    627    433    436    509
+  >> sum(rate(pg_stat_statements_calls_total{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     70     75     80     85
+    -                                         10.60   9.06    484    950   1261    739   1441   1064   1067   1094
+  >> sum(pg_stat_activity_count{instance="e-lt",datname="bench",state="active"})
+    t+秒（牆鐘）                                       0      5     10     15     20     65     70     75     80     85
+    -                                             0      0      0      1     36     23      1      0      1      0
+  >> sum(pg_stat_activity_count{instance="e-lt",datname="bench",wait_event_type="Lock"})
+    t+秒（牆鐘）                                      20
+    -                                             1
+  >> sum(pg_stat_database_numbackends{instance="e-lt"})
+    t+秒（牆鐘）                                       0      5     10     15     20     65     70     75     80     85
+    -                                             3      3     11     11     32     34     11     11     11      3
+  >> count by (instance) (pg_scrape_collector_success)
+    t+秒（牆鐘）                                       0      5     10     15     20     65     70     75     80     85
+    e-lt                                         18     18     18     18     18     18     18     18     18     18
+    e-plain                                      18     18     18     18      ·     18     18     18     18     18
+  psql 連線錯誤（去重）：
+          7 psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  sorry, too many clients already
+          1 number of failed transactions: 0 (0.000%)
+          1 pgbench: error: Run was aborted; the above results are incomplete.
+          1 pgbench: error: client 0 aborted while establishing connection
+          1 pgbench: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  sorry, too many clients already
+          1 tps = 21.349127 (including reconnection times)
+## run.sh 在 S9 結尾的裸 wait 卡住（bash 會等 process substitution 的 tee），手動中止；S10 改由 run-s10.sh 另起環境執行（08:13:17）

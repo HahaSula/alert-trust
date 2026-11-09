@@ -1,0 +1,3 @@
+      1 e-plain-1   msg="error scraping dsn" err="Error opening connection to database (postgresql://exporter:PASSWORD_REMOVED@pg:5432/bench?sslmode=disable): driver: bad connection" dsn="postgresql://exporte
+      1 e-lt-1   msg="error scraping dsn" err="Error opening connection to database (postgresql://exporter_lt:PASSWORD_REMOVED@pg:5432/bench?sslmode=disable): driver: bad connection" dsn="postgresql://exporte
+      1 e-lt-1   msg="Error opening connection to database" err="error querying postgresql version: pq: the database system is not yet accepting connections"

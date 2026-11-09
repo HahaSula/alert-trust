@@ -1,0 +1,79 @@
+環境：同 run.sh；scrape 5s
+    done in 1.40 s (drop tables 0.00 s, create tables 0.01 s, client-side generate 0.89 s, vacuum 0.11 s, primary keys 0.39 s).
+
+## S10 基線 20 秒後開始（08:14:30）
+
+## S10 OOM：pg 記憶體上限改成 400MB，pgbench 中一個 backend 用 array_agg 吃記憶體（08:14:30）
+    OOM 查詢: server closed the connection unexpectedly
+    OOM 查詢: 	This probably means the server terminated abnormally
+    OOM 查詢: 	before or while processing the request.
+  OOM 查詢結束 t+61
+  > up
+    e-lt         up{} = 1
+    e-plain      up{} = 1
+  > pg_up
+    e-lt         pg_up{} = 1
+    e-plain      pg_up{} = 1
+  > pg_postmaster_start_time_seconds
+    e-lt         pg_postmaster_start_time_seconds{} = 1794183227.084868
+    e-plain      pg_postmaster_start_time_seconds{} = 1794183227.084868
+  > resets(pg_stat_database_xact_commit{datname="bench"}[2m])
+    e-lt         {datname=bench} = 1
+    e-plain      {datname=bench} = 1
+  >> up
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75
+    e-lt                                          1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1
+    e-plain                                       1      1      1      1      1      1      1      1      1      1      1      1      1      1      1      1
+  >> sum(rate(pg_stat_database_xact_commit{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     70     75
+    -                                         10.02  12.80  98.11    199    211    133    160    207    220    256    204    153    117   3.10   8.42
+  >> sum(rate(pg_stat_database_tup_updated{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     70     75
+    -                                             0      0    240    528    594    371    452    584    622    731    573    430    328      0      0
+  >> sum(rate(pg_stat_statements_calls_total{instance="e-lt",datname="bench"}[15s]))
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     70     75
+    -                                          7.04   8.88   8.70   1070   1359    878   1071   1538   1415   1602   1385    919    839   2.50   3.36
+  >> sum(pg_stat_activity_count{instance="e-lt",datname="bench",state="active"})
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     70     75
+    -                                             0      1      0      1      0      8      7      9      7      5      1      1      5      0      0
+  >> sum(pg_stat_activity_count{instance="e-lt",datname="bench",wait_event_type="Lock"})
+    t+秒（牆鐘）                                      25     35     40     60
+    -                                             2      2      2      1
+  >> pg_up
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     65     70     75
+    e-lt                                          1      1      1      1      1      1      1      1      1      1      1      1      1      0      1      1
+    e-plain                                       1      1      1      1      1      1      1      1      1      1      1      1      1      0      1      1
+  >> pg_postmaster_start_time_seconds{instance="e-lt"}
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     70     75
+    e-lt                                     1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09 1.79e+09
+  >> pg_stat_database_xact_commit{instance="e-lt",datname="bench"}
+    t+秒（牆鐘）                                       0      5     10     15     20     25     30     35     40     45     50     55     60     70     75
+    e-lt,bench                                  416    480   1397   2472   3506   4251   5645   6325   7845   8890   9882   9882  10856     31     94
+  >> resets(pg_stat_database_xact_commit{instance="e-lt",datname="bench"}[1m]) > 0 unless on (job, instance) changes(pg_postmaster_start_time_seconds{instance="e-lt"}[1m]) > 0
+    t+秒（牆鐘）                                      70     75
+    e-lt,bench                                    1      1
+    progress: 5.0 s, 202.6 tps, lat 2.393 ms stddev 0.721, 0 failed, lag 0.067 ms
+    progress: 10.0 s, 192.8 tps, lat 4.712 ms stddev 12.330, 0 failed, lag 0.861 ms
+    progress: 15.0 s, 192.6 tps, lat 33.474 ms stddev 82.592, 0 failed, lag 23.226 ms
+    progress: 20.0 s, 140.0 tps, lat 722.070 ms stddev 594.665, 0 failed, lag 675.364 ms
+    progress: 25.0 s, 262.6 tps, lat 821.675 ms stddev 746.930, 0 failed, lag 797.954 ms
+    progress: 30.0 s, 166.0 tps, lat 662.215 ms stddev 768.200, 0 failed, lag 629.599 ms
+    progress: 35.0 s, 236.0 tps, lat 172.010 ms stddev 277.884, 0 failed, lag 155.650 ms
+    progress: 40.0 s, 196.6 tps, lat 41.723 ms stddev 55.961, 0 failed, lag 24.175 ms
+    progress: 45.0 s, 197.6 tps, lat 17.282 ms stddev 18.298, 0 failed, lag 4.208 ms
+    progress: 50.0 s, 197.2 tps, lat 13.486 ms stddev 14.800, 0 failed, lag 3.846 ms
+    pgbench: error: client 3 aborted in command 4 (SQL) of script 0; perhaps the backend died while processing
+    pgbench: error: client 6 aborted in command 10 (SQL) of script 0; perhaps the backend died while processing
+2026-11-09 00:13:46.679 UTC [42] LOG:  database system is ready to accept connections
+2026-11-09 00:13:46.979 UTC [43] LOG:  checkpoint complete: wrote 946 buffers (5.8%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.023 s, sync=0.075 s, total=0.104 s; sync files=313, longest=0.002 s, average=0.001
+2026-11-09 00:13:47.092 UTC [1] LOG:  database system is ready to accept connections
+2026-11-09 00:15:31.178 UTC [1] LOG:  server process (PID 121) was terminated by signal 9: Killed
+2026-11-09 00:15:31.189 UTC [1] LOG:  all server processes terminated; reinitializing
+2026-11-09 00:15:31.323 UTC [136] LOG:  database system was interrupted; last known up at 2026-11-09 00:13:47 UTC
+2026-11-09 00:15:31.971 UTC [136] LOG:  redo starts at 0/193FA70
+2026-11-09 00:15:33.586 UTC [136] LOG:  redo done at 0/9A4B3F8 system usage: CPU: user: 0.21 s, system: 0.44 s, elapsed: 1.61 s
+    容器 OOMKilled=true RestartCount=0 Status=running
+  $ select count(*) as xact_commit_after from pg_stat_database where datname='bench' and stats_reset is null
+    1
+
+## 結束（08:15:46）

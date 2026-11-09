@@ -1,0 +1,15 @@
+pgbench (16.15)
+transaction type: /sql/slow.sql
+scaling factor: 1
+query mode: simple
+number of clients: 1
+number of threads: 1
+maximum number of tries: 1
+duration: 50 s
+number of transactions actually processed: 43
+number of failed transactions: 0 (0.000%)
+latency average = 612.950 ms
+latency stddev = 334.748 ms
+rate limit schedule lag: avg 172.063 (max 889.006) ms
+initial connection time = 2.888 ms
+tps = 0.885116 (without initial connection time)

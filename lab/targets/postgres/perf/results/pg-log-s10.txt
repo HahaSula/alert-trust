@@ -1,0 +1,228 @@
+pg-1  | The files belonging to this database system will be owned by user "postgres".
+pg-1  | This user must also own the server process.
+pg-1  | 
+pg-1  | The database cluster will be initialized with locale "en_US.utf8".
+pg-1  | The default database encoding has accordingly been set to "UTF8".
+pg-1  | The default text search configuration will be set to "english".
+pg-1  | 
+pg-1  | Data page checksums are disabled.
+pg-1  | 
+pg-1  | fixing permissions on existing directory /var/lib/postgresql/data ... ok
+pg-1  | creating subdirectories ... ok
+pg-1  | selecting dynamic shared memory implementation ... posix
+pg-1  | selecting default max_connections ... 100
+pg-1  | selecting default shared_buffers ... 128MB
+pg-1  | selecting default time zone ... UTC
+pg-1  | creating configuration files ... ok
+pg-1  | running bootstrap script ... ok
+pg-1  | sh: locale: not found
+pg-1  | 2026-11-09 00:13:42.474 UTC [36] WARNING:  no usable system locales were found
+pg-1  | performing post-bootstrap initialization ... ok
+pg-1  | initdb: warning: enabling "trust" authentication for local connections
+pg-1  | initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+pg-1  | syncing data to disk ... ok
+pg-1  | 
+pg-1  | 
+pg-1  | Success. You can now start the database server using:
+pg-1  | 
+pg-1  |     pg_ctl -D /var/lib/postgresql/data -l logfile start
+pg-1  | 
+pg-1  | waiting for server to start....2026-11-09 00:13:46.663 UTC [42] LOG:  starting PostgreSQL 16.15 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+pg-1  | 2026-11-09 00:13:46.665 UTC [42] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+pg-1  | 2026-11-09 00:13:46.671 UTC [45] LOG:  database system was shut down at 2026-11-09 00:13:39 UTC
+pg-1  | 2026-11-09 00:13:46.679 UTC [42] LOG:  database system is ready to accept connections
+pg-1  |  done
+pg-1  | server started
+pg-1  | 
+pg-1  | /usr/local/bin/docker-entrypoint.sh: sourcing /docker-entrypoint-initdb.d/init.sh
+pg-1  | 
+pg-1  | waiting for server to shut down....2026-11-09 00:13:46.853 UTC [42] LOG:  received fast shutdown request
+pg-1  | 2026-11-09 00:13:46.856 UTC [42] LOG:  aborting any active transactions
+pg-1  | 2026-11-09 00:13:46.858 UTC [42] LOG:  background worker "logical replication launcher" (PID 48) exited with exit code 1
+pg-1  | 2026-11-09 00:13:46.875 UTC [43] LOG:  shutting down
+pg-1  | 2026-11-09 00:13:46.876 UTC [43] LOG:  checkpoint starting: shutdown immediate
+pg-1  | 2026-11-09 00:13:46.979 UTC [43] LOG:  checkpoint complete: wrote 946 buffers (5.8%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.023 s, sync=0.075 s, total=0.104 s; sync files=313, longest=0.002 s, average=0.001 s; distance=4386 kB, estimate=4386 kB; lsn=0/193F9F8, redo lsn=0/193F9F8
+pg-1  | 2026-11-09 00:13:46.990 UTC [42] LOG:  database system is shut down
+pg-1  |  done
+pg-1  | server stopped
+pg-1  | 
+pg-1  | PostgreSQL init process complete; ready for start up.
+pg-1  | 
+pg-1  | 2026-11-09 00:13:47.078 UTC [1] LOG:  starting PostgreSQL 16.15 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+pg-1  | 2026-11-09 00:13:47.078 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+pg-1  | 2026-11-09 00:13:47.078 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+pg-1  | 2026-11-09 00:13:47.082 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+pg-1  | 2026-11-09 00:13:47.087 UTC [59] LOG:  database system was shut down at 2026-11-09 00:13:46 UTC
+pg-1  | 2026-11-09 00:13:47.092 UTC [1] LOG:  database system is ready to accept connections
+pg-1  | 2026-11-09 00:14:07.134 UTC [71] LOG:  automatic analyze of table "template1.pg_catalog.pg_type"
+pg-1  | 	I/O timings: read: 0.526 ms, write: 0.042 ms
+pg-1  | 	avg read rate: 26.654 MB/s, avg write rate: 4.136 MB/s
+pg-1  | 	buffer usage: 1023 hits, 58 misses, 9 dirtied
+pg-1  | 	system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.01 s
+pg-1  | 2026-11-09 00:14:07.147 UTC [71] LOG:  automatic analyze of table "template1.pg_catalog.pg_attribute"
+pg-1  | 	I/O timings: read: 0.474 ms, write: 0.019 ms
+pg-1  | 	avg read rate: 23.438 MB/s, avg write rate: 4.207 MB/s
+pg-1  | 	buffer usage: 481 hits, 39 misses, 7 dirtied
+pg-1  | 	system usage: CPU: user: 0.01 s, system: 0.00 s, elapsed: 0.01 s
+pg-1  | 2026-11-09 00:14:07.148 UTC [71] LOG:  automatic aggressive vacuum of table "template1.pg_catalog.pg_class": index scans: 0
+pg-1  | 	pages: 0 removed, 14 remain, 14 scanned (100.00% of total)
+pg-1  | 	tuples: 0 removed, 413 remain, 0 are dead but not yet removable
+pg-1  | 	removable cutoff: 739, which was 0 XIDs old when operation ended
+pg-1  | 	new relfrozenxid: 739, which is 16 XIDs ahead of previous value
+pg-1  | 	frozen: 0 pages from table (0.00% of total) had 0 tuples frozen
+pg-1  | 	index scan not needed: 0 pages from table (0.00% of total) had 0 dead item identifiers removed
+pg-1  | 	I/O timings: read: 0.107 ms, write: 0.000 ms
+pg-1  | 	avg read rate: 86.167 MB/s, avg write rate: 14.361 MB/s
+pg-1  | 	buffer usage: 53 hits, 6 misses, 1 dirtied
+pg-1  | 	WAL usage: 1 records, 1 full page images, 3097 bytes
+pg-1  | 	system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+pg-1  | 2026-11-09 00:14:07.155 UTC [71] LOG:  automatic analyze of table "template1.pg_catalog.pg_class"
+pg-1  | 	I/O timings: read: 0.057 ms, write: 0.021 ms
+pg-1  | 	avg read rate: 5.580 MB/s, avg write rate: 4.464 MB/s
+pg-1  | 	buffer usage: 520 hits, 5 misses, 4 dirtied
+pg-1  | 	system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+pg-1  | 2026-11-09 00:14:07.162 UTC [71] LOG:  automatic analyze of table "template1.pg_catalog.pg_constraint"
+pg-1  | 	I/O timings: read: 0.082 ms, write: 0.028 ms
+pg-1  | 	avg read rate: 9.115 MB/s, avg write rate: 6.510 MB/s
+pg-1  | 	buffer usage: 522 hits, 7 misses, 5 dirtied
+pg-1  | 	system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+pg-1  | 2026-11-09 00:14:07.163 UTC [71] LOG:  automatic analyze of table "template1.pg_catalog.pg_rewrite"
+pg-1  | 	I/O timings: read: 0.044 ms, write: 0.000 ms
+pg-1  | 	avg read rate: 117.188 MB/s, avg write rate: 7.812 MB/s
+pg-1  | 	buffer usage: 114 hits, 15 misses, 1 dirtied
+pg-1  | 	system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+pg-1  | 2026-11-09 00:14:07.168 UTC [71] LOG:  automatic analyze of table "template1.pg_catalog.pg_description"
+pg-1  | 	I/O timings: read: 0.082 ms, write: 0.032 ms
+pg-1  | 	avg read rate: 73.438 MB/s, avg write rate: 4.688 MB/s
+pg-1  | 	buffer usage: 76 hits, 47 misses, 3 dirtied
+pg-1  | 	system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+pg-1  | 2026-11-09 00:14:07.170 UTC [71] LOG:  automatic aggressive vacuum of table "template1.pg_catalog.pg_depend": index scans: 0
+pg-1  | 	pages: 0 removed, 13 remain, 13 scanned (100.00% of total)
+pg-1  | 	tuples: 0 removed, 1704 remain, 0 are dead but not yet removable
+pg-1  | 	removable cutoff: 743, which was 0 XIDs old when operation ended
+pg-1  | 	new relfrozenxid: 743, which is 20 XIDs ahead of previous value
+pg-1  | 	frozen: 0 pages from table (0.00% of total) had 0 tuples frozen
+pg-1  | 	index scan not needed: 0 pages from table (0.00% of total) had 0 dead item identifiers removed
+pg-1  | 	I/O timings: read: 0.081 ms, write: 0.000 ms
+pg-1  | 	avg read rate: 262.257 MB/s, avg write rate: 13.803 MB/s
+pg-1  | 	buffer usage: 60 hits, 19 misses, 1 dirtied
+pg-1  | 	WAL usage: 1 records, 1 full page images, 7869 bytes
+pg-1  | 	system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+pg-1  | 2026-11-09 00:14:07.172 UTC [71] LOG:  automatic analyze of table "template1.pg_catalog.pg_depend"
+pg-1  | 	I/O timings: read: 0.023 ms, write: 0.000 ms
+pg-1  | 	avg read rate: 2.604 MB/s, avg write rate: 5.208 MB/s
+pg-1  | 	buffer usage: 107 hits, 1 misses, 2 dirtied
+pg-1  | 	system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+pg-1  | 2026-11-09 00:14:07.174 UTC [71] LOG:  automatic analyze of table "template1.pg_catalog.pg_ts_config_map"
+pg-1  | 	I/O timings: read: 0.026 ms, write: 0.000 ms
+pg-1  | 	avg read rate: 39.062 MB/s, avg write rate: 7.812 MB/s
+pg-1  | 	buffer usage: 56 hits, 5 misses, 1 dirtied
+pg-1  | 	system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+pg-1  | 2026-11-09 00:14:07.175 UTC [71] LOG:  automatic analyze of table "template1.pg_catalog.pg_init_privs"
+pg-1  | 	I/O timings: read: 0.014 ms, write: 0.020 ms
+pg-1  | 	avg read rate: 31.250 MB/s, avg write rate: 7.812 MB/s
+pg-1  | 	buffer usage: 86 hits, 4 misses, 1 dirtied
+pg-1  | 	system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+pg-1  | 2026-11-09 00:14:07.178 UTC [71] LOG:  automatic analyze of table "template1.pg_catalog.pg_collation"
+pg-1  | 	I/O timings: read: 0.102 ms, write: 0.000 ms
+pg-1  | 	avg read rate: 70.312 MB/s, avg write rate: 3.906 MB/s
+pg-1  | 	buffer usage: 131 hits, 18 misses, 1 dirtied
+pg-1  | 	system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+pg-1  | 2026-11-09 00:14:07.181 UTC [71] LOG:  automatic analyze of table "template1.information_schema.sql_features"
+pg-1  | 	I/O timings: read: 0.043 ms, write: 0.025 ms
+pg-1  | 	avg read rate: 31.250 MB/s, avg write rate: 7.812 MB/s
+pg-1  | 	buffer usage: 175 hits, 12 misses, 3 dirtied
+pg-1  | 	system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+pg-1  | 2026-11-09 00:14:11.822 UTC [80] LOG:  duration: 851.923 ms  statement: copy pgbench_accounts from stdin with (freeze on)
+pg-1  | 2026-11-09 00:14:12.346 UTC [80] LOG:  temporary file: path "base/pgsql_tmp/pgsql_tmp80.1.fileset/0.0", size 8192
+pg-1  | 2026-11-09 00:14:12.346 UTC [80] STATEMENT:  alter table pgbench_accounts add primary key (aid)
+pg-1  | 2026-11-09 00:14:12.346 UTC [80] LOG:  temporary file: path "base/pgsql_tmp/pgsql_tmp80.1.fileset/1.0", size 8192
+pg-1  | 2026-11-09 00:14:12.346 UTC [80] STATEMENT:  alter table pgbench_accounts add primary key (aid)
+pg-1  | 2026-11-09 00:14:12.348 UTC [80] LOG:  temporary file: path "base/pgsql_tmp/pgsql_tmp80.0.fileset/0.0", size 10674176
+pg-1  | 2026-11-09 00:14:12.348 UTC [80] STATEMENT:  alter table pgbench_accounts add primary key (aid)
+pg-1  | 2026-11-09 00:14:12.349 UTC [80] LOG:  temporary file: path "base/pgsql_tmp/pgsql_tmp80.0.fileset/1.0", size 9371648
+pg-1  | 2026-11-09 00:14:12.349 UTC [80] STATEMENT:  alter table pgbench_accounts add primary key (aid)
+pg-1  | 2026-11-09 00:14:30.448 UTC [88] LOG:  automatic vacuum of table "bench.public.pgbench_accounts": index scans: 0
+pg-1  | 	pages: 0 removed, 16394 remain, 1 scanned (0.01% of total)
+pg-1  | 	tuples: 0 removed, 1000000 remain, 0 are dead but not yet removable
+pg-1  | 	removable cutoff: 760, which was 0 XIDs old when operation ended
+pg-1  | 	new relfrozenxid: 760, which is 5 XIDs ahead of previous value
+pg-1  | 	frozen: 0 pages from table (0.00% of total) had 0 tuples frozen
+pg-1  | 	index scan not needed: 0 pages from table (0.00% of total) had 0 dead item identifiers removed
+pg-1  | 	I/O timings: read: 0.069 ms, write: 0.000 ms
+pg-1  | 	avg read rate: 10.572 MB/s, avg write rate: 0.000 MB/s
+pg-1  | 	buffer usage: 50 hits, 1 misses, 0 dirtied
+pg-1  | 	WAL usage: 1 records, 0 full page images, 229 bytes
+pg-1  | 	system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+pg-1  | 2026-11-09 00:14:30.896 UTC [88] LOG:  automatic analyze of table "bench.public.pgbench_accounts"
+pg-1  | 	I/O timings: read: 24.162 ms, write: 0.000 ms
+pg-1  | 	avg read rate: 249.512 MB/s, avg write rate: 0.000 MB/s
+pg-1  | 	buffer usage: 2245 hits, 14308 misses, 0 dirtied
+pg-1  | 	system usage: CPU: user: 0.10 s, system: 0.03 s, elapsed: 0.44 s
+pg-1  | 2026-11-09 00:14:30.899 UTC [88] LOG:  automatic analyze of table "bench.public.pgbench_tellers"
+pg-1  | 	I/O timings: read: 0.000 ms, write: 0.000 ms
+pg-1  | 	avg read rate: 0.000 MB/s, avg write rate: 0.000 MB/s
+pg-1  | 	buffer usage: 53 hits, 0 misses, 0 dirtied
+pg-1  | 	system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+pg-1  | 2026-11-09 00:14:53.229 UTC [103] LOG:  duration: 6468.675 ms  statement: END;
+pg-1  | 2026-11-09 00:14:53.229 UTC [99] LOG:  duration: 6468.859 ms  statement: END;
+pg-1  | 2026-11-09 00:14:53.294 UTC [98] LOG:  duration: 6532.676 ms  statement: END;
+pg-1  | 2026-11-09 00:14:53.294 UTC [102] LOG:  duration: 6532.716 ms  statement: END;
+pg-1  | 2026-11-09 00:14:53.294 UTC [100] LOG:  duration: 6532.014 ms  statement: END;
+pg-1  | 2026-11-09 00:14:53.294 UTC [104] LOG:  duration: 6532.723 ms  statement: END;
+pg-1  | 2026-11-09 00:14:53.294 UTC [101] LOG:  duration: 6664.721 ms  statement: UPDATE pgbench_tellers SET tbalance = tbalance + 4354 WHERE tid = 3;
+pg-1  | 2026-11-09 00:14:53.294 UTC [105] LOG:  duration: 6533.160 ms  statement: UPDATE pgbench_branches SET bbalance = bbalance + 3540 WHERE bid = 4;
+pg-1  | 2026-11-09 00:15:02.644 UTC [105] LOG:  process 105 still waiting for ShareLock on transaction 6192 after 1000.080 ms
+pg-1  | 2026-11-09 00:15:02.644 UTC [105] DETAIL:  Process holding the lock: 99. Wait queue: 105.
+pg-1  | 2026-11-09 00:15:02.644 UTC [105] CONTEXT:  while updating tuple (6,118) in relation "pgbench_branches"
+pg-1  | 2026-11-09 00:15:02.644 UTC [105] STATEMENT:  UPDATE pgbench_branches SET bbalance = bbalance + -3382 WHERE bid = 8;
+pg-1  | 2026-11-09 00:15:02.644 UTC [103] LOG:  process 103 still waiting for ShareLock on transaction 6193 after 1000.059 ms
+pg-1  | 2026-11-09 00:15:02.644 UTC [103] DETAIL:  Process holding the lock: 98. Wait queue: 103.
+pg-1  | 2026-11-09 00:15:02.644 UTC [103] CONTEXT:  while updating tuple (8,125) in relation "pgbench_branches"
+pg-1  | 2026-11-09 00:15:02.644 UTC [103] STATEMENT:  UPDATE pgbench_branches SET bbalance = bbalance + -1553 WHERE bid = 4;
+pg-1  | 2026-11-09 00:15:02.650 UTC [100] LOG:  process 100 still waiting for ExclusiveLock on tuple (6,118) of relation 16433 of database 16388 after 1000.047 ms
+pg-1  | 2026-11-09 00:15:02.650 UTC [100] DETAIL:  Process holding the lock: 105. Wait queue: 100.
+pg-1  | 2026-11-09 00:15:02.650 UTC [100] STATEMENT:  UPDATE pgbench_branches SET bbalance = bbalance + 2484 WHERE bid = 8;
+pg-1  | 2026-11-09 00:15:03.733 UTC [104] LOG:  duration: 2087.465 ms  statement: END;
+pg-1  | 2026-11-09 00:15:03.733 UTC [101] LOG:  duration: 2088.185 ms  statement: END;
+pg-1  | 2026-11-09 00:15:03.733 UTC [99] LOG:  duration: 2088.868 ms  statement: END;
+pg-1  | 2026-11-09 00:15:03.733 UTC [98] LOG:  duration: 2088.634 ms  statement: END;
+pg-1  | 2026-11-09 00:15:03.733 UTC [103] LOG:  process 103 acquired ShareLock on transaction 6193 after 2088.795 ms
+pg-1  | 2026-11-09 00:15:03.733 UTC [103] CONTEXT:  while updating tuple (8,125) in relation "pgbench_branches"
+pg-1  | 2026-11-09 00:15:03.733 UTC [103] STATEMENT:  UPDATE pgbench_branches SET bbalance = bbalance + -1553 WHERE bid = 4;
+pg-1  | 2026-11-09 00:15:03.733 UTC [105] LOG:  process 105 acquired ShareLock on transaction 6192 after 2088.956 ms
+pg-1  | 2026-11-09 00:15:03.733 UTC [105] CONTEXT:  while updating tuple (6,118) in relation "pgbench_branches"
+pg-1  | 2026-11-09 00:15:03.733 UTC [105] STATEMENT:  UPDATE pgbench_branches SET bbalance = bbalance + -3382 WHERE bid = 8;
+pg-1  | 2026-11-09 00:15:03.733 UTC [100] LOG:  process 100 acquired ExclusiveLock on tuple (6,118) of relation 16433 of database 16388 after 2083.491 ms
+pg-1  | 2026-11-09 00:15:03.733 UTC [100] STATEMENT:  UPDATE pgbench_branches SET bbalance = bbalance + 2484 WHERE bid = 8;
+pg-1  | 2026-11-09 00:15:03.733 UTC [105] LOG:  duration: 2089.172 ms  statement: UPDATE pgbench_branches SET bbalance = bbalance + -3382 WHERE bid = 8;
+pg-1  | 2026-11-09 00:15:03.733 UTC [103] LOG:  duration: 2089.045 ms  statement: UPDATE pgbench_branches SET bbalance = bbalance + -1553 WHERE bid = 4;
+pg-1  | 2026-11-09 00:15:03.734 UTC [102] LOG:  duration: 2084.863 ms  statement: END;
+pg-1  | 2026-11-09 00:15:03.735 UTC [100] LOG:  duration: 2085.003 ms  statement: UPDATE pgbench_branches SET bbalance = bbalance + 2484 WHERE bid = 8;
+pg-1  | 2026-11-09 00:15:11.158 UTC [128] LOG:  automatic aggressive vacuum of table "template1.pg_catalog.pg_statistic": index scans: 1
+pg-1  | 	pages: 0 removed, 25 remain, 25 scanned (100.00% of total)
+pg-1  | 	tuples: 88 removed, 409 remain, 0 are dead but not yet removable
+pg-1  | 	removable cutoff: 8086, which was 4 XIDs old when operation ended
+pg-1  | 	new relfrozenxid: 8086, which is 7363 XIDs ahead of previous value
+pg-1  | 	frozen: 15 pages from table (60.00% of total) had 164 tuples frozen
+pg-1  | 	index scan needed: 13 pages from table (52.00% of total) had 144 dead item identifiers removed
+pg-1  | 	index "pg_statistic_relid_att_inh_index": pages: 5 in total, 0 newly deleted, 0 currently deleted, 0 reusable
+pg-1  | 	I/O timings: read: 0.725 ms, write: 0.000 ms
+pg-1  | 	avg read rate: 25.300 MB/s, avg write rate: 10.120 MB/s
+pg-1  | 	buffer usage: 99 hits, 5 misses, 2 dirtied
+pg-1  | 	WAL usage: 66 records, 3 full page images, 22105 bytes
+pg-1  | 	system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+pg-1  | 2026-11-09 00:15:31.178 UTC [1] LOG:  server process (PID 121) was terminated by signal 9: Killed
+pg-1  | 2026-11-09 00:15:31.178 UTC [1] DETAIL:  Failed process was running: SELECT array_length(array_agg(g),1) FROM generate_series(1, 150000000) g
+pg-1  | 2026-11-09 00:15:31.178 UTC [1] LOG:  terminating any other active server processes
+pg-1  | 2026-11-09 00:15:31.189 UTC [1] LOG:  all server processes terminated; reinitializing
+pg-1  | 2026-11-09 00:15:31.323 UTC [136] LOG:  database system was interrupted; last known up at 2026-11-09 00:13:47 UTC
+pg-1  | 2026-11-09 00:15:31.968 UTC [136] LOG:  database system was not properly shut down; automatic recovery in progress
+pg-1  | 2026-11-09 00:15:31.971 UTC [136] LOG:  redo starts at 0/193FA70
+pg-1  | 2026-11-09 00:15:32.435 UTC [139] FATAL:  the database system is not yet accepting connections
+pg-1  | 2026-11-09 00:15:32.435 UTC [139] DETAIL:  Consistent recovery state has not been yet reached.
+pg-1  | 2026-11-09 00:15:33.586 UTC [136] LOG:  invalid record length at 0/9A4B420: expected at least 24, got 0
+pg-1  | 2026-11-09 00:15:33.586 UTC [136] LOG:  redo done at 0/9A4B3F8 system usage: CPU: user: 0.21 s, system: 0.44 s, elapsed: 1.61 s
+pg-1  | 2026-11-09 00:15:33.597 UTC [137] LOG:  checkpoint starting: end-of-recovery immediate wait
+pg-1  | 2026-11-09 00:15:33.823 UTC [137] LOG:  checkpoint complete: wrote 16384 buffers (100.0%); 0 WAL file(s) added, 0 removed, 8 recycled; write=0.143 s, sync=0.039 s, total=0.230 s; sync files=60, longest=0.016 s, average=0.001 s; distance=132142 kB, estimate=132142 kB; lsn=0/9A4B420, redo lsn=0/9A4B420
+pg-1  | 2026-11-09 00:15:33.836 UTC [1] LOG:  database system is ready to accept connections

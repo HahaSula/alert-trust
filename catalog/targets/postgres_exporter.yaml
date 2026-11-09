@@ -44,16 +44,20 @@ silent_failures:
   - text: >-
       PostgreSQL 17 把 checkpoint 欄位從 pg_stat_bgwriter 移到 pg_stat_checkpointer。exporter 在 17 以上不再輸出
       pg_stat_bgwriter_checkpoints_*，而 stat_checkpointer collector 預設關閉；collector 回報成功，
-      mixin 與 awesome 的 TooManyCheckpointsRequested 回傳空。反過來在 17 以下打開 stat_checkpointer 也是 success=1、沒有資料。
-    evidence: code
-    source: pg-exporter-collectors
+      mixin 與 awesome 的 TooManyCheckpointsRequested 回傳空。反過來在 17 以下打開 stat_checkpointer 也是 success=1、沒有資料
+      （每次 scrape 記一條 WARN「not available on PostgreSQL < 17.0.0, skipping」）。實測：17 的名稱清單沒有任何 pg_stat_bgwriter_checkpoints_*。
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-c-bgwriter-17, pg-c-checkpointer-default, pg-trace-ex-bgwriter-after17, pg-trace-ex-checkpointer-skip]
   - text: >-
       pg_replication_lag_seconds 在 receive_lsn 等於 replay_lsn 時直接回 0。複本的 WAL receiver 斷線後不再收到新 WAL，
       兩者相等，lag 顯示 0；主庫完全沒有寫入時同樣是 0，而 pg_replication_last_replay_seconds 會一直變大。
-      但複本重啟後 receiver 從未連上時 receive_lsn 是 NULL，lag 改成顯示「距最後套用多久」（實測 103 秒）：同一個 metric 在兩種斷線下行為不同。
+      差別在 receiver 是第一次啟動還是斷線重連：重連時 flushedUpto 不重設，receive_lsn 仍等於 replay 位置，lag 是 0；
+      複本重啟後 receiver 第一次啟動，flushedUpto 被設成當前 WAL segment 的開頭（比 replay 位置小），lag 改走「now − 最後套用時間」（實測 103 秒）。
+      同一個 metric 在兩種斷線下行為不同。
     evidence: tested
     source: pg-target-lab
-    refs: [pg-exp-target, pg-c-replication-lag]
+    refs: [pg-exp-target, pg-c-replication-lag, pg-trace-pg16-walrcv-flushinit, pg-trace-pg16-walrcv-segstart]
   - text: >-
       mixin 的 PostgresReplicationLaggingMore1Hour 用 pg_replication_lag，這個名字在目前的 exporter 不存在（只有 pg_replication_lag_seconds），規則永遠回傳空。
     evidence: tested
@@ -88,10 +92,10 @@ silent_failures:
     refs: [pg-exp-target, pg-c-walrecv-slotnull, pg-src-walsnd-privs, pg-src-walrcv-privs]
   - text: >-
       單一 backend 當掉觸發的 crash recovery 只花 0.3 秒，pg_up 一直是 1，pg_postmaster_start_time_seconds 不變；
-      看得出來的只有 pg_stat_database 的 counter 歸零（crash recovery 會丟棄累積統計，13～17 都一樣）。
+      看得出來的只有 pg_stat_database 的 counter 歸零（crash recovery 會丟棄累積統計；只核對過 16、17 的原始碼）。
     evidence: tested
     source: pg-target-lab
-    refs: [pg-exp-target, pg-src-starttime, pg-src-crash-stats]
+    refs: [pg-exp-target, pg-src-starttime, pg-src-crash-stats, pg-trace-pg16-crash-stats]
 
 contracts: [exporter-deadline]
 
@@ -283,9 +287,9 @@ signals:
       collector 預設關閉，沒打開時規則也要響。它量的是凍結進度，不是「現在被誰擋住」，那是 xmin-horizon
     metrics: [pg_database_wraparound_age_datfrozenxid_seconds, pg_database_wraparound_age_datminmxid_seconds]
     evaluate_on: self
-    evidence: code
-    source: pg-exporter-collectors
-    refs: [pg-c-wraparound-default, pg-c-wraparound-query, pg-src-xid-warn, pg-src-xid-stop]
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-exp-target, pg-c-wraparound-default, pg-c-wraparound-query, pg-src-xid-warn, pg-src-xid-stop, pg-trace-pg17-xid-age]
     upstream: { status: no, note: "mixin 與 awesome 都沒有；awesome 的 low XID consumption 要自訂查詢 pg_txid_current" }
     rules:
       - rules/targets/postgres.yml#PostgresXidWraparoundRisk
@@ -303,7 +307,7 @@ signals:
     signal: >-
       postmaster 重啟看 changes(pg_postmaster_start_time_seconds)（--collector.postmaster 預設關閉）。
       單一 backend 當掉觸發的 crash recovery 不會改變 postmaster 啟動時間，要看 pg_stat_database 的 counter 被歸零
-      （crash recovery 會丟棄累積統計，13～17 都一樣）：resets(pg_stat_database_xact_commit) > 0。stats_reset 在 crash 後仍是 NULL（輸出 0），幫不上忙；
+      （crash recovery 會丟棄累積統計，16、17 已核對原始碼）：resets(pg_stat_database_xact_commit) > 0。stats_reset 在 crash 後仍是 NULL（輸出 0），幫不上忙；
       手動 pg_stat_reset() 也會讓 counter 歸零
     metrics: [pg_postmaster_start_time_seconds, pg_stat_database_xact_commit, pg_stat_database_stats_reset, pg_up]
     evaluate_on: self
@@ -370,13 +374,13 @@ signals:
     signal: >-
       requested／(requested + timed) 的比例。PostgreSQL 16 以下用 pg_stat_bgwriter_checkpoints_*（預設開），
       17 以上用 pg_stat_checkpointer_num_*（--collector.stat_checkpointer 預設關），規則要用 or 把兩邊接起來。
-      手動 CHECKPOINT、pg_basebackup 也算 requested
+      手動 CHECKPOINT、pg_basebackup 也算 requested。16 的複本把 restartpoint 算進 checkpoints_*，17 分到 restartpoints_*
     metrics: [pg_stat_bgwriter_checkpoints_req_total, pg_stat_bgwriter_checkpoints_timed_total, pg_stat_checkpointer_num_requested_total, pg_stat_checkpointer_num_timed_total, pg_settings_max_wal_size_bytes]
     evaluate_on: self
     applies_when: "PostgreSQL 17 以上要打開 --collector.stat_checkpointer"
     evidence: tested
     source: pg-target-lab
-    refs: [pg-exp-target, pg-c-bgwriter-17, pg-c-checkpointer-17, pg-src-checkpointer-view, pg-src-bgwriter16]
+    refs: [pg-exp-target, pg-c-bgwriter-17, pg-c-checkpointer-17, pg-src-checkpointer-view, pg-src-bgwriter16, pg-trace-pg16-ckpt-req, pg-trace-pg17-rstpt-req]
     upstream: { status: partial, note: "mixin 與 awesome 的 TooManyCheckpointsRequested 只用 bgwriter 名稱，17 以上回傳空" }
     rules: [rules/targets/postgres.yml#PostgresCheckpointsMostlyRequested, rules/targets/postgres.yml#PostgresCheckpointMetricsMissing]
 
@@ -455,12 +459,14 @@ signals:
     question: active、idle、等鎖的 session 各有多少
     signal: >-
       pg_stat_activity_count 依 state 與 wait_event_type 分：active 太多是 CPU 或 I/O 不夠，wait_event_type="Lock" 是鎖等待。
-      pg_locks_count 只有各 mode 的數量，看不出誰擋誰；要 pg_blocking_pids() 的自訂查詢
+      pg_locks_count 只有各 mode 的數量（granted 與等待中都算），看不出誰擋誰，要 pg_blocking_pids() 的自訂查詢；
+      而且只數 database 不是 NULL 的鎖，transactionid 鎖被排除，等 row lock 的 ShareLock 不會出現在 mode="sharelock"。
+      pg_stat_activity_count 排除的只是 collector 自己那條連線，舊架構的常駐連線（idle）照樣算進去
     metrics: [pg_stat_activity_count, pg_locks_count]
     evaluate_on: self
     evidence: tested
     source: pg-target-lab
-    refs: [pg-exp-target, pg-c-activity-labels, pg-c-locks-query]
+    refs: [pg-exp-target, pg-c-activity-labels, pg-c-locks-query, pg-trace-ex-locks-dbnotnull, pg-trace-pg17-lock-xid-nulldb, pg-trace-ex-activity-self, pg-perf-exp]
     upstream: { status: no, note: "mixin 與 awesome 都沒有鎖等待規則" }
     rules: [rules/targets/postgres.yml#PostgresLockWaits]
 
@@ -488,14 +494,128 @@ signals:
     question: cache hit 與 temp file
     signal: >-
       blks_hit／(blks_hit + blks_read) 只看 shared_buffers，OS page cache 命中也算 read，比例偏低不一定是問題；
-      rate(pg_stat_database_temp_bytes) 持續偏高表示 work_mem 不夠。適合畫圖，不適合當 alert
+      rate(pg_stat_database_temp_bytes) 持續偏高表示 work_mem 不夠；temp_bytes 在暫存檔刪除時才計入，還沒結束的排序看不到。適合畫圖，不適合當 alert
     metrics: [pg_stat_database_blks_hit, pg_stat_database_blks_read, pg_stat_database_temp_files, pg_stat_database_temp_bytes]
     evaluate_on: self
     evidence: tested
     source: pg-target-lab
-    refs: [pg-exp-target, pg-c-database-columns]
+    refs: [pg-exp-target, pg-c-database-columns, pg-trace-pg17-temp-call]
     upstream: { status: partial, note: "awesome 有 cache hit 與 temp file 規則；門檻與 workload 綁得很緊" }
     rules: []
+
+  # ---------- 效能與故障情境（lab/targets/postgres/perf）----------
+  - id: slow-sql
+    aspect: usage
+    tier: 3
+    question: 使用｜慢 SQL 找得到嗎
+    signal: >-
+      每個 queryid 的平均執行時間 rate(pg_stat_statements_seconds_total) / rate(pg_stat_statements_calls_total)；
+      執行中、還沒結束的長查詢只能看 pg_stat_activity_max_tx_duration{state="active"} 或 pg_long_running_transactions_oldest_timestamp_seconds。
+      需要 shared_preload_libraries、在 DSN 的資料庫 CREATE EXTENSION、--collector.stat_statements（預設關）與 pg_read_all_stats。
+      label 只有 user、datname、queryid；--collector.stat_statements.include_query 另給 pg_stat_statements_query_id{queryid, query}，文字截在 120 字元
+    metrics: [pg_stat_statements_seconds_total, pg_stat_statements_calls_total, pg_stat_statements_rows_total, pg_stat_statements_block_read_seconds_total, pg_stat_activity_max_tx_duration, pg_long_running_transactions_oldest_timestamp_seconds]
+    evaluate_on: self
+    applies_when: pg_stat_statements
+    silent_failure: >-
+      pg_stat_statements 在查詢結束時才記錄：實測一個 40 秒的 pg_sleep 執行中完全不在 exporter 輸出裡，結束後才出現 mean=40014 ms。
+      exporter 只輸出總和（沒有 mean／max／stddev、shared_blks_read、temp_blks），只取總耗時前 100 名並排除最低 10%，exporter 自己的查詢也佔名額；
+      沒有計畫，log_min_duration_statement 與 auto_explain 的 log 都不會變成 metric
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-perf-exp, pg-perf-c-stmt-disabled, pg-perf-c-stmt-limit, pg-perf-c-stmt-percentile, pg-perf-c-stmt-labels, pg-perf-c-stmt-querylen, pg-perf-c-stmt-queryid, pg-perf-c-stmt-pg13-query, pg-perf-src-pgss-max, pg-perf-src-duration-log, pg-perf-src-activity-size]
+    upstream: { status: partial, note: "mixin 的 SlowQueries 對 gauge 取 rate；awesome 沒有 per-query 規則" }
+    rules:
+      - rules/targets/postgres.yml#PostgresSlowStatement
+      - rules/targets/postgres.yml#PostgresStatStatementsMissing
+      - rules/targets/postgres.yml#PostgresLongRunningTransaction
+
+  - id: lock-queue
+    aspect: usage
+    tier: 3
+    question: 使用｜鎖等待與 DDL 鎖佇列
+    signal: >-
+      pg_stat_activity_count{wait_event_type="Lock"} 是等鎖的 session 數；pg_stat_activity_max_tx_duration{wait_event_type="Lock"} 是等鎖 session 的交易年齡（不是等鎖時間）。
+      DDL 鎖佇列的特徵是同時有 pg_locks_count{mode="accessexclusivelock"} > 0：ACCESS EXCLUSIVE 排在長交易後面，之後所有讀寫都排在它後面。
+      exporter 看不出誰擋誰，要 pg_blocking_pids() 直接查
+    metrics: [pg_stat_activity_count, pg_stat_activity_max_tx_duration, pg_locks_count, up, pg_scrape_collector_success]
+    evaluate_on: self
+    silent_failure: >-
+      實測 DDL 等了 43 秒，其間 pgbench 0 tps：沒設 lock_timeout 的 exporter up=0 共 40 秒，還多了 4 條等鎖連線，什麼都看不到；
+      設了 lock_timeout=1s 的 exporter 只有 stat_user_tables 失敗，看得到 9→17 個等鎖 session 與 accessexclusivelock=1。
+      列鎖等待的 transactionid ShareLock 不在 pg_locks_count 裡（只有 tuple 的 exclusivelock）
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-perf-exp, pg-perf-exp-raw, pg-perf-c-activity-group, pg-perf-c-activity-maxtx, pg-perf-c-locks-nogranted, pg-trace-ex-locks-dbnotnull, pg-perf-src-lock-waitmask, pg-perf-src-lock-wait-log, pg-perf-src-lock-timeout]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有鎖佇列規則" }
+    rules:
+      - rules/targets/postgres.yml#PostgresLockQueuePileUp
+      - rules/targets/postgres.yml#PostgresLockWaitLong
+      - rules/targets/postgres.yml#PostgresLockWaits
+      - rules/targets/postgres.yml#PostgresExporterDown
+
+  - id: throughput-drop
+    aspect: usage
+    tier: 3
+    question: 使用｜TPS／QPS 掉了嗎，原因在哪一層
+    signal: >-
+      rate(pg_stat_database_xact_commit) 與 rate(pg_stat_database_tup_updated) 對照昨天同一時間；同時看
+      pg_stat_activity_count 依 wait_event_type 分（Lock＝鎖、空白＝CPU、IO、LWLock）、scrape_duration_seconds（CPU 不夠時先變長）、
+      collector 是否整組消失（連線額滿）、resets(xact_commit)（crash recovery）。xact_commit 包含 exporter 自己的交易，掉到 0 時仍有每秒幾筆
+    metrics: [pg_stat_database_xact_commit, pg_stat_database_tup_updated, pg_stat_statements_calls_total, pg_stat_activity_count, scrape_duration_seconds]
+    evaluate_on: self
+    silent_failure: >-
+      實測：列鎖、DDL 鎖佇列讓 pgbench 掉到 0，exporter 的 TPS 只降到 4–14（exporter 自己的交易）；CPU 降到 0.1 核時 TPS −75%，scrape 從 0.05 秒變 3.6 秒；
+      連線風暴時兩個 exporter 的 collector 全部消失 35 秒，TPS 這段沒有資料；OOM 之後 TPS 一直是 0，因為應用的連線全被斷掉
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-perf-exp, pg-perf-exp-raw, pg-c-database-columns]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有吞吐量下降規則" }
+    rules:
+      - rules/targets/postgres.yml#PostgresThroughputDrop
+      - rules/targets/postgres.yml#PostgresScrapeNearTimeout
+      - rules/targets/postgres.yml#PostgresCollectorsMissing
+
+  - id: resource-pressure
+    aspect: usage
+    tier: 3
+    question: 使用｜CPU、shared_buffers、work_mem、checkpoint 不夠時哪個 metric 先動
+    signal: >-
+      CPU：TPS 與 scrape_duration_seconds（exporter 沒有 CPU 使用率，要用 cAdvisor／node_exporter）。shared_buffers：cache hit 比例與 rate(blks_read)。
+      work_mem：rate(pg_stat_database_temp_bytes)、temp_files。checkpoint：rate(checkpoints_req) 對照 pg_settings_max_wal_size_bytes。
+      這些都和 workload 綁在一起，適合畫圖與排查，只有 checkpoint 比例有通用規則
+    metrics: [scrape_duration_seconds, pg_stat_database_blks_read, pg_stat_database_blks_hit, pg_stat_database_temp_bytes, pg_stat_database_temp_files, pg_stat_bgwriter_checkpoints_req_total, pg_stat_bgwriter_buffers_checkpoint_total, pg_settings_max_wal_size_bytes]
+    evaluate_on: self
+    silent_failure: >-
+      實測在限速負載下多數設定錯誤不會讓 TPS 下降：shared_buffers 16MB 時 cache hit 0.98→0.93、不限速容量 −11%；work_mem 64kB 時 temp 約 7MB/s、延遲 +19%；
+      max_wal_size 32MB 時 60 秒 6 次 requested checkpoint，TPS 沒變。只看 TPS 的規則看不到這些
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-perf-exp, pg-perf-c-db-tempbytes, pg-trace-pg17-temp-call, pg-perf-src-ckpt-frequent]
+    upstream: { status: partial, note: "awesome 有 cache hit 與 temp file 規則，門檻與 workload 綁得很緊" }
+    rules:
+      - rules/targets/postgres.yml#PostgresCheckpointsMostlyRequested
+      - rules/targets/postgres.yml#PostgresScrapeNearTimeout
+
+  - id: oom-crash
+    aspect: stability
+    tier: 2
+    question: 穩定｜backend 被 OOM killer 殺掉時看得出來嗎
+    signal: >-
+      cgroup 記憶體上限下 kernel 殺的是最大的 backend，不是 postmaster：postmaster 記「terminated by signal 9: Killed」，
+      斷掉所有連線、crash recovery，容器不會重啟。看 resets(pg_stat_database_xact_commit) > 0 且 postmaster 啟動時間沒變（PostgresCrashRecovery），
+      加上 pg_up 短暫變 0、應用端 TPS 不回來
+    metrics: [pg_stat_database_xact_commit, pg_postmaster_start_time_seconds, pg_up]
+    evaluate_on: self
+    silent_failure: >-
+      實測：up 一直是 1，pg_up 只有一個 scrape 是 0，pg_postmaster_start_time_seconds 不變，PostgresRestarted 不響；
+      docker 的 OOMKilled=true 但 RestartCount=0、容器仍在跑。exporter 沒有記憶體使用量
+    evidence: tested
+    source: pg-target-lab
+    refs: [pg-perf-exp, pg-perf-exp-raw, pg-perf-src-child-signal, pg-perf-src-reinit, pg-src-crash-stats, pg-trace-pg16-crash-stats]
+    upstream: { status: no, note: "awesome 的 PostgresqlRestarted 用 postmaster 啟動時間，看不到" }
+    rules:
+      - rules/targets/postgres.yml#PostgresCrashRecovery
+      - rules/targets/postgres.yml#PostgresThroughputDrop
 
   - id: standby-streaming
     aspect: ha
