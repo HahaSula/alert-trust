@@ -27,6 +27,15 @@ argument-hint: "[snapshot-dir] [policy-file]"
 
 規則的 group `query_offset` 在舊版 Prometheus 的 API 不回傳；`rules.json` 沒有 `queryOffset` 而使用者說有用時，請對方提供 rule 檔再判斷。全域 `rule_query_offset` 從 `config.json` 讀。
 
+## 0. 先決條件（不能跳過）
+
+進入下面任何一節之前，確認：
+
+1. **監控體系已確認**：評估規則的是 Prometheus 還是 vmalert、版本、資料從哪裡來、有沒有外部觀察者。沒有 `env/<name>.yaml` 時先用 `env-profile`，或依 `rule-review` 第 1 步問清楚。
+2. **基礎設施的覆蓋已檢查**：已經跑過 `check_coverage.py`（沒有 API 時先用 `tools/rules_to_snapshot.py` 把 rule 檔轉成快照），並先回報第 1 級缺口。
+
+使用者只丟 rule 檔要你「檢查」時，改走 `rule-review` skill，不要直接從時間契約開始。
+
 ## 做法
 
 1. 對每個 kind，逐條套用 policies.md 的檢查。判斷時要讀表達式本身；PromQL／MetricsQL 的解析靠你，不要只用正規表示式下結論。Recording rule 的上游延遲、`on()`、subquery 都要人工看。

@@ -39,6 +39,15 @@ argument-hint: "[snapshot-dir] [component-id]"
 2. **尖峰**（最重要）：`max by (job) (max_over_time(scrape_duration_seconds[7d]))`、`topk(10, max_over_time(prometheus_rule_group_last_duration_seconds[7d]))`、`sum by (rule_group) (increase(prometheus_rule_group_iterations_missed_total[7d])) > 0`，以及各 job 的 `scrape_interval`、各 group 的 `interval`。
 3. **Rule**：rule 檔或 `/api/v1/rules`，至少最重要的幾條。
 
+## 0. 先決條件（不能跳過）
+
+進入下面任何一節之前，確認：
+
+1. **監控體系已確認**：評估規則的是 Prometheus 還是 vmalert、版本、資料從哪裡來、有沒有外部觀察者。沒有 `env/<name>.yaml` 時先用 `env-profile`，或依 `rule-review` 第 1 步問清楚。
+2. **基礎設施的覆蓋已檢查**：已經跑過 `check_coverage.py`（沒有 API 時先用 `tools/rules_to_snapshot.py` 把 rule 檔轉成快照），並先回報第 1 級缺口。
+
+使用者只丟 rule 檔要你「檢查」時，改走 `rule-review` skill，不要直接從時間契約開始。
+
 ## 1. 盤點與尖峰
 
 | 項目 | 從哪裡看 |
@@ -120,7 +129,7 @@ groups:
 
 見 [references/upgrade.md](references/upgrade.md)。先查官方版本週期確認目前的 LTS；**不要等升級才修 rule**。
 
-## 5. 覆蓋缺口
+## 5. 覆蓋缺口（第 0 步已先做；這裡是 Prometheus 卡的細節）
 
 `check_coverage.py` 的結果裡，`card: prometheus` 的每一列：
 

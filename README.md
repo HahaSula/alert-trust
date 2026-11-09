@@ -59,6 +59,15 @@ python3 tools/collect.py --out snapshot --prom prom-a=http://localhost:9090 --am
 python3 tools/check_coverage.py --env env/<name>.yaml --snapshot snapshot --out report --live
 ```
 
+只有 rule 檔、連不到環境時：
+
+```bash
+python3 tools/rules_to_snapshot.py --out snapshot --ruler prom-a my-rules/*.yml --ruler meta meta-rules/*.yml
+python3 tools/check_coverage.py --env env/<name>.yaml --snapshot snapshot --out report
+```
+
+檢查別人的 rule 檔時用 `/alert-trust:rule-review`：先確認監控體系與基礎設施的覆蓋，最後才看每條 rule 的時間契約。
+
 ## 新增一個元件或 target
 
 1. 在 `catalog/components/` 或 `catalog/targets/` 新增 `<id>.yaml`，格式照 `catalog/components/prometheus.yaml`。

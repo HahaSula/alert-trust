@@ -37,3 +37,19 @@ class CoverageTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RulesToSnapshotTest(unittest.TestCase):
+    def test_offline_rule_files_find_gaps(self):
+        import tempfile
+        import rules_to_snapshot as R2S
+        with tempfile.TemporaryDirectory() as d:
+            for rid, f in (("prom-a", "rules-prom-a.yml"), ("meta", "rules-meta.yml")):
+                os.makedirs(os.path.join(d, rid))
+                with open(os.path.join(d, rid, "rules.json"), "w", encoding="utf-8") as fh:
+                    import json
+                    json.dump(R2S.convert([os.path.join(ROOT, "lab", "coverage", f)]), fh)
+            env = CC.load_env(os.path.join(FIX, "env.yaml"))
+            items = {(i["component"], i["signal"]): i["status"] for i in CC.evaluate(env, d, {1}, live=False)}
+        self.assertEqual(items[("prom-a", "wal-write-failed")], "missing")
+        self.assertEqual(items[("prom-a", "rule-failures")], "self_only")

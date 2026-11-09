@@ -44,11 +44,23 @@ docker run --rm -u $(id -u):$(id -g) -v "$PWD":/docs squidfunk/mkdocs-material:9
 
 本機預覽：`docker run -d --name alert-trust-docs -u $(id -u):$(id -g) -p 8000:8000 -v "$PWD":/docs squidfunk/mkdocs-material:9.5.39 serve --dev-addr=0.0.0.0:8000`，網址 `http://localhost:8000/alert-trust/`。改了 `hooks/refs.py` 或 `mkdocs.yml` 要重啟容器。
 
+## 檢查使用者的 rule 檔（不走 skill 時也照這個順序）
+
+使用者給你 rule.yml、VMRule 或 PrometheusRule 要你檢查時，**不要直接從時間契約開始**。順序：
+
+1. **確認監控體系**：評估這些 rule 的是 Prometheus 還是 vmalert（版本）、資料從哪裡來、有沒有外部觀察者、告警走哪台 Alertmanager。能從檔案判斷就判斷，否則問。寫成 `env/<name>.yaml`。
+2. **監控基礎設施的覆蓋**：`python3 tools/rules_to_snapshot.py --out snapshot --ruler <id> <rule 檔...>`，再 `python3 tools/check_coverage.py --env env/<name>.yaml --snapshot snapshot --out report`。先回報第 1 級缺口，例如 scrape 耗時、rule group 跑不完或停止評估、WAL 寫入失敗、送不到 Alertmanager、Watchdog。
+3. **每條 rule 的時間契約**：依體系用對的公式（`catalog/contracts.yaml`）。
+4. **寫法問題**：presence lint、job selector、group 擺放。
+
+完整步驟在 `skills/rule-review/SKILL.md`。
+
 ## 證據規則（最重要）
 
 - **每個結論都要有依據並附參考**：原始碼（釘在 tag 與行號）或可重現的實驗結果。頁面用 `[^key]`，元件卡用 `refs: [key]`。
 - 證據等級：`tested`（實驗量到）、`code`（讀原始碼或官方文件）、`upstream`（上游規則）、`inferred`（未單獨驗證）。只有親眼觀察到的才標 `tested`。沒有實測就降級，不要沿用舊說法。
 - 原始碼參考：加到 `catalog/refs-code.src.json`（`[repo, tag, path, 關鍵字, 第幾個]`）再跑 `python3 tools/gen_code_refs.py`。關鍵字找不到時腳本會失敗，代表程式碼移動了，要重新核對。
+- 實驗數據不準時（例如這台機器的容器時鐘不穩），改用原始碼佐證，並在結論旁註明。
 - 圖說要分開寫**機制**（原始碼）與**這組數據**（實驗條件）。圖上的數字只是一組情境，多組數據放 lab。
 - 不要改寫實驗數字。參數要換（例如 30m 改 1h）就重跑實驗。
 - 寫「interval」時要指名是哪一個：`scrape_interval`、`evaluation_interval`、group `interval`、`group_interval`。名稱用反引號，會自動連到名詞表。

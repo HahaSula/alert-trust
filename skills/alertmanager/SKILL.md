@@ -32,6 +32,15 @@ argument-hint: "[snapshot-dir] [component-id]"
 
 結構見 `$AT/skills/selfcheck/references/snapshot.md`。`<id>/status.json`（`config.original`、`cluster.status`、`cluster.peers`、`versionInfo`）、`alerts.json`、`silences.json`、`metrics.txt`、`buildinfo.json`、`errors.json`；ruler 端的 `prom-*/alertmanagers.json`、`prom-*/peaks.json`（`notify_*`、`am_*`）、vmalert 的 `flags.json`（`notifier.url`）。沒有快照時請使用者提供遮蔽過的 `alertmanager.yml` 與 `/api/v2/status` 的 `cluster` 段。
 
+## 0. 先決條件（不能跳過）
+
+進入下面任何一節之前，確認：
+
+1. **監控體系已確認**：評估規則的是 Prometheus 還是 vmalert、版本、資料從哪裡來、有沒有外部觀察者。沒有 `env/<name>.yaml` 時先用 `env-profile`，或依 `rule-review` 第 1 步問清楚。
+2. **基礎設施的覆蓋已檢查**：已經跑過 `check_coverage.py`（沒有 API 時先用 `tools/rules_to_snapshot.py` 把 rule 檔轉成快照），並先回報第 1 級缺口。
+
+使用者只丟 rule 檔要你「檢查」時，改走 `rule-review` skill，不要直接從時間契約開始。
+
 ## 1. 路由與設定
 
 解析 `config.original`（YAML）：
