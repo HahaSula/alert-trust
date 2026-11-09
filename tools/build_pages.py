@@ -104,10 +104,12 @@ def component_page(card: dict, sources: dict, contracts: dict) -> str:
 
     if card.get("blind_spots"):
         out.append("## 目前無法監控的範圍\n")
-        out.append("| 範圍 | 類型 | 為什麼 | 補法 |\n|---|---|---|---|")
+        out.append("| 範圍 | 類型 | 為什麼 | 補法 | 已補上 |\n|---|---|---|---|---|")
         for b in card["blind_spots"]:
             link = f"[{esc(b['what'])}](../{b['section']})" if b.get("section") else esc(b["what"])
-            out.append(f"| {link} | {C.BLIND_CATEGORIES[b['category']]} | {esc(b.get('why', ''))} | {esc(b['workaround'])} |")
+            cov = b.get("covered_by")
+            done = (f"{esc(cov['tool'])}：" + "、".join(f"`{m}`" for m in cov["metrics"]) + marks(cov)) if cov else "—"
+            out.append(f"| {link} | {C.BLIND_CATEGORIES[b['category']]} | {esc(b.get('why', ''))} | {esc(b['workaround'])} | {done} |")
         out.append("")
 
     na_asp = card.get("not_applicable_aspects") or {}
@@ -265,7 +267,9 @@ def targets_overview(cards: list[dict]) -> str:
             out.append(f"**{ctitle}**\n")
             for b in items:
                 link = f"[{b['what']}](../{b['section']})" if b.get("section") else b["what"]
-                out.append(f"- {link}：{b.get('why', '')}。補法：{b['workaround']}")
+                cov = b.get("covered_by")
+                done = f" **已用 {cov['tool']} 補上**：" + "、".join(f"`{m}`" for m in cov["metrics"]) if cov else ""
+                out.append(f"- {link}：{b.get('why', '')}。補法：{b['workaround']}{done}")
             out.append("")
     out.append("## 每個資料庫的頁面\n")
     for c in targets:

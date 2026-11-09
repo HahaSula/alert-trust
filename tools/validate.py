@@ -219,9 +219,26 @@ def check_target_pattern(components: list[dict], root: str) -> list[str]:
         blind = card.get("blind_spots") or []
         if not blind:
             errors.append(f"{card['_path']}: target 卡要列出 blind_spots（目前無法監控的範圍）")
+        all_rules = {ref.split("#", 1)[1] for ref in C.load_rules(root)}
+        all_refs = C.load_refs(root)
         for b in blind:
             if b.get("category") not in C.BLIND_CATEGORIES or not b.get("what") or not b.get("workaround"):
                 errors.append(f"{card['_path']}: blind_spots 每項要有 what、category（{', '.join(C.BLIND_CATEGORIES)}）、workaround")
+            cov = b.get("covered_by")
+            if cov:
+                where = f"{card['_path']}: blind_spots「{b.get('what')}」的 covered_by"
+                if not cov.get("tool") or not cov.get("config") or not cov.get("metrics"):
+                    errors.append(f"{where} 要有 tool、config、metrics")
+                elif not os.path.exists(os.path.join(root, cov["config"])):
+                    errors.append(f"{where} 的 config {cov['config']} 不存在")
+                for r in cov.get("rules", []) or []:
+                    if r not in all_rules:
+                        errors.append(f"{where} 的規則 {r} 不存在")
+                if not cov.get("refs"):
+                    errors.append(f"{where} 要有 refs（實驗或原始碼）")
+                for r in cov.get("refs", []) or []:
+                    if r not in all_refs:
+                        errors.append(f"{where} 的 refs {r} 不存在")
         have = {s.get("aspect") for s in card.get("signals", [])}
         na_asp = card.get("not_applicable_aspects") or {}
         for asp in aspects_required:
