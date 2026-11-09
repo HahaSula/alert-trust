@@ -24,12 +24,12 @@
 | MariaDB 的 ASH 缺口與取樣器原型 | `docs/targets/mariadb-ash.md`、`lab/targets/mysql/ash/` |
 | Thanos v0.42.5、Grafana Alerting v13.3.0 元件卡、規則、架構頁與小 lab | `catalog/components/`、`rules/thanos/`、`rules/grafana/`、`lab/thanos/`、`lab/grafana/` |
 | MySQL／MariaDB 與 PostgreSQL 的 exporter 盲點用 query-exporter 5.2.2 自訂查詢補上（lab 實測） | `queries/query-exporter/`、`lab/targets/*/custom-queries/` |
+| 資料庫架構頁：關聯式（MySQL／InnoDB 對照 PostgreSQL） | `docs/architecture/db-relational.md` |
 | `rule-review` skill 與流程圖：先確認體系與基礎設施覆蓋，再看時間契約；離線用 `tools/rules_to_snapshot.py` | `skills/rule-review/`、`docs/tools/rule-review.md` |
 
 ## 進行中
 
 - Valkey／Redis target（redis_exporter）與「記憶體 KV」架構頁
-- 「關聯式」資料庫架構頁
 
 之後的資料庫順序（使用者已同意）：etcd → TiDB → YugabyteDB → ClickHouse → MongoDB；CockroachDB（專有授權）不做。資料庫架構頁依類型分頁：關聯式、記憶體 KV、共識（Raft）、分散式 SQL、分析型、文件型。
 
@@ -46,6 +46,7 @@
 9. **待驗證**：Patroni＋etcd、pgBackRest 的規則只讀碼，可做小 lab；Galera 與 Group Replication 的 flow control 沒有觸發；MariaDB ASH 的 digest 回填未實測；query-exporter 輸出 MySQL／MariaDB 與 PostgreSQL 都已實測（PG16 只讀碼、PG18 未查）。
 11. **Thanos／Grafana 沒實測的部分**：Thanos 的 sidecar 上傳失敗、Receive、HA；Grafana 的 HA、DB 中斷、外部 Alertmanager 失敗、UI 預設的 NoData／Error、Loki／SQL datasource。`docs/architecture/index.md` 的單序點對照表還沒加這兩個元件。
 10. **小項目**：MySQL redo log 太小的情境沒有重現（`log_waits` 一直是 0）；`ThroughputDrop` 規則用「昨天同時段」比較，lab 沒有一天的資料無法驗證；MySQL `NoWritablePrimary` 修正後未重跑；PG17、`/probe`、auto-discover 只讀碼；契約頁的圖未截圖確認；Prometheus 報告的例子（30s／100s／120s）使用者尚未表示意見。
+12. **架構頁發現的卡片缺口**：MySQL 卡沒有 checkpoint age 訊號（`innodb-pressure` 只有 `log_waits`、`wait_free`；lab 有量到 checkpoint age）；PG 卡沒有 `synchronous_commit` 訊號。
 
 ## 已做的決定
 

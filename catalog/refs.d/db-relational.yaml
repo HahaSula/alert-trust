@@ -1,0 +1,99 @@
+# docs/architecture/db-relational.md 的參考（關聯式資料庫架構）。行號已用 tag 上的檔案核對（2026-11-09）。
+# 原始碼：MySQL 8.4.7、MariaDB 11.4.13、PostgreSQL REL_17_11（和既有參考同版）。
+refs:
+  dbr-my-thread-per-conn:
+    kind: code
+    title: "沒有閒置 thread 時，每條新連線建立一條 thread（handle_connection）"
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/conn_handler/connection_handler_per_thread.cc"
+    line: 421
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/conn_handler/connection_handler_per_thread.cc#L421"
+  dbr-mdb-thread-handling:
+    kind: code
+    title: "thread_handling：one-thread-per-connection、no-threads、pool-of-threads"
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sys_vars.cc"
+    line: 3348
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sys_vars.cc#L3348"
+  dbr-pg-backend-fork:
+    kind: code
+    title: "BackendStartup：每條連線由 postmaster 啟動一個 backend process"
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/postmaster/postmaster.c"
+    line: 3582
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/postmaster/postmaster.c#L3582"
+  dbr-my-purge-view:
+    kind: code
+    title: "purge 複製最舊的 read view，只清得到比它舊的 undo"
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/innobase/trx/trx0purge.cc"
+    line: 264
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/trx/trx0purge.cc#L264"
+  dbr-my-log-free-check-wait:
+    kind: code
+    title: "log_free_check_wait：redo 可用空間不夠時，寫入的 thread 等 checkpoint 推進"
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/innobase/log/log0chkp.cc"
+    line: 1176
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/log/log0chkp.cc#L1176"
+  dbr-my-semisync-timeout:
+    kind: code
+    title: "等 replica ACK 逾時：wait_timeouts 加 1，switch_off() 退回 async"
+    project: "MySQL"
+    version: "8.4.7"
+    file: "plugin/semisync/semisync_source.cc"
+    line: 807
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/plugin/semisync/semisync_source.cc#L807"
+  dbr-pg-horizon-slots:
+    kind: code
+    title: "ComputeXidHorizons：先取 replication slot 的 xmin 與 catalog_xmin"
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/storage/ipc/procarray.c"
+    line: 1789
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/storage/ipc/procarray.c#L1789"
+  dbr-pg-horizon-procs:
+    kind: code
+    title: "ComputeXidHorizons：再取每個 proc 的 xid 與 xmin"
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/storage/ipc/procarray.c"
+    line: 1802
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/storage/ipc/procarray.c#L1802"
+  dbr-pg-ckpt-needed:
+    kind: code
+    title: "XLogCheckpointNeeded：自上次 redo 起的 WAL segment 數達 CheckPointSegments（由 max_wal_size 算）就要求 checkpoint"
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/access/transam/xlog.c"
+    line: 2272
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/access/transam/xlog.c#L2272"
+  dbr-pg-xlogflush:
+    kind: code
+    title: "XLogFlush：commit 時把 WAL 寫到指定位置並 fsync"
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/access/transam/xlog.c"
+    line: 2778
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/access/transam/xlog.c#L2778"
+  dbr-pg-sync-commit-default:
+    kind: code
+    title: "synchronous_commit 預設 on"
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/misc/guc_tables.c"
+    line: 4926
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/misc/guc_tables.c#L4926"
+  dbr-pg-remove-archived:
+    kind: code
+    title: "RemoveOldXlogFiles：只刪 XLogArchiveCheckDone 為真（已 archive）的 segment"
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/access/transam/xlog.c"
+    line: 3886
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/access/transam/xlog.c#L3886"

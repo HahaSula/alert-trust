@@ -1,0 +1,39 @@
+<svg viewBox="0 0 900 300" role="img" aria-label="Who holds back MVCC cleanup. InnoDB: the oldest read view limits purge, history list length grows. PostgreSQL: the xmin horizon is the minimum over backend xid and xmin, prepared transactions, and replication slot xmin; vacuum leaves dead tuples and datfrozenxid age cannot drop.">
+  <defs>
+    <marker id="ahdbr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+    <marker id="ahdbrb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah-bad"/></marker>
+  </defs>
+  <text x="20" y="24" class="lbl-b">MySQL／MariaDB（InnoDB）</text>
+  <rect x="20" y="40" width="190" height="64" rx="8" class="b-node-bad"/>
+  <text x="115" y="66" text-anchor="middle" class="lbl-b">最舊的 read view</text>
+  <text x="115" y="86" text-anchor="middle" class="lbl-s">長交易、consistent snapshot</text>
+  <rect x="270" y="40" width="190" height="64" rx="8" class="b-node-acc"/>
+  <text x="365" y="66" text-anchor="middle" class="lbl-b">purge</text>
+  <text x="365" y="86" text-anchor="middle" class="lbl-s">只清比 view 舊的 undo</text>
+  <rect x="520" y="40" width="360" height="64" rx="8" class="b-node"/>
+  <text x="700" y="66" text-anchor="middle" class="lbl-b">history list length 上升</text>
+  <text x="700" y="86" text-anchor="middle" class="lbl-s">訊號：long-transactions、undo-history</text>
+  <path d="M210 72 H266" class="arrow-bad" marker-end="url(#ahdbrb)"/>
+  <path d="M460 72 H516" class="arrow" marker-end="url(#ahdbr)"/>
+  <text x="20" y="148" class="lbl-b">PostgreSQL</text>
+  <rect x="20" y="164" width="190" height="30" rx="6" class="b-node-bad"/>
+  <text x="115" y="184" text-anchor="middle" class="lbl-s">backend 的 xid／xmin（含 idle in tx）</text>
+  <rect x="20" y="202" width="190" height="30" rx="6" class="b-node-bad"/>
+  <text x="115" y="222" text-anchor="middle" class="lbl-s">prepared transaction</text>
+  <rect x="20" y="240" width="190" height="30" rx="6" class="b-node-bad"/>
+  <text x="115" y="260" text-anchor="middle" class="lbl-s">replication slot 的 xmin</text>
+  <rect x="270" y="186" width="190" height="64" rx="8" class="b-node-acc"/>
+  <text x="365" y="212" text-anchor="middle" class="lbl-b">xmin horizon（取最小）</text>
+  <text x="365" y="232" text-anchor="middle" class="lbl-s">vacuum 只清比它舊的</text>
+  <rect x="520" y="164" width="360" height="50" rx="8" class="b-node"/>
+  <text x="700" y="184" text-anchor="middle" class="lbl-b">dead but not yet removable</text>
+  <text x="700" y="202" text-anchor="middle" class="lbl-s">訊號：xmin-horizon、autovacuum（n_dead_tup）</text>
+  <rect x="520" y="222" width="360" height="50" rx="8" class="b-node"/>
+  <text x="700" y="242" text-anchor="middle" class="lbl-b">datfrozenxid 的 age 降不下來</text>
+  <text x="700" y="260" text-anchor="middle" class="lbl-s">訊號：wraparound（長期才看得出來）</text>
+  <path d="M210 179 L266 208" class="arrow-bad" marker-end="url(#ahdbrb)"/>
+  <path d="M210 217 H266" class="arrow-bad" marker-end="url(#ahdbrb)"/>
+  <path d="M210 255 L266 228" class="arrow-bad" marker-end="url(#ahdbrb)"/>
+  <path d="M460 208 L516 190" class="arrow" marker-end="url(#ahdbr)"/>
+  <path d="M460 228 L516 246" class="arrow" marker-end="url(#ahdbr)"/>
+</svg>
