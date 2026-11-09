@@ -1,0 +1,40 @@
+# etcd 卡引用的來源。key 一律以 etcd- 開頭，避免和其他 target 衝突。
+sources:
+  etcd-lab:
+    title: etcd 健康第二路徑實驗（lab/targets/etcd）
+    kind: experiment
+    visibility: public
+    url: https://github.com/HahaSula/alert-trust/tree/main/lab/targets/etcd
+    checked: "2026-11-09, etcd v3.7.3 ×3, Prometheus v3.13.5, blackbox_exporter v0.27.0"
+    note: results/run-20261109.txt 是原始輸出，results/summary.md 是摘要
+  etcd-server:
+    title: etcd v3.7.3 server/（etcdserver 的 raft loop、apply、alarm；storage 的 wal、backend、mvcc、quota；api/etcdhttp 的健康端點）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/etcd-io/etcd/tree/v3.7.3/server
+    checked: "2026-11-09, v3.7.3（commit 0a173d0）"
+  etcd-raft:
+    title: go.etcd.io/raft v3.7.0（etcd v3.7.3 的 go.mod 所用版本）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/etcd-io/raft/blob/v3.7.0/raft.go
+    checked: "2026-11-09, v3.7.0"
+  etcd-mixin:
+    title: etcd 官方 mixin（contrib/mixin/alerts/alerts.libsonnet）
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/etcd-io/etcd/blob/v3.7.3/contrib/mixin/alerts/alerts.libsonnet
+    checked: "2026-11-09, v3.7.3"
+    note: 預設 etcd_selector 是 job=~".*etcd.*"，clusterLabel 是 job（config.libsonnet）
+  etcd-doc-monitoring:
+    title: etcd 文件：Monitoring etcd
+    kind: upstream-doc
+    visibility: public
+    url: https://etcd.io/docs/v3.6/op-guide/monitoring/
+    checked: "2026-11-09"
+  etcd-doc-maintenance:
+    title: etcd 文件：Maintenance（compaction、defragmentation、space quota、alarm disarm）
+    kind: upstream-doc
+    visibility: public
+    url: https://etcd.io/docs/v3.6/op-guide/maintenance/
+    checked: "2026-11-09"

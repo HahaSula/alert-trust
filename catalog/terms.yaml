@@ -406,3 +406,61 @@ terms:
       - "`redis_exporter_last_scrape_duration_seconds`；比 scrape_timeout 長時，伺服器忙會讓 `up` 變 0、`redis_up` 消失"
     note: "設得比 scrape_timeout 短，exporter 會自己回 `redis_up=0` 與錯誤訊息。"
     refs: [rx-flag-timeout, rx-dial-timeouts, vk-exp]
+
+  # ---------- etcd ----------
+  etcd-quota-backend-bytes:
+    title: etcd backend quota
+    kind: config
+    systems: [etcd]
+    tokens: [--quota-backend-bytes, quota-backend-bytes]
+    where: "etcd 的 `--quota-backend-bytes` 或設定檔 `quota-backend-bytes`"
+    default: "0＝2GiB"
+    observe:
+      - "`etcd_server_quota_backend_bytes`；和 `etcd_mvcc_db_total_size_in_bytes`（檔案大小，不是使用中的大小）比"
+    note: "超過時發 NOSPACE alarm、拒絕寫入；compact＋defrag 不會解除，要 `etcdctl alarm disarm`。"
+    refs: [etcd-embed-quota-flag, etcd-quota-default, etcd-quota-available, etcd-exp]
+
+  etcd-auto-compaction-retention:
+    title: etcd 自動 compaction
+    kind: config
+    systems: [etcd]
+    tokens: [--auto-compaction-retention, auto-compaction-retention]
+    where: "etcd 的 `--auto-compaction-retention`（搭配 `--auto-compaction-mode` periodic／revision）"
+    default: "0（關閉）"
+    observe:
+      - "`etcd_debugging_mvcc_compact_revision` 有沒有前進；`etcd_debugging_mvcc_db_compaction_last` 重啟歸 0，不要拿來算多久沒跑"
+    refs: [etcd-embed-autocompact, etcd-compact-rev-restore, etcd-compaction-last]
+
+  etcd-metrics-level:
+    title: etcd metric 細節等級
+    kind: config
+    systems: [etcd]
+    tokens: [--metrics=extensive, --metrics=basic]
+    where: "etcd 的 `--metrics`"
+    default: "basic"
+    observe:
+      - "`grpc_server_handling_seconds_bucket` 只在 extensive 存在；basic 下 mixin 的 etcdGRPCRequestsSlow 回傳空"
+    note: "basic 也有 `etcd_server_request_duration_seconds`。"
+    refs: [etcd-embed-metrics-flag, etcd-grpc-histogram-extensive, etcd-exp]
+
+  etcd-listen-metrics-urls:
+    title: etcd 獨立的 metrics listener
+    kind: config
+    systems: [etcd]
+    tokens: [--listen-metrics-urls]
+    where: "etcd 的 `--listen-metrics-urls`"
+    default: "不設（/metrics 與健康端點只在 client port）"
+    observe:
+      - "這個 listener 也有 `/health`、`/livez`、`/readyz`，blackbox 可以探它"
+    refs: [etcd-embed-metrics-mux, dbm-etcd-listen-metrics]
+
+  etcd-warning-apply-duration:
+    title: etcd 慢 apply 門檻
+    kind: config
+    systems: [etcd]
+    tokens: [--warning-apply-duration]
+    where: "etcd 的 `--warning-apply-duration`"
+    default: "100ms"
+    observe:
+      - "超過時 `etcd_server_slow_apply_total` 加 1，並寫 warning log「apply request took too long」"
+    refs: [etcd-embed-warn-apply, etcd-txn-slow-apply]

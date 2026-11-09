@@ -1,0 +1,39 @@
+# etcd v3.7.3 三台、Prometheus v3.13.5、blackbox_exporter v0.27.0。執行 ./run.sh，結束會 docker compose down -v。
+# 只對外開 127.0.0.1：28001–28003（三台 etcd 的 client port）、28090（Prometheus）、28091（blackbox）。
+# --quota-backend-bytes 32MiB 是為了 NOSPACE 情境故意設小。
+name: at-etcd
+x-etcd: &etcd
+  image: gcr.io/etcd-development/etcd:v3.7.3
+  entrypoint: ["/usr/local/bin/etcd"]
+services:
+  e1:
+    <<: *etcd
+    command: [--name=e1, --data-dir=/var/lib/etcd, --listen-client-urls=http://0.0.0.0:2379, --advertise-client-urls=http://e1:2379,
+      --listen-peer-urls=http://0.0.0.0:2380, --initial-advertise-peer-urls=http://e1:2380,
+      "--initial-cluster=e1=http://e1:2380,e2=http://e2:2380,e3=http://e3:2380", --initial-cluster-state=new,
+      --initial-cluster-token=at-etcd, --quota-backend-bytes=33554432]
+    ports: ["127.0.0.1:28001:2379"]
+  e2:
+    <<: *etcd
+    command: [--name=e2, --data-dir=/var/lib/etcd, --listen-client-urls=http://0.0.0.0:2379, --advertise-client-urls=http://e2:2379,
+      --listen-peer-urls=http://0.0.0.0:2380, --initial-advertise-peer-urls=http://e2:2380,
+      "--initial-cluster=e1=http://e1:2380,e2=http://e2:2380,e3=http://e3:2380", --initial-cluster-state=new,
+      --initial-cluster-token=at-etcd, --quota-backend-bytes=33554432]
+    ports: ["127.0.0.1:28002:2379"]
+  e3:
+    <<: *etcd
+    command: [--name=e3, --data-dir=/var/lib/etcd, --listen-client-urls=http://0.0.0.0:2379, --advertise-client-urls=http://e3:2379,
+      --listen-peer-urls=http://0.0.0.0:2380, --initial-advertise-peer-urls=http://e3:2380,
+      "--initial-cluster=e1=http://e1:2380,e2=http://e2:2380,e3=http://e3:2380", --initial-cluster-state=new,
+      --initial-cluster-token=at-etcd, --quota-backend-bytes=33554432]
+    ports: ["127.0.0.1:28003:2379"]
+  blackbox:
+    image: prom/blackbox-exporter:v0.27.0
+    command: [--config.file=/etc/bb/blackbox.yml]
+    volumes: ["./blackbox.yml:/etc/bb/blackbox.yml:ro"]
+    ports: ["127.0.0.1:28091:9115"]
+  prometheus:
+    image: prom/prometheus:v3.13.5
+    command: [--config.file=/etc/lab/prometheus.yml, --web.enable-lifecycle, --storage.tsdb.path=/prometheus]
+    volumes: ["./prom:/etc/lab:ro", "../../../rules/targets/etcd.yml:/etc/rules/etcd.yml:ro"]
+    ports: ["127.0.0.1:28090:9090"]

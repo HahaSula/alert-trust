@@ -1,0 +1,226 @@
+環境：etcd v3.7.3 ×3（--quota-backend-bytes 32MiB，其他預設）、Prometheus v3.13.5（scrape 5s）、blackbox_exporter v0.27.0（timeout 4s）
+  $ [e1] etcdctl endpoint status --cluster -w table
+    ┌────────────────┬──────────────────┬─────────┬─────────────────┬─────────┬────────┬───────────────────────┬───────┬───────────┬────────────┬───────────┬────────────┬────────────────────┬────────┬──────────────────────────┬───────────────────┐
+    │    ENDPOINT    │        ID        │ VERSION │ STORAGE VERSION │ DB SIZE │ IN USE │ PERCENTAGE NOT IN USE │ QUOTA │ IS LEADER │ IS LEARNER │ RAFT TERM │ RAFT INDEX │ RAFT APPLIED INDEX │ ERRORS │ DOWNGRADE TARGET VERSION │ DOWNGRADE ENABLED │
+    ├────────────────┼──────────────────┼─────────┼─────────────────┼─────────┼────────┼───────────────────────┼───────┼───────────┼────────────┼───────────┼────────────┼────────────────────┼────────┼──────────────────────────┼───────────────────┤
+    │ http://e1:2379 │ 59a7fc3d1f69e653 │   3.7.3 │           3.7.0 │   20 kB │  16 kB │                   20% │ 34 MB │      true │      false │         2 │          8 │                  8 │        │                          │             false │
+    │ http://e2:2379 │ e4b6a4a877a6a0ef │   3.7.3 │           3.7.0 │   20 kB │  16 kB │                   20% │ 34 MB │     false │      false │         2 │          8 │                  8 │        │                          │             false │
+    │ http://e3:2379 │ ecca99eb90128d6f │   3.7.3 │           3.7.0 │   20 kB │  16 kB │                   20% │ 34 MB │     false │      false │         2 │          8 │                  8 │        │                          │             false │
+    └────────────────┴──────────────────┴─────────┴─────────────────┴─────────┴────────┴───────────────────────┴───────┴───────────┴────────────┴───────────┴────────────┴────────────────────┴────────┴──────────────────────────┴───────────────────┘
+
+## A 基線（23:36:34）
+    instance | up | readyz | livez | health | has_leader | is_leader | leader_changes
+    e1:2379 | 1 | 1 | 1 | 1 | 1 | 1 | 1
+    e2:2379 | 1 | 1 | 1 | 1 | 1 | 0 | 1
+    e3:2379 | 1 | 1 | 1 | 1 | 1 | 0 | 1
+    {'instance': 'e3:2379'} = 1584
+    {'instance': 'e2:2379'} = 1584
+    {'instance': 'e1:2379'} = 1602
+  預設 --metrics=basic：有沒有 server 端 gRPC histogram（mixin etcdGRPCRequestsSlow 用的）
+    （空）
+    {} = 105
+    etcd_network_known_peers{'Local': '59a7fc3d1f69e653', 'Remote': '59a7fc3d1f69e653', 'instance': 'e1:2379', 'job': 'etcd'} = 1
+    etcd_network_known_peers{'Local': '59a7fc3d1f69e653', 'Remote': 'e4b6a4a877a6a0ef', 'instance': 'e1:2379', 'job': 'etcd'} = 1
+    etcd_network_known_peers{'Local': '59a7fc3d1f69e653', 'Remote': 'ecca99eb90128d6f', 'instance': 'e1:2379', 'job': 'etcd'} = 1
+    etcd_server_feature_enabled{'instance': 'e1:2379', 'job': 'etcd', 'name': 'CompactHashCheck', 'stage': 'ALPHA'} = 0
+    etcd_server_feature_enabled{'instance': 'e1:2379', 'job': 'etcd', 'name': 'InitialCorruptCheck', 'stage': 'ALPHA'} = 0
+    etcd_server_quota_backend_bytes{'instance': 'e3:2379', 'job': 'etcd'} = 33554432
+    etcd_server_quota_backend_bytes{'instance': 'e2:2379', 'job': 'etcd'} = 33554432
+    etcd_server_quota_backend_bytes{'instance': 'e1:2379', 'job': 'etcd'} = 33554432
+    etcd_server_is_learner{'instance': 'e3:2379', 'job': 'etcd'} = 0
+    etcd_server_is_learner{'instance': 'e2:2379', 'job': 'etcd'} = 0
+    etcd_server_is_learner{'instance': 'e1:2379', 'job': 'etcd'} = 0
+  /metrics 的 metric 名稱 193 個，存到 results/names-etcd-3.7.3.txt
+    pending EtcdCorruptionCheckDisabled e1:2379
+    pending EtcdCorruptionCheckDisabled e2:2379
+    pending EtcdCorruptionCheckDisabled e3:2379
+
+## B 停掉 leader（docker kill），20 秒後（23:36:35）
+  leader 是 e1
+    instance | up | readyz | livez | health | has_leader | is_leader | leader_changes
+    e1:2379 | 0 | 0 | 0 | 0 | （無） | （無） | （無）
+    e2:2379 | 1 | 1 | 1 | 1 | 1 | 1 | 2
+    e3:2379 | 1 | 1 | 1 | 1 | 1 | 0 | 2
+    {} = 1
+    pending EtcdCorruptionCheckDisabled e2:2379
+    pending EtcdCorruptionCheckDisabled e3:2379
+    pending EtcdEndpointDown e1:2379
+    pending EtcdHealthProbeFailing e1:2379
+    pending EtcdMembersNotScraped etcd
+    pending EtcdReadyzProbeFailing e1:2379
+  e1 重新啟動 20 秒後
+    instance | up | readyz | livez | health | has_leader | is_leader | leader_changes
+    e1:2379 | 1 | 1 | 1 | 1 | 1 | 0 | 1
+    e2:2379 | 1 | 1 | 1 | 1 | 1 | 1 | 2
+    e3:2379 | 1 | 1 | 1 | 1 | 1 | 0 | 2
+
+## C 停掉 3 台中的 2 台（失去 quorum）（23:37:19）
+  存活：e3（host port 28003）；15 秒後
+    instance | up | readyz | livez | health | has_leader | is_leader | leader_changes
+    e1:2379 | 0 | 0 | 0 | 0 | （無） | （無） | （無）
+    e2:2379 | 0 | 0 | 0 | 0 | （無） | （無） | （無）
+    e3:2379 | 1 | 0 | 1 | 0 | 0 | 0 | 2
+  直接打存活的 member（主機時鐘）：
+    GET :28003/metrics -> 200，0.02s（主機時鐘），185294 bytes
+    GET :28003/livez -> 200，0.02s（主機時鐘），3 bytes：ok
+    GET :28003/readyz -> TimeoutError，10.02s（主機時鐘），9 bytes：timed out
+    GET :28003/health -> 503，0.02s（主機時鐘），45 bytes：{"health":"false","reason":"RAFT NO LEADER"}
+    GET :28003/readyz?verbose -> 503，7.02s（主機時鐘），124 bytes：[+]non_learner ok ⏎ [+]data_corruption ok ⏎ [+]serializable_read ok ⏎ [-]linearizable_read failed: etcdserver: request timed out
+  寫入：
+  $ [e3] etcdctl --command-timeout=5s put k1 v1
+    {"level":"warn","ts":"2026-11-09T15:38:01.085774Z","logger":"etcd-client","caller":"v3/retry_interceptor.go:68","msg":"retrying of unary invoker failed","target":"etcd-endpoints://0x28827297ae00/127.0.0.1:2379","peer":"Peer{Addr: '127.0.0.1:2379', LocalAddr: '127.0.0.1:53024', AuthInfo: 'insecure'}","method":"/etcdserverpb.KV/Put","attempt":0,"error":"rpc error: code = DeadlineExceeded desc = stream terminated by RST_STREAM with error code: CANCEL"}
+    Error: context deadline exceeded
+  再等 70 秒讓 for: 1m 的規則觸發
+    instance | up | readyz | livez | health | has_leader | is_leader | leader_changes
+    e1:2379 | 0 | 0 | 0 | 0 | （無） | （無） | （無）
+    e2:2379 | 0 | 0 | 0 | 0 | （無） | （無） | （無）
+    e3:2379 | 1 | 0 | 1 | 0 | 0 | 0 | 2
+    pending EtcdCorruptionCheckDisabled e3:2379
+    pending EtcdEndpointDown e1:2379
+    pending EtcdEndpointDown e2:2379
+    firing  EtcdHealthProbeFailing e1:2379
+    firing  EtcdHealthProbeFailing e2:2379
+    firing  EtcdHealthProbeFailing e3:2379
+    firing  EtcdLeaderCountWrong etcd
+    pending EtcdMembersNotScraped etcd
+    firing  EtcdNoLeader e3:2379
+    firing  EtcdQuorumAtRisk etcd
+    firing  EtcdReadyzProbeFailing e1:2379
+    firing  EtcdReadyzProbeFailing e2:2379
+    firing  EtcdReadyzProbeFailing e3:2379
+    firing  EtcdServingMetricsButNotReady e3:2379
+    pending EtcdSlowApplies e3:2379
+    etcd_server_proposals_failed_total{'instance': 'e3:2379', 'job': 'etcd'} = 1
+    probe_duration_seconds{'instance': 'e2:2379', 'job': 'etcd-readyz'} = 2.813146783
+    probe_duration_seconds{'instance': 'e1:2379', 'job': 'etcd-readyz'} = 2.817035429
+    probe_duration_seconds{'instance': 'e3:2379', 'job': 'etcd-readyz'} = 3.501142252
+  e1、e2 重新啟動 25 秒後
+    instance | up | readyz | livez | health | has_leader | is_leader | leader_changes
+    e1:2379 | 1 | 1 | 1 | 1 | 1 | 0 | 1
+    e2:2379 | 1 | 1 | 1 | 1 | 1 | 0 | 1
+    e3:2379 | 1 | 1 | 1 | 1 | 1 | 1 | 3
+
+## D 只有 scrape 失敗：job="etcd" 加 sample_limit: 100（etcd 一次輸出上千個 sample）（23:39:46）
+    instance | up | readyz | livez | health | has_leader | is_leader | leader_changes
+    e1:2379 | 0 | 1 | 1 | 1 | 1 | 0 | 1
+    e2:2379 | 0 | 1 | 1 | 1 | （無） | （無） | （無）
+    e3:2379 | 0 | 1 | 1 | 1 | （無） | （無） | （無）
+    pending EtcdCorruptionCheckDisabled e1:2379
+    pending EtcdEndpointDown e1:2379
+    pending EtcdEndpointDown e2:2379
+    pending EtcdEndpointDown e3:2379
+    firing  EtcdLeaderCountWrong etcd
+    firing  EtcdQuorumAtRisk etcd
+    pending EtcdScrapeFailingButReady e1:2379
+    pending EtcdScrapeFailingButReady e2:2379
+    pending EtcdScrapeFailingButReady e3:2379
+    pending EtcdSlowApplies e3:2379
+
+## E /metrics 會不會被讀取或刪除卡住（endpoint-blocking）（23:41:27）
+    put 3000 個 key（每個 2048 bytes）全部成功
+    無負載基線：/metrics 10 次，非 200 0 次；耗時 min 0.004s、中位 0.004s、max 0.020s（主機時鐘）
+    4 條執行緒 20 秒內共讀 847 次整個 prefix（每次回應 8490931 bytes）
+    讀取負載中：/metrics 39 次，非 200 0 次；耗時 min 0.005s、中位 0.012s、max 0.024s（主機時鐘）
+    deleterange -> 200，0.01s：{"header":{"cluster_id":"11044242597399619407","member_id":"6460409529936504403","revision":"3002","raft_term":"4"},"del
+    刪除期間：/metrics 5 次，非 200 0 次；耗時 min 0.004s、中位 0.005s、max 0.021s（主機時鐘）
+
+## F NOSPACE：寫到 quota（32MiB）（23:42:13）
+    put #97 -> 429：{"code":8,"message":"etcdserver: mvcc: database space exceeded"}
+  $ [e1] etcdctl alarm list
+    memberID:6460409529936504403 alarm:NOSPACE
+    memberID:16480540929877778671 alarm:NOSPACE
+    instance | up | readyz | livez | health | has_leader | is_leader | leader_changes
+    e1:2379 | 1 | 1 | 1 | 0 | 1 | 0 | 1
+    e2:2379 | 1 | 1 | 1 | 0 | 1 | 0 | 1
+    e3:2379 | 1 | 1 | 1 | 0 | 1 | 1 | 3
+    etcd_debugging_server_alarms{'alarm_type': 'NOSPACE', 'instance': 'e2:2379', 'job': 'etcd', 'server_id': '59a7fc3d1f69e653'} = 1
+    etcd_debugging_server_alarms{'alarm_type': 'NOSPACE', 'instance': 'e2:2379', 'job': 'etcd', 'server_id': 'e4b6a4a877a6a0ef'} = 1
+    etcd_debugging_server_alarms{'alarm_type': 'NOSPACE', 'instance': 'e1:2379', 'job': 'etcd', 'server_id': '59a7fc3d1f69e653'} = 1
+    etcd_debugging_server_alarms{'alarm_type': 'NOSPACE', 'instance': 'e1:2379', 'job': 'etcd', 'server_id': 'e4b6a4a877a6a0ef'} = 1
+    etcd_debugging_server_alarms{'alarm_type': 'NOSPACE', 'instance': 'e3:2379', 'job': 'etcd', 'server_id': '59a7fc3d1f69e653'} = 1
+    etcd_debugging_server_alarms{'alarm_type': 'NOSPACE', 'instance': 'e3:2379', 'job': 'etcd', 'server_id': 'e4b6a4a877a6a0ef'} = 1
+    {'instance': 'e3:2379', 'job': 'etcd'} = 1.0699462890625
+    {'instance': 'e2:2379', 'job': 'etcd'} = 1.0772705078125
+    {'instance': 'e1:2379', 'job': 'etcd'} = 1.064453125
+    GET :28001/readyz -> 200，0.02s（主機時鐘），3 bytes：ok
+    GET :28001/livez -> 200，0.02s（主機時鐘），3 bytes：ok
+    GET :28001/health -> 503，0.02s（主機時鐘），44 bytes：{"health":"false","reason":"ALARM NOSPACE"}
+  寫入與刪除：
+  $ [e1] etcdctl put k2 v2
+    {"level":"warn","ts":"2026-11-09T15:42:27.551631Z","logger":"etcd-client","caller":"v3/retry_interceptor.go:68","msg":"retrying of unary invoker failed","target":"etcd-endpoints://0x700120d4e00/127.0.0.1:2379","peer":"Peer{Addr: '127.0.0.1:2379', LocalAddr: '127.0.0.1:45178', AuthInfo: 'insecure'}","method":"/etcdserverpb.KV/Put","attempt":0,"error":"rpc error: code = ResourceExhausted desc = etcdserver: mvcc: database space exceeded"}
+    Error: etcdserver: mvcc: database space exceeded
+  $ [e1] etcdctl del /fill/000000
+    1
+
+## F2 compact 到目前 revision、每台 defrag 之後（alarm 還沒 disarm）（23:42:27）
+  $ [e1] etcdctl del --prefix /fill/
+    96
+  $ [e1] etcdctl compact 3101 --physical
+    compacted revision 3101
+  $ [e1] etcdctl defrag --cluster
+    Finished defragmenting etcd member[http://e1:2379]. took 13.870039ms
+    Finished defragmenting etcd member[http://e2:2379]. took 13.153898ms
+    Finished defragmenting etcd member[http://e3:2379]. took 13.10508ms
+    {'instance': 'e3:2379', 'job': 'etcd'} = 0.0009765625
+    {'instance': 'e2:2379', 'job': 'etcd'} = 0.0009765625
+    {'instance': 'e1:2379', 'job': 'etcd'} = 0.0009765625
+    etcd_debugging_mvcc_compact_revision{'instance': 'e3:2379', 'job': 'etcd'} = 3101
+    etcd_debugging_mvcc_compact_revision{'instance': 'e2:2379', 'job': 'etcd'} = 3101
+    etcd_debugging_mvcc_compact_revision{'instance': 'e1:2379', 'job': 'etcd'} = 3101
+  $ [e1] etcdctl alarm list
+    memberID:16480540929877778671 alarm:NOSPACE
+    memberID:6460409529936504403 alarm:NOSPACE
+  $ [e1] etcdctl put k3 v3
+    {"level":"warn","ts":"2026-11-09T15:42:44.261829Z","logger":"etcd-client","caller":"v3/retry_interceptor.go:68","msg":"retrying of unary invoker failed","target":"etcd-endpoints://0x16e3e0054c00/127.0.0.1:2379","peer":"Peer{Addr: '127.0.0.1:2379', LocalAddr: '127.0.0.1:36990', AuthInfo: 'insecure'}","method":"/etcdserverpb.KV/Put","attempt":0,"error":"rpc error: code = ResourceExhausted desc = etcdserver: mvcc: database space exceeded"}
+    Error: etcdserver: mvcc: database space exceeded
+    firing  EtcdAlarmActive e1:2379
+    firing  EtcdAlarmActive e1:2379
+    firing  EtcdAlarmActive e2:2379
+    firing  EtcdAlarmActive e2:2379
+    firing  EtcdAlarmActive e3:2379
+    firing  EtcdAlarmActive e3:2379
+    pending EtcdCorruptionCheckDisabled e1:2379
+    pending EtcdCorruptionCheckDisabled e2:2379
+    pending EtcdCorruptionCheckDisabled e3:2379
+    pending EtcdDbGrowthToQuota e1:2379
+    pending EtcdDbGrowthToQuota e2:2379
+    pending EtcdDbGrowthToQuota e3:2379
+    pending EtcdHealthProbeFailing e1:2379
+    pending EtcdHealthProbeFailing e2:2379
+    pending EtcdHealthProbeFailing e3:2379
+    pending EtcdSlowApplies e3:2379
+
+## F3 alarm 仍在時重啟 e2：e2 的 etcd_debugging_server_alarms 還在嗎（23:42:44）
+    etcd_debugging_server_alarms{'alarm_type': 'NOSPACE', 'instance': 'e1:2379', 'job': 'etcd', 'server_id': '59a7fc3d1f69e653'} = 2
+    etcd_debugging_server_alarms{'alarm_type': 'NOSPACE', 'instance': 'e1:2379', 'job': 'etcd', 'server_id': 'e4b6a4a877a6a0ef'} = 1
+    etcd_debugging_server_alarms{'alarm_type': 'NOSPACE', 'instance': 'e3:2379', 'job': 'etcd', 'server_id': '59a7fc3d1f69e653'} = 2
+    etcd_debugging_server_alarms{'alarm_type': 'NOSPACE', 'instance': 'e3:2379', 'job': 'etcd', 'server_id': 'e4b6a4a877a6a0ef'} = 1
+  $ [e2] etcdctl alarm list
+    memberID:6460409529936504403 alarm:NOSPACE
+    memberID:16480540929877778671 alarm:NOSPACE
+    GET :28002/health -> 503，0.02s（主機時鐘），44 bytes：{"health":"false","reason":"ALARM NOSPACE"}
+    GET :28002/readyz -> 200，0.02s（主機時鐘），3 bytes：ok
+    instance | up | readyz | livez | health | has_leader | is_leader | leader_changes
+    e1:2379 | 1 | 1 | 1 | 0 | 1 | 0 | 1
+    e2:2379 | 1 | 1 | 1 | 0 | 1 | 0 | 1
+    e3:2379 | 1 | 1 | 1 | 0 | 1 | 1 | 3
+
+## F4 disarm（23:43:06）
+  $ [e1] etcdctl alarm disarm
+    memberID:6460409529936504403 alarm:NOSPACE
+    memberID:16480540929877778671 alarm:NOSPACE
+  $ [e1] etcdctl put k4 v4
+    OK
+    instance | up | readyz | livez | health | has_leader | is_leader | leader_changes
+    e1:2379 | 1 | 1 | 1 | 1 | 1 | 0 | 1
+    e2:2379 | 1 | 1 | 1 | 1 | 1 | 0 | 1
+    e3:2379 | 1 | 1 | 1 | 1 | 1 | 1 | 3
+    etcd_debugging_server_alarms{'alarm_type': 'NOSPACE', 'instance': 'e2:2379', 'job': 'etcd', 'server_id': '59a7fc3d1f69e653'} = -1
+    etcd_debugging_server_alarms{'alarm_type': 'NOSPACE', 'instance': 'e2:2379', 'job': 'etcd', 'server_id': 'e4b6a4a877a6a0ef'} = -1
+    etcd_debugging_server_alarms{'alarm_type': 'NOSPACE', 'instance': 'e1:2379', 'job': 'etcd', 'server_id': '59a7fc3d1f69e653'} = 1
+    etcd_debugging_server_alarms{'alarm_type': 'NOSPACE', 'instance': 'e1:2379', 'job': 'etcd', 'server_id': 'e4b6a4a877a6a0ef'} = 0
+    etcd_debugging_server_alarms{'alarm_type': 'NOSPACE', 'instance': 'e3:2379', 'job': 'etcd', 'server_id': '59a7fc3d1f69e653'} = 1
+    etcd_debugging_server_alarms{'alarm_type': 'NOSPACE', 'instance': 'e3:2379', 'job': 'etcd', 'server_id': 'e4b6a4a877a6a0ef'} = 0
+
+## 結束（23:43:22）
+  殘留容器：0

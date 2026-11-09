@@ -1,0 +1,338 @@
+# etcd（內建 /metrics，model: native）的建議規則。etcd v3.7.3。
+# 選擇器是佔位用的，請換成實際的 job 名稱：
+#   job="etcd"         Prometheus 直接抓每個 member 的 /metrics（client port 或 --listen-metrics-urls）
+#   job="etcd-readyz"  blackbox_exporter 的 http probe 探每個 member 的 /readyz
+#   job="etcd-health"  blackbox_exporter 的 http probe 探每個 member 的 /health（/readyz 不看 NOSPACE alarm，/health 會）
+# 兩個 probe job 都要把 instance relabel 成和 job="etcd" 相同的 host:port（例子見 lab/targets/etcd/prometheus.yml），
+# 三方交叉（up、probe、etcd_server_has_leader）才能用 on (instance) 對上。
+# 一個 job 代表一個 etcd 叢集（和官方 mixin 的 clusterLabel: job 相同）；多個叢集共用 job 時把 by (job) 換成你的 cluster label。
+# 門檻以 scrape_interval 15s、scrape_timeout 10s 為基準；標「例子」的數字沒有官方依據，請依環境調整。
+# runbook_url 指向 alert-trust 網站上對應訊號的段落。
+groups:
+  - name: etcd-liveness
+    rules:
+      - alert: EtcdEndpointDown
+        expr: up{job="etcd"} == 0
+        for: 2m
+        labels: { severity: critical, component: etcd, tier: "1", aspect: exporter }
+        annotations:
+          summary: "抓不到 etcd member {{ $labels.instance }} 的 /metrics；和 EtcdReadyzProbeFailing 一起看：兩者都響是 process 或主機，只有這條響是 scrape 路徑"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#endpoint-up
+      - alert: EtcdEndpointMissing
+        expr: absent(up{job="etcd"})
+        for: 5m
+        labels: { severity: critical, component: etcd, tier: "1", aspect: exporter }
+        annotations:
+          summary: "完全沒有 etcd 的 target，服務發現或 job 名稱可能錯了"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#endpoint-up
+      - alert: EtcdReadyzProbeFailing
+        expr: probe_success{job="etcd-readyz"} == 0
+        for: 1m
+        labels: { severity: critical, component: etcd, tier: "1", aspect: exporter }
+        annotations:
+          summary: "/readyz 探測失敗（{{ $labels.instance }}）：沒有 leader、linearizable read 逾時、CORRUPT alarm，或這台是 learner"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#health-second-path
+          absence_covered_by: "EtcdReadyzProbeMissing"
+      - alert: EtcdReadyzProbeMissing
+        expr: absent(probe_success{job="etcd-readyz"})
+        for: 5m
+        labels: { severity: warning, component: etcd, tier: "1", aspect: exporter }
+        annotations:
+          summary: "沒有 /readyz 探測結果；blackbox_exporter 停了或 job 名稱不對，三方交叉只剩 up 一條路"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#health-second-path
+      - alert: EtcdServingMetricsButNotReady
+        expr: |
+          up{job="etcd"} == 1
+            and on (instance) probe_success{job="etcd-readyz"} == 0
+        for: 1m
+        labels: { severity: critical, component: etcd, tier: "1", aspect: exporter }
+        annotations:
+          summary: "{{ $labels.instance }} 照常回應 /metrics（up=1），/readyz 卻失敗：process 活著但不能服務（失去 quorum 時就是這樣）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#health-second-path
+          absence_covered_by: "EtcdReadyzProbeMissing, EtcdEndpointMissing"
+      - alert: EtcdScrapeFailingButReady
+        expr: |
+          up{job="etcd"} == 0
+            and on (instance) probe_success{job="etcd-readyz"} == 1
+        for: 2m
+        labels: { severity: warning, component: etcd, tier: "1", aspect: exporter }
+        annotations:
+          summary: "{{ $labels.instance }} 的 /readyz 正常，/metrics 卻抓不到：問題在 scrape 本身（sample_limit、body_size_limit、逾時、網路政策）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#health-second-path
+      - alert: EtcdMetricFamiliesMissing
+        expr: |
+          up{job="etcd"} == 1
+            unless on (job, instance) (
+              etcd_server_has_leader{job="etcd"}
+              and on (job, instance) etcd_mvcc_db_total_size_in_bytes{job="etcd"}
+              and on (job, instance) etcd_disk_wal_fsync_duration_seconds_count{job="etcd"}
+            )
+        for: 5m
+        labels: { severity: warning, component: etcd, tier: "1", aspect: exporter }
+        annotations:
+          summary: "{{ $labels.instance }} 有回應，但 has_leader、db_total_size 或 wal_fsync 不見了；抓到的可能不是 etcd，或 metric 改名了"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#metric-families-present
+      - alert: EtcdSamplesDropped
+        expr: scrape_samples_scraped{job="etcd"} < 0.5 * (scrape_samples_scraped{job="etcd"} offset 1h)
+        for: 10m
+        labels: { severity: warning, component: etcd, tier: "1", aspect: exporter }
+        annotations:
+          summary: "{{ $labels.instance }} 的 sample 數比一小時前少一半以上，有一批 metric 消失了（例如 --metrics 從 extensive 改回 basic）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#metric-families-present
+      - alert: EtcdScrapeNearTimeout
+        expr: scrape_duration_seconds{job="etcd"} > 8
+        for: 5m
+        labels: { severity: warning, component: etcd, tier: "2", aspect: exporter }
+        annotations:
+          summary: "{{ $labels.instance }} 的 scrape 要 {{ $value }} 秒，接近 scrape_timeout（例子：10 秒）；超過時整個 target 消失"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#scrape-budget
+
+  - name: etcd-consensus
+    rules:
+      - alert: EtcdNoLeader
+        expr: etcd_server_has_leader{job="etcd"} == 0
+        for: 1m
+        labels: { severity: critical, component: etcd, tier: "1", aspect: availability }
+        annotations:
+          summary: "{{ $labels.instance }} 沒有 leader：這台的讀寫都會失敗。member 停機時這條 series 消失，由 EtcdEndpointDown 補位"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#has-leader
+          absence_covered_by: "EtcdMetricFamiliesMissing, EtcdEndpointDown, EtcdEndpointMissing"
+      - alert: EtcdQuorumAtRisk
+        expr: |
+          (count(probe_success{job="etcd-readyz"} == 1) or vector(0))
+            < (floor(max(count by (Local) (etcd_network_known_peers{job="etcd"} == 1)) / 2) + 1)
+        for: 1m
+        labels: { severity: critical, component: etcd, tier: "1", aspect: cluster }
+        annotations:
+          summary: "/readyz 探測成功（linearizable read 通過）的 member 少於成員數的過半；成員數取自 etcd 自己的 known_peers，不是 scrape target 數。寫入會停"
+          description: "一個 probe job 對一個叢集。用 /readyz 而不用 has_leader 計數：scrape 失敗時 has_leader 會消失或停在舊值，計數會誤報（lab 情境 D）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#quorum
+      - alert: EtcdLeaderCountWrong
+        expr: |
+          sum by (job) (etcd_server_is_leader{job="etcd"}) != 1
+            unless on (job) (up{job="etcd"} == 0)
+        for: 1m
+        labels: { severity: critical, component: etcd, tier: "2", aspect: cluster }
+        annotations:
+          summary: "叢集 {{ $labels.job }} 有 {{ $value }} 個 leader；0 是沒有 leader，大於 1 是舊 leader 還沒發現自己失去 quorum（或 job 混了兩個叢集）。有 member 抓不到時不評估（那時的總和不可信），由 EtcdEndpointDown 與 EtcdQuorumAtRisk 負責"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#role-detection
+      - alert: EtcdFrequentLeaderChanges
+        expr: increase((max by (job) (etcd_server_leader_changes_seen_total{job="etcd"}))[15m:1m]) >= 4
+        for: 5m
+        labels: { severity: warning, component: etcd, tier: "2", aspect: cluster }
+        annotations:
+          summary: "15 分鐘內換了 {{ $value }} 次 leader；常見原因是磁碟慢（heartbeat 送不出去）或網路延遲"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#leader-changes
+      - alert: EtcdMembersNotScraped
+        expr: |
+          count by (job) (up{job="etcd"} == 1)
+            < on (job) max by (job) (count by (job, Local) (etcd_network_known_peers{job="etcd"} == 1))
+        for: 5m
+        labels: { severity: warning, component: etcd, tier: "2", aspect: cluster }
+        annotations:
+          summary: "etcd 自己記得的成員數比 Prometheus 抓得到的 member 多：有 member 停了，或沒有加進 scrape 設定"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#component-count
+      - alert: EtcdPeerRttHigh
+        expr: histogram_quantile(0.99, rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[5m])) > 0.15
+        for: 10m
+        labels: { severity: warning, component: etcd, tier: "2", aspect: cluster }
+        annotations:
+          summary: "{{ $labels.instance }} 到 {{ $labels.To }} 的 peer RTT p99 是 {{ $value }} 秒（官方 mixin 門檻 0.15）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#peer-network
+      - alert: EtcdPeerSendFailures
+        expr: rate(etcd_network_peer_sent_failures_total{job="etcd"}[5m]) > 0.01
+        for: 10m
+        labels: { severity: warning, component: etcd, tier: "2", aspect: cluster }
+        annotations:
+          summary: "{{ $labels.instance }} 送往 {{ $labels.To }} 的 raft 訊息持續失敗；對方停機或網路分割"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#peer-network
+      - alert: EtcdLearnerNotPromoted
+        expr: etcd_server_is_learner{job="etcd"} == 1
+        for: 1h
+        labels: { severity: info, component: etcd, tier: "3", aspect: cluster }
+        annotations:
+          summary: "{{ $labels.instance }} 當 learner 超過 1 小時（例子）；learner 不算 quorum，它的 /readyz 一定失敗"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#learner
+
+  - name: etcd-replication
+    rules:
+      - alert: EtcdApplyLagging
+        expr: |
+          max by (job) (etcd_server_proposals_committed_total{job="etcd"})
+            - on (job) group_right etcd_server_proposals_applied_total{job="etcd"}
+          > 5000
+        for: 5m
+        labels: { severity: warning, component: etcd, tier: "2", aspect: replication }
+        annotations:
+          summary: "{{ $labels.instance }} 套用的 raft index 落後叢集最新 commit {{ $value }} 筆（例子：5000，等於預設 snapshot-catchup-entries）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#replication-lag
+      - alert: EtcdSnapshotTransferFailing
+        expr: increase(etcd_network_snapshot_send_failures{job="etcd"}[30m]) > 0 or increase(etcd_network_snapshot_receive_failures{job="etcd"}[30m]) > 0
+        for: 0m
+        labels: { severity: warning, component: etcd, tier: "3", aspect: replication }
+        annotations:
+          summary: "{{ $labels.instance }} 的 raft snapshot 傳送或接收失敗；落後太多的 follower 只能靠 snapshot 追上"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#snapshot-transfer
+
+  - name: etcd-disk
+    rules:
+      - alert: EtcdWalFsyncSlow
+        expr: histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[5m])) > 0.5
+        for: 10m
+        labels: { severity: warning, component: etcd, tier: "2", aspect: saturation }
+        annotations:
+          summary: "{{ $labels.instance }} WAL fsync p99 {{ $value }} 秒（官方 mixin：0.5 warning）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#wal-fsync
+      - alert: EtcdWalFsyncVerySlow
+        expr: histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[5m])) > 1
+        for: 10m
+        labels: { severity: critical, component: etcd, tier: "2", aspect: saturation }
+        annotations:
+          summary: "{{ $labels.instance }} WAL fsync p99 {{ $value }} 秒（官方 mixin：1 critical）；leader 的 heartbeat 會送不出去"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#wal-fsync
+      - alert: EtcdBackendCommitSlow
+        expr: histogram_quantile(0.99, rate(etcd_disk_backend_commit_duration_seconds_bucket{job="etcd"}[5m])) > 0.25
+        for: 10m
+        labels: { severity: warning, component: etcd, tier: "2", aspect: saturation }
+        annotations:
+          summary: "{{ $labels.instance }} backend（bbolt）commit p99 {{ $value }} 秒（官方 mixin：0.25）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#backend-commit
+      - alert: EtcdSlowApplies
+        expr: increase(etcd_server_slow_apply_total{job="etcd"}[10m]) > 10
+        for: 5m
+        labels: { severity: warning, component: etcd, tier: "2", aspect: saturation }
+        annotations:
+          summary: "{{ $labels.instance }} 10 分鐘內有 {{ $value }} 次 apply 超過 --warning-apply-duration（預設 100ms；次數門檻是例子）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#slow-apply
+      - alert: EtcdHeartbeatSendFailures
+        expr: increase(etcd_server_heartbeat_send_failures_total{job="etcd"}[10m]) > 0
+        for: 5m
+        labels: { severity: warning, component: etcd, tier: "2", aspect: saturation }
+        annotations:
+          summary: "leader {{ $labels.instance }} 沒有在 2 倍 heartbeat interval 內送出 heartbeat；通常是磁碟慢"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#slow-apply
+      - alert: EtcdProposalsPendingHigh
+        expr: etcd_server_proposals_pending{job="etcd"} > 100
+        for: 5m
+        labels: { severity: warning, component: etcd, tier: "2", aspect: saturation }
+        annotations:
+          summary: "{{ $labels.instance }} 有 {{ $value }} 個提案在等 commit（例子：100）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#proposals-pending
+      - alert: EtcdFdNearLimit
+        expr: os_fd_used{job="etcd"} / os_fd_limit{job="etcd"} > 0.8
+        for: 10m
+        labels: { severity: warning, component: etcd, tier: "2", aspect: saturation }
+        annotations:
+          summary: "{{ $labels.instance }} 用了 {{ $value | humanizePercentage }} 的 file descriptor"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#fd-headroom
+
+  - name: etcd-workload
+    rules:
+      - alert: EtcdGrpcErrorRate
+        expr: |
+          100 * sum without (grpc_type, grpc_code) (rate(grpc_server_handled_total{job="etcd", grpc_code=~"Unknown|FailedPrecondition|ResourceExhausted|Internal|Unavailable|DataLoss|DeadlineExceeded"}[5m]))
+            / sum without (grpc_type, grpc_code) (rate(grpc_server_handled_total{job="etcd"}[5m]))
+          > 5
+        for: 5m
+        labels: { severity: critical, component: etcd, tier: "2", aspect: workload }
+        annotations:
+          summary: "{{ $labels.instance }} 的 {{ $labels.grpc_method }} 有 {{ $value }}% 失敗（官方 mixin 的 critical 門檻）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#grpc-errors
+      - alert: EtcdProposalsFailing
+        expr: increase(etcd_server_proposals_failed_total{job="etcd"}[15m]) > 5
+        for: 5m
+        labels: { severity: warning, component: etcd, tier: "2", aspect: workload }
+        annotations:
+          summary: "{{ $labels.instance }} 15 分鐘內有 {{ $value }} 個提案失敗（例子：5 次；官方 mixin 是每秒 5 次）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#proposals-failed
+      - alert: EtcdRequestSlow
+        expr: |
+          histogram_quantile(0.99, sum by (job, instance, type, le) (rate(etcd_server_request_duration_seconds_bucket{job="etcd", success="true"}[5m])))
+          > 0.15
+        for: 10m
+        labels: { severity: warning, component: etcd, tier: "3", aspect: workload }
+        annotations:
+          summary: "{{ $labels.instance }} 的 {{ $labels.type }} 請求 p99 {{ $value }} 秒（例子：0.15，借用 mixin gRPC 門檻）；這個 histogram 在預設 --metrics=basic 就有"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#request-latency
+
+  - name: etcd-alarms
+    rules:
+      - alert: EtcdAlarmActive
+        expr: |
+          etcd_debugging_server_alarms{job="etcd"} > 0
+            and on (instance) probe_success{job="etcd-health"} == 0
+        for: 1m
+        labels: { severity: critical, component: etcd, tier: "1", aspect: availability }
+        annotations:
+          summary: "{{ $labels.alarm_type }} alarm 啟動中（由 member {{ $labels.server_id }} 提出）；NOSPACE 時寫入全部被拒，要 compact、defrag 後再 etcdctl alarm disarm"
+          description: "etcd_debugging_server_alarms 是「套用過幾次 activate」的計數，不是 0／1 狀態：重複提出會變 2，disarm 後可能停在 1，重啟的 member 沒有這條、disarm 後變 -1（lab 情境 F）。所以要和 /health 探測一起成立才告警；alarm_type 只拿來標示種類"
+          absence_covered_by: "EtcdHealthProbeFailing, EtcdHealthProbeMissing"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#alarms
+      - alert: EtcdHealthProbeFailing
+        expr: probe_success{job="etcd-health"} == 0
+        for: 1m
+        labels: { severity: critical, component: etcd, tier: "1", aspect: availability }
+        annotations:
+          summary: "/health 探測失敗（{{ $labels.instance }}）：有 alarm（NOSPACE、CORRUPT）、沒有 leader，或讀不到。/readyz 不看 NOSPACE，這條才看得到"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#alarms
+          absence_covered_by: "EtcdHealthProbeMissing"
+      - alert: EtcdHealthProbeMissing
+        expr: absent(probe_success{job="etcd-health"})
+        for: 5m
+        labels: { severity: warning, component: etcd, tier: "1", aspect: availability }
+        annotations:
+          summary: "沒有 /health 探測結果；NOSPACE alarm 在 member 重啟後只剩這條路看得到"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#alarms
+
+  - name: etcd-maintenance
+    rules:
+      - alert: EtcdDbFragmented
+        expr: |
+          (last_over_time(etcd_mvcc_db_total_size_in_use_in_bytes{job="etcd"}[5m]) / last_over_time(etcd_mvcc_db_total_size_in_bytes{job="etcd"}[5m])) < 0.5
+            and etcd_mvcc_db_total_size_in_use_in_bytes{job="etcd"} > 104857600
+        for: 10m
+        labels: { severity: warning, component: etcd, tier: "3", aspect: maintenance }
+        annotations:
+          summary: "{{ $labels.instance }} 只用了配置空間的 {{ $value | humanizePercentage }}；compaction 不會縮小檔案，要 defrag（官方 mixin 門檻）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#defrag
+      - alert: EtcdCompactionNotRunning
+        expr: |
+          changes(etcd_debugging_mvcc_compact_revision{job="etcd"}[1d]) == 0
+            and delta(etcd_debugging_mvcc_current_revision{job="etcd"}[1d]) > 0
+        for: 1h
+        labels: { severity: warning, component: etcd, tier: "3", aspect: maintenance }
+        annotations:
+          summary: "{{ $labels.instance }} 一天內有寫入但沒有 compaction；--auto-compaction-retention 預設 0（關閉），舊 revision 會一直累積到 quota"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#compaction
+      - alert: EtcdCorruptionCheckDisabled
+        expr: etcd_server_feature_enabled{job="etcd", name="CompactHashCheck"} == 0
+        for: 1h
+        labels: { severity: info, component: etcd, tier: "3", aspect: maintenance }
+        annotations:
+          summary: "{{ $labels.instance }} 沒有開 CompactHashCheck（預設關）；沒有任何檢查會發出 CORRUPT alarm，/readyz 的 data_corruption 一直是 ok"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#corruption-check
+          absence_covered_by: "EtcdMetricFamiliesMissing"
+
+  - name: etcd-capacity
+    rules:
+      - alert: EtcdDbNearQuota
+        expr: (last_over_time(etcd_mvcc_db_total_size_in_bytes{job="etcd"}[5m]) / last_over_time(etcd_server_quota_backend_bytes{job="etcd"}[5m])) > 0.8
+        for: 10m
+        labels: { severity: warning, component: etcd, tier: "1", aspect: capacity }
+        annotations:
+          summary: "{{ $labels.instance }} 的 DB 檔案用了 quota 的 {{ $value | humanizePercentage }}（例子：80%；mixin 的 critical 是 95%）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#db-quota
+      - alert: EtcdDbQuotaLowSpace
+        expr: (last_over_time(etcd_mvcc_db_total_size_in_bytes{job="etcd"}[5m]) / last_over_time(etcd_server_quota_backend_bytes{job="etcd"}[5m])) > 0.95
+        for: 10m
+        labels: { severity: critical, component: etcd, tier: "1", aspect: capacity }
+        annotations:
+          summary: "{{ $labels.instance }} 的 DB 檔案用了 quota 的 {{ $value | humanizePercentage }}；到 100% 會發 NOSPACE alarm、拒絕寫入（官方 mixin 門檻）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#db-quota
+      - alert: EtcdDbGrowthToQuota
+        expr: predict_linear(etcd_mvcc_db_total_size_in_bytes{job="etcd"}[4h], 4 * 3600) > etcd_server_quota_backend_bytes{job="etcd"}
+        for: 10m
+        labels: { severity: warning, component: etcd, tier: "2", aspect: capacity }
+        annotations:
+          summary: "{{ $labels.instance }} 依過去 4 小時的成長，4 小時內會碰到 quota（官方 mixin 門檻）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#db-growth

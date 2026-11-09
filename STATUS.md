@@ -5,7 +5,7 @@
 ## 現況
 
 - GitHub repo `HahaSula/alert-trust`，Pages 由 GitHub Actions 發布。
-- 12 張卡（9 個監控元件、3 個資料庫 target）、231 個訊號、285 條規則；`validate.py` 0 錯誤、2 個警告；`--strict` 建置通過。
+- 13 張卡（9 個監控元件、4 個資料庫 target）、259 個訊號、323 條規則；`validate.py` 0 錯誤、2 個警告；`--strict` 建置通過。
 - 原始碼參考 105+ 筆（釘版本與行號），實驗參考多數已換成 `lab/` 的公開結果。
 
 ## 已完成
@@ -27,13 +27,14 @@
 | 資料庫架構頁：關聯式（MySQL／InnoDB 對照 PostgreSQL） | `docs/architecture/db-relational.md` |
 | 資料庫監控模型調查（exporter／內建 endpoint／collector／DB 內歷史／廠商方案）與官方告警規則 | `docs/targets/models.md` |
 | Valkey 9.1／Redis 7.2、8 target（redis_exporter v1.97.0）與「記憶體 KV」架構頁，lab 實測 | `catalog/targets/redis_exporter.yaml`、`docs/targets/valkey*.md`、`lab/targets/valkey/` |
+| etcd v3.7.3 target（第一張 `model: native`）與「共識（Raft）」架構頁，3 節點 lab 實測三方交叉判斷 | `catalog/targets/etcd.yaml`、`docs/targets/etcd*.md`、`lab/targets/etcd/` |
 | `rule-review` skill 與流程圖：先確認體系與基礎設施覆蓋，再看時間契約；離線用 `tools/rules_to_snapshot.py` | `skills/rule-review/`、`docs/tools/rule-review.md` |
 
 ## 進行中
 
-- etcd target（第一張 `model: native`）與「共識（Raft）」架構頁
+（無）
 
-之後的資料庫順序（使用者已同意）：etcd → TiDB → YugabyteDB → ClickHouse → MongoDB；CockroachDB（專有授權）不做。資料庫架構頁依類型分頁：關聯式、記憶體 KV、共識（Raft）、分散式 SQL、分析型、文件型。
+之後的資料庫順序（使用者已同意）：TiDB → YugabyteDB → ClickHouse → MongoDB；CockroachDB（專有授權）不做。資料庫架構頁依類型分頁：關聯式、記憶體 KV、共識（Raft）、分散式 SQL、分析型、文件型。
 
 ## 待辦（依建議順序）
 
@@ -45,7 +46,7 @@
 6. **覆蓋狀態輸出成 metric**：讓 `check_coverage.py` 定期執行並輸出每個元件、每個訊號的狀態，由外部觀察者抓取並告警，讓 monitor of monitor 的缺口本身也會通知。
 7. **CI 用的 policy lint**：舊 repo 的 `policy_lint.py`、`analyze_rules.py` 尚未改寫成讀新目錄。
 8. （已完成）GitHub repo 已建立並 push，Pages 已上線；舊 repo 的實驗搬到 `lab/prometheus/`，舊 repo 已封存。
-9. **待驗證**：Patroni＋etcd、pgBackRest 的規則只讀碼，可做小 lab；Galera 與 Group Replication 的 flow control 沒有觸發；MariaDB ASH 的 digest 回填未實測；query-exporter 輸出 MySQL／MariaDB 與 PostgreSQL 都已實測（PG16 只讀碼、PG18 未查）。
+9. **待驗證**：Patroni（etcd 本身已有卡片與 lab）、pgBackRest 的規則只讀碼，可做小 lab；Galera 與 Group Replication 的 flow control 沒有觸發；MariaDB ASH 的 digest 回填未實測；query-exporter 輸出 MySQL／MariaDB 與 PostgreSQL 都已實測（PG16 只讀碼、PG18 未查）。
 11. **Thanos／Grafana 沒實測的部分**：Thanos 的 sidecar 上傳失敗、Receive、HA；Grafana 的 HA、DB 中斷、外部 Alertmanager 失敗、UI 預設的 NoData／Error、Loki／SQL datasource。`docs/architecture/index.md` 的單序點對照表還沒加這兩個元件。
 10. **小項目**：MySQL redo log 太小的情境沒有重現（`log_waits` 一直是 0）；`ThroughputDrop` 規則用「昨天同時段」比較，lab 沒有一天的資料無法驗證；MySQL `NoWritablePrimary` 修正後未重跑；PG17、`/probe`、auto-discover 只讀碼；契約頁的圖未截圖確認；Prometheus 報告的例子（30s／100s／120s）使用者尚未表示意見。
 12. **架構頁發現的卡片缺口**：MySQL 卡沒有 checkpoint age 訊號（`innodb-pressure` 只有 `log_waits`、`wait_free`；lab 有量到 checkpoint age）；PG 卡沒有 `synchronous_commit` 訊號。

@@ -86,6 +86,10 @@ nav:
           - 怎麼監控: targets/valkey.md
           - 監控訊號: components/redis_exporter.md
           - 原始碼到 metric: targets/valkey-appendix.md
+      - etcd:
+          - 怎麼監控: targets/etcd.md
+          - 監控訊號: components/etcd.md
+          - 原始碼到 metric: targets/etcd-appendix.md
   - 原理:
       - 信任契約: contracts.md
       - 名詞：設定與 metric: reference/terms.md
@@ -103,6 +107,7 @@ nav:
       - 資料庫架構:
           - 關聯式: architecture/db-relational.md
           - 記憶體 KV: architecture/db-kv.md
+          - 共識（Raft）: architecture/db-raft.md
       - 來源: reference/sources.md
   - 實驗報告:
       - 總覽: reports/index.md

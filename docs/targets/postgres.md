@@ -86,6 +86,8 @@ exporter 本身的訊號（`up`、`pg_up`、collector 成功與否、scrape 預�
 
 `rules/targets/postgres.yml` 的 `patroni-cluster` 組，假設 Patroni 的 `/metrics` 在 `job="patroni"`。不用 Patroni 的環境整組刪掉（否則 `PatroniMissing` 會響）。
 
+DCS 用 etcd 時，etcd 本身的 quorum、leader 與 alarm 見 [etcd：叢集與共識](etcd.md#cluster)；etcd 失去 quorum 時 `up` 仍是 1，要靠健康探測（實測）。
+
 | 規則 | PostgreSQL 原始碼 | view／函式／DCS | Patroni 原始碼與查詢（v4.1.5） | metric | 條件 |
 |---|---|---|---|---|---|
 | `PatroniDown`、`PatroniMissing` | — | — | `api.py:584` `do_GET_metrics`；`api.py:625` 每個 series 帶 `scope`、`name`[^pg-asp-patroni-metrics][^pg-asp-patroni-labels] | `up{job="patroni"}` | `== 0`、`absent()` |

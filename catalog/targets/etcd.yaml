@@ -1,0 +1,561 @@
+id: etcd
+name: etcd（內建 /metrics）
+kind: target
+model: native
+family: database
+status: draft
+stages: [source]
+versions_checked: ["etcd v3.7.3", "go.etcd.io/raft v3.7.0"]
+architecture: architecture/db-raft.md
+role: >-
+  etcd 自己在 client port（或 --listen-metrics-urls 指定的獨立 listener）提供 /metrics、/health、/livez、/readyz，沒有 exporter 這一層。
+  回應 /metrics 的就是 etcd process 本身，所以 up 只代表「process 回應了 HTTP」：失去 quorum 的 member 照樣回應 /metrics，up 仍是 1（lab 實測）。
+  「活著」要分三條路看：Prometheus 抓得到 /metrics（up）、從另一條路徑探測 /readyz（blackbox）、etcd 自己的 etcd_server_has_leader。
+  訊號依九個面向（aspect）分組；exporter 面向在這裡是「抓取本身」的自檢。完整說明見[etcd 怎麼監控](../targets/etcd.md)，
+  共識機制見[共識（Raft）架構](../architecture/db-raft.md)。
+
+silent_failures:
+  - text: >-
+      失去 quorum（3 台停 2 台）時，存活的 member 照常回應 /metrics（200、約 185KB），up=1；etcd_server_has_leader=0、/livez 200。
+      只看 up 的規則（mixin etcdInsufficientMembers 是用 up 算過半）在「process 都在、彼此連不到」的網路分割下不會響。
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp, etcd-exp-raw, etcd-h-metrics-handler, etcd-raft-hasleader, etcd-raft-checkquorum-stepdown]
+  - text: >-
+      /readyz 在沒有 leader 時不是立刻回 503：linearizable read 要等到 ReqTimeout（5s + 2 × election timeout，預設 7 秒）才失敗。
+      實測（主機時鐘）：第一次執行 7.02 秒回 503，第二次 10.00 秒回 503，兩次都另有一次超過 curl 的 10 秒逾時（容器時鐘比牆鐘慢約 30%，可能是 7 秒變 10 秒的原因）；
+      blackbox 的 timeout 比這短時，probe 是以逾時失敗（probe_success=0）。
+      /health 先看 leader，立刻回 503 "RAFT NO LEADER"。
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-h-readyz-linear, etcd-h-readcheck-ctx, etcd-read-timeout, etcd-srv-reqtimeout, etcd-h-health-noleader]
+  - text: >-
+      /readyz 不看 NOSPACE alarm：它只檢查 CORRUPT alarm、serializable read、linearizable read 與是否為 learner。
+      NOSPACE 時寫入全部被拒，/readyz 仍是 200；看得到的是 /health（任何 alarm 都讓它 503）與 etcd_debugging_server_alarms。
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-h-readyz-corrupt, etcd-h-health-alarms, etcd-h-health-nospace]
+  - text: >-
+      etcd_debugging_server_alarms 不是 0／1 狀態，是「套用過幾次 activate／deactivate」的累計：alarm 已存在時 Activate 回傳既有那一筆，applier 照樣 Inc；
+      member 重啟時 alarm store 從 backend 還原，gauge 不重建。實測：第一次執行中有一筆重複提出後是 2、disarm 後停在 1（alarm 已解除，第二次執行沒有重現）；
+      兩次執行中 NOSPACE 期間重啟的 member 都沒有這條 series（寫入仍被拒），disarm 後變成 -1。只看 gauge > 0 的規則會漏掉重啟過的 member，也可能在 disarm 後一直響。
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-exp-raw-v1, etcd-alarm-gauge-inc, etcd-alarm-activate-existing, etcd-alarm-store-restore, etcd-uber-restore-alarms]
+  - text: >-
+      用 etcd 自己的 metric 計數 quorum（例如數 has_leader == 1 的 member）在 scrape 失敗時會誤報：規則第一版在 sample_limit 讓三台 up=0、/readyz 全部正常時，
+      EtcdQuorumAtRisk 與 EtcdLeaderCountWrong 都觸發（has_leader 有一台停在舊值、其他消失）。改用 /readyz 探測成功的 member 數計數後重測。
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw-v1, etcd-exp-raw]
+  - text: >-
+      NOSPACE alarm 不會自己解除：compact 加 defrag 之後 DB 大小遠低於 quota，mixin 的 etcdDatabaseQuotaLowSpace（> 95%）已經不響，
+      寫入仍然全部回 "etcdserver: mvcc: database space exceeded"，要 etcdctl alarm disarm。官方 mixin 沒有任何 alarm 規則。
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-capped-put, etcd-uber-restore-alarms]
+  - text: >-
+      預設 --metrics=basic 不註冊 server 端 gRPC histogram：grpc_server_handling_seconds_bucket 完全不存在，
+      mixin 的 etcdGRPCRequestsSlow 回傳空。etcd_server_request_duration_seconds 在 basic 就有，可以替代。
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-grpc-histogram-extensive, etcd-srv-request-duration]
+  - text: >-
+      CompactHashCheck 與 InitialCorruptCheck 預設關（etcd_server_feature_enabled 為 0），--corrupt-check-time 預設也是 0；
+      沒有任何檢查會發出 CORRUPT alarm，/readyz 的 data_corruption 檢查一直是 ok。
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-feat-compacthash, etcd-feat-initialcorrupt, etcd-h-readyz-corrupt]
+  - text: >-
+      learner 的 /readyz 一定失敗（non_learner 檢查），blackbox 探 learner 會一直是 probe_success=0；探測對象要排除 learner，
+      或用 /readyz?exclude=non_learner。
+    evidence: code
+    source: etcd-server
+    refs: [etcd-h-readyz-learner]
+  - text: >-
+      etcd_server_leader_changes_seen_total 是每個 member 自己看到的次數，重啟歸零（實測重啟的 member 從 2 回到 1）；
+      etcd_debugging_mvcc_db_compaction_last 重啟歸 0，用 time() − 它判斷「多久沒 compaction」會在重啟後誤報。
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-raft-leaderchanges, etcd-compaction-last]
+
+signals:
+  # ---------- 監測自檢（抓取本身） ----------
+  - id: endpoint-up
+    aspect: exporter
+    tier: 1
+    question: 抓得到 /metrics 嗎
+    signal: 'up{job="etcd"} == 0，加上 absent(up{job="etcd"})；member 停機時它的所有 etcd_* 一起消失'
+    metrics: [up]
+    evaluate_on: self
+    silent_failure: up 只代表 process 回應了 HTTP；失去 quorum 的 member up 仍是 1
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp, etcd-exp-raw]
+    upstream: { status: partial, note: "mixin etcdMembersDown 有 up == bool 0（for 20m），沒有 absent" }
+    rules: [rules/targets/etcd.yml#EtcdEndpointDown, rules/targets/etcd.yml#EtcdEndpointMissing]
+
+  - id: health-second-path
+    aspect: exporter
+    tier: 1
+    question: 抓得到 /metrics，就代表 etcd 健康嗎
+    signal: >-
+      三方交叉，用 on (instance) 對上：up{job="etcd"}、blackbox 探 /readyz 的 probe_success{job="etcd-readyz"}、etcd_server_has_leader。
+      up 0、probe 1 是 scrape 本身（實測：sample_limit 讓 up=0，/readyz 照樣 1）；兩者都 0 是 process 或主機；
+      up 1、probe 0（has_leader 0）是 etcd 不能服務（實測：失去 quorum）。probe 的 instance 要 relabel 成和 job="etcd" 相同的 host:port
+    metrics: [up, probe_success, etcd_server_has_leader]
+    evaluate_on: self
+    silent_failure: >-
+      /readyz 沒有 leader 時要等 ReqTimeout（預設 7 秒；實測 7–10 秒以上）才回 503，blackbox timeout 較短時以逾時失敗；/readyz 不看 NOSPACE（要另探 /health）；learner 的 /readyz 一定失敗
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp, etcd-exp-raw, etcd-h-livez, etcd-h-readyz-corrupt, etcd-h-readyz-linear, etcd-h-readyz-learner, etcd-read-timeout]
+    upstream: { status: no, note: "mixin 只用 /metrics；文件建議探 /readyz、/livez，沒有規則" }
+    rules:
+      - rules/targets/etcd.yml#EtcdReadyzProbeFailing
+      - rules/targets/etcd.yml#EtcdReadyzProbeMissing
+      - rules/targets/etcd.yml#EtcdServingMetricsButNotReady
+      - rules/targets/etcd.yml#EtcdScrapeFailingButReady
+
+  - id: metric-families-present
+    aspect: exporter
+    tier: 1
+    question: 該有的 metric 都還在嗎
+    signal: >-
+      up == 1 unless on (job, instance) (etcd_server_has_leader and etcd_mvcc_db_total_size_in_bytes and etcd_disk_wal_fsync_duration_seconds_count)；
+      再加 scrape_samples_scraped 比一小時前少一半（例如 --metrics 從 extensive 改回 basic）。lab 每台約 1,600 個 sample、193 個 metric 名稱
+    metrics: [up, etcd_server_has_leader, etcd_mvcc_db_total_size_in_bytes, etcd_disk_wal_fsync_duration_seconds_count, scrape_samples_scraped]
+    evaluate_on: self
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-grpc-histogram-extensive]
+    upstream: { status: no }
+    rules: [rules/targets/etcd.yml#EtcdMetricFamiliesMissing, rules/targets/etcd.yml#EtcdSamplesDropped]
+
+  - id: scrape-budget
+    aspect: exporter
+    tier: 2
+    question: Scrape 來得及在期限內完成、內容沒有超過上限嗎
+    signal: >-
+      scrape_duration_seconds 對照 scrape_timeout（80%）。回應約 185KB、1,600 個 sample（basic，3 台叢集）；--metrics=extensive 每個 gRPC method 多一組 histogram。
+      sample_limit 比實際小時整次 scrape 失敗、up=0，看起來像 etcd 掛了（實測）
+    metrics: [scrape_duration_seconds, scrape_samples_scraped]
+    evaluate_on: self
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-embed-metrics-flag]
+    upstream: { status: no }
+    rules: [rules/targets/etcd.yml#EtcdScrapeNearTimeout]
+
+  - id: endpoint-blocking
+    aspect: exporter
+    tier: 2
+    question: 產生 /metrics 時會不會被 etcd 內部的鎖卡住
+    signal: >-
+      /metrics 是 promhttp.Handler()，不經過 raft 或 apply。scrape 時才算的 GaugeFunc 有六個：db_total_size、in_use、open_read_transactions 讀 atomic；
+      current_revision、compact_revision 要拿 mvcc 的 revMu 讀鎖。寫入交易結束時拿 revMu 寫鎖再 tx.Unlock()，而有 delete 或達到 batch limit 時
+      Unlock 會當場做 bbolt commit（含 fsync），所以一次 scrape 最多等一次 backend commit。實測讀整個 prefix（4 條執行緒）與一次刪 3,000 個 key 時，
+      /metrics 耗時與無負載相同（本機 SSD；磁碟慢時未測）。用 scrape_duration_seconds 與 backend_commit p99 一起看
+    metrics: [scrape_duration_seconds, etcd_disk_backend_commit_duration_seconds_bucket]
+    evaluate_on: self
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-h-metrics-handler, etcd-mvcc-gaugefunc-size, etcd-be-size-atomic, etcd-mvcc-report-rev, etcd-mvcc-txn-revmu, etcd-be-unlock-commit]
+    upstream: { status: no }
+    rules: [rules/targets/etcd.yml#EtcdScrapeNearTimeout, rules/targets/etcd.yml#EtcdBackendCommitSlow]
+
+  # ---------- 可用性 ----------
+  - id: has-leader
+    aspect: availability
+    tier: 1
+    question: 這台 member 看得到 leader 嗎
+    signal: >-
+      etcd_server_has_leader == 0 for 1m。只在 raft 的 SoftState 改變時更新：follower 在 election timeout 後成為 pre-candidate（lead = None），
+      leader 在 CheckQuorum 失敗時退成 follower（lead = None），兩者都設成 0。member 停機時 series 消失，由 endpoint-up 補位
+    metrics: [etcd_server_has_leader]
+    evaluate_on: self
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-raft-hasleader, etcd-raft-precandidate-lead, etcd-raft-checkquorum-stepdown, etcd-boot-checkquorum, dbm-etcd-mixin-noleader]
+    upstream: { status: yes, note: "mixin etcdNoLeader：has_leader == 0 for 1m" }
+    rules: [rules/targets/etcd.yml#EtcdNoLeader]
+
+  - id: alarms
+    aspect: availability
+    tier: 1
+    question: 有沒有 alarm 讓寫入被拒（NOSPACE）或資料被判定損毀（CORRUPT）
+    signal: >-
+      主要訊號是 blackbox 探 /health（任何 alarm 都 503，三台都看得到）。etcd_debugging_server_alarms{alarm_type} 只用來標示種類，
+      而且要和 /health 失敗同時成立才告警（gauge 會停在舊值、重啟後消失）。NOSPACE 時 Put、寫入的 Txn、LeaseGrant 回 ErrNoSpace，
+      DeleteRange 照常；/readyz 仍是 200。alarm 要手動 disarm
+    metrics: [probe_success, etcd_debugging_server_alarms]
+    evaluate_on: self
+    silent_failure: gauge 重複提出後是 2、disarm 後停在 1（第一次執行）；重啟過的 member 沒有這條、disarm 後變 -1（兩次執行）；mixin 沒有 alarm 規則
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-mvcc-alarm-metric, etcd-alarm-gauge-inc, etcd-alarm-activate-existing, etcd-alarm-store-restore, etcd-capped-put, etcd-h-health-nospace, etcd-srv-nospace-raise]
+    upstream: { status: no, note: "mixin 只有 DB 大小 / quota > 95%，沒有 alarm" }
+    rules: [rules/targets/etcd.yml#EtcdAlarmActive, rules/targets/etcd.yml#EtcdHealthProbeFailing, rules/targets/etcd.yml#EtcdHealthProbeMissing]
+
+  # ---------- 叢集與共識 ----------
+  - id: quorum
+    aspect: cluster
+    tier: 1
+    question: 看得到 leader 的 member 還有過半嗎
+    signal: >-
+      /readyz 探測成功的 member 數（linearizable read 通過＝這台看得到有 quorum 的 leader）小於 floor(成員數 / 2) + 1；
+      成員數取自 etcd 自己的 etcd_network_known_peers（每個成員含自己一條，值 1；含 learner），不是 scrape target 數。
+      不用 has_leader 計數：scrape 失敗時 has_leader 消失或停在舊值，第一版規則因此誤報（實測）。一個 probe job 對一個叢集
+    metrics: [probe_success, etcd_network_known_peers, etcd_server_has_leader]
+    evaluate_on: self
+    silent_failure: >-
+      mixin etcdInsufficientMembers 用 up 算：process 都在、彼此分割時（up=1）不響，只有 scrape 失敗時也會響。
+      Prometheus 與 blackbox 一起和 etcd 斷開時這條也會響，要和 EtcdEndpointDown 一起看
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-exp-raw-v1, etcd-member-knownpeers, etcd-h-readyz-linear, dbm-etcd-mixin-insufficient]
+    upstream: { status: partial, note: "mixin etcdInsufficientMembers 用 up == bool 1 對 count(up) 過半" }
+    rules: [rules/targets/etcd.yml#EtcdQuorumAtRisk]
+
+  - id: role-detection
+    aspect: cluster
+    tier: 2
+    question: 每個叢集剛好有一個 leader 嗎
+    signal: >-
+      sum by (job) (etcd_server_is_leader) != 1 for 1m，有任何 member up == 0 時不評估（那時的總和不可信；第一版沒有這個條件，scrape 失敗時誤報）。
+      0 是沒有 leader；大於 1 只會短暫出現：被分割的舊 leader 在 CheckQuorum 讓它退位前仍是 leader，或同一個 job 混了兩個叢集
+    metrics: [etcd_server_is_leader]
+    evaluate_on: self
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-exp-raw-v1, etcd-raft-checkquorum-stepdown]
+    upstream: { status: no }
+    rules: [rules/targets/etcd.yml#EtcdLeaderCountWrong]
+
+  - id: leader-changes
+    aspect: cluster
+    tier: 2
+    question: leader 換得太頻繁嗎
+    signal: >-
+      increase((max by (job) (etcd_server_leader_changes_seen_total))[15m:1m]) >= 4（mixin 門檻）。counter 是每台自己看到的次數、重啟歸零，
+      取叢集內最大值可避開單台重啟
+    metrics: [etcd_server_leader_changes_seen_total]
+    evaluate_on: self
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-raft-leaderchanges, etcd-mixin-leaderchanges]
+    upstream: { status: yes, note: "mixin etcdHighNumberOfLeaderChanges" }
+    rules: [rules/targets/etcd.yml#EtcdFrequentLeaderChanges]
+
+  - id: component-count
+    aspect: cluster
+    tier: 2
+    question: 抓得到的 member 數和 etcd 自己記得的成員數一樣嗎
+    signal: >-
+      count by (job) (up == 1) 小於 max by (job) (count by (job, Local) (etcd_network_known_peers == 1))。不用另外寫死預期數量：
+      known_peers 由 etcd 的成員表產生（移除的成員設 0）。scrape 設定漏了某台時也會響
+    metrics: [up, etcd_network_known_peers]
+    evaluate_on: self
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-member-knownpeers]
+    upstream: { status: partial, note: "mixin etcdMembersDown 看 up 與 peer 送出失敗" }
+    rules: [rules/targets/etcd.yml#EtcdMembersNotScraped]
+
+  - id: peer-network
+    aspect: cluster
+    tier: 2
+    question: member 之間的通訊慢或斷了嗎
+    signal: >-
+      peer RTT p99 > 0.15 秒（mixin）；rate(etcd_network_peer_sent_failures_total[5m]) > 0.01。RTT 是 prober 的平滑值，健康時每 30 秒才觀察一次，
+      5 分鐘的 rate 只有約 10 個樣本
+    metrics: [etcd_network_peer_round_trip_time_seconds_bucket, etcd_network_peer_sent_failures_total, etcd_network_active_peers]
+    evaluate_on: self
+    evidence: code
+    source: etcd-server
+    refs: [etcd-rafthttp-rtt, etcd-rafthttp-probe-interval, etcd-rafthttp-sentfail, etcd-mixin-peerslow, etcd-mixin-membersdown]
+    upstream: { status: yes, note: "mixin etcdMemberCommunicationSlow 與 etcdMembersDown" }
+    rules: [rules/targets/etcd.yml#EtcdPeerRttHigh, rules/targets/etcd.yml#EtcdPeerSendFailures]
+
+  - id: learner
+    aspect: cluster
+    tier: 3
+    question: 有 learner 卡著沒升級嗎
+    signal: etcd_server_is_learner == 1 超過 1 小時（例子）；learner 不算 quorum，它的 /readyz 一定失敗
+    metrics: [etcd_server_is_learner]
+    evaluate_on: self
+    evidence: code
+    source: etcd-server
+    refs: [etcd-member-islearner, etcd-h-readyz-learner]
+    upstream: { status: no }
+    rules: [rules/targets/etcd.yml#EtcdLearnerNotPromoted]
+
+  # ---------- 複寫 ----------
+  - id: replication-lag
+    aspect: replication
+    tier: 2
+    question: 每台 member 套用的進度跟得上叢集嗎
+    signal: >-
+      max by (job) (etcd_server_proposals_committed_total) − 每台的 etcd_server_proposals_applied_total > 5000（例子，等於預設 snapshot-catchup-entries）。
+      兩個名字有 _total 但都是 gauge（值是 raft index），不能用 rate 當 counter。沒有寫入時兩者一起停，差值是 0，這是真的沒有落後；
+      被分割的 follower 的 committed 不再前進，差值由其他 member 的 committed 撐大
+    metrics: [etcd_server_proposals_committed_total, etcd_server_proposals_applied_total]
+    evaluate_on: self
+    evidence: code
+    source: etcd-server
+    refs: [etcd-raft-committed, etcd-srv-applied, etcd-srv-snapshot-catchup]
+    upstream: { status: no }
+    rules: [rules/targets/etcd.yml#EtcdApplyLagging]
+
+  - id: snapshot-transfer
+    aspect: replication
+    tier: 3
+    question: 落後太多的 follower 能用 snapshot 追上嗎
+    signal: >-
+      increase(etcd_network_snapshot_send_failures[30m]) 或 snapshot_receive_failures > 0。每 10,000 筆 apply 做一次 raft snapshot，之後只保留
+      5,000 筆 entry；follower 落後更多時只能收整份 snapshot
+    metrics: [etcd_network_snapshot_send_failures, etcd_network_snapshot_receive_failures, etcd_server_snapshot_apply_in_progress_total]
+    evaluate_on: self
+    evidence: code
+    source: etcd-server
+    refs: [etcd-rafthttp-snapfail, etcd-srv-snapshot-count, etcd-srv-snapshot-catchup]
+    upstream: { status: no }
+    rules: [rules/targets/etcd.yml#EtcdSnapshotTransferFailing]
+
+  # ---------- 資源與飽和 ----------
+  - id: wal-fsync
+    aspect: saturation
+    tier: 2
+    question: WAL fsync 夠快嗎
+    signal: >-
+      histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket[5m])) > 0.5（warning）、> 1（critical），mixin 門檻。
+      raft loop 每批 Ready 先寫 WAL 再通知 apply；follower 寫完才回應，leader 與送訊息並行寫。超過 1 秒另有 warning log
+    metrics: [etcd_disk_wal_fsync_duration_seconds_bucket]
+    evaluate_on: self
+    evidence: code
+    source: etcd-server
+    refs: [etcd-wal-fsync-observe, etcd-wal-warn-sync, etcd-raft-save-before-apply, etcd-raft-leader-parallel, dbm-etcd-mixin-fsync]
+    upstream: { status: yes, note: "mixin etcdHighFsyncDurations" }
+    rules: [rules/targets/etcd.yml#EtcdWalFsyncSlow, rules/targets/etcd.yml#EtcdWalFsyncVerySlow]
+
+  - id: backend-commit
+    aspect: saturation
+    tier: 2
+    question: backend（bbolt）commit 夠快嗎
+    signal: >-
+      histogram_quantile(0.99, rate(etcd_disk_backend_commit_duration_seconds_bucket[5m])) > 0.25（mixin）。預設每 100ms 或 10,000 筆 commit 一次，
+      有 delete 時當場 commit
+    metrics: [etcd_disk_backend_commit_duration_seconds_bucket]
+    evaluate_on: self
+    evidence: code
+    source: etcd-server
+    refs: [etcd-be-commit-observe, etcd-be-batch-limit, etcd-be-unlock-commit, etcd-mixin-commit]
+    upstream: { status: yes, note: "mixin etcdHighCommitDurations" }
+    rules: [rules/targets/etcd.yml#EtcdBackendCommitSlow]
+
+  - id: slow-apply
+    aspect: saturation
+    tier: 2
+    question: apply 或 heartbeat 被拖慢了嗎
+    signal: >-
+      increase(etcd_server_slow_apply_total[10m])（超過 --warning-apply-duration，預設 100ms）；increase(etcd_server_heartbeat_send_failures_total[10m]) > 0
+      （leader 沒在 2 倍 heartbeat interval 內送出，程式註解說通常是磁碟慢）
+    metrics: [etcd_server_slow_apply_total, etcd_server_heartbeat_send_failures_total]
+    evaluate_on: self
+    evidence: code
+    source: etcd-server
+    refs: [etcd-txn-slow-apply, etcd-embed-warn-apply, etcd-raft-heartbeat-fail]
+    upstream: { status: no }
+    rules: [rules/targets/etcd.yml#EtcdSlowApplies, rules/targets/etcd.yml#EtcdHeartbeatSendFailures]
+
+  - id: proposals-pending
+    aspect: saturation
+    tier: 2
+    question: 提案在排隊嗎
+    signal: etcd_server_proposals_pending > 100 for 5m（例子）；送出後等 commit 的數量，quorum 失去或磁碟慢時累積
+    metrics: [etcd_server_proposals_pending]
+    evaluate_on: self
+    evidence: code
+    source: etcd-server
+    refs: [etcd-srv-proposal-pending]
+    upstream: { status: no }
+    rules: [rules/targets/etcd.yml#EtcdProposalsPendingHigh]
+
+  - id: fd-headroom
+    aspect: saturation
+    tier: 2
+    question: file descriptor 夠嗎
+    signal: os_fd_used / os_fd_limit > 0.8；每條 client 與 peer 連線各占一個
+    metrics: [os_fd_used, os_fd_limit]
+    evaluate_on: self
+    evidence: inferred
+    source: etcd-server
+    upstream: { status: no }
+    rules: [rules/targets/etcd.yml#EtcdFdNearLimit]
+
+  # ---------- 工作量 ----------
+  - id: grpc-errors
+    aspect: workload
+    tier: 2
+    question: client 請求失敗的比例高嗎
+    signal: >-
+      grpc_server_handled_total 依 grpc_code（Unknown、FailedPrecondition、ResourceExhausted、Internal、Unavailable、DataLoss、DeadlineExceeded）
+      占比 > 5%（mixin critical）。這個 counter 在 basic 就有
+    metrics: [grpc_server_handled_total]
+    evaluate_on: self
+    evidence: upstream
+    source: etcd-mixin
+    refs: [etcd-mixin-grpcfail]
+    upstream: { status: yes, note: "mixin etcdHighNumberOfFailedGRPCRequests（1% warning、5% critical）" }
+    rules: [rules/targets/etcd.yml#EtcdGrpcErrorRate]
+
+  - id: proposals-failed
+    aspect: workload
+    tier: 2
+    question: 提案失敗多嗎
+    signal: >-
+      increase(etcd_server_proposals_failed_total[15m]) > 5（例子）。Propose 失敗與等 commit 逾時都算。
+      mixin 寫 rate(...[15m]) > 5，rate 的單位是每秒，等於 15 分鐘 4,500 次；描述卻寫「30 分鐘內」（讀碼，未實測門檻）
+    metrics: [etcd_server_proposals_failed_total]
+    evaluate_on: self
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-srv-proposal-failed, etcd-srv-proposal-timeout, etcd-mixin-proposals]
+    upstream: { status: partial, note: "mixin etcdHighNumberOfFailedProposals 的門檻是每秒 5 次" }
+    rules: [rules/targets/etcd.yml#EtcdProposalsFailing]
+
+  - id: request-latency
+    aspect: workload
+    tier: 3
+    question: 請求慢嗎
+    signal: >-
+      etcd_server_request_duration_seconds（type：Range、ReadonlyTxn、Put、Txn…；basic 就有）p99 > 0.15 秒（例子）。
+      mixin 的 etcdGRPCRequestsSlow 用 grpc_server_handling_seconds，預設 basic 沒有這個 histogram，規則回傳空（實測）
+    metrics: [etcd_server_request_duration_seconds_bucket, grpc_server_handling_seconds_bucket]
+    evaluate_on: self
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-srv-request-duration, etcd-grpc-histogram-extensive, etcd-mixin-grpcslow]
+    upstream: { status: partial, note: "mixin etcdGRPCRequestsSlow 需要 --metrics=extensive" }
+    rules: [rules/targets/etcd.yml#EtcdRequestSlow]
+
+  # ---------- 資料維護 ----------
+  - id: compaction
+    aspect: maintenance
+    tier: 3
+    question: 舊 revision 有在 compaction 嗎
+    signal: >-
+      一天內 etcd_debugging_mvcc_compact_revision 沒變、current_revision 有變。--auto-compaction-retention 預設 0（關閉）。
+      compact_revision 重啟時從 backend 還原，不像 db_compaction_last 會歸 0
+    metrics: [etcd_debugging_mvcc_compact_revision, etcd_debugging_mvcc_current_revision]
+    evaluate_on: self
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-embed-autocompact, etcd-compact-rev-restore, etcd-compaction-last]
+    upstream: { status: no }
+    rules: [rules/targets/etcd.yml#EtcdCompactionNotRunning]
+
+  - id: defrag
+    aspect: maintenance
+    tier: 3
+    question: DB 檔案裡空著的空間多到該 defrag 嗎
+    signal: >-
+      db_total_size_in_use / db_total_size < 0.5 且 in_use > 100MB（mixin）。compaction 只把頁面標成可重用，檔案不會縮小；
+      quota 比的是檔案大小（Size），不是 in_use
+    metrics: [etcd_mvcc_db_total_size_in_use_in_bytes, etcd_mvcc_db_total_size_in_bytes, etcd_disk_backend_defrag_duration_seconds_bucket]
+    evaluate_on: self
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-quota-available, etcd-mixin-frag, etcd-be-defrag-metric]
+    upstream: { status: yes, note: "mixin etcdDatabaseHighFragmentationRatio" }
+    rules: [rules/targets/etcd.yml#EtcdDbFragmented]
+
+  - id: corruption-check
+    aspect: maintenance
+    tier: 3
+    question: 有沒有任何機制會發現資料不一致
+    signal: >-
+      etcd_server_feature_enabled{name="CompactHashCheck"} == 0（預設關，實測）；InitialCorruptCheck 也預設關。沒開時不會有 CORRUPT alarm
+    metrics: [etcd_server_feature_enabled]
+    evaluate_on: self
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-feat-compacthash, etcd-feat-initialcorrupt, etcd-feat-metric]
+    upstream: { status: no }
+    rules: [rules/targets/etcd.yml#EtcdCorruptionCheckDisabled]
+
+  # ---------- 容量 ----------
+  - id: db-quota
+    aspect: capacity
+    tier: 1
+    question: DB 檔案離 quota 多遠
+    signal: >-
+      etcd_mvcc_db_total_size_in_bytes / etcd_server_quota_backend_bytes > 0.8（例子）與 > 0.95（mixin）。到 quota 時發 NOSPACE alarm、拒絕寫入。
+      預設 quota 2GiB
+    metrics: [etcd_mvcc_db_total_size_in_bytes, etcd_server_quota_backend_bytes]
+    evaluate_on: self
+    silent_failure: alarm 發出後 compact＋defrag 讓比例降回很低，規則不響，寫入仍被拒（見 alarms）
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-quota-available, etcd-quota-default, etcd-quota-metric, dbm-etcd-mixin-quota]
+    upstream: { status: yes, note: "mixin etcdDatabaseQuotaLowSpace（> 95%）" }
+    rules: [rules/targets/etcd.yml#EtcdDbNearQuota, rules/targets/etcd.yml#EtcdDbQuotaLowSpace]
+
+  - id: db-growth
+    aspect: capacity
+    tier: 2
+    question: 依目前成長多久會碰到 quota
+    signal: predict_linear(etcd_mvcc_db_total_size_in_bytes[4h], 4h) > quota（mixin）
+    metrics: [etcd_mvcc_db_total_size_in_bytes, etcd_server_quota_backend_bytes]
+    evaluate_on: self
+    evidence: upstream
+    source: etcd-mixin
+    refs: [etcd-mixin-growth]
+    upstream: { status: yes, note: "mixin etcdExcessiveDatabaseGrowth" }
+    rules: [rules/targets/etcd.yml#EtcdDbGrowthToQuota]
+
+not_applicable_aspects:
+  protection:
+    why: >-
+      etcd 本身不做備份：沒有排程、沒有「最後一次備份」的 metric。/metrics 裡的 snapshot 相關 metric（etcd_debugging_snap_save_*、etcd_snap_db_*、
+      etcd_network_snapshot_*）都是 raft snapshot，用來截短 WAL 或讓落後的 follower 追上，不是可以拿來還原的備份。
+      備份要靠外部執行 etcdctl snapshot save，新鮮度見 blind_spots。
+    refs: [etcd-srv-snapshot-count, etcd-srv-snapshot-catchup, etcd-rafthttp-snapfail]
+
+# 目前無法監控的範圍。category：exporter（資料庫有、exporter 沒輸出；native 模型下指「etcd 有這個資訊、/metrics 沒輸出」）、database（資料庫本身沒提供）、other（要靠其他元件）。
+blind_spots:
+  - what: 備份（etcdctl snapshot save）的新鮮度與可還原性
+    category: other
+    why: etcd 沒有內建備份，/metrics 的 snapshot 都是 raft snapshot
+    workaround: 備份工作成功後寫 textfile metric（例如 etcd_backup_last_success_timestamp_seconds），由 node_exporter 輸出；定期還原測試
+    section: targets/etcd.md#protection
+  - what: TLS 憑證到期（client、peer、metrics listener）
+    category: database
+    why: etcd 3.7.3 沒有任何憑證相關的 metric（讀碼：server 的 metric 名稱沒有 cert、tls、expir）
+    workaround: blackbox 的 tls／http module 探 2379、2380，看 probe_ssl_earliest_cert_expiry；client-cert-auth 開著時 probe 要帶 client 憑證
+    section: targets/etcd.md#blind-spots
+  - what: 每個 follower 的 raft 進度（match index、inflight）
+    category: exporter
+    why: leader 的 raft tracker 有每個 follower 的進度，/metrics 沒有輸出；只能用各 member 的 committed／applied 推算
+    workaround: 比較各 member 的 etcd_server_proposals_applied_total（replication-lag 訊號）
+    section: targets/etcd.md#replication
+  - what: alarm 在 member 重啟後的狀態
+    category: exporter
+    why: etcd_debugging_server_alarms 只在 apply alarm 請求時更新，重啟時不從 alarm store 重建
+    workaround: blackbox 探 /health（任何 alarm 都 503），或定期 etcdctl alarm list
+    section: targets/etcd.md#availability
+  - what: 慢請求與大請求的內容（哪個 key、哪個 client）
+    category: database
+    why: 只有 warning log（apply request took too long），沒有依 key 或 client 的 metric
+    workaround: log 管線（VictoriaLogs 等）計數 "apply request took too long"；Kubernetes 的 apiserver 端 metric
+    section: targets/etcd.md#workload
+  - what: 磁碟剩餘空間
+    category: other
+    why: quota 只限制 DB 檔案；WAL 與 snapshot 檔也在 data-dir，磁碟滿的情況 quota 管不到（磁碟滿時的行為未驗證）
+    workaround: node_exporter 的 node_filesystem_avail_bytes
+    section: targets/etcd.md#capacity
+  - what: 資料損毀
+    category: database
+    why: CompactHashCheck、InitialCorruptCheck 預設關，--corrupt-check-time 預設 0；不開就沒有任何檢查
+    workaround: 打開 CompactHashCheck（feature gate），並監控 corruption-check 訊號
+    section: targets/etcd.md#maintenance

@@ -1,0 +1,655 @@
+# etcd target 的參考：etcd v3.7.3（commit 0a173d0）與 go.etcd.io/raft v3.7.0 的原始碼位置（在 tag 上取檔、依關鍵字找行號），與 lab 結果。
+# 由 agent 用 git clone --branch <tag> 逐行核對；關鍵字與檔案見每筆的 title。
+refs:
+  etcd-h-health-alarms:
+    kind: code
+    title: "/health：先看所有 alarm，再看 leader，再做一次 range"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/api/etcdhttp/health.go"
+    line: 62
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/api/etcdhttp/health.go#L62"
+  etcd-h-health-noleader:
+    kind: code
+    title: "/health：沒有 leader 時回 RAFT NO LEADER"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/api/etcdhttp/health.go"
+    line: 213
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/api/etcdhttp/health.go#L213"
+  etcd-h-health-nospace:
+    kind: code
+    title: "/health：NOSPACE alarm 讓 /health 失敗"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/api/etcdhttp/health.go"
+    line: 196
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/api/etcdhttp/health.go#L196"
+  etcd-h-health-503:
+    kind: code
+    title: "/health：不健康回 503"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/api/etcdhttp/health.go"
+    line: 100
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/api/etcdhttp/health.go#L100"
+  etcd-h-livez:
+    kind: code
+    title: "/livez 只做 serializable read（本機讀）"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/api/etcdhttp/health.go"
+    line: 245
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/api/etcdhttp/health.go#L245"
+  etcd-h-readyz-corrupt:
+    kind: code
+    title: "/readyz：只看 CORRUPT alarm，不看 NOSPACE"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/api/etcdhttp/health.go"
+    line: 251
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/api/etcdhttp/health.go#L251"
+  etcd-h-readyz-linear:
+    kind: code
+    title: "/readyz：linearizable read（要有 quorum）"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/api/etcdhttp/health.go"
+    line: 257
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/api/etcdhttp/health.go#L257"
+  etcd-h-readyz-learner:
+    kind: code
+    title: "/readyz：learner 一定失敗"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/api/etcdhttp/health.go"
+    line: 259
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/api/etcdhttp/health.go#L259"
+  etcd-h-readcheck-ctx:
+    kind: code
+    title: "/readyz、/livez 的 read check 用請求的 context，沒有自己的逾時"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/api/etcdhttp/health.go"
+    line: 432
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/api/etcdhttp/health.go#L432"
+  etcd-h-health-reqtimeout:
+    kind: code
+    title: "/health 的 range 用 ReqTimeout 當逾時"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/api/etcdhttp/health.go"
+    line: 223
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/api/etcdhttp/health.go#L223"
+  etcd-h-healthcheck-gauge:
+    kind: code
+    title: "etcd_server_healthcheck{type,name}：只在有人打 /livez、/readyz 時更新"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/api/etcdhttp/health.go"
+    line: 127
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/api/etcdhttp/health.go#L127"
+  etcd-h-metrics-handler:
+    kind: code
+    title: "/metrics 就是 promhttp.Handler()（預設 registry）"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/api/etcdhttp/metrics.go"
+    line: 30
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/api/etcdhttp/metrics.go#L30"
+  etcd-embed-metrics-mux:
+    kind: code
+    title: "--listen-metrics-urls 的 listener 也掛 /metrics 與健康端點"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/embed/etcd.go"
+    line: 874
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/embed/etcd.go#L874"
+  etcd-mvcc-gaugefunc-size:
+    kind: code
+    title: "db_total_size_in_bytes 是 GaugeFunc，scrape 時才讀"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/storage/mvcc/metrics.go"
+    line: 179
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/storage/mvcc/metrics.go#L179"
+  etcd-mvcc-report-rev:
+    kind: code
+    title: "current_revision 的 GaugeFunc 要拿 revMu 讀鎖"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/storage/mvcc/kvstore.go"
+    line: 543
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/storage/mvcc/kvstore.go#L543"
+  etcd-mvcc-txn-revmu:
+    kind: code
+    title: "寫入交易結束時拿 revMu 寫鎖，再 tx.Unlock()"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/storage/mvcc/kvstore_txn.go"
+    line: 213
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/storage/mvcc/kvstore_txn.go#L213"
+  etcd-be-unlock-commit:
+    kind: code
+    title: "batchTx.Unlock：有 delete 或達 batch limit 時當場 commit"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/storage/backend/batch_tx.go"
+    line: 335
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/storage/backend/batch_tx.go#L335"
+  etcd-be-size-atomic:
+    kind: code
+    title: "backend.Size() 是 atomic 讀，不拿鎖"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/storage/backend/backend.go"
+    line: 434
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/storage/backend/backend.go#L434"
+  etcd-be-commit-observe:
+    kind: code
+    title: "backend_commit_duration_seconds：bbolt commit（含 fsync）"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/storage/backend/batch_tx.go"
+    line: 277
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/storage/backend/batch_tx.go#L277"
+  etcd-be-defrag-metric:
+    kind: code
+    title: "backend_defrag_duration_seconds"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/storage/backend/metrics.go"
+    line: 67
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/storage/backend/metrics.go#L67"
+  etcd-be-batch-limit:
+    kind: code
+    title: "backend 預設 batch limit 10000、interval 100ms"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/storage/backend/backend.go"
+    line: 35
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/storage/backend/backend.go#L35"
+  etcd-wal-fsync-observe:
+    kind: code
+    title: "wal_fsync_duration_seconds：每次 WAL fsync"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/storage/wal/wal.go"
+    line: 891
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/storage/wal/wal.go#L891"
+  etcd-wal-warn-sync:
+    kind: code
+    title: "WAL fsync 超過 1 秒寫 warning log"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/storage/wal/wal.go"
+    line: 47
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/storage/wal/wal.go#L47"
+  etcd-raft-save-before-apply:
+    kind: code
+    title: "raft loop：每批 Ready 先寫 WAL（含 fsync）"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/raft.go"
+    line: 256
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/raft.go#L256"
+  etcd-raft-leader-parallel:
+    kind: code
+    title: "leader 先送訊息再寫自己的 WAL（並行）"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/raft.go"
+    line: 242
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/raft.go#L242"
+  etcd-raft-hasleader:
+    kind: code
+    title: "has_leader 只在 SoftState 改變時更新：Lead == None 設 0"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/raft.go"
+    line: 193
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/raft.go#L193"
+  etcd-raft-leaderchanges:
+    kind: code
+    title: "leader_changes_seen_total：看到新的 leader 才加 1"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/raft.go"
+    line: 189
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/raft.go#L189"
+  etcd-raft-heartbeat-fail:
+    kind: code
+    title: "heartbeat 沒在 2 倍 interval 內送出就加 1（通常是磁碟慢）"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/raft.go"
+    line: 397
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/raft.go#L397"
+  etcd-raft-committed:
+    kind: code
+    title: "proposals_committed_total 是 gauge，值是 HardState.Commit"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/raft.go"
+    line: 260
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/raft.go#L260"
+  etcd-srv-applied:
+    kind: code
+    title: "proposals_applied_total 是 gauge，值是已套用的 index"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/server.go"
+    line: 977
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/server.go#L977"
+  etcd-srv-proposal-failed:
+    kind: code
+    title: "proposals_failed_total：Propose 失敗"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/v3_server.go"
+    line: 1116
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/v3_server.go#L1116"
+  etcd-srv-proposal-timeout:
+    kind: code
+    title: "proposals_failed_total：等 commit 逾時"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/v3_server.go"
+    line: 1128
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/v3_server.go#L1128"
+  etcd-srv-proposal-pending:
+    kind: code
+    title: "proposals_pending：送出後等結果"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/v3_server.go"
+    line: 1120
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/v3_server.go#L1120"
+  etcd-srv-reqtimeout:
+    kind: code
+    title: "ReqTimeout = 5s + 2 × election timeout（預設 7s）"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/config/config.go"
+    line: 323
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/config/config.go#L323"
+  etcd-srv-request-duration:
+    kind: code
+    title: "etcd_server_request_duration_seconds{type,success}（basic 就有）"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/metrics.go"
+    line: 102
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/metrics.go#L102"
+  etcd-srv-nospace-raise:
+    kind: code
+    title: "寫入超過 quota 時提出 NOSPACE alarm"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/server.go"
+    line: 1988
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/server.go#L1988"
+  etcd-srv-snapshot-catchup:
+    kind: code
+    title: "snapshot 後保留 5000 筆 entry 給慢的 follower"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/server.go"
+    line: 85
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/server.go#L85"
+  etcd-srv-snapshot-count:
+    kind: code
+    title: "每 10000 筆 apply 做一次 raft snapshot"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/server.go"
+    line: 78
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/server.go#L78"
+  etcd-quota-available:
+    kind: code
+    title: "quota 用 backend 檔案大小（Size，不是 SizeInUse）比較"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/storage/quota.go"
+    line: 133
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/storage/quota.go#L133"
+  etcd-quota-default:
+    kind: code
+    title: "預設 quota 2GiB"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/storage/quota.go"
+    line: 30
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/storage/quota.go#L30"
+  etcd-quota-metric:
+    kind: code
+    title: "etcd_server_quota_backend_bytes"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/storage/metrics.go"
+    line: 24
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/storage/metrics.go#L24"
+  etcd-capped-put:
+    kind: code
+    title: "NOSPACE 時 Put、Txn 寫入、LeaseGrant 回 ErrNoSpace；DeleteRange 不擋"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/apply/capped.go"
+    line: 33
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/apply/capped.go#L33"
+  etcd-uber-restore-alarms:
+    kind: code
+    title: "啟動時依 alarm store 決定是否進入 capped 模式"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/apply/uber_applier.go"
+    line: 71
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/apply/uber_applier.go#L71"
+  etcd-alarm-gauge-inc:
+    kind: code
+    title: "etcd_debugging_server_alarms 只在 apply alarm 請求時 Inc／Dec"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/apply/backend.go"
+    line: 124
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/apply/backend.go#L124"
+  etcd-alarm-activate-existing:
+    kind: code
+    title: "Activate：alarm 已存在時回傳既有的那一筆（不是 nil），applier 照樣 Inc"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/api/v3alarm/alarms.go"
+    line: 58
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/api/v3alarm/alarms.go#L58"
+  etcd-alarm-store-restore:
+    kind: code
+    title: "alarm store 從 backend 還原，不更新 gauge"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/api/v3alarm/alarms.go"
+    line: 103
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/api/v3alarm/alarms.go#L103"
+  etcd-mvcc-alarm-metric:
+    kind: code
+    title: "etcd_debugging_server_alarms{server_id,alarm_type}"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/apply/metrics.go"
+    line: 23
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/apply/metrics.go#L23"
+  etcd-txn-slow-apply:
+    kind: code
+    title: "slow_apply_total：apply 超過 warning-apply-duration"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/txn/util.go"
+    line: 102
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/txn/util.go#L102"
+  etcd-embed-warn-apply:
+    kind: code
+    title: "--warning-apply-duration 預設 100ms"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/embed/config.go"
+    line: 65
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/embed/config.go#L65"
+  etcd-embed-autocompact:
+    kind: code
+    title: "--auto-compaction-retention 預設 0（關閉）"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/embed/config.go"
+    line: 730
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/embed/config.go#L730"
+  etcd-embed-metrics-flag:
+    kind: code
+    title: "--metrics basic／extensive"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/embed/config.go"
+    line: 737
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/embed/config.go#L737"
+  etcd-embed-quota-flag:
+    kind: code
+    title: "--quota-backend-bytes"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/embed/config.go"
+    line: 632
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/embed/config.go#L632"
+  etcd-grpc-histogram-extensive:
+    kind: code
+    title: "server 端 gRPC histogram 只在 --metrics=extensive 註冊"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/api/v3rpc/grpc.go"
+    line: 103
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/api/v3rpc/grpc.go#L103"
+  etcd-feat-compacthash:
+    kind: code
+    title: "CompactHashCheck 預設關"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/features/etcd_features.go"
+    line: 92
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/features/etcd_features.go#L92"
+  etcd-feat-initialcorrupt:
+    kind: code
+    title: "InitialCorruptCheck 預設關"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/features/etcd_features.go"
+    line: 91
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/features/etcd_features.go#L91"
+  etcd-feat-metric:
+    kind: code
+    title: "etcd_server_feature_enabled{name,stage}"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/metrics.go"
+    line: 146
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/metrics.go#L146"
+  etcd-member-knownpeers:
+    kind: code
+    title: "known_peers：每個成員（含自己、含 learner）設 1，移除的設 0"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/api/membership/cluster.go"
+    line: 854
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/api/membership/cluster.go#L854"
+  etcd-member-islearner:
+    kind: code
+    title: "etcd_server_is_learner"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/api/membership/metrics.go"
+    line: 41
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/api/membership/metrics.go#L41"
+  etcd-rafthttp-rtt:
+    kind: code
+    title: "peer_round_trip_time_seconds：prober 的平滑 RTT"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/api/rafthttp/probing_status.go"
+    line: 92
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/api/rafthttp/probing_status.go#L92"
+  etcd-rafthttp-probe-interval:
+    kind: code
+    title: "RTT 健康時每 30 秒觀察一次、不健康時 5 秒"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/api/rafthttp/probing_status.go"
+    line: 37
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/api/rafthttp/probing_status.go#L37"
+  etcd-rafthttp-sentfail:
+    kind: code
+    title: "peer_sent_failures_total：送不出的 raft 訊息"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/api/rafthttp/peer.go"
+    line: 264
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/api/rafthttp/peer.go#L264"
+  etcd-rafthttp-snapfail:
+    kind: code
+    title: "etcd_network_snapshot_send_failures"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/api/rafthttp/metrics.go"
+    line: 104
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/api/rafthttp/metrics.go#L104"
+  etcd-read-timeout:
+    kind: code
+    title: "linearizable read 的 ReadIndex 等到 RequestTimeout 才回 ErrTimeout"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/read/read.go"
+    line: 225
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/read/read.go#L225"
+  etcd-boot-checkquorum:
+    kind: code
+    title: "etcd 一律開 CheckQuorum"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/bootstrap.go"
+    line: 548
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/bootstrap.go#L548"
+  etcd-compaction-last:
+    kind: code
+    title: "db_compaction_last：重啟歸 0"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/storage/mvcc/metrics.go"
+    line: 158
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/storage/mvcc/metrics.go#L158"
+  etcd-compact-rev-restore:
+    kind: code
+    title: "compact revision 重啟時從 backend 還原"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/storage/mvcc/kvstore.go"
+    line: 343
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/storage/mvcc/kvstore.go#L343"
+  etcd-mixin-membersdown:
+    kind: code
+    title: "mixin etcdMembersDown：up == 0 或 peer 送出失敗，for 20m"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "contrib/mixin/alerts/alerts.libsonnet"
+    line: 8
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/contrib/mixin/alerts/alerts.libsonnet#L8"
+  etcd-mixin-leaderchanges:
+    kind: code
+    title: "mixin：15 分鐘內 leader 變動 ≥ 4"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "contrib/mixin/alerts/alerts.libsonnet"
+    line: 57
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/contrib/mixin/alerts/alerts.libsonnet#L57"
+  etcd-mixin-grpcfail:
+    kind: code
+    title: "mixin：gRPC 失敗比例 > 1%（warning）、> 5%（critical）"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "contrib/mixin/alerts/alerts.libsonnet"
+    line: 71
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/contrib/mixin/alerts/alerts.libsonnet#L71"
+  etcd-mixin-grpcslow:
+    kind: code
+    title: "mixin：gRPC unary p99 > 0.15s（需要 extensive）"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "contrib/mixin/alerts/alerts.libsonnet"
+    line: 105
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/contrib/mixin/alerts/alerts.libsonnet#L105"
+  etcd-mixin-peerslow:
+    kind: code
+    title: "mixin：peer RTT p99 > 0.15s"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "contrib/mixin/alerts/alerts.libsonnet"
+    line: 120
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/contrib/mixin/alerts/alerts.libsonnet#L120"
+  etcd-mixin-proposals:
+    kind: code
+    title: "mixin：proposals_failed 的 rate（每秒）> 5"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "contrib/mixin/alerts/alerts.libsonnet"
+    line: 137
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/contrib/mixin/alerts/alerts.libsonnet#L137"
+  etcd-mixin-commit:
+    kind: code
+    title: "mixin：backend commit p99 > 0.25s"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "contrib/mixin/alerts/alerts.libsonnet"
+    line: 179
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/contrib/mixin/alerts/alerts.libsonnet#L179"
+  etcd-mixin-growth:
+    kind: code
+    title: "mixin：predict_linear 4h 超過 quota"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "contrib/mixin/alerts/alerts.libsonnet"
+    line: 208
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/contrib/mixin/alerts/alerts.libsonnet#L208"
+  etcd-mixin-frag:
+    kind: code
+    title: "mixin：in_use / total < 0.5 且 in_use > 100MB"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "contrib/mixin/alerts/alerts.libsonnet"
+    line: 222
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/contrib/mixin/alerts/alerts.libsonnet#L222"
+  etcd-mixin-selector:
+    kind: code
+    title: "mixin 預設 selector job=~\".*etcd.*\""
+    project: "etcd"
+    version: "v3.7.3"
+    file: "contrib/mixin/config.libsonnet"
+    line: 8
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/contrib/mixin/config.libsonnet#L8"
+  etcd-mixin-clusterlabel:
+    kind: code
+    title: "mixin 用 job 當 cluster label"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "contrib/mixin/config.libsonnet"
+    line: 24
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/contrib/mixin/config.libsonnet#L24"
+  etcd-raft-precandidate-lead:
+    kind: code
+    title: "pre-candidate 把 lead 設成 None"
+    project: "etcd raft"
+    version: "v3.7.0"
+    file: "raft.go"
+    line: 917
+    url: "https://github.com/etcd-io/raft/blob/v3.7.0/raft.go#L917"
+  etcd-raft-checkquorum-stepdown:
+    kind: code
+    title: "CheckQuorum：leader 收不到過半回應就退成 follower、lead = None"
+    project: "etcd raft"
+    version: "v3.7.0"
+    file: "raft.go"
+    line: 1283
+    url: "https://github.com/etcd-io/raft/blob/v3.7.0/raft.go#L1283"
+  etcd-raft-becomefollower:
+    kind: code
+    title: "becomeFollower 設定 term 與 lead"
+    project: "etcd raft"
+    version: "v3.7.0"
+    file: "raft.go"
+    line: 891
+    url: "https://github.com/etcd-io/raft/blob/v3.7.0/raft.go#L891"
+  etcd-exp:
+    kind: experiment
+    title: "etcd v3.7.3 三台叢集：quorum、leader、sample_limit、endpoint-blocking、NOSPACE（lab/targets/etcd）"
+    url: "https://github.com/HahaSula/alert-trust/tree/main/lab/targets/etcd"
+  etcd-exp-raw:
+    kind: experiment
+    title: "etcd lab 原始輸出"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/etcd/results/run-20261109.txt"
+  etcd-exp-raw-v1:
+    kind: experiment
+    title: "etcd lab 第一次執行（規則第一版：quorum 用 has_leader 計數）的原始輸出"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/etcd/results/run-20261109-v1.txt"
