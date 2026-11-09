@@ -1,0 +1,276 @@
+# query-exporter 5.2.2（albertodonato/query-exporter，映像 adonato/query-exporter:5.2.2）
+# 補 mysqld_exporter 看不到的 MySQL／MariaDB 盲點：連線打滿當下的連線數、errant GTID、metadata lock 阻擋者、
+# replica 錯誤碼（errno 與錯誤名稱當 label）、MariaDB ASH 取樣器的彙總。說明與證據：docs/targets/mysql.md#custom-queries。
+#
+# databases 區塊是例子（lab/targets/mysql/custom-queries 直接用這份）：每台一個項目，DSN 從環境變數讀。
+# 每個 query 的 databases 清單決定在哪種資料庫上跑（MySQL 8.4 與 MariaDB 11.4 的 SQL 不同）。
+# 每個 metric 自動帶 database label（項目名稱），另外用 labels 標 cluster，規則用 (cluster, database) 對齊。
+#
+# 連線：DSN 指到「不受 max_connections 限制」的埠，連線打滿時查詢仍然連得上。
+#   MySQL 8.4：--admin-address=<本機 IP 或主機名稱>（不接受 0.0.0.0）、--admin-port（預設 33062），帳號要有 SERVICE_CONNECTION_ADMIN。
+#   MariaDB 11.4：--extra-port=3307，--extra-max-connections 至少 2（預設 1：query-exporter 的常駐連線佔掉之後，
+#   timeout 丟掉連線再重連、或人要從同一個 port 進來查都會被拒）；extra_port 有自己的連線計數，不需要額外權限，
+#   這些連線也不算進 Threads_connected。
+#   不開這兩個埠時，query-exporter 的常駐連線（connection-pool size 1）在打滿前就連好的話仍然能查；
+#   一旦斷線（DB 重啟、query timeout 會丟掉連線、每 3600 秒 pool_recycle）就要重連，打滿時重連會被拒。
+#   不要用 CONNECTION_ADMIN 繞過：它同時讓帳號在 read_only 下可寫、可以 KILL 別人的連線。
+#
+# 帳號與權限（只讀）：
+#   -- MySQL 8.4
+#   CREATE USER 'qexporter'@'%' IDENTIFIED BY '...' WITH MAX_USER_CONNECTIONS 2;
+#   GRANT PROCESS ON *.* TO 'qexporter'@'%';                         -- 看別人的 thread、INNODB_TRX
+#   GRANT SELECT ON performance_schema.* TO 'qexporter'@'%';          -- global_status、metadata_locks、threads、replication_*
+#   GRANT SERVICE_CONNECTION_ADMIN ON *.* TO 'qexporter'@'%';         -- 只在走 admin port 時需要
+#   -- MariaDB 11.4
+#   CREATE USER 'qexporter'@'%' IDENTIFIED BY '...' WITH MAX_USER_CONNECTIONS 2;
+#   GRANT PROCESS ON *.* TO 'qexporter'@'%';                         -- PROCESSLIST、METADATA_LOCK_INFO
+#   INSTALL SONAME 'metadata_lock_info';                              -- metadata lock 查詢要這個 plugin（官方映像內附）
+#   GRANT SELECT ON ash.* TO 'qexporter'@'%';                         -- 只有裝了 ASH 取樣器才需要
+#   GRANT EVENT ON ash.* TO 'qexporter'@'%';                          -- information_schema.EVENTS 只列有 EVENT 權限的 schema（取樣器存活檢查）
+#
+# expiration 至少 4 倍 interval：APScheduler 3.11 的 misfire_grace_time 預設 1 秒，排程晚到超過 1 秒那一次就跳過
+# （lab 中容器時鐘不穩時 15 秒的查詢常被跳過一次），expiration 太短會讓正常的 series 中途消失。
+# 成本：每個查詢都是單列彙總或少量列，timeout 5 秒；所有 metric 設 expiration，查詢失敗或資料庫連不上時
+# series 會在 expiration 後消失，不會一直停在最後一個值（由 rules/targets/mysql.yml 的 mysql-custom-queries 群組告警）。
+# 欄位名稱和 metric、label 對不上時 query-exporter 會把這個查詢永久移除，只留 queries{status="error"} 與停止更新的 query_timestamp。
+
+databases:
+  my1:
+    dsn: !env QE_DSN_MY1          # 例：mysql://qexporter:...@my1:33062/
+    labels: { cluster: my }
+    connect-sql: ["SET SESSION lock_wait_timeout = 2", "SET SESSION max_execution_time = 4000"]
+  my2:
+    dsn: !env QE_DSN_MY2
+    labels: { cluster: my }
+    connect-sql: ["SET SESSION lock_wait_timeout = 2", "SET SESSION max_execution_time = 4000"]
+  mdb1:
+    dsn: !env QE_DSN_MDB1         # 例：mysql://qexporter:...@mdb1:3307/
+    labels: { cluster: mdb }
+    connect-sql: ["SET SESSION lock_wait_timeout = 2", "SET SESSION max_statement_time = 4"]
+  mdb2:
+    dsn: !env QE_DSN_MDB2
+    labels: { cluster: mdb }
+    connect-sql: ["SET SESSION lock_wait_timeout = 2", "SET SESSION max_statement_time = 4"]
+
+metrics:
+  # ---- 連線：打滿當下仍然有數字 ----
+  mysql_q_threads_connected:
+    type: gauge
+    description: Threads_connected（含 admin／extra port 的連線）
+    expiration: 60
+  mysql_q_max_connections:
+    type: gauge
+    description: max_connections
+    expiration: 60
+  mysql_q_read_only:
+    type: gauge
+    description: "@@global.read_only；errant GTID 規則用它分出 primary（0）與 replica（1）"
+    expiration: 60
+  # ---- errant GTID ----
+  mysql_q_gtid_executed_transactions:
+    type: gauge
+    description: MySQL gtid_executed 中每個 source UUID 的交易數（各區間長度加總）
+    labels: [source_uuid]
+    expiration: 180
+  mysql_q_gtid_binlog_state_seq:
+    type: gauge
+    description: MariaDB gtid_binlog_state 中每個 (domain_id, server_id) 最後的 seq_no
+    labels: [domain_id, server_id]
+    expiration: 180
+  # ---- metadata lock：誰擋住誰（彙總成數字，細節看 runbook 的查詢） ----
+  mysql_q_mdl_waiting_sessions:
+    type: gauge
+    description: 正在等 table metadata lock 的 session 數
+    expiration: 60
+  mysql_q_mdl_oldest_wait_seconds:
+    type: gauge
+    description: 等 table metadata lock 最久的 session 已等的秒數
+    expiration: 60
+  mysql_q_mdl_blocking_sessions:
+    type: gauge
+    description: 持有被等待的表的 metadata lock、自己沒有在等的 session 數（阻擋者）
+    expiration: 60
+  mysql_q_mdl_idle_blocking_sessions:
+    type: gauge
+    description: 阻擋者中 command 是 Sleep 的 session 數（交易開著但沒有在跑語句）
+    expiration: 60
+  mysql_q_mdl_blocker_age_seconds:
+    type: gauge
+    description: 阻擋者持有多久（MySQL：InnoDB 交易開啟秒數；MariaDB：metadata lock 持有秒數）
+    expiration: 60
+  # ---- replica 錯誤：errno 與錯誤名稱當 label，不放錯誤訊息 ----
+  mysql_q_replica_last_error_timestamp_seconds:
+    type: gauge
+    description: replica applier／IO thread 最後一次錯誤的時間（Unix 秒），label 是錯誤碼與名稱
+    labels: [channel, thread, errno, error_name]
+    expiration: 60
+  # ---- MariaDB ASH 取樣器（docs/targets/mariadb-ash.md#sampler） ----
+  mysql_q_ash_active_sessions:
+    type: gauge
+    description: 最近 60 秒平均 active session 數，依等待類別（7 種）與 digest（前 10 名＋other）
+    labels: [wait_class, digest]
+    expiration: 150
+  mysql_q_ash_sampler_enabled:
+    type: gauge
+    description: 取樣 EVENT 是 ENABLED 而且 event_scheduler=ON 時是 1
+    expiration: 150
+  mysql_q_ash_sampler_last_run_age_seconds:
+    type: gauge
+    description: 取樣 EVENT 最後一次執行距今秒數
+    expiration: 150
+
+queries:
+  # ---------- 連線與角色 ----------
+  mysql_server:
+    databases: [my1, my2]
+    interval: 15
+    timeout: 5
+    metrics: [mysql_q_threads_connected, mysql_q_max_connections, mysql_q_read_only]
+    sql: |
+      SELECT CAST(s.VARIABLE_VALUE AS UNSIGNED) AS mysql_q_threads_connected,
+             @@global.max_connections AS mysql_q_max_connections,
+             @@global.read_only AS mysql_q_read_only
+        FROM performance_schema.global_status s
+       WHERE s.VARIABLE_NAME = 'Threads_connected'
+  mariadb_server:
+    databases: [mdb1, mdb2]
+    interval: 15
+    timeout: 5
+    metrics: [mysql_q_threads_connected, mysql_q_max_connections, mysql_q_read_only]
+    sql: |
+      SELECT CAST(s.VARIABLE_VALUE AS UNSIGNED) AS mysql_q_threads_connected,
+             @@global.max_connections AS mysql_q_max_connections,
+             @@global.read_only AS mysql_q_read_only
+        FROM information_schema.GLOBAL_STATUS s
+       WHERE s.VARIABLE_NAME = 'THREADS_CONNECTED'
+
+  # ---------- errant GTID ----------
+  # 拆 @@global.gtid_executed（"uuid:1-5:7,uuid2[:tag]:1-3"，逗號後可能換行）成每個 UUID 的交易數。
+  # label 數 = 曾經寫過這組資料的 server 數（重建或換機會增加）。
+  mysql_gtid:
+    databases: [my1, my2]
+    interval: 30
+    timeout: 5
+    metrics: [mysql_q_gtid_executed_transactions]
+    sql: |
+      SELECT SUBSTRING_INDEX(e.entry, ':', 1) AS source_uuid,
+             SUM(CAST(SUBSTRING_INDEX(s.seg, '-', -1) AS UNSIGNED)
+                 - CAST(SUBSTRING_INDEX(s.seg, '-', 1) AS UNSIGNED) + 1) AS mysql_q_gtid_executed_transactions
+        FROM JSON_TABLE(CONCAT('["', REPLACE(REPLACE(@@global.gtid_executed, '\n', ''), ',', '","'), '"]'),
+                        '$[*]' COLUMNS (entry VARCHAR(16000) PATH '$')) e,
+             JSON_TABLE(CONCAT('["', REPLACE(e.entry, ':', '","'), '"]'),
+                        '$[*]' COLUMNS (pos FOR ORDINALITY, seg VARCHAR(64) PATH '$')) s
+       WHERE s.pos > 1 AND s.seg REGEXP '^[0-9]'
+       GROUP BY source_uuid
+  # gtid_binlog_state 保留每個 (domain_id, server_id) 的最後一筆 GTID；gtid_binlog_pos 每個 domain 只留最後一筆，
+  # replica 上的本機寫入會在下一筆複寫事件後從 gtid_binlog_pos 消失，所以用 state。
+  # 前提：每台都 log_slave_updates=ON（複寫來的交易也寫進 binlog）。
+  mariadb_gtid:
+    databases: [mdb1, mdb2]
+    interval: 30
+    timeout: 5
+    metrics: [mysql_q_gtid_binlog_state_seq]
+    sql: |
+      SELECT SUBSTRING_INDEX(g.gtid, '-', 1) AS domain_id,
+             SUBSTRING_INDEX(SUBSTRING_INDEX(g.gtid, '-', 2), '-', -1) AS server_id,
+             CAST(SUBSTRING_INDEX(g.gtid, '-', -1) AS UNSIGNED) AS mysql_q_gtid_binlog_state_seq
+        FROM JSON_TABLE(CONCAT('["', REPLACE(@@global.gtid_binlog_state, ',', '","'), '"]'),
+                        '$[*]' COLUMNS (gtid VARCHAR(64) PATH '$')) g
+       WHERE g.gtid <> ''
+
+  # ---------- metadata lock ----------
+  # 等待者：LOCK_STATUS='PENDING'；阻擋者：同一張表上 GRANTED、自己沒有 PENDING 的 thread。
+  mysql_mdl:
+    databases: [my1, my2]
+    interval: 15
+    timeout: 5
+    metrics: [mysql_q_mdl_waiting_sessions, mysql_q_mdl_oldest_wait_seconds, mysql_q_mdl_blocking_sessions,
+              mysql_q_mdl_idle_blocking_sessions, mysql_q_mdl_blocker_age_seconds]
+    sql: |
+      SELECT
+        (SELECT COUNT(*) FROM performance_schema.metadata_locks
+          WHERE OBJECT_TYPE = 'TABLE' AND LOCK_STATUS = 'PENDING') AS mysql_q_mdl_waiting_sessions,
+        (SELECT COALESCE(MAX(t.PROCESSLIST_TIME), 0)
+           FROM performance_schema.metadata_locks m
+           JOIN performance_schema.threads t ON t.THREAD_ID = m.OWNER_THREAD_ID
+          WHERE m.OBJECT_TYPE = 'TABLE' AND m.LOCK_STATUS = 'PENDING') AS mysql_q_mdl_oldest_wait_seconds,
+        COUNT(DISTINCT b.OWNER_THREAD_ID) AS mysql_q_mdl_blocking_sessions,
+        COUNT(DISTINCT IF(bt.PROCESSLIST_COMMAND = 'Sleep', b.OWNER_THREAD_ID, NULL)) AS mysql_q_mdl_idle_blocking_sessions,
+        COALESCE(MAX(TIMESTAMPDIFF(SECOND, trx.trx_started, NOW())), 0) AS mysql_q_mdl_blocker_age_seconds
+      FROM performance_schema.metadata_locks w
+      JOIN performance_schema.metadata_locks b
+        ON b.OBJECT_TYPE = w.OBJECT_TYPE AND b.OBJECT_SCHEMA = w.OBJECT_SCHEMA AND b.OBJECT_NAME = w.OBJECT_NAME
+       AND b.LOCK_STATUS = 'GRANTED' AND b.OWNER_THREAD_ID <> w.OWNER_THREAD_ID
+      JOIN performance_schema.threads bt ON bt.THREAD_ID = b.OWNER_THREAD_ID
+      LEFT JOIN information_schema.INNODB_TRX trx ON trx.trx_mysql_thread_id = bt.PROCESSLIST_ID
+      WHERE w.OBJECT_TYPE = 'TABLE' AND w.LOCK_STATUS = 'PENDING'
+        AND NOT EXISTS (SELECT 1 FROM performance_schema.metadata_locks p
+                         WHERE p.OWNER_THREAD_ID = b.OWNER_THREAD_ID AND p.LOCK_STATUS = 'PENDING')
+  # MariaDB 的 performance_schema 預設關，metadata_locks 也看不到 PENDING；改用 metadata_lock_info plugin（只列 GRANTED）
+  # 加上 PROCESSLIST 的 state。阻擋者 = 和「正在等的 session 持有鎖的同一張表」上的其他持有者，
+  # 所以抓得到 ALTER（持有 MDL_SHARED_UPGRADABLE 再等 exclusive）被擋的情況；沒有持有任何鎖的等待者（排在 ALTER 後面的 SELECT）只算進等待數。
+  mariadb_mdl:
+    databases: [mdb1, mdb2]
+    interval: 15
+    timeout: 5
+    metrics: [mysql_q_mdl_waiting_sessions, mysql_q_mdl_oldest_wait_seconds, mysql_q_mdl_blocking_sessions,
+              mysql_q_mdl_idle_blocking_sessions, mysql_q_mdl_blocker_age_seconds]
+    sql: |
+      SELECT
+        (SELECT COUNT(*) FROM information_schema.PROCESSLIST
+          WHERE STATE = 'Waiting for table metadata lock') AS mysql_q_mdl_waiting_sessions,
+        (SELECT COALESCE(MAX(TIME_MS), 0) / 1000 FROM information_schema.PROCESSLIST
+          WHERE STATE = 'Waiting for table metadata lock') AS mysql_q_mdl_oldest_wait_seconds,
+        COUNT(DISTINCT h.THREAD_ID) AS mysql_q_mdl_blocking_sessions,
+        COUNT(DISTINCT IF(hp.COMMAND = 'Sleep', h.THREAD_ID, NULL)) AS mysql_q_mdl_idle_blocking_sessions,
+        COALESCE(MAX(h.LOCK_TIME_MS), 0) / 1000 AS mysql_q_mdl_blocker_age_seconds
+      FROM information_schema.METADATA_LOCK_INFO w
+      JOIN information_schema.PROCESSLIST wp ON wp.ID = w.THREAD_ID AND wp.STATE = 'Waiting for table metadata lock'
+      JOIN information_schema.METADATA_LOCK_INFO h
+        ON h.LOCK_TYPE = w.LOCK_TYPE AND h.TABLE_SCHEMA = w.TABLE_SCHEMA AND h.TABLE_NAME = w.TABLE_NAME
+       AND h.THREAD_ID <> w.THREAD_ID
+      JOIN information_schema.PROCESSLIST hp ON hp.ID = h.THREAD_ID
+       AND COALESCE(hp.STATE, '') <> 'Waiting for table metadata lock'
+      WHERE w.LOCK_TYPE = 'Table metadata lock'
+
+  # ---------- replica 錯誤碼 ----------
+  # 只有 MySQL：events_errors_summary_global_by_error 把 errno 對到 ER_ 名稱（有限集合）。LAST_ERROR_MESSAGE 是自由文字，不放 label。
+  # MariaDB 沒有這個查詢：replication_applier_status_by_worker 只在 performance_schema=ON 且 slave_parallel_threads > 0 時有列，
+  # 也沒有 events_errors_summary_*；用 mysqld_exporter 的 mysql_slave_status_last_sql_errno。
+  mysql_replica_errors:
+    databases: [my1, my2]
+    interval: 15
+    timeout: 5
+    metrics: [mysql_q_replica_last_error_timestamp_seconds]
+    sql: |
+      SELECT x.channel, x.thread, CAST(x.errno AS CHAR) AS errno,
+             COALESCE(MAX(e.ERROR_NAME), 'unknown') AS error_name,
+             MAX(x.ts) AS mysql_q_replica_last_error_timestamp_seconds
+        FROM (SELECT CHANNEL_NAME AS channel, 'applier' AS thread, LAST_ERROR_NUMBER AS errno,
+                     UNIX_TIMESTAMP(LAST_ERROR_TIMESTAMP) AS ts
+                FROM performance_schema.replication_applier_status_by_worker WHERE LAST_ERROR_NUMBER <> 0
+              UNION ALL
+              SELECT CHANNEL_NAME, 'io', LAST_ERROR_NUMBER, UNIX_TIMESTAMP(LAST_ERROR_TIMESTAMP)
+                FROM performance_schema.replication_connection_status WHERE LAST_ERROR_NUMBER <> 0) x
+        LEFT JOIN performance_schema.events_errors_summary_global_by_error e ON e.ERROR_NUMBER = x.errno
+       GROUP BY x.channel, x.thread, x.errno
+
+  # ---------- MariaDB ASH 取樣器 ----------
+  # 前提：lab/targets/mysql/ash/ash-sampler.sql 已安裝（performance_schema=ON、event_scheduler=ON）。label 上限 7 × 11。
+  mariadb_ash:
+    databases: [mdb1]
+    interval: 30
+    timeout: 5
+    metrics: [mysql_q_ash_active_sessions]
+    sql: |
+      SELECT wait_class, digest_label AS digest, aas AS mysql_q_ash_active_sessions FROM ash.aas_60s
+  mariadb_ash_sampler:
+    databases: [mdb1]
+    interval: 30
+    timeout: 5
+    metrics: [mysql_q_ash_sampler_enabled, mysql_q_ash_sampler_last_run_age_seconds]
+    sql: |
+      SELECT (STATUS = 'ENABLED' AND @@global.event_scheduler = 'ON') AS mysql_q_ash_sampler_enabled,
+             TIMESTAMPDIFF(SECOND, LAST_EXECUTED, NOW()) AS mysql_q_ash_sampler_last_run_age_seconds
+        FROM information_schema.EVENTS
+       WHERE EVENT_SCHEMA = 'ash' AND EVENT_NAME = 'ev_sample'

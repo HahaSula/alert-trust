@@ -1,0 +1,77 @@
+# query-exporter 5.2.2 補 mysqld_exporter 盲點的輕量實驗。
+#   my1（primary）→ my2（replica）：MySQL 8.4.7、GTID、admin port 33062
+#   mdb1（primary）→ mdb2（replica）：MariaDB 11.4、GTID、extra_port 3307、log_slave_updates=ON；mdb1 開 performance_schema 跑 ASH 取樣器
+#   兩台 primary 的 max_connections=10，方便打滿。
+#   qe：query-exporter 5.2.2，直接用 repo 的 queries/query-exporter/mysql.yaml
+#   ex-my1、ex-mdb1：mysqld_exporter v0.21.0（走一般 port，對照「打滿時 exporter 也進不去」）
+#   prom：Prometheus v3.13.5，載入 rules/targets/mysql.yml
+# Host port 只開 127.0.0.1:22990（Prometheus）、127.0.0.1:22960（query-exporter）。執行：./run.sh；結束後 docker compose down -v。
+name: at-myq
+x-ex: &ex
+  image: prom/mysqld-exporter:v0.21.0
+  environment: { MYSQLD_EXPORTER_PASSWORD: exporterpw }
+x-my: &my
+  image: mysql:8.4.7
+  environment: { MYSQL_ROOT_PASSWORD: rootpw }
+  volumes: [./init-my.sql:/docker-entrypoint-initdb.d/1-users.sql:ro]
+  mem_limit: 768m
+  healthcheck:
+    test: ["CMD", "mysqladmin", "ping", "-uroot", "-prootpw", "--silent"]
+    interval: 3s
+    retries: 80
+x-mdb: &mdb
+  image: mariadb:11.4
+  environment: { MARIADB_ROOT_PASSWORD: rootpw }
+  volumes: [./init-mdb.sql:/docker-entrypoint-initdb.d/1-users.sql:ro]
+  mem_limit: 768m
+  healthcheck:
+    test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+    interval: 3s
+    retries: 80
+services:
+  my1:
+    <<: *my
+    command: [--server-id=11, --gtid-mode=ON, --enforce-gtid-consistency=ON, --max-connections=10,
+              --admin-address=my1, --admin-port=33062, --innodb-buffer-pool-size=64M]
+    volumes: [./init-my.sql:/docker-entrypoint-initdb.d/1-users.sql:ro, ./init-my-data.sql:/docker-entrypoint-initdb.d/2-data.sql:ro]
+  my2:
+    <<: *my
+    command: [--server-id=12, --gtid-mode=ON, --enforce-gtid-consistency=ON, --max-connections=30,
+              --admin-address=my2, --admin-port=33062, --innodb-buffer-pool-size=64M]
+  mdb1:
+    <<: *mdb
+    command: [--server-id=1, --log-bin=mysql-bin, --binlog-format=ROW, --log-slave-updates=ON, --max-connections=10,
+              --extra-port=3307, --extra-max-connections=3, --performance-schema=ON, --event-scheduler=ON, --innodb-buffer-pool-size=64M,
+              --innodb-lock-wait-timeout=60]
+    volumes: [./init-mdb.sql:/docker-entrypoint-initdb.d/1-users.sql:ro, ./init-mdb-data.sql:/docker-entrypoint-initdb.d/2-data.sql:ro,
+              ../ash/ash-sampler.sql:/ash-sampler.sql:ro]
+  mdb2:
+    <<: *mdb
+    command: [--server-id=2, --log-bin=mysql-bin, --binlog-format=ROW, --log-slave-updates=ON, --max-connections=30,
+              --extra-port=3307, --extra-max-connections=3, --innodb-buffer-pool-size=64M]
+  ex-my1:
+    <<: *ex
+    command: [--mysqld.address=my1:3306, --mysqld.username=exporter, --collect.info_schema.processlist]
+    depends_on: { my1: { condition: service_healthy } }
+  ex-mdb1:
+    <<: *ex
+    command: [--mysqld.address=mdb1:3306, --mysqld.username=exporter, --collect.info_schema.processlist]
+    depends_on: { mdb1: { condition: service_healthy } }
+  qe:
+    image: adonato/query-exporter:5.2.2
+    command: [--config, /config/mysql.yaml]
+    environment:
+      QE_DSN_MY1: "mysql://qexporter:qepw@my1:33062/"
+      QE_DSN_MY2: "mysql://qexporter:qepw@my2:33062/"
+      QE_DSN_MDB1: "mysql://qexporter:qepw@mdb1:3307/"
+      QE_DSN_MDB2: "mysql://qexporter:qepw@mdb2:3307/"
+    volumes: ["${QE_CONFIG:-../../../../queries/query-exporter/mysql.yaml}:/config/mysql.yaml:ro"]
+    ports: ["127.0.0.1:22960:9560"]
+    profiles: [qe]
+  prom:
+    image: prom/prometheus:v3.13.5
+    command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.retention.time=1h]
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../../../../rules/targets/mysql.yml:/etc/prometheus/rules/mysql.yml:ro
+    ports: ["127.0.0.1:22990:9090"]

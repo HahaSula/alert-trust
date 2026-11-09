@@ -622,3 +622,141 @@ groups:
         annotations:
           summary: "一小時內重啟超過一次（crash loop、反覆 OOM kill）；重啟之間的停機短於 scrape 間隔時 mysql_up 看不到，uptime 歸零才看得到"
           runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#crash-oom
+
+  # ---------- 用 query-exporter 5.2.2 補的盲點（queries/query-exporter/mysql.yaml） ----------
+  # 這組規則的 metric 由 query-exporter 輸出：job="query-exporter" 是佔位符；每個 metric 帶 database（設定檔裡的項目名稱）與 cluster。
+  # query-exporter 的內建 metric 沒有前綴：queries_total{query,status}、database_errors_total（counter 輸出時加 _total）、query_timestamp、query_interval。
+  # 所有自訂 metric 都設了 expiration，查詢失敗時 series 會消失，下面的規則回傳空；由前三條補位。
+  - name: mysql-custom-queries
+    rules:
+      - alert: MySQLCustomQueryExporterDown
+        expr: up{job="query-exporter"} == 0 or absent(up{job="query-exporter"})
+        for: 2m
+        labels: { severity: warning, component: mysqld_exporter, tier: "1" }
+        annotations:
+          summary: "抓不到 query-exporter（或沒有這個 job）；連線打滿、errant GTID、metadata lock 阻擋者、replica 錯誤碼的規則都會回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#custom-queries
+      - alert: MySQLCustomQueryFailing
+        expr: |
+          sum by (instance, database, query, status) (increase(queries_total{job="query-exporter", status!="success"}[5m])) > 0
+          or sum by (instance, database) (increase(database_errors_total{job="query-exporter"}[5m])) > 0
+        for: 5m
+        labels: { severity: warning, component: mysqld_exporter, tier: "1" }
+        annotations:
+          summary: "{{ $labels.database }} 的自訂查詢 {{ $labels.query }} 失敗（{{ $labels.status }}；沒有 query label 表示連不上資料庫）；欄位對不上時查詢會被永久移除，要重啟 query-exporter"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#custom-queries
+      - alert: MySQLCustomQueryStale
+        expr: |
+          sum by (job, instance, cluster, database, query) (
+            increase(queries_total{job="query-exporter", status="success"}[5m])
+          ) == 0
+        for: 2m
+        labels: { severity: warning, component: mysqld_exporter, tier: "1" }
+        annotations:
+          summary: "{{ $labels.database }} 的自訂查詢 {{ $labels.query }} 5 分鐘內沒有成功過（連不上、逾時，或欄位對不上被永久移除）；對應的 mysql_q_* 已過 expiration 消失。不用 query_timestamp：查詢回 0 列時它不會更新"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#custom-queries
+          absence_covered_by: "MySQLCustomQueryExporterDown"
+      - alert: MySQLConnectionsExhausted
+        expr: mysql_q_threads_connected{job="query-exporter"} / mysql_q_max_connections{job="query-exporter"} >= 0.95
+        for: 1m
+        labels: { severity: critical, component: mysqld_exporter, tier: "2" }
+        annotations:
+          summary: "{{ $labels.database }} 連線數到 max_connections 的 {{ $value | humanizePercentage }}；一般帳號（含 mysqld_exporter）已經或快要連不上，這個數字來自 admin port／extra_port"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#connections
+          absence_covered_by: "MySQLCustomQueryExporterDown, MySQLCustomQueryFailing, MySQLCustomQueryStale"
+      - alert: MySQLErrantGtid
+        expr: |
+          (
+            max by (cluster, database, source_uuid) (
+              (mysql_q_gtid_executed_transactions{job="query-exporter"} offset 2m)
+                and on (cluster, database) (mysql_q_read_only{job="query-exporter"} == 1)
+            )
+              > on (cluster, source_uuid) group_left
+            max by (cluster, source_uuid) (
+              mysql_q_gtid_executed_transactions{job="query-exporter"}
+                and on (cluster, database) (mysql_q_read_only{job="query-exporter"} == 0)
+            )
+          or
+            max by (cluster, database, source_uuid) (
+              mysql_q_gtid_executed_transactions{job="query-exporter"}
+                and on (cluster, database) (mysql_q_read_only{job="query-exporter"} == 1)
+            )
+              unless on (cluster, source_uuid)
+            max by (cluster, source_uuid) (
+              mysql_q_gtid_executed_transactions{job="query-exporter"}
+                and on (cluster, database) (mysql_q_read_only{job="query-exporter"} == 0)
+            )
+          )
+          and on (cluster) (count by (cluster) (mysql_q_read_only{job="query-exporter"} == 0) == 1)
+        for: 5m
+        labels: { severity: critical, component: mysqld_exporter, tier: "2" }
+        annotations:
+          summary: "{{ $labels.database }}（read_only）有 primary 沒有的 GTID（source_uuid {{ $labels.source_uuid }}）；failover 到這台會讓其他 replica 拿到不一致的資料。用 GTID_SUBTRACT 找出交易"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#gtid-consistency
+          absence_covered_by: "MySQLCustomQueryExporterDown, MySQLCustomQueryFailing, MySQLCustomQueryStale"
+      - alert: MariaDBErrantGtid
+        expr: |
+          (
+            max by (cluster, database, domain_id, server_id) (
+              (mysql_q_gtid_binlog_state_seq{job="query-exporter"} offset 2m)
+                and on (cluster, database) (mysql_q_read_only{job="query-exporter"} == 1)
+            )
+              > on (cluster, domain_id, server_id) group_left
+            max by (cluster, domain_id, server_id) (
+              mysql_q_gtid_binlog_state_seq{job="query-exporter"}
+                and on (cluster, database) (mysql_q_read_only{job="query-exporter"} == 0)
+            )
+          or
+            max by (cluster, database, domain_id, server_id) (
+              mysql_q_gtid_binlog_state_seq{job="query-exporter"}
+                and on (cluster, database) (mysql_q_read_only{job="query-exporter"} == 1)
+            )
+              unless on (cluster, domain_id, server_id)
+            max by (cluster, domain_id, server_id) (
+              mysql_q_gtid_binlog_state_seq{job="query-exporter"}
+                and on (cluster, database) (mysql_q_read_only{job="query-exporter"} == 0)
+            )
+          )
+          and on (cluster) (count by (cluster) (mysql_q_read_only{job="query-exporter"} == 0) == 1)
+        for: 5m
+        labels: { severity: critical, component: mysqld_exporter, tier: "2" }
+        annotations:
+          summary: "{{ $labels.database }}（read_only）的 gtid_binlog_state 有 primary 沒有的 GTID（domain {{ $labels.domain_id }}、server_id {{ $labels.server_id }}）；要每台 log_slave_updates=ON"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#gtid-consistency
+          absence_covered_by: "MySQLCustomQueryExporterDown, MySQLCustomQueryFailing, MySQLCustomQueryStale"
+      - alert: MySQLMetadataLockBlocker
+        expr: |
+          mysql_q_mdl_blocking_sessions{job="query-exporter"} > 0
+            and on (cluster, database) mysql_q_mdl_oldest_wait_seconds{job="query-exporter"} > 30
+        for: 1m
+        labels: { severity: warning, component: mysqld_exporter, tier: "2" }
+        annotations:
+          summary: "{{ $labels.database }} 有 session 等 metadata lock 超過 30 秒，{{ $value }} 個 session 擋住它們（mysql_q_mdl_idle_blocking_sessions 是其中交易開著沒在做事的）；MySQL 看 sys.schema_table_lock_waits，MariaDB 看 information_schema.METADATA_LOCK_INFO"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#metadata-locks
+          absence_covered_by: "MySQLCustomQueryExporterDown, MySQLCustomQueryFailing, MySQLCustomQueryStale"
+      - alert: MySQLReplicaErrorCode
+        expr: max by (cluster, database, channel, errno, error_name) (mysql_q_replica_last_error_timestamp_seconds{job="query-exporter", thread="applier"}) > 0
+        for: 1m
+        labels: { severity: critical, component: mysqld_exporter, tier: "2" }
+        annotations:
+          summary: "{{ $labels.database }} 的 applier 停在錯誤 {{ $labels.errno }}（{{ $labels.error_name }}）；錯誤訊息看 performance_schema.replication_applier_status_by_worker 的 LAST_ERROR_MESSAGE"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#replication-error
+          absence_covered_by: "MySQLCustomQueryExporterDown, MySQLCustomQueryFailing, MySQLCustomQueryStale"
+      - alert: MariaDBAshSamplerStopped
+        expr: |
+          mysql_q_ash_sampler_enabled{job="query-exporter"} == 0
+          or mysql_q_ash_sampler_last_run_age_seconds{job="query-exporter"} > 30
+        for: 2m
+        labels: { severity: warning, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "{{ $labels.database }} 的 ASH 取樣 EVENT 停了（event_scheduler=OFF、EVENT 被停用或報錯）；取樣停止時 mysql_q_ash_active_sessions 會在 expiration 後消失"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#active-sessions
+          absence_covered_by: "MySQLCustomQueryExporterDown, MySQLCustomQueryFailing, MySQLCustomQueryStale"
+      - alert: MariaDBRowLockActiveSessions
+        expr: sum by (cluster, database) (mysql_q_ash_active_sessions{job="query-exporter", wait_class="lock_row"}) > 2
+        for: 5m
+        labels: { severity: info, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "{{ $labels.database }} 最近 60 秒平均有 {{ $value }} 個 session 在等 row lock；用 ash.sample 找出語句與 digest"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#active-sessions
+          absence_covered_by: "MariaDBAshSamplerStopped, MySQLCustomQueryStale"

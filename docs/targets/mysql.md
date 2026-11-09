@@ -540,18 +540,125 @@ SELECT trx_mysql_thread_id, trx_started, trx_state FROM information_schema.INNOD
 
 | 盲點 | 為什麼 | 補法 |
 |---|---|---|
-| 連線打滿時的連線數 | exporter 也被擋，整組 metric 消失 | 告警靠 `mysql_up` 與事後的 `connection_errors_total`；或讓 exporter 走管理埠 |
-| errant GTID | `gtid_executed` 是字串 | 外部 script 跑 `GTID_SUBSET`，結果用 textfile 或 pushgateway 送進來 |
+| 連線打滿時的連線數 | exporter 也被擋，整組 metric 消失 | 告警靠 `mysql_up` 與事後的 `connection_errors_total`；[自訂查詢走 admin port／extra_port](#custom-queries) |
+| errant GTID | `gtid_executed` 是字串 | [自訂查詢](#custom-queries)輸出每個 UUID（MariaDB：domain × server_id）的數字，在 PromQL 比 replica 與 primary |
 | 磁碟用量 | 不在資料庫裡 | node_exporter，規則要知道資料目錄的掛載點 |
 | OOM 原因 | 只看得到 uptime 歸零 | kernel log、cAdvisor 的 OOM 事件 |
 | 真正的寫入 | `mysql_up` 只做 ping | heartbeat 寫入程式自己回報成功時間，或應用層探測 |
-| Replica 錯誤訊息 | `Last_SQL_Error` 是字串 | 規則帶 errno，細節看 `SHOW REPLICA STATUS` |
+| Replica 錯誤訊息 | `Last_SQL_Error` 是字串 | 規則帶 errno；MySQL 可用[自訂查詢](#custom-queries)加上 `ER_` 名稱；訊息本身看 `SHOW REPLICA STATUS` |
 | MariaDB 的每帳號、每查詢統計 | performance_schema 預設關 | 開 `performance_schema=ON`（要重啟，佔記憶體） |
-| Metadata lock 細節 | 沒有 collector 讀 `performance_schema.metadata_locks` | processlist 的 state 只能看到「有人在等」 |
+| Metadata lock 細節 | 沒有 collector 讀 `performance_schema.metadata_locks` | [自訂查詢](#custom-queries)輸出等待數、阻擋者數與持有時間；是誰看 `sys.schema_table_lock_waits` |
 | 備份新鮮度 | 沒有備份 collector | 備份 job 寫 textfile metric（`mysql_backup_last_success_timestamp_seconds`，例子），見[資料保護](#protection) |
-| 頁面損毀 | 沒有 status 計數，只在 error log | log pipeline 對 error log 告警；定期 `CHECK TABLE` 寫 textfile |
+| 頁面損毀 | 沒有 status 計數，只在 error log | log pipeline 對 error log 告警；離峰排程 `CHECK TABLE` 寫 textfile（太重，不放進自訂查詢） |
 | GR 節流時間 | `Gr_flow_control_*` 只有 Enterprise component 有 | 看 applier／certifier 佇列對門檻的比例 |
 | MariaDB 執行中語句的 digest、長尾延遲 | digest 在語句結束才寫入；沒有 quantile | [ASH 取樣器](mariadb-ash.md#sampler) |
+
+## 用自訂查詢補上 {#custom-queries}
+
+「資料庫有、exporter 沒輸出」的四項，用 query-exporter 5.2.2（映像 `adonato/query-exporter:5.2.2`）跑自訂查詢補上；設定在 [`queries/query-exporter/mysql.yaml`](https://github.com/HahaSula/alert-trust/blob/main/queries/query-exporter/mysql.yaml)，規則在 `rules/targets/mysql.yml` 的 `mysql-custom-queries` 群組。Lab 直接掛載同一份設定。<span class="at-chip at-ev-tested">實測</span>[^my-q-exp]
+
+| 盲點 | 結果 | 新 metric（都帶 `database`、`cluster`） | 規則 |
+|---|---|---|---|
+| 連線打滿當下的連線數 | 補上（要開 admin port／extra_port） | `mysql_q_threads_connected`、`mysql_q_max_connections` | `MySQLConnectionsExhausted` |
+| errant GTID | 補上（在 PromQL 裡比 replica 與 primary） | `mysql_q_gtid_executed_transactions{source_uuid}`、`mysql_q_gtid_binlog_state_seq{domain_id,server_id}`、`mysql_q_read_only` | `MySQLErrantGtid`、`MariaDBErrantGtid` |
+| Metadata lock 誰擋住誰 | 補上數字；「是誰」不放 label | `mysql_q_mdl_waiting_sessions`、`_oldest_wait_seconds`、`_blocking_sessions`、`_idle_blocking_sessions`、`_blocker_age_seconds` | `MySQLMetadataLockBlocker` |
+| Replica 錯誤訊息 | MySQL 補上錯誤碼與名稱；訊息文字與 MariaDB 補不了 | `mysql_q_replica_last_error_timestamp_seconds{channel,thread,errno,error_name}` | `MySQLReplicaErrorCode` |
+| MariaDB ASH 彙總（[取樣器](mariadb-ash.md#sampler)） | 輸出取樣器的 60 秒彙總 | `mysql_q_ash_active_sessions{wait_class,digest}`、`mysql_q_ash_sampler_enabled`、`mysql_q_ash_sampler_last_run_age_seconds` | `MariaDBAshSamplerStopped`、`MariaDBRowLockActiveSessions` |
+| 頁面損毀 | 不做 | — | — |
+| 真正的寫入 | 不做 | — | — |
+
+不做的兩項：`CHECK TABLE` 要讀整張表並加鎖，不能放進每 15–60 秒的查詢；寫入探測要讓監控帳號有寫入權限，改用 pt-heartbeat ＋ `--collect.heartbeat`（見[延遲](#replication)）。GR 節流時間沒有資料來源，自訂查詢也補不了。
+
+### 連線打滿時查詢怎麼進得去
+
+一般帳號在打滿時一定被拒：MySQL 只放行 admin 連線或有 `SUPER`／`CONNECTION_ADMIN`／`SERVICE_CONNECTION_ADMIN` 的帳號[^my-q-my-admin-bypass][^mysql-conn-reserved]，MariaDB 只放行有 `CONNECTION ADMIN` 的帳號。[^my-q-mdb-ignore-maxconn][^my-q-mdb-conn-check]做法依序：
+
+| 做法 | 條件 | 代價 |
+|---|---|---|
+| **MySQL admin port**（建議） | `--admin-address=<IP 或主機名稱>`（不接受 `0.0.0.0`）、`--admin-port`（預設 33062）；帳號要 `SERVICE_CONNECTION_ADMIN`[^my-q-my-admin-address][^my-q-my-admin-priv] | 要重啟才能開；這個權限只影響連線，不給資料權限 |
+| **MariaDB extra_port**（建議） | `--extra-port`、`--extra-max-connections` 至少 2；extra_port 有自己的連線計數，不需要額外權限[^my-q-mdb-extra-port][^my-q-mdb-extra-scheduler][^my-q-mdb-extra-max-default] | 要重啟；這些連線不算進 `Threads_connected`（實驗中 mdb2 只有 extra_port 連線時是 0） |
+| 只靠 query-exporter 的常駐連線 | connection-pool 預設 1 條常駐連線[^my-q-qe-pool-size][^my-q-qe-pool-persist]，打滿前已連上就能繼續查（連線數上限只在連線時檢查） | 斷線就要重連：資料庫重啟、查詢 timeout（query-exporter 會丟掉那條連線[^my-q-qe-timeout-drop]）、每 3600 秒 `pool_recycle`[^my-q-qe-pool-recycle]；打滿時重連會被拒（讀碼，未實測） |
+| 給帳號 `CONNECTION_ADMIN` | — | 不要：它同時讓帳號在 `read_only` 下可寫、可以 KILL 別人的連線[^my-q-my-connadmin-readonly][^my-q-my-connadmin-kill] |
+
+實驗：my1、mdb1 的 `max_connections=10`，各開 15 條 `SELECT SLEEP(75)`。<span class="at-chip at-ev-tested">實測</span>[^my-q-exp]
+
+- mysqld_exporter（一般 port）兩台 `mysql_up` 都是 0，`threads_connected` 消失；qexporter 從一般 port 新開連線，MariaDB 收到 `ERROR 1040`（MySQL 那一刻 app 只連上 8 條，還有空位）。
+- 同一時間 query-exporter 走 admin port／extra_port：`mysql_q_threads_connected` 兩台都是 10、比例 1，`MySQLConnectionsExhausted` 兩台都進入 pending；CLI 從 33062、3307 新開連線也成功。
+- 第一輪用 MariaDB 預設 `extra_max_connections=1`：query-exporter 的常駐連線佔掉唯一的位置，CLI 從 3307 也被拒（`ERROR 1040`），所以建議至少 2。<span class="at-chip at-ev-tested">實測</span>[^my-q-exp-1]
+
+### errant GTID
+
+單一查詢只連一台，算不出「replica 的 `gtid_executed` 是不是 primary 的子集」（`GTID_SUBSET` 要同時拿到兩邊的字串）。做法是讓每台輸出可以比較的數字，在 PromQL 裡比：
+
+- **MySQL**：用 `JSON_TABLE` 把 `@@global.gtid_executed`[^my-q-my-gtid-executed] 拆成每個 source UUID 的交易數（各區間長度加總）。replica 上的本機寫入用 replica 自己的 UUID，primary 沒有這個 UUID；replica 曾經是 primary 時，同一個 UUID 的交易數會比 primary 多。
+- **MariaDB**：讀 `@@global.gtid_binlog_state`，它保留每個 (domain_id, server_id) 的最後一筆 GTID。[^my-q-mdb-binlog-state-pair][^my-q-mdb-gtid-binlog-state]不能用 `gtid_binlog_pos`：它每個 domain 只留最後一筆，下一筆複寫事件就把本機寫入蓋掉（實驗：`0-2-161` → `0-1-161`，state 仍有 `0-2-161`）。前提是每台都 `log_slave_updates=ON`。
+- **規則**：read_only=1 的節點，某個 UUID（或 domain／server_id）的值在 2 分鐘前就大於 read_only=0 那台現在的值，或 primary 根本沒有這個 UUID → errant。用 2 分鐘前的值是為了避開 replica 比 primary 晚 scrape 而暫時看起來比較多；只在剛好一台可寫時評估。
+
+實驗：在 read_only 的 my2、mdb2 上直接寫一筆。my2 多出 `source_uuid=<my2 的 UUID>` 1 筆（`GTID_SUBSET` 同時是 0），mdb2 多出 `server_id=2` 的 seq；`MySQLErrantGtid`、`MariaDBErrantGtid` 都進入 pending（`for: 5m`，lab 沒有等到 firing）。寫入之前（s0–s3，primary 上有寫入並複寫到 replica）兩條規則都沒有出現在 ALERTS。<span class="at-chip at-ev-tested">實測</span>[^my-q-exp]
+
+Cardinality：label 數 = 曾經寫過這組資料的 server 數（MySQL 的 UUID、MariaDB 的 domain × server_id），重建或換機才會增加。
+
+### Metadata lock 阻擋者
+
+| | MySQL 8.4 | MariaDB 11.4 |
+|---|---|---|
+| 等待者 | `performance_schema.metadata_locks` 的 `LOCK_STATUS='PENDING'`[^my-q-my-mdl-status] | `PROCESSLIST.STATE='Waiting for table metadata lock'`[^my-perf-mdb-mdl-state]（performance_schema 預設關，也看不到 PENDING[^exp-mysql-perf]） |
+| 阻擋者 | 同一張表上 `GRANTED`、自己沒有 PENDING 的 thread | `METADATA_LOCK_INFO`（要 `INSTALL SONAME 'metadata_lock_info'`，官方映像內附）只列已取得的鎖[^my-q-mdb-mli-granted]；阻擋者 = 和「正在等的 session 持有鎖的同一張表」上的其他持有者 |
+| 持有多久 | 阻擋者 InnoDB 交易開啟秒數 | `LOCK_TIME_MS`[^my-q-mdb-mli-time] |
+
+查詢都是沒有 `GROUP BY` 的彙總，一定回一列（沒有等待時是 0；NULL 會被當成 0[^my-q-qe-null-zero]），所以沒有 label、不會累積 series。誰（pid、帳號、SQL）不放 label：告警後查 `sys.schema_table_lock_waits` 或 `METADATA_LOCK_INFO`。MariaDB 的限制：排在 ALTER 後面、自己沒有持有任何鎖的 SELECT 只算進等待數，找不到阻擋者；只有等待者本身持有那張表的鎖（例如 ALTER 的 `MDL_SHARED_UPGRADABLE`）時才找得到。
+
+實驗：閒置交易讀 `app.t` → `ALTER TABLE` → `SELECT`。兩邊都是等待 2、阻擋者 1、閒置的阻擋者 1、阻擋者持有約 30 秒；交易結束後全部回到 0。同一時間 mysqld_exporter 的 processlist collector 只看得到 state 的計數。`MySQLMetadataLockBlocker`（最久等待 > 30 秒、`for: 1m`）在 lab 的 75 秒裡沒有走到 pending（容器時鐘慢，取樣時 MySQL 的最久等待才 30 秒）。<span class="at-chip at-ev-tested">實測</span>[^my-q-exp]
+
+### Replica 錯誤碼
+
+MySQL 讀 `performance_schema.replication_applier_status_by_worker` 與 `replication_connection_status` 的 `LAST_ERROR_NUMBER`[^my-q-my-worker-errno][^my-q-my-conn-errno]，join `events_errors_summary_global_by_error` 拿到 `ER_` 名稱[^my-q-my-error-name]。`errno`、`error_name` 是有限集合，可以當 label；`LAST_ERROR_MESSAGE` 含表名與值，是自由文字，不放。值是錯誤時間（Unix 秒），只輸出有錯誤的列，設 60 秒 expiration：錯誤清掉後 series 會消失。[^my-q-qe-expiration][^my-q-qe-expire-on-scrape]
+
+MariaDB 補不了：`replication_applier_status_by_worker` 的列數等於 `slave_parallel_threads`，預設 0 就沒有列，還要 `performance_schema=ON`[^my-q-mdb-worker-rows]；也沒有 `events_errors_summary_*`。繼續用 mysqld_exporter 的 `mysql_slave_status_last_sql_errno`（[複寫與 HA](#replication)）。
+
+實驗：replica 先有 id=100，primary 再寫 id=100。my2 輸出 `errno="1062"`、`error_name="ER_DUP_ENTRY"`、`thread="applier"`，`MySQLReplicaErrorCode` 進入 pending（第一輪到 firing[^my-q-exp-1]）；修好並 `START REPLICA SQL_THREAD` 後 15 秒 series 仍在（expiration 60 秒），再 70 秒消失。mdb2 的 by_worker 表 0 列，`SHOW SLAVE STATUS` 的 `Last_SQL_Errno` 是 1062。<span class="at-chip at-ev-tested">實測</span>[^my-q-exp]
+
+### MariaDB ASH
+
+[ASH 頁](mariadb-ash.md#sampler)的取樣器在資料庫裡每秒取樣，query-exporter 只讀 `ash.aas_60s`（7 種等待類別 × 前 10 個 digest＋other，上限 77 條 series）和取樣 EVENT 的狀態（`information_schema.EVENTS` 只列有 `EVENT` 權限的 schema，所以要 `GRANT EVENT ON ash.*`）。digest 仍只有已結束的語句，quantile 與 CPU 時間仍然沒有，這個盲點只補上「依時間的等待分布」。
+
+實驗：一個交易持有 row lock，3 個 UPDATE 等它。`mysql_q_ash_active_sessions{wait_class="lock_row"}` 是 1.75，和同一時間直接查 `ash.aas_60s` 相同；`ALTER EVENT ... DISABLE` 後 `mysql_q_ash_sampler_enabled` 0、`MariaDBAshSamplerStopped` 進入 pending。這組數據用「每次 scrape 執行」的設定（刪掉 interval）量到，原因見下一節。<span class="at-chip at-ev-tested">實測</span>[^my-q-exp-ash]
+
+### query-exporter 本身的失效方式
+
+| 行為 | 影響 | 對策 | 依據 |
+|---|---|---|---|
+| 查詢依 `interval` 由排程執行，和 scrape 無關[^my-q-qe-interval] | 失敗時 metric 不更新，沒有 expiration 會一直停在最後一個值 | 每個 metric 設 expiration；資料庫停機後約 90 秒 mdb2 的自訂 series 全部消失 | 讀碼＋實測[^my-q-qe-expiration][^my-q-exp] |
+| 查詢回 0 列時不更新任何 metric，也不更新 `query_timestamp`[^my-q-qe-empty-rows][^my-q-qe-timestamp-empty] | 用 `query_timestamp` 判斷停滯會誤報（第一輪：正常沒有錯誤的 replica 查詢被判成停滯） | `MySQLCustomQueryStale` 改用 `queries_total{status="success"}` 的增加量 | 讀碼＋實測[^my-q-exp-1] |
+| 欄位名稱或數量不符是 fatal，查詢被永久移除[^my-q-qe-fatal][^my-q-qe-doomed] | 之後只剩不再增加的成功計數 | 同上，5 分鐘沒有成功就告警 | 讀碼 |
+| 連不上資料庫只加 `database_errors_total`，沒有 query label[^my-q-qe-connect-error] | — | `MySQLCustomQueryFailing` 同時看兩個 counter（輸出時 counter 加 `_total`） | 讀碼＋實測：mdb2 停機後 `database_errors_total` 2、`MySQLCustomQueryFailing` pending[^my-q-exp] |
+| APScheduler 3.11 的 `misfire_grace_time` 預設 1 秒，晚到超過 1 秒的那次直接跳過[^my-q-aps-grace][^my-q-aps-missed] | 這台機器（容器時鐘慢）上 30 秒的查詢約 3 分鐘只成功 2 次、跳過 3 次，ASH metric 一直停在開頭的值 | expiration 至少 4 倍 interval；時鐘不穩的環境改成每次 scrape 執行（刪掉 interval；成本跟著 scrape 次數，多台 Prometheus 會加倍） | 實測[^my-q-exp-ash-interval][^my-q-exp-ash] |
+| 每個 metric 自動加 `database` label（項目名稱）[^my-q-qe-db-label]；`query_interval` 不帶[^my-q-qe-interval-labels] | 規則要用 `(cluster, database)` 對齊，不能用 `instance`（那是 query-exporter 的位址） | 設定裡用 database `labels` 標 `cluster` | 讀碼 |
+
+### 權限、成本與 cardinality
+
+```sql
+-- MySQL 8.4
+CREATE USER 'qexporter'@'%' IDENTIFIED BY '...' WITH MAX_USER_CONNECTIONS 2;
+GRANT PROCESS ON *.* TO 'qexporter'@'%';
+GRANT SELECT ON performance_schema.* TO 'qexporter'@'%';
+GRANT SERVICE_CONNECTION_ADMIN ON *.* TO 'qexporter'@'%';   -- 只在走 admin port 時
+-- MariaDB 11.4
+CREATE USER 'qexporter'@'%' IDENTIFIED BY '...' WITH MAX_USER_CONNECTIONS 2;
+GRANT PROCESS ON *.* TO 'qexporter'@'%';
+INSTALL SONAME 'metadata_lock_info';
+GRANT SELECT, EVENT ON ash.* TO 'qexporter'@'%';               -- 只在裝了 ASH 取樣器時
+```
+
+| 查詢 | interval | 成本 | series 數（每台） |
+|---|---|---|---|
+| 連線與角色 | 15s | 讀一個 status 變數 | 3 |
+| errant GTID | 30s | 拆一個字串，和 UUID 或 domain×server 數成正比 | 寫過的 server 數 |
+| metadata lock | 15s | 掃 metadata lock 清單（和持有中的 MDL 數成正比） | 5 |
+| replica 錯誤碼 | 15s | 讀 by_worker（列數 = applier worker 數） | 0（有錯誤時每個 channel × thread 1 條） |
+| ASH | 30s | 讀最近 60 秒的取樣表（取樣本身的成本見 ASH 頁） | 最多 77 ＋ 2 |
+
+每個查詢 timeout 5 秒，連線時另外設 `lock_wait_timeout=2` 與語句上限（MySQL `max_execution_time=4000`、MariaDB `max_statement_time=4`）。實驗中 4 台合計 39 條自訂 series。<span class="at-chip at-ev-tested">實測</span>[^my-q-exp]
 
 ## 建議的 exporter 設定 {#recommended}
 
@@ -592,5 +699,7 @@ GRANT SLAVE MONITOR ON *.* TO 'exporter'@'%';
 [`lab/targets/mysql/ha/`](https://github.com/HahaSula/alert-trust/tree/main/lab/targets/mysql/ha)：`./run.sh` 起 4 台資料庫、4 台 exporter、1 台 Prometheus（只開 127.0.0.1:22090），跑完 9 個情境後 `docker compose down -v`，約 13 分鐘。原始結果與摘要在 `results/run-20261108.md`，各節點的 metric 名稱清單在 `results/names-*.txt`。[^exp-mysql-ha]
 
 [`lab/targets/mysql/perf/`](https://github.com/HahaSula/alert-trust/tree/main/lab/targets/mysql/perf)：`./run.sh` 跑 11 個效能與故障情境（約 21 分鐘），`./run.sh focus` 只重做 metadata lock 與 OOM（約 7 分鐘）；只開 127.0.0.1:22690，結束後 `docker compose down -v`。[^exp-mysql-perf]
+
+[`lab/targets/mysql/custom-queries/`](https://github.com/HahaSula/alert-trust/tree/main/lab/targets/mysql/custom-queries)：`./run.sh` 起 4 台資料庫、query-exporter 5.2.2、2 台 mysqld_exporter 與 Prometheus（只開 127.0.0.1:22960、22990），做連線打滿、metadata lock、replica 錯誤碼、errant GTID、ASH、資料庫停機 6 個情境，約 14 分鐘；`./run.sh ash` 只重做 ASH。[^my-q-exp]
 
 [`lab/targets/mysql/ash/`](https://github.com/HahaSula/alert-trust/tree/main/lab/targets/mysql/ash)：`./run.sh` 起三台 Group Replication、三台 Galera、一台 MariaDB 與四台 exporter（只開 127.0.0.1:22801–22804），做 quorum、binlog、auto_increment 與 ASH 取樣器的情境，約 6 分鐘；`./run.sh ash` 只重做 ASH（約 1 分鐘）。結果在 `results/`。[^my-asp-exp][^my-asp-exp-ash]

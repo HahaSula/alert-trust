@@ -211,6 +211,29 @@ signals:
     upstream: { status: no, note: "mixin 與 awesome 都沒有" }
     rules: [rules/targets/mysql.yml#MySQLCollectorFailed]
 
+  - id: custom-queries
+    aspect: exporter
+    tier: 1
+    question: 補盲點的自訂查詢（query-exporter）還在跑嗎
+    signal: >-
+      query-exporter 5.2.2 的內建 metric：up{job="query-exporter"}、queries_total{status!="success"} 與 database_errors_total 的增加量（設定裡叫 queries、database_errors，輸出時 counter 加 _total）、
+      time() - query_timestamp 超過 4 個 query_interval。查詢由排程執行，失敗時自訂 metric 不更新；設了 expiration 的 series
+      在 expiration 後消失，所以 MySQLConnectionsExhausted、MySQLErrantGtid 這類規則在查詢失敗時回傳空，要靠這三條補位
+    metrics: [up, queries_total, database_errors_total, query_timestamp, query_interval]
+    evaluate_on: self
+    applies_when: "有部署 queries/query-exporter/mysql.yaml"
+    silent_failure: >-
+      欄位名稱或數量和設定不符時查詢被永久移除（不重試），之後只剩停止更新的 query_timestamp；
+      沒設 expiration 的 metric 在資料庫停機後一直停在最後一個值
+    evidence: tested
+    source: query-exporter
+    refs: [my-q-exp, my-q-qe-fatal, my-q-qe-doomed, my-q-qe-expiration, my-q-qe-connect-error, my-q-qe-query-timestamp, my-q-qe-interval-labels]
+    upstream: { status: no }
+    rules:
+      - rules/targets/mysql.yml#MySQLCustomQueryExporterDown
+      - rules/targets/mysql.yml#MySQLCustomQueryFailing
+      - rules/targets/mysql.yml#MySQLCustomQueryStale
+
   - id: probe-blast-radius
     aspect: exporter
     tier: 1
@@ -427,6 +450,7 @@ signals:
       - rules/targets/mysql.yml#MySQLTooManyConnections
       - rules/targets/mysql.yml#MySQLHighThreadsRunning
       - rules/targets/mysql.yml#MySQLConnectionsRefused
+      - rules/targets/mysql.yml#MySQLConnectionsExhausted
 
   - id: user-connection-limits
     aspect: saturation
@@ -588,7 +612,7 @@ signals:
     source: art-mysql
     refs: [exp-mysql-perf, my-processlist-query, my-trace-ex-pl-sanitize, my-perf-my-mdl-state, my-perf-mdb-mdl-state, my-perf-my-lock-wait-timeout, my-perf-mdb-lock-wait-timeout, my-perf-ex-waits-query]
     upstream: { status: no }
-    rules: [rules/targets/mysql.yml#MySQLMetadataLockWaits]
+    rules: [rules/targets/mysql.yml#MySQLMetadataLockWaits, rules/targets/mysql.yml#MySQLMetadataLockBlocker]
 
   - id: slow-sql-visibility
     aspect: workload
@@ -689,7 +713,7 @@ signals:
     source: art-mysql-ha
     refs: [exp-mysql-ha, my-slave-skip]
     upstream: { status: no }
-    rules: [rules/targets/mysql.yml#MySQLReplicationError]
+    rules: [rules/targets/mysql.yml#MySQLReplicationError, rules/targets/mysql.yml#MySQLReplicaErrorCode]
 
   - id: replica-status-present
     aspect: replication
@@ -799,7 +823,7 @@ signals:
     source: art-mysql-ha
     refs: [exp-mysql-ha, my-global-variables-parse, my-trace-ex-slave-gtid]
     upstream: { status: no, note: "mixin 與 awesome 都沒有；Orchestrator 等 HA 工具自己會檢查" }
-    rules: []
+    rules: [rules/targets/mysql.yml#MySQLErrantGtid, rules/targets/mysql.yml#MariaDBErrantGtid]
 
   - id: semi-sync
     aspect: replication
@@ -1147,40 +1171,79 @@ signals:
     source: art-mysql-asp
     refs: [my-asp-exp-ash, my-processlist-query, my-asp-ex-processlist-group]
     upstream: { status: no }
-    rules: []
+    rules: [rules/targets/mysql.yml#MariaDBAshSamplerStopped, rules/targets/mysql.yml#MariaDBRowLockActiveSessions]
 
 # 目前無法監控的範圍。category：exporter（資料庫有、exporter 沒輸出）、database（資料庫本身沒提供）、other（要靠其他元件）。
 blind_spots:
   - what: 連線打滿當下的連線數
     category: exporter
     why: exporter 也被擋在外面，整組 metric 消失
-    workaround: 告警靠 `mysql_up` 與事後的 `connection_errors_total`；或讓 exporter 走管理埠
-    section: targets/mysql.md#blind-spots
+    workaround: >-
+      告警靠 `mysql_up` 與事後的 `connection_errors_total`；或讓查詢走不受 max_connections 限制的埠：
+      MySQL 的 admin port（帳號要 SERVICE_CONNECTION_ADMIN）、MariaDB 的 extra_port（extra_max_connections 至少 2）
+    section: targets/mysql.md#custom-queries
+    covered_by:
+      tool: "query-exporter 5.2.2"
+      config: queries/query-exporter/mysql.yaml
+      metrics: [mysql_q_threads_connected, mysql_q_max_connections]
+      rules: [MySQLConnectionsExhausted]
+      refs: [my-q-exp, my-q-exp-1, my-q-my-admin-bypass, my-q-my-admin-priv, my-q-mdb-extra-scheduler, my-q-mdb-extra-max-default, my-q-qe-pool-persist]
   - what: errant GTID
     category: exporter
     why: "`gtid_executed`、`gtid_binlog_pos` 是字串，exporter 跳過"
-    workaround: 外部 script 跑 `GTID_SUBSET`，結果用 textfile 送進來
-    section: targets/mysql.md#blind-spots
+    workaround: >-
+      自訂查詢把 gtid_executed 拆成每個 source UUID 的交易數（MariaDB 用 gtid_binlog_state 的每個 (domain_id, server_id) seq），
+      在 PromQL 裡比 replica 與 read_only=0 的 primary；精確的 GTID_SUBSET 要同時連兩台，單一查詢做不到
+    section: targets/mysql.md#custom-queries
+    covered_by:
+      tool: "query-exporter 5.2.2"
+      config: queries/query-exporter/mysql.yaml
+      metrics: [mysql_q_gtid_executed_transactions, mysql_q_gtid_binlog_state_seq, mysql_q_read_only]
+      rules: [MySQLErrantGtid, MariaDBErrantGtid]
+      refs: [my-q-exp, my-q-my-gtid-executed, my-q-mdb-binlog-state-pair, my-q-mdb-gtid-binlog-state, my-q-qe-row-map]
   - what: Metadata lock 的細節（誰擋住誰）
     category: exporter
     why: 沒有 collector 讀 `performance_schema.metadata_locks`
-    workaround: 手動查 `sys.schema_table_lock_waits`（MySQL）；MariaDB 用 ASH 取樣器
-    section: targets/mysql.md#blind-spots
+    workaround: >-
+      自訂查詢彙總成數字：等待數、最久等待、阻擋者數、閒置的阻擋者數、阻擋者持有多久；誰（pid、帳號、SQL）不放 label，
+      告警後查 `sys.schema_table_lock_waits`（MySQL）或 `information_schema.METADATA_LOCK_INFO`（MariaDB，要裝 plugin）
+    section: targets/mysql.md#custom-queries
+    covered_by:
+      tool: "query-exporter 5.2.2"
+      config: queries/query-exporter/mysql.yaml
+      metrics: [mysql_q_mdl_waiting_sessions, mysql_q_mdl_oldest_wait_seconds, mysql_q_mdl_blocking_sessions, mysql_q_mdl_idle_blocking_sessions, mysql_q_mdl_blocker_age_seconds]
+      rules: [MySQLMetadataLockBlocker]
+      refs: [my-q-exp, my-q-my-mdl-status, my-q-mdb-mli-granted, my-q-mdb-mli-time, my-q-qe-null-zero]
   - what: Replica 的錯誤訊息
     category: exporter
-    why: "`Last_SQL_Error` 是字串"
-    workaround: 規則帶 errno，細節看 `SHOW REPLICA STATUS`
-    section: targets/mysql.md#blind-spots
+    why: "`Last_SQL_Error` 是字串（自由文字，不能當 label）"
+    workaround: >-
+      MySQL：自訂查詢把 errno 與 ER_ 名稱（events_errors_summary_global_by_error，有限集合）當 label；錯誤訊息本身仍要看
+      `SHOW REPLICA STATUS`。MariaDB 補不了：by_worker 表只在 performance_schema=ON 且 slave_parallel_threads > 0 時有列，
+      也沒有錯誤名稱表，用 mysqld_exporter 的 `mysql_slave_status_last_sql_errno`
+    section: targets/mysql.md#custom-queries
+    covered_by:
+      tool: "query-exporter 5.2.2"
+      config: queries/query-exporter/mysql.yaml
+      metrics: [mysql_q_replica_last_error_timestamp_seconds]
+      rules: [MySQLReplicaErrorCode]
+      refs: [my-q-exp, my-q-my-worker-errno, my-q-my-conn-errno, my-q-my-error-name, my-q-mdb-worker-rows, my-q-qe-expiration]
   - what: 頁面損毀
     category: database
-    why: 沒有 status 計數，只寫在 error log
-    workaround: log 管線對 error log 告警；定期 `CHECK TABLE` 寫 textfile
+    why: 沒有 status 計數，只寫在 error log；`CHECK TABLE` 要讀整張表（並加鎖），不能放進每 15–60 秒的查詢
+    workaround: log 管線對 error log 告警；離峰排程 `CHECK TABLE`／mariadb-check 寫 textfile（query-exporter 的 schedule 也能跑，但成本與鎖要自己評估，這裡不提供）
     section: targets/mysql.md#blind-spots
   - what: MariaDB 執行中語句的 digest、長尾延遲、CPU 時間
     category: database
     why: digest 在語句結束才寫入；沒有 quantile 與 `SUM_CPU_TIME`
-    workaround: ASH 取樣器
+    workaround: ASH 取樣器（資料庫內的 EVENT），用 query-exporter 輸出最近 60 秒的等待類別 × digest 平均；digest 仍只有已結束的語句，quantile 與 CPU 時間仍然沒有
     section: targets/mariadb-ash.md#sampler
+    covered_by:
+      tool: "query-exporter 5.2.2"
+      config: queries/query-exporter/mysql.yaml
+      metrics: [mysql_q_ash_active_sessions, mysql_q_ash_sampler_enabled, mysql_q_ash_sampler_last_run_age_seconds]
+      rules: [MariaDBAshSamplerStopped, MariaDBRowLockActiveSessions]
+      refs: [my-q-exp, my-asp-exp-ash, my-q-qe-expiration]
   - what: Group Replication 的節流時間
     category: database
     why: "`Gr_flow_control_*` 只有 Enterprise component 有"
@@ -1189,7 +1252,7 @@ blind_spots:
   - what: 真正的寫入是否成功
     category: database
     why: "`mysql_up` 只做 ping"
-    workaround: heartbeat 寫入程式回報成功時間，或應用層探測
+    workaround: heartbeat 寫入程式回報成功時間（pt-heartbeat ＋ --collect.heartbeat），或應用層探測；不建議讓監控帳號寫入，所以沒有放進自訂查詢
     section: targets/mysql.md#blind-spots
   - what: 磁碟用量
     category: other

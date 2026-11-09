@@ -1,0 +1,348 @@
+# query-exporter 自訂查詢（docs/targets/mysql.md#custom-queries、queries/query-exporter/mysql.yaml）的參考。
+# 每一行都用 gh api 取 tag 上的檔案核對過（行內含關鍵字）。
+# 原始碼：query-exporter 5.2.2、MySQL 8.4.7（mysql-8.4.7）、MariaDB 11.4.13（mariadb-11.4.13）。
+refs:
+  my-q-qe-pool-persist:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/db.py"
+    line: 131
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/db.py#L131"
+    title: "QueuePool 常駐連線，pool_pre_ping"
+  my-q-qe-pool-recycle:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/db.py"
+    line: 132
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/db.py#L132"
+    title: "pool_recycle=3600：每小時重連一次"
+  my-q-qe-pool-size:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/schema.py"
+    line: 189
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/schema.py#L189"
+    title: "connection-pool size 預設 1"
+  my-q-qe-empty-rows:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/db.py"
+    line: 226
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/db.py#L226"
+    title: "查詢回 0 列時不更新任何 metric"
+  my-q-qe-row-map:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/db.py"
+    line: 237
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/db.py#L237"
+    title: "每一列依欄位名稱對到 metric 與 label"
+  my-q-qe-fatal:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/db.py"
+    line: 105
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/db.py#L105"
+    title: "欄位數或名稱不符是 fatal 錯誤"
+  my-q-qe-doomed:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/executor.py"
+    line: 227
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/executor.py#L227"
+    title: "fatal 錯誤的查詢被永久移除"
+  my-q-qe-null-zero:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/executor.py"
+    line: 285
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/executor.py#L285"
+    title: "NULL 當成 0"
+  my-q-qe-db-label:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/executor.py"
+    line: 291
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/executor.py#L291"
+    title: "每個 metric 自動帶 database label"
+  my-q-qe-expiration:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/executor.py"
+    line: 85
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/executor.py#L85"
+    title: "超過 expiration 沒更新的 series 被移除"
+  my-q-qe-expire-on-scrape:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/main.py"
+    line: 91
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/main.py#L91"
+    title: "移除過期 series 發生在每次 HTTP 請求"
+  my-q-qe-timeout:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/db.py"
+    line: 382
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/db.py#L382"
+    title: "查詢 timeout 用 asyncio.wait_for"
+  my-q-qe-timeout-drop:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/db.py"
+    line: 399
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/db.py#L399"
+    title: "timeout 時丟掉該條連線"
+  my-q-qe-connect-error:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/executor.py"
+    line: 215
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/executor.py#L215"
+    title: "連不上資料庫時只加 database_errors"
+  my-q-qe-status-timeout:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/executor.py"
+    line: 218
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/executor.py#L218"
+    title: "queries 的 status=timeout"
+  my-q-qe-interval:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/executor.py"
+    line: 140
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/executor.py#L140"
+    title: "interval 查詢由排程執行，與 scrape 無關"
+  my-q-qe-query-timestamp:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/builtin_metrics.py"
+    line: 14
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/builtin_metrics.py#L14"
+    title: "內建 metric query_timestamp（沒有前綴）"
+  my-q-qe-interval-labels:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/builtin_metrics.py"
+    line: 58
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/builtin_metrics.py#L58"
+    title: "query_interval 不帶 database label"
+  my-q-my-admin-bypass:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/conn_handler/connection_handler_manager.cc"
+    line: 116
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/conn_handler/connection_handler_manager.cc#L116"
+    title: "admin 連線不受 max_connections 限制"
+  my-q-my-admin-priv:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/auth/sql_authentication.cc"
+    line: 3877
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/auth/sql_authentication.cc#L3877"
+    title: "admin 連線要 SERVICE_CONNECTION_ADMIN"
+  my-q-my-admin-address:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/sys_vars.cc"
+    line: 1129
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/sys_vars.cc#L1129"
+    title: "admin_address 不接受萬用位址"
+  my-q-my-connadmin-readonly:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/auth/sql_authorization.cc"
+    line: 1863
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/auth/sql_authorization.cc#L1863"
+    title: "CONNECTION_ADMIN 等同 SUPER 跳過 read_only"
+  my-q-my-connadmin-kill:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/sql_parse.cc"
+    line: 6504
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/sql_parse.cc#L6504"
+    title: "CONNECTION_ADMIN 可以 KILL 別人的連線"
+  my-q-mdb-extra-scheduler:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 9075
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L9075"
+    title: "extra_port 用自己的 extra_max_connections 計數"
+  my-q-mdb-extra-max-default:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sys_vars.cc"
+    line: 6729
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sys_vars.cc#L6729"
+    title: "extra_max_connections 預設 1"
+  my-q-mdb-extra-port:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sys_vars.cc"
+    line: 6719
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sys_vars.cc#L6719"
+    title: "extra_port 系統變數"
+  my-q-mdb-conn-check:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 6377
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L6377"
+    title: "連線數檢查用 scheduler 自己的上限 +1"
+  my-q-mdb-ignore-maxconn:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/privilege.h"
+    line: 427
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/privilege.h#L427"
+    title: "跳過 max_connections 的權限是 CONNECTION ADMIN"
+  my-q-my-gtid-executed:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/sys_vars.cc"
+    line: 6418
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/sys_vars.cc#L6418"
+    title: "gtid_executed 系統變數"
+  my-q-mdb-binlog-state-pair:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/rpl_gtid.h"
+    line: 293
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/rpl_gtid.h#L293"
+    title: "binlog state 保留每個 (domain_id, server_id) 的最後 GTID"
+  my-q-mdb-gtid-binlog-state:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sys_vars.cc"
+    line: 2319
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sys_vars.cc#L2319"
+    title: "gtid_binlog_state 系統變數"
+  my-q-my-mdl-status:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/perfschema/table_md_locks.cc"
+    line: 60
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/perfschema/table_md_locks.cc#L60"
+    title: "metadata_locks.LOCK_STATUS（PENDING／GRANTED）"
+  my-q-mdb-mli-granted:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "plugin/metadata_lock_info/metadata_lock_info.cc"
+    line: 80
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/plugin/metadata_lock_info/metadata_lock_info.cc#L80"
+    title: "METADATA_LOCK_INFO 只列已取得的鎖"
+  my-q-mdb-mli-time:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "plugin/metadata_lock_info/metadata_lock_info.cc"
+    line: 51
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/plugin/metadata_lock_info/metadata_lock_info.cc#L51"
+    title: "METADATA_LOCK_INFO.LOCK_TIME_MS"
+  my-q-my-worker-errno:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/perfschema/table_replication_applier_status_by_worker.cc"
+    line: 65
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/perfschema/table_replication_applier_status_by_worker.cc#L65"
+    title: "applier worker 的 LAST_ERROR_NUMBER"
+  my-q-my-conn-errno:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/perfschema/table_replication_connection_status.cc"
+    line: 99
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/perfschema/table_replication_connection_status.cc#L99"
+    title: "IO thread 的 LAST_ERROR_NUMBER"
+  my-q-my-error-name:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/perfschema/table_ees_global_by_error.cc"
+    line: 55
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/perfschema/table_ees_global_by_error.cc#L55"
+    title: "events_errors_summary_global_by_error.ERROR_NAME"
+  my-q-mdb-worker-rows:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/perfschema/table_replication_applier_status_by_worker.cc"
+    line: 97
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/perfschema/table_replication_applier_status_by_worker.cc#L97"
+    title: "MariaDB 的 by_worker 列數 = slave_parallel_threads"
+  my-q-exp:
+    kind: experiment
+    title: "query-exporter 5.2.2 補 mysqld_exporter 盲點：連線打滿、MDL 阻擋者、replica 錯誤碼、errant GTID、MariaDB ASH"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/mysql/custom-queries/results/run-20261109.md"
+  my-q-qe-timestamp-empty:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/executor.py"
+    line: 205
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/executor.py#L205"
+    title: "只有結果帶 timestamp 時才更新 query_timestamp（0 列的結果沒有）"
+  my-q-exp-1:
+    kind: experiment
+    title: "query-exporter 自訂查詢第一輪（extra_max_connections 預設 1、query_timestamp 誤判停滯）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/mysql/custom-queries/results/run-20261109-1.md"
+  my-q-aps-grace:
+    kind: code
+    project: "APScheduler"
+    version: "3.11.3"
+    file: "src/apscheduler/schedulers/base.py"
+    line: 911
+    url: "https://github.com/agronholm/apscheduler/blob/3.11.3/src/apscheduler/schedulers/base.py#L911"
+    title: "misfire_grace_time 預設 1 秒（query-exporter 5.2.2 鎖定 APScheduler 3.11.3）"
+  my-q-aps-missed:
+    kind: code
+    project: "APScheduler"
+    version: "3.11.3"
+    file: "src/apscheduler/executors/base.py"
+    line: 126
+    url: "https://github.com/agronholm/apscheduler/blob/3.11.3/src/apscheduler/executors/base.py#L126"
+    title: "晚於 grace time 的那一次執行被跳過，只記一行 warning"
+  my-q-exp-ash:
+    kind: experiment
+    title: "query-exporter 自訂查詢：只重做 MariaDB ASH（expiration 150 秒）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/mysql/custom-queries/results/run-20261109-ash.md"
+  my-q-exp-ash-interval:
+    kind: experiment
+    title: "query-exporter 自訂查詢：只重做 MariaDB ASH、設定原樣（APScheduler 跳過排程）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/mysql/custom-queries/results/run-20261109-ash-interval.md"

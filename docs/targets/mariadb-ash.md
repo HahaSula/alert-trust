@@ -98,7 +98,7 @@ flowchart LR
 
 ### 輸出成 metric
 
-`ash.aas_60s` 每列是「最近 60 秒，這個等待類別 × digest 平均有幾個 active session」。label 上限 7 × 11（前 10 個 digest 加 `other`），可以直接當 gauge。mysqld_exporter 沒有自訂查詢，要用 query-exporter、sql_exporter 這類工具，或由 cron 把結果寫成 textfile。以下是 query-exporter 的設定例子（未實測，格式依它的 README）：[^my-asp-exp-ash]
+`ash.aas_60s` 每列是「最近 60 秒，這個等待類別 × digest 平均有幾個 active session」。label 上限 7 × 11（前 10 個 digest 加 `other`），可以直接當 gauge。mysqld_exporter 沒有自訂查詢，要用 query-exporter、sql_exporter 這類工具，或由 cron 把結果寫成 textfile。以下是最小的 query-exporter 設定；完整、實測過的版本（含 expiration、取樣器存活檢查與規則）在 [`queries/query-exporter/mysql.yaml`](https://github.com/HahaSula/alert-trust/blob/main/queries/query-exporter/mysql.yaml)，見[主頁的自訂查詢](mysql.md#custom-queries)。實驗中 `lock_row` 的值和直接查 `ash.aas_60s` 相同。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp-ash][^my-q-exp-ash]
 
 ```yaml
 databases:
@@ -144,5 +144,6 @@ queries:
 | MariaDB 預設 consumer 全關 | 實測 |
 | 取樣器能分出 row lock、MDL、重查詢 | 實測（一組情境） |
 | 每次取樣 3–4 ms | 實測（上限，時鐘不穩） |
-| digest 回填、query-exporter 設定、規則例子 | 推論（未實測） |
+| query-exporter 輸出 `ash.aas_60s`、取樣器停用時的告警 | 實測（每次 scrape 執行的設定） |
+| digest 回填、上表的規則例子 | 推論（未實測） |
 | MySQL、MariaDB 都沒有內建 ASH | 讀碼（兩邊的 performance_schema 表清單） |

@@ -200,3 +200,27 @@ sources:
     visibility: public
     url: https://github.com/albertodonato/query-exporter
     checked: "2026-11-09"
+  mysql-admin-interface:
+    title: MySQL 8.4 手冊：administrative connection interface（admin_address、admin_port、SERVICE_CONNECTION_ADMIN）
+    kind: upstream-doc
+    visibility: public
+    url: https://dev.mysql.com/doc/refman/8.4/en/administrative-connection-interface.html
+    checked: "2026-11-09"
+  mysql-pfs-metadata-locks:
+    title: MySQL 8.4 手冊：performance_schema.metadata_locks
+    kind: upstream-doc
+    visibility: public
+    url: https://dev.mysql.com/doc/refman/8.4/en/performance-schema-metadata-locks-table.html
+    checked: "2026-11-09"
+  mariadb-metadata-lock-info:
+    title: MariaDB 手冊：metadata_lock_info plugin（information_schema.METADATA_LOCK_INFO）
+    kind: upstream-doc
+    visibility: public
+    url: https://mariadb.com/kb/en/metadata_lock_info-plugin/
+    checked: "2026-11-09"
+  mariadb-extra-port:
+    title: MariaDB 手冊：thread pool 系統變數（extra_port、extra_max_connections）
+    kind: upstream-doc
+    visibility: public
+    url: https://mariadb.com/kb/en/thread-pool-system-status-variables/
+    checked: "2026-11-09"
