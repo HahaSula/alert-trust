@@ -56,46 +56,45 @@ nav:
   - 首頁: index.md
   - 開始使用:
       - 共同模型與檢查流程: model.md
-      - 檢查 rule 檔的流程: tools/rule-review.md
+      - 檢查 rule 檔: tools/rule-review.md
+      - 契約計算器: tools/calculator.md
       - 參與與擴充: contributing.md
-  - 監控元件:
-      - 元件卡總覽: components/index.md
-      - 架構總覽：單序點對照: architecture/index.md
-      - Prometheus:
-          - 元件卡: components/prometheus.md
-          - 內部架構: architecture/prometheus.md
-      - VictoriaMetrics 體系:
-          - vmagent 元件卡: components/vmagent.md
-          - vmagent 內部架構: architecture/vmagent.md
-          - VictoriaMetrics 元件卡: components/victoriametrics.md
-          - VictoriaMetrics 內部架構: architecture/victoriametrics.md
-          - VictoriaLogs 元件卡: components/victorialogs.md
-          - VictoriaLogs 內部架構: architecture/victorialogs.md
-          - vmalert 元件卡: components/vmalert.md
-          - vmalert 內部架構: architecture/vmalert.md
-      - Alertmanager:
-          - 元件卡: components/alertmanager.md
-          - 內部架構: architecture/alertmanager.md
+  - 監控鏈:
+      - 總覽: components/index.md
+      - Prometheus: components/prometheus.md
+      - vmagent: components/vmagent.md
+      - VictoriaMetrics: components/victoriametrics.md
+      - VictoriaLogs: components/victorialogs.md
+      - vmalert: components/vmalert.md
+      - Alertmanager: components/alertmanager.md
       - 外部觀察者: components/observer.md
-  - 資料庫 Target:
-      - Exporter 共通架構: architecture/exporters.md
+  - 資料庫:
+      - 總覽: targets/index.md
       - MySQL／MariaDB:
           - 怎麼監控: targets/mysql.md
-          - 查詢與 session 分析（ASH）: targets/mariadb-ash.md
-          - 元件卡: components/mysqld_exporter.md
-          - 附錄：原始碼到 metric: targets/mysql-appendix.md
+          - 監控訊號: components/mysqld_exporter.md
+          - 查詢與 session 分析: targets/mariadb-ash.md
+          - 原始碼到 metric: targets/mysql-appendix.md
       - PostgreSQL:
           - 怎麼監控: targets/postgres.md
-          - 元件卡: components/postgres_exporter.md
-          - 附錄：原始碼到 metric: targets/postgres-appendix.md
-  - 寫 rule:
+          - 監控訊號: components/postgres_exporter.md
+          - 原始碼到 metric: targets/postgres-appendix.md
+  - 原理:
       - 信任契約: contracts.md
-      - 契約計算器: tools/calculator.md
       - 名詞：設定與 metric: reference/terms.md
+      - 內部架構:
+          - 總覽：單序點對照: architecture/index.md
+          - Prometheus: architecture/prometheus.md
+          - vmagent: architecture/vmagent.md
+          - VictoriaMetrics: architecture/victoriametrics.md
+          - VictoriaLogs: architecture/victorialogs.md
+          - vmalert: architecture/vmalert.md
+          - Alertmanager: architecture/alertmanager.md
+          - 資料庫 exporter: architecture/exporters.md
+      - 來源: reference/sources.md
   - 實驗報告:
       - 總覽: reports/index.md
       - Prometheus Rule 信任邊際: reports/prometheus-trust.md
       - Alert Pending 抖動分析: reports/pending-jitter.md
       - VictoriaMetrics Rule 信任邊際: reports/victoriametrics-trust.md
       - Alertmanager 監控指南: reports/alertmanager.md
-  - 來源: reference/sources.md

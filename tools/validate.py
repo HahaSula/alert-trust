@@ -216,6 +216,12 @@ def check_target_pattern(components: list[dict], root: str) -> list[str]:
             continue
         by_id = {s["id"]: s for s in card.get("signals", [])}
         na = card.get("not_applicable") or {}
+        blind = card.get("blind_spots") or []
+        if not blind:
+            errors.append(f"{card['_path']}: target 卡要列出 blind_spots（目前無法監控的範圍）")
+        for b in blind:
+            if b.get("category") not in C.BLIND_CATEGORIES or not b.get("what") or not b.get("workaround"):
+                errors.append(f"{card['_path']}: blind_spots 每項要有 what、category（{', '.join(C.BLIND_CATEGORIES)}）、workaround")
         have = {s.get("aspect") for s in card.get("signals", [])}
         na_asp = card.get("not_applicable_aspects") or {}
         for asp in aspects_required:

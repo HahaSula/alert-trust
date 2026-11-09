@@ -973,3 +973,61 @@ not_applicable_aspects:
       這種部署的「叢集」問題（誰是主庫、有沒有兩個主庫）在 replication 面向的 promotion 用 cluster label 計數。
       對照：YugabyteDB 這類分散式資料庫每個 tablet 用 Raft，才有 leader 與 quorum 可監控
     refs: [pg-asp-src17-doc-nofailover, pg-asp-src16-doc-nofailover, pg-asp-src17-promote, pg-asp-src16-promote, pg-asp-src17-doc-quorum, pg-asp-src17-syncrep-wait, pg-asp-src17-syncrep-method, pg-asp-src16-syncrep-quorum-def]
+
+# 目前無法監控的範圍。category：exporter（資料庫有、exporter 沒輸出）、database（資料庫本身沒提供）、other（要靠其他元件）。
+blind_spots:
+  - what: 同步 standby 的狀態（`sync_state`、`synchronous_standby_names`）
+    category: exporter
+    why: exporter 沒有查；同步 standby 消失時 commit 會卡住
+    workaround: 自訂查詢 `pg_stat_replication.sync_state`
+    section: targets/postgres.md#blind-spots
+  - what: 時間延遲（`write_lag`、`flush_lag`、`replay_lag`）
+    category: exporter
+    why: exporter 沒有輸出；閒置時會變 NULL
+    workaround: 自訂查詢，或 heartbeat 表
+    section: targets/postgres.md#blind-spots
+  - what: 誰擋住 vacuum（`backend_xid` 的 age、slot 的 `xmin`、prepared xacts）
+    category: exporter
+    why: exporter 沒有輸出
+    workaround: 自訂查詢 `max(age(backend_xid))`、`max(age(xmin))`
+    section: targets/postgres.md#blind-spots
+  - what: "`archive_mode`、`archive_command`、`last_failed_wal`"
+    category: exporter
+    why: enum 與字串設定不輸出；關掉 archive 時看起來和剛啟動一樣
+    workaround: 盤點時檢查，或自訂查詢輸出 0／1
+    section: targets/postgres.md#blind-spots
+  - what: 失效索引、checksum 失敗、timeline
+    category: exporter
+    why: exporter 沒有查
+    workaround: 自訂查詢 `pg_index`、`pg_stat_database.checksum_failures`、`pg_control_checkpoint()`；排程 amcheck
+    section: targets/postgres.md#blind-spots
+  - what: "`pg_stat_wal`、`pg_stat_io`、`sessions_*`"
+    category: exporter
+    why: exporter 沒有查
+    workaround: 自訂查詢（`sessions_*` 從 14 起有）
+    section: targets/postgres.md#blind-spots
+  - what: 其他資料庫的表
+    category: exporter
+    why: stat_user_tables 只看 DSN 那一個資料庫
+    workaround: 每個資料庫各設一個 DSN，或用 `/probe`
+    section: targets/postgres.md#blind-spots
+  - what: SQL 錯誤數
+    category: database
+    why: 沒有任何 view 計數
+    workaround: log 管線計數
+    section: targets/postgres.md#blind-spots
+  - what: 叢集共識（leader、quorum）
+    category: database
+    why: 核心 PostgreSQL 沒有共識機制
+    workaround: Patroni 的 `/metrics`（`patroni-cluster` 規則組）
+    section: targets/postgres.md#cluster
+  - what: 磁碟剩餘空間
+    category: other
+    why: 不在資料庫裡；WAL 寫滿就停機
+    workaround: node_exporter 的 `node_filesystem_avail_bytes`
+    section: targets/postgres.md#capacity
+  - what: base backup 的新鮮度
+    category: other
+    why: 沒有備份時 archive 再正常也還原不了
+    workaround: pgbackrest_exporter；WAL-G、Barman 用 textfile
+    section: targets/postgres.md#protection

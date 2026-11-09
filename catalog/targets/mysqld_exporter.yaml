@@ -1148,3 +1148,61 @@ signals:
     refs: [my-asp-exp-ash, my-processlist-query, my-asp-ex-processlist-group]
     upstream: { status: no }
     rules: []
+
+# 目前無法監控的範圍。category：exporter（資料庫有、exporter 沒輸出）、database（資料庫本身沒提供）、other（要靠其他元件）。
+blind_spots:
+  - what: 連線打滿當下的連線數
+    category: exporter
+    why: exporter 也被擋在外面，整組 metric 消失
+    workaround: 告警靠 `mysql_up` 與事後的 `connection_errors_total`；或讓 exporter 走管理埠
+    section: targets/mysql.md#blind-spots
+  - what: errant GTID
+    category: exporter
+    why: "`gtid_executed`、`gtid_binlog_pos` 是字串，exporter 跳過"
+    workaround: 外部 script 跑 `GTID_SUBSET`，結果用 textfile 送進來
+    section: targets/mysql.md#blind-spots
+  - what: Metadata lock 的細節（誰擋住誰）
+    category: exporter
+    why: 沒有 collector 讀 `performance_schema.metadata_locks`
+    workaround: 手動查 `sys.schema_table_lock_waits`（MySQL）；MariaDB 用 ASH 取樣器
+    section: targets/mysql.md#blind-spots
+  - what: Replica 的錯誤訊息
+    category: exporter
+    why: "`Last_SQL_Error` 是字串"
+    workaround: 規則帶 errno，細節看 `SHOW REPLICA STATUS`
+    section: targets/mysql.md#blind-spots
+  - what: 頁面損毀
+    category: database
+    why: 沒有 status 計數，只寫在 error log
+    workaround: log 管線對 error log 告警；定期 `CHECK TABLE` 寫 textfile
+    section: targets/mysql.md#blind-spots
+  - what: MariaDB 執行中語句的 digest、長尾延遲、CPU 時間
+    category: database
+    why: digest 在語句結束才寫入；沒有 quantile 與 `SUM_CPU_TIME`
+    workaround: ASH 取樣器
+    section: targets/mariadb-ash.md#sampler
+  - what: Group Replication 的節流時間
+    category: database
+    why: "`Gr_flow_control_*` 只有 Enterprise component 有"
+    workaround: 看 applier／certifier 佇列對門檻的比例
+    section: targets/mysql.md#blind-spots
+  - what: 真正的寫入是否成功
+    category: database
+    why: "`mysql_up` 只做 ping"
+    workaround: heartbeat 寫入程式回報成功時間，或應用層探測
+    section: targets/mysql.md#blind-spots
+  - what: 磁碟用量
+    category: other
+    why: 不在資料庫裡
+    workaround: node_exporter，規則要知道資料目錄的掛載點
+    section: targets/mysql.md#capacity
+  - what: OOM 的原因
+    category: other
+    why: 資料庫只看得到 uptime 歸零
+    workaround: kernel log、cAdvisor 的 OOM 事件
+    section: targets/mysql.md#blind-spots
+  - what: 備份是否成功、多新
+    category: other
+    why: 沒有備份 collector
+    workaround: 備份 job 寫 textfile metric
+    section: targets/mysql.md#protection

@@ -15,7 +15,7 @@ alert-trust 回答兩個問題：
 | 檢查別人的 rule 檔 | [檢查 rule 檔的流程](tools/rule-review.md)：先確認監控體系與基礎設施，再看每條 rule |
 | 寫 rule 前確認 range、offset、`for` 夠不夠 | [信任契約](contracts.md)、[契約計算器](tools/calculator.md) |
 | 想知道某個元件內部哪裡會卡住 | [架構總覽：單序點對照](architecture/index.md) |
-| 監控資料庫：穩定、效能、HA、叢集、備份、容量 | [MySQL／MariaDB](targets/mysql.md)、[PostgreSQL](targets/postgres.md) |
+| 監控資料庫：穩定、效能、HA、叢集、備份、容量，以及目前看不到的範圍 | [資料庫總覽](targets/index.md) |
 | 收到告警，想知道它在保護什麼 | 告警的 `runbook_url` 會連到對應的訊號 |
 | 檢查自己的環境缺什麼 | [共同模型與檢查流程](model.md#flow) |
 

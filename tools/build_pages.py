@@ -102,6 +102,14 @@ def component_page(card: dict, sources: dict, contracts: dict) -> str:
                    f"{C.EVALUATE_ON[s['evaluate_on']]} | {up(s['upstream']['status'])} | {n if n else '—'} |")
     out.append("")
 
+    if card.get("blind_spots"):
+        out.append("## 目前無法監控的範圍\n")
+        out.append("| 範圍 | 類型 | 為什麼 | 補法 |\n|---|---|---|---|")
+        for b in card["blind_spots"]:
+            link = f"[{esc(b['what'])}](../{b['section']})" if b.get("section") else esc(b["what"])
+            out.append(f"| {link} | {C.BLIND_CATEGORIES[b['category']]} | {esc(b.get('why', ''))} | {esc(b['workaround'])} |")
+        out.append("")
+
     na_asp = card.get("not_applicable_aspects") or {}
     if na_asp:
         out.append("## 不適用的面向\n")
@@ -225,6 +233,49 @@ def terms_page(terms: dict) -> str:
     return "\n".join(out)
 
 
+DB_PAGES = {"mysqld_exporter": ("MySQL／MariaDB", "mysql.md"), "postgres_exporter": ("PostgreSQL", "postgres.md")}
+
+
+def targets_overview(cards: list[dict]) -> str:
+    targets = [c for c in cards if c["kind"] == "target"]
+    name = lambda c: DB_PAGES.get(c["id"], (c["name"], None))[0]  # noqa: E731
+    out = [GENERATED, "# 資料庫總覽\n",
+           "每個資料庫 target 都用同一組面向檢查，從大到小：叢集 → 複寫 → 實例 → 資源 → 工作量 → 單一查詢，"
+           "再加上維護、保護與容量。每個 target 也都列出**目前無法監控的範圍**。\n",
+           "## 面向覆蓋\n",
+           "數字是該面向的訊號數；「不適用」附理由，見各自的元件卡。\n",
+           "| 面向 | " + " | ".join(name(c) for c in targets) + " |",
+           "|---|" + "---|" * len(targets)]
+    for asp, title in C.ASPECTS.items():
+        row = []
+        for c in targets:
+            n = sum(1 for s in c["signals"] if s.get("aspect") == asp)
+            na = (c.get("not_applicable_aspects") or {}).get(asp)
+            row.append(f"{n}" + ("（另有不適用說明）" if na else "") if n else ("不適用" if na else "—"))
+        out.append(f"| {title.split('：')[0]} | " + " | ".join(row) + " |")
+    out.append("")
+    out.append("## 目前無法監控的範圍\n")
+    out.append("分成三類：資料庫有但 exporter 沒輸出（補一個自訂查詢就看得到）、資料庫本身沒提供（只能靠 log 或外部工具）、要靠其他元件（node_exporter、備份工具、HA 管理工具）。\n")
+    for c in targets:
+        out.append(f"### {name(c)}\n")
+        for cat, ctitle in C.BLIND_CATEGORIES.items():
+            items = [b for b in c.get("blind_spots", []) if b["category"] == cat]
+            if not items:
+                continue
+            out.append(f"**{ctitle}**\n")
+            for b in items:
+                link = f"[{b['what']}](../{b['section']})" if b.get("section") else b["what"]
+                out.append(f"- {link}：{b.get('why', '')}。補法：{b['workaround']}")
+            out.append("")
+    out.append("## 每個資料庫的頁面\n")
+    for c in targets:
+        title, page = DB_PAGES.get(c["id"], (c["name"], None))
+        links = [f"[怎麼監控]({page})"] if page else []
+        links.append(f"[監控訊號（元件卡）](../components/{c['id']}.md)")
+        out.append(f"- **{title}**：" + "、".join(links))
+    return "\n".join(out) + "\n"
+
+
 def main() -> int:
     sources, contracts, cards = C.load_sources(), C.load_contracts(), C.load_components()
     comp_dir = os.path.join(C.ROOT, "docs", "components")
@@ -238,6 +289,8 @@ def main() -> int:
         f.write(index_page(cards))
     with open(os.path.join(ref_dir, "sources.md"), "w", encoding="utf-8") as f:
         f.write(sources_page(sources))
+    with open(os.path.join(C.ROOT, "docs", "targets", "index.md"), "w", encoding="utf-8") as f:
+        f.write(targets_overview(cards))
     with open(os.path.join(ref_dir, "terms.md"), "w", encoding="utf-8") as f:
         f.write(terms_page(C.load_terms()))
     print(f"wrote {len(cards)} component pages, index, sources")

@@ -3,6 +3,7 @@
 /docs/components/
 /docs/reference/sources.md
 /docs/reference/terms.md
+/docs/targets/index.md
 
 # 你的環境：不要 commit 到公開 repo
 /env/*.yaml
