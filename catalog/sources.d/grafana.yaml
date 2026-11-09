@@ -1,0 +1,21 @@
+# Grafana Alerting 卡引用的來源。key 一律以 graf- 開頭。
+sources:
+  graf-lab:
+    title: Grafana Alerting 信任實驗（lab/grafana）
+    kind: experiment
+    visibility: public
+    url: https://github.com/HahaSula/alert-trust/tree/main/lab/grafana
+    checked: "2026-11-09, Grafana 13.3.0, Prometheus v3.13.5, Alertmanager v0.27.0"
+    note: results/summary.txt 是摘要，run.log 與 run.json 是原始輸出
+  graf-ngalert:
+    title: Grafana pkg/services/ngalert（scheduler、state manager、sender）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/grafana/grafana/tree/v13.3.0/pkg/services/ngalert
+    checked: "2026-11-09, v13.3.0（AGPL-3.0）"
+  graf-mixin:
+    title: Grafana mixin alerts（grafana-mixin/alerts）
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/grafana/grafana/blob/v13.3.0/grafana-mixin/alerts/alerts.libsonnet
+    checked: "2026-11-09, v13.3.0：只有 GrafanaRequestsFailing（HTTP 5xx），沒有任何 alerting 相關告警"

@@ -1,0 +1,52 @@
+<svg viewBox="0 0 900 300" role="img" aria-label="Thanos data paths: ruler queries querier, querier fans out to sidecar and store gateway; silent data loss points marked">
+  <defs>
+    <marker id="th-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+    <marker id="th-ahb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah-bad"/></marker>
+  </defs>
+  <!-- Ruler / Querier / AM -->
+  <rect x="20" y="40" width="150" height="56" rx="6" class="b-node-acc"/>
+  <text x="95" y="64" text-anchor="middle" class="lbl-b">Ruler</text>
+  <text x="95" y="84" text-anchor="middle" class="lbl-s">每條 rule 一次 HTTP 查詢</text>
+  <rect x="20" y="200" width="150" height="56" rx="6" class="b-node"/>
+  <text x="95" y="224" text-anchor="middle" class="lbl-b">Alertmanager</text>
+  <text x="95" y="244" text-anchor="middle" class="lbl-s">EndsAt 到期即 resolved</text>
+  <line x1="95" y1="96" x2="95" y2="198" class="arrow" marker-end="url(#th-ah)"/>
+  <text x="104" y="150" class="lbl-s">查詢失敗不續送</text>
+
+  <rect x="270" y="40" width="170" height="56" rx="6" class="b-node"/>
+  <text x="355" y="64" text-anchor="middle" class="lbl-b">Querier</text>
+  <text x="355" y="84" text-anchor="middle" class="lbl-s">每 5s 健康檢查、去重</text>
+  <line x1="170" y1="68" x2="268" y2="68" class="arrow" marker-end="url(#th-ah)"/>
+
+  <!-- Sidecar + Prometheus -->
+  <rect x="560" y="20" width="160" height="56" rx="6" class="b-node"/>
+  <text x="640" y="44" text-anchor="middle" class="lbl-b">Sidecar + Prometheus</text>
+  <text x="640" y="64" text-anchor="middle" class="lbl-s">最近的資料</text>
+  <line x1="440" y1="58" x2="558" y2="48" class="arrow-bad" marker-end="url(#th-ahb)"/>
+  <text x="452" y="36" class="t-bad">① 斷線 5s 後不再查詢</text>
+
+  <!-- Store gateway -->
+  <rect x="560" y="120" width="160" height="56" rx="6" class="b-node"/>
+  <text x="640" y="144" text-anchor="middle" class="lbl-b">Store gateway</text>
+  <text x="640" y="164" text-anchor="middle" class="lbl-s">每 15m 同步 block 清單</text>
+  <line x1="440" y1="80" x2="558" y2="140" class="arrow" marker-end="url(#th-ah)"/>
+
+  <!-- Bucket -->
+  <rect x="780" y="70" width="100" height="56" rx="6" class="b-node"/>
+  <text x="830" y="94" text-anchor="middle" class="lbl-b">Bucket</text>
+  <text x="830" y="114" text-anchor="middle" class="lbl-s">物件儲存</text>
+  <line x1="720" y1="48" x2="778" y2="84" class="arrow-bad" marker-end="url(#th-ahb)"/>
+  <text x="738" y="30" class="t-bad">② 上傳中斷</text>
+  <line x1="778" y1="112" x2="722" y2="146" class="arrow" marker-end="url(#th-ah)"/>
+  <text x="742" y="160" class="t-bad">③ 未同步</text>
+
+  <!-- Compactor -->
+  <rect x="740" y="210" width="140" height="56" rx="6" class="b-node-bad"/>
+  <text x="810" y="234" text-anchor="middle" class="lbl-b">Compactor</text>
+  <text x="810" y="254" text-anchor="middle" class="lbl-s">④ halt 時 up 仍是 1</text>
+  <line x1="830" y1="126" x2="830" y2="208" class="arrow" marker-end="url(#th-ah)"/>
+
+  <text x="270" y="140" class="lbl-s">①–③：查詢回 success、沒有 warning，</text>
+  <text x="270" y="158" class="lbl-s">abort 也一樣（只要還有別的 store）</text>
+  <text x="270" y="190" class="lbl-s">④：bucket 不再整理，retention 不生效</text>
+</svg>

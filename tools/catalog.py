@@ -125,7 +125,7 @@ def load_components(root: str = ROOT) -> list[dict]:
                 up["status"] = "yes" if up["status"] else "no"
         out.append(card)
     fam = list(FAMILIES)
-    within = {"prometheus": 0, "vmagent": 0, "victoriametrics": 1, "victorialogs": 2, "vmalert": 3, "alertmanager": 0, "observer": 1}
+    within = {"prometheus": 0, "vmagent": 0, "victoriametrics": 1, "victorialogs": 2, "vmalert": 3, "thanos": 1, "grafana_alerting": 0, "alertmanager": 1, "observer": 2}
     return sorted(out, key=lambda c: (fam.index(c["family"]) if c.get("family") in fam else 9,
                                       within.get(c.get("id"), 5), c.get("_path")))
 

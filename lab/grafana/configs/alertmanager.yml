@@ -1,0 +1,12 @@
+# 外部 Alertmanager：收 Grafana 送來的 alert，用 webhook 轉給 fake 記錄 firing／resolved。
+route:
+  receiver: hook
+  group_by: [alertname, rulename]
+  group_wait: 1s
+  group_interval: 5s
+  repeat_interval: 1h
+receivers:
+  - name: hook
+    webhook_configs:
+      - url: http://fake:8080/hook/external
+        send_resolved: true

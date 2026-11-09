@@ -1,0 +1,281 @@
+[   19.2s] Grafana up; set admin_config alertmanagersChoice=all（不設就不會送到外部 Alertmanager）
+[   99.3s] baseline/ready
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=114.6s, mode_nodata_error gap=112.7s, mode_ok gap=110.6s, slow_query gap=108.7s
+    hooks: {'external': ['firing:mode_alerting', 'firing:mode_keeplast', 'firing:mode_nodata_error', 'firing:mode_ok', 'firing:slow_query'], 'embedded': ['firing:mode_keeplast', 'firing:slow_query', 'firing:mode_alerting', 'firing:mode_nodata_error', 'firing:mode_ok']}
+[   99.4s] metrics at baseline
+    grafana_alerting_alerts{state="alerting"} 5
+    grafana_alerting_alerts{state="error"} 0
+    grafana_alerting_alerts{state="nodata"} 0
+    grafana_alerting_alerts{state="normal"} 0
+    grafana_alerting_alerts{state="pending"} 0
+    grafana_alerting_alerts{state="recovering"} 0
+    grafana_alerting_sender_sent_total{alertmanager="http://am:9093/api/v2/alerts",data_source_uid="extam",org="1"} 5
+[   99.4s] S1 exporter stopped (lab_value disappears → NoData)
+[  109.4s] nodata/+10s
+    grafana: mode_alerting=firing/ok[Alerting (NoData):mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting (NoData, KeepLast):mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=114.6s, mode_nodata_error gap=112.7s, mode_ok gap=110.6s, slow_query gap=108.7s
+    hooks: {'external': [], 'embedded': []}
+[  119.5s] nodata/+20s
+    grafana: mode_alerting=firing/ok[Alerting (NoData):mode_alerting], mode_ok=inactive/ok[Normal (NoData):mode_ok], mode_nodata_error=firing/nodata[Alerting:mode_nodata_error NoData:mode_nodata_error], mode_keeplast=firing/ok[Alerting (NoData, KeepLast):mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: DatasourceNoData(mode_nodata_error) gap=116.0s, mode_alerting gap=120.0s, mode_keeplast gap=118.0s, mode_nodata_error gap=112.7s, slow_query gap=108.7s
+    hooks: {'external': ['firing:DatasourceNoData(mode_nodata_error)', 'resolved:mode_ok'], 'embedded': ['firing:DatasourceNoData(mode_nodata_error)', 'resolved:mode_ok']}
+[  132.8s] nodata/+30s
+    grafana: mode_alerting=firing/ok[Alerting (NoData):mode_alerting], mode_ok=inactive/ok[Normal (NoData):mode_ok], mode_nodata_error=inactive/nodata[NoData:mode_nodata_error], mode_keeplast=firing/ok[Alerting (NoData, KeepLast):mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: DatasourceNoData(mode_nodata_error) gap=116.0s, mode_alerting gap=120.0s, mode_keeplast gap=118.0s, slow_query gap=108.6s
+    hooks: {'external': ['resolved:mode_nodata_error'], 'embedded': ['resolved:mode_nodata_error']}
+[  142.9s] nodata/+40s
+    grafana: mode_alerting=firing/ok[Alerting (NoData):mode_alerting], mode_ok=inactive/ok[Normal (NoData):mode_ok], mode_nodata_error=inactive/nodata[NoData:mode_nodata_error], mode_keeplast=firing/ok[Alerting (NoData, KeepLast):mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: DatasourceNoData(mode_nodata_error) gap=116.0s, mode_alerting gap=120.0s, mode_keeplast gap=118.0s, slow_query gap=108.6s
+    hooks: {'external': [], 'embedded': []}
+[  152.9s] nodata/+50s
+    grafana: mode_alerting=firing/ok[Alerting (NoData):mode_alerting], mode_ok=inactive/ok[Normal (NoData):mode_ok], mode_nodata_error=inactive/nodata[NoData:mode_nodata_error], mode_keeplast=firing/ok[Alerting (NoData, KeepLast):mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: DatasourceNoData(mode_nodata_error) gap=116.0s, mode_alerting gap=120.0s, mode_keeplast gap=118.0s, slow_query gap=108.6s
+    hooks: {'external': [], 'embedded': []}
+[  166.3s] nodata/+60s
+    grafana: mode_alerting=firing/ok[Alerting (NoData):mode_alerting], mode_ok=inactive/ok[Normal (NoData):mode_ok], mode_nodata_error=inactive/nodata[NoData:mode_nodata_error], mode_keeplast=firing/ok[Alerting (NoData, KeepLast):mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: DatasourceNoData(mode_nodata_error) gap=116.0s, mode_alerting gap=120.0s, mode_keeplast gap=118.0s, slow_query gap=117.0s
+    hooks: {'external': [], 'embedded': []}
+[  176.3s] nodata/+70s
+    grafana: mode_alerting=firing/ok[Alerting (NoData):mode_alerting], mode_ok=inactive/ok[Normal (NoData):mode_ok], mode_nodata_error=inactive/nodata[NoData:mode_nodata_error], mode_keeplast=firing/ok[Alerting (NoData, KeepLast):mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: DatasourceNoData(mode_nodata_error) gap=116.0s, mode_alerting gap=120.0s, mode_keeplast gap=118.0s, slow_query gap=117.0s
+    hooks: {'external': [], 'embedded': []}
+[  176.3s] S1 exporter back
+[  186.4s] nodata-recover/+10s
+    grafana: mode_alerting=firing/ok[Alerting (NoData):mode_alerting], mode_ok=inactive/ok[Normal (NoData):mode_ok], mode_nodata_error=inactive/nodata[NoData:mode_nodata_error], mode_keeplast=firing/ok[Alerting (NoData, KeepLast):mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: DatasourceNoData(mode_nodata_error) gap=116.0s, mode_alerting gap=120.0s, mode_keeplast gap=118.0s, slow_query gap=112.0s
+    hooks: {'external': [], 'embedded': []}
+[  199.7s] nodata-recover/+20s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=118.0s, mode_nodata_error gap=112.6s, slow_query gap=112.0s
+    hooks: {'external': ['firing:mode_nodata_error', 'resolved:DatasourceNoData(mode_nodata_error)'], 'embedded': ['firing:mode_nodata_error', 'resolved:DatasourceNoData(mode_nodata_error)']}
+[  209.8s] nodata-recover/+30s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=118.0s, mode_nodata_error gap=112.6s, mode_ok gap=110.6s, slow_query gap=112.0s
+    hooks: {'external': ['firing:mode_ok'], 'embedded': ['firing:mode_ok']}
+[  219.8s] nodata-recover/+40s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=118.0s, mode_nodata_error gap=112.6s, mode_ok gap=110.6s, slow_query gap=112.0s
+    hooks: {'external': [], 'embedded': []}
+[  233.2s] nodata-recover/+50s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=118.0s, mode_nodata_error gap=116.0s, mode_ok gap=110.6s, slow_query gap=112.0s
+    hooks: {'external': [], 'embedded': []}
+[  233.7s] S2 Prometheus stopped (query error → Error)
+[  243.8s] error/+10s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=118.0s, mode_nodata_error gap=116.0s, mode_ok gap=110.6s, slow_query gap=112.0s
+    hooks: {'external': [], 'embedded': []}
+[  253.8s] error/+20s
+    grafana: mode_alerting=firing/error[Alerting (Error):mode_alerting], mode_ok=inactive/ok[Normal (Error):mode_ok], mode_nodata_error=firing/error[Alerting:mode_nodata_error Error:mode_nodata_error], mode_keeplast=firing/ok[Alerting (Error, KeepLast):mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: DatasourceError(mode_nodata_error) gap=100.6s, mode_alerting gap=110.7s, mode_keeplast gap=107.8s, mode_nodata_error gap=116.0s, slow_query gap=112.0s
+    hooks: {'external': ['firing:DatasourceError(mode_nodata_error)', 'resolved:mode_ok'], 'embedded': ['firing:DatasourceError(mode_nodata_error)', 'resolved:mode_ok']}
+[  267.2s] error/+30s
+    grafana: mode_alerting=firing/error[Alerting (Error):mode_alerting], mode_ok=inactive/ok[Normal (Error):mode_ok], mode_nodata_error=inactive/error[Error:mode_nodata_error], mode_keeplast=firing/ok[Alerting (Error, KeepLast):mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: DatasourceError(mode_nodata_error) gap=100.6s, mode_alerting gap=110.7s, mode_keeplast gap=107.8s, slow_query gap=112.0s
+    hooks: {'external': ['resolved:mode_nodata_error'], 'embedded': ['resolved:mode_nodata_error']}
+[  277.2s] error/+40s
+    grafana: mode_alerting=firing/error[Alerting (Error):mode_alerting], mode_ok=inactive/ok[Normal (Error):mode_ok], mode_nodata_error=inactive/error[Error:mode_nodata_error], mode_keeplast=firing/ok[Alerting (Error, KeepLast):mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: DatasourceError(mode_nodata_error) gap=100.6s, mode_alerting gap=110.7s, mode_keeplast gap=107.8s, slow_query gap=112.0s
+    hooks: {'external': [], 'embedded': []}
+[  287.3s] error/+50s
+    grafana: mode_alerting=firing/error[Alerting (Error):mode_alerting], mode_ok=inactive/ok[Normal (Error):mode_ok], mode_nodata_error=inactive/error[Error:mode_nodata_error], mode_keeplast=firing/ok[Alerting (Error, KeepLast):mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: DatasourceError(mode_nodata_error) gap=97.8s, mode_alerting gap=107.8s, mode_keeplast gap=105.0s, slow_query gap=112.0s
+    hooks: {'external': [], 'embedded': []}
+[  300.6s] error/+60s
+    grafana: mode_alerting=firing/error[Alerting (Error):mode_alerting], mode_ok=inactive/ok[Normal (Error):mode_ok], mode_nodata_error=inactive/error[Error:mode_nodata_error], mode_keeplast=firing/ok[Alerting (Error, KeepLast):mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: DatasourceError(mode_nodata_error) gap=97.8s, mode_alerting gap=107.8s, mode_keeplast gap=105.0s, slow_query gap=112.0s
+    hooks: {'external': [], 'embedded': []}
+[  310.7s] error/+70s
+    grafana: mode_alerting=firing/error[Alerting (Error):mode_alerting], mode_ok=inactive/ok[Normal (Error):mode_ok], mode_nodata_error=inactive/error[Error:mode_nodata_error], mode_keeplast=firing/ok[Alerting (Error, KeepLast):mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: DatasourceError(mode_nodata_error) gap=97.8s, mode_alerting gap=107.8s, mode_keeplast gap=105.0s, slow_query gap=108.6s
+    hooks: {'external': [], 'embedded': []}
+[  310.7s] metrics during error
+    grafana_alerting_alerts{state="alerting"} 3
+    grafana_alerting_alerts{state="error"} 1
+    grafana_alerting_alerts{state="nodata"} 0
+    grafana_alerting_alerts{state="normal"} 1
+    grafana_alerting_alerts{state="pending"} 0
+    grafana_alerting_alerts{state="recovering"} 0
+    grafana_alerting_rule_evaluation_attempt_failures_total{org="1"} 79
+    grafana_alerting_rule_evaluation_attempts_total{org="1"} 189
+    grafana_alerting_rule_evaluation_duration_seconds_count{org="1"} 134
+    grafana_alerting_rule_evaluation_duration_seconds_sum{org="1"} 237.935
+    grafana_alerting_rule_evaluation_failures_total{org="1"} 24
+    grafana_alerting_rule_evaluations_total{org="1"} 138
+[  311.2s] S2 Prometheus back
+[  316.3s] error-recover/+10s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=105.0s, mode_keeplast gap=103.5s, mode_nodata_error gap=114.9s, slow_query gap=108.6s
+    hooks: {'external': ['firing:mode_nodata_error', 'resolved:DatasourceError(mode_nodata_error)'], 'embedded': ['firing:mode_nodata_error', 'resolved:DatasourceError(mode_nodata_error)']}
+[  334.6s] error-recover/+20s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=116.7s, mode_keeplast gap=114.7s, mode_nodata_error gap=114.9s, mode_ok gap=110.7s, slow_query gap=108.6s
+    hooks: {'external': ['firing:mode_ok'], 'embedded': ['firing:mode_ok']}
+[  344.6s] error-recover/+30s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=116.7s, mode_keeplast gap=114.7s, mode_nodata_error gap=116.0s, mode_ok gap=110.7s, slow_query gap=108.7s
+    hooks: {'external': [], 'embedded': []}
+[  358.0s] error-recover/+40s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=116.7s, mode_keeplast gap=114.7s, mode_nodata_error gap=116.0s, mode_ok gap=114.0s, slow_query gap=108.7s
+    hooks: {'external': [], 'embedded': []}
+[  368.1s] error-recover/+50s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=116.6s, mode_keeplast gap=114.6s, mode_nodata_error gap=116.0s, mode_ok gap=114.0s, slow_query gap=108.6s
+    hooks: {'external': [], 'embedded': []}
+[  378.1s] error-recover/+60s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=116.6s, mode_keeplast gap=114.6s, mode_nodata_error gap=116.0s, mode_ok gap=114.0s, slow_query gap=108.6s
+    hooks: {'external': [], 'embedded': []}
+[  378.9s] S3 Grafana restarted (SIGTERM, same container and sqlite DB)
+[  383.0s] restart/health ok
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=116.6s, mode_keeplast gap=114.6s, mode_nodata_error gap=116.0s, mode_ok gap=114.0s, slow_query gap=108.6s
+    hooks: {'external': [], 'embedded': []}
+[  396.3s] restart/+10s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=114.6s, mode_nodata_error gap=116.0s, mode_ok gap=110.6s, slow_query gap=108.6s
+    hooks: {'external': [], 'embedded': []}
+[  406.4s] restart/+20s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=114.6s, mode_nodata_error gap=112.6s, mode_ok gap=110.6s, slow_query gap=108.6s
+    hooks: {'external': [], 'embedded': []}
+[  416.4s] restart/+30s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=114.6s, mode_nodata_error gap=112.6s, mode_ok gap=110.6s, slow_query gap=108.6s
+    hooks: {'external': [], 'embedded': []}
+[  429.8s] restart/+40s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=118.0s, mode_nodata_error gap=112.6s, mode_ok gap=110.6s, slow_query gap=108.6s
+    hooks: {'external': [], 'embedded': []}
+[  439.9s] restart/+50s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=118.0s, mode_nodata_error gap=112.6s, mode_ok gap=110.6s, slow_query gap=108.6s
+    hooks: {'external': [], 'embedded': []}
+[  449.9s] restart/+60s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=118.0s, mode_nodata_error gap=112.6s, mode_ok gap=110.6s, slow_query gap=108.6s
+    hooks: {'external': [], 'embedded': []}
+[  449.9s] S3 startsAt before restart: {'mode_alerting': '2026-11-09T14:15:30.000Z', 'mode_keeplast': '2026-11-09T14:15:30.000Z', 'mode_nodata_error': '2026-11-09T14:20:10.000Z', 'mode_ok': '2026-11-09T14:20:00.000Z', 'slow_query': '2026-11-09T14:15:30.000Z'}
+    S3 startsAt after restart:  {'mode_alerting': '2026-11-09T14:15:30.000Z', 'mode_keeplast': '2026-11-09T14:15:30.000Z', 'mode_nodata_error': '2026-11-09T14:20:10.000Z', 'mode_ok': '2026-11-09T14:20:00.000Z', 'slow_query': '2026-11-09T14:15:30.000Z'}
+[  449.9s] S4a slow datasource: delay=25s (< evaluation_timeout 30s, > interval 10s)
+[  468.3s] slow25/+15s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=118.0s, mode_nodata_error gap=112.6s, mode_ok gap=114.0s, slow_query gap=108.6s
+    hooks: {'external': [], 'embedded': []}
+[  483.3s] slow25/+30s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=118.0s, mode_nodata_error gap=112.6s, mode_ok gap=114.0s, slow_query gap=83.6s
+    hooks: {'external': [], 'embedded': []}
+[  501.7s] slow25/+45s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=118.0s, mode_nodata_error gap=112.6s, mode_ok gap=114.0s, slow_query gap=83.6s
+    hooks: {'external': [], 'embedded': []}
+[  516.8s] slow25/+60s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=118.0s, mode_nodata_error gap=112.6s, mode_ok gap=114.0s, slow_query gap=83.6s
+    hooks: {'external': [], 'embedded': []}
+[  535.1s] slow25/+75s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=118.0s, mode_nodata_error gap=116.0s, mode_ok gap=114.0s, slow_query gap=83.6s
+    hooks: {'external': [], 'embedded': []}
+[  550.2s] slow25/+90s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=118.0s, mode_nodata_error gap=116.0s, mode_ok gap=114.0s, slow_query gap=76.9s
+    hooks: {'external': [], 'embedded': []}
+[  550.2s] metrics after delay=25
+    grafana_alerting_rule_evaluation_attempt_failures_total{org="1"} 0
+    grafana_alerting_rule_evaluation_attempts_total{org="1"} 75
+    grafana_alerting_rule_evaluation_duration_seconds_count{org="1"} 75
+    grafana_alerting_rule_evaluation_duration_seconds_sum{org="1"} 76.2382
+    grafana_alerting_rule_evaluation_failures_total{org="1"} 0
+    grafana_alerting_rule_evaluations_total{org="1"} 76
+    grafana_alerting_schedule_rule_evaluations_missed_total{name="slow_query",org="1",reason="slow_evaluation"} 5
+[  550.2s] fake api: {'requests': 45, 'in_flight': 1, 'max_in_flight': 1}
+[  550.2s] S4b slow datasource: delay=45s (> evaluation_timeout 30s)
+[  568.6s] slow45/+15s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=118.0s, mode_nodata_error gap=116.0s, mode_ok gap=114.0s, slow_query gap=78.5s
+    hooks: {'external': [], 'embedded': []}
+[  583.6s] slow45/+30s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=118.0s, mode_nodata_error gap=116.0s, mode_ok gap=114.0s, slow_query gap=78.5s
+    hooks: {'external': [], 'embedded': []}
+[  602.0s] slow45/+45s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=116.6s, mode_keeplast gap=114.7s, mode_nodata_error gap=116.0s, mode_ok gap=114.0s, slow_query gap=78.5s
+    hooks: {'external': [], 'embedded': []}
+[  617.1s] slow45/+60s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=116.6s, mode_keeplast gap=114.7s, mode_nodata_error gap=116.0s, mode_ok gap=110.7s, slow_query gap=78.5s
+    hooks: {'external': [], 'embedded': []}
+[  635.5s] slow45/+75s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=116.6s, mode_keeplast gap=114.6s, mode_nodata_error gap=116.0s, mode_ok gap=110.7s, slow_query gap=78.5s
+    hooks: {'external': [], 'embedded': []}
+[  650.6s] slow45/+90s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=116.6s, mode_keeplast gap=114.6s, mode_nodata_error gap=116.0s, mode_ok gap=110.6s
+    hooks: {'external': [], 'embedded': []}
+[  668.9s] slow45/+105s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=116.6s, mode_keeplast gap=114.6s, mode_nodata_error gap=116.0s, mode_ok gap=110.6s
+    hooks: {'external': ['resolved:slow_query'], 'embedded': ['resolved:slow_query']}
+[  684.0s] slow45/+120s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=inactive/error[Error:slow_query]
+    external AM active: mode_alerting gap=116.6s, mode_keeplast gap=114.6s, mode_nodata_error gap=116.0s, mode_ok gap=110.6s
+    hooks: {'external': ['firing:DatasourceError(slow_query)', 'resolved:DatasourceError(slow_query)'], 'embedded': ['firing:DatasourceError(slow_query)', 'resolved:DatasourceError(slow_query)']}
+[  702.4s] slow45/+135s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=inactive/error[Error:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=114.6s, mode_nodata_error gap=116.0s, mode_ok gap=110.7s
+    hooks: {'external': [], 'embedded': []}
+[  702.4s] metrics after delay=45
+    grafana_alerting_alerts{state="alerting"} 4
+    grafana_alerting_alerts{state="error"} 1
+    grafana_alerting_alerts{state="nodata"} 0
+    grafana_alerting_alerts{state="normal"} 0
+    grafana_alerting_alerts{state="pending"} 0
+    grafana_alerting_alerts{state="recovering"} 0
+    grafana_alerting_rule_evaluation_attempt_failures_total{org="1"} 3
+    grafana_alerting_rule_evaluation_attempts_total{org="1"} 139
+    grafana_alerting_rule_evaluation_duration_seconds_count{org="1"} 137
+    grafana_alerting_rule_evaluation_duration_seconds_sum{org="1"} 195.023
+    grafana_alerting_rule_evaluation_failures_total{org="1"} 1
+    grafana_alerting_rule_evaluations_total{org="1"} 138
+    grafana_alerting_schedule_rule_evaluations_missed_total{name="slow_query",org="1",reason="slow_evaluation"} 17
+[  702.4s] fake api: {'requests': 49, 'in_flight': 1, 'max_in_flight': 2}
+[  717.4s] slow-recover/+15s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=114.6s, mode_nodata_error gap=112.6s, mode_ok gap=110.7s, slow_query gap=101.4s
+    hooks: {'external': ['firing:slow_query'], 'embedded': ['firing:slow_query']}
+[  735.8s] slow-recover/+30s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=118.0s, mode_nodata_error gap=112.6s, mode_ok gap=110.6s, slow_query gap=108.6s
+    hooks: {'external': [], 'embedded': []}
+[  750.9s] slow-recover/+45s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=118.0s, mode_nodata_error gap=112.6s, mode_ok gap=110.6s, slow_query gap=108.6s
+    hooks: {'external': [], 'embedded': []}
+[  769.3s] slow-recover/+60s
+    grafana: mode_alerting=firing/ok[Alerting:mode_alerting], mode_ok=firing/ok[Alerting:mode_ok], mode_nodata_error=firing/ok[Alerting:mode_nodata_error], mode_keeplast=firing/ok[Alerting:mode_keeplast], slow_query=firing/ok[Alerting:slow_query]
+    external AM active: mode_alerting gap=120.0s, mode_keeplast gap=118.0s, mode_nodata_error gap=112.6s, mode_ok gap=114.0s, slow_query gap=112.0s
+    hooks: {'external': [], 'embedded': []}
+[  769.3s] final metrics
+    grafana_alerting_alerts{state="alerting"} 5
+    grafana_alerting_alerts{state="error"} 0
+    grafana_alerting_alerts{state="nodata"} 0
+    grafana_alerting_alerts{state="normal"} 0
+    grafana_alerting_alerts{state="pending"} 0
+    grafana_alerting_alerts{state="recovering"} 0
+    grafana_alerting_notifications_total{integration="webhook",org="1"} 4
+    grafana_alerting_rule_evaluation_attempt_failures_total{org="1"} 4
+    grafana_alerting_rule_evaluation_attempts_total{org="1"} 177
+    grafana_alerting_rule_evaluation_duration_seconds_count{org="1"} 174
+    grafana_alerting_rule_evaluation_duration_seconds_sum{org="1"} 226.535
+    grafana_alerting_rule_evaluation_failures_total{org="1"} 1
+    grafana_alerting_rule_evaluations_total{org="1"} 174
+    grafana_alerting_schedule_rule_evaluations_missed_total{name="slow_query",org="1",reason="slow_evaluation"} 18
+    grafana_alerting_sender_dropped_total{org="1"} 0
+    grafana_alerting_sender_errors_total{alertmanager="http://am:9093/api/v2/alerts",data_source_uid="extam",org="1"} 0
+    grafana_alerting_sender_sent_total{alertmanager="http://am:9093/api/v2/alerts",data_source_uid="extam",org="1"} 64

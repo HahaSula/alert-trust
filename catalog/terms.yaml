@@ -205,3 +205,154 @@ terms:
     where: "vmalert 的 `/metrics`，帶 `group`"
     note: "查詢飽和（429）時查詢失敗得很快，這個值可能一直是 0。"
     refs: [vma-missed, exp-vm-faults]
+
+  # ---------- Grafana Alerting（Grafana-managed rule）----------
+  grafana_rule_interval:
+    title: Grafana rule group 的 evaluation interval 與 scheduler tick
+    kind: config
+    systems: [grafana_alerting]
+    tokens: [scheduler_tick_interval, min_interval, unified_alerting.min_interval]
+    where: "Rule group 的 `interval`（UI 的 evaluation group、provisioning 檔的 `groups[].interval`）。`[unified_alerting]` 的 `min_interval` 是下限，`scheduler_tick_interval` 是 scheduler 的 tick（base interval）。"
+    default: "tick 10s；min_interval 等於 tick（10s）；新 group 預設 1m。Interval 必須是 tick 的整數倍。"
+    observe:
+      - "`/api/prometheus/grafana/api/v1/rules` 每個 group 的 `interval`"
+      - "`grafana_alerting_ticker_interval_seconds`：實際的 tick"
+    note: "Interval 小於 min_interval 時被悄悄調成 min_interval。每個 tick 都會先到資料庫讀 rule 版本。"
+    refs: [graf-base-interval, graf-ready-to-run, graf-tick-fetch-rules]
+
+  no_data_state:
+    title: Grafana rule 的 no_data_state
+    kind: config
+    systems: [grafana_alerting]
+    tokens: [no_data_state, noDataState]
+    where: "每條 Grafana-managed rule 的「Alert state if no data」；provisioning 檔的 `noDataState`；API 的 `no_data_state`"
+    default: "NoData（API 與 provisioning 沒寫時；UI 預設未核對）"
+    observe:
+      - "`/api/v1/provisioning/alert-rules` 每條 rule 的 `noDataState`"
+      - "`grafana_alerting_alerts{state=\"nodata\"}`：只數 NoData 這一種；設成 OK 的 rule 會數在 normal"
+    note: "選項：NoData（送 DatasourceNoData，原 alert 2 個 interval 後 resolved）、Alerting、OK（立刻 resolved）、KeepLast。見信任契約。"
+    refs: [graf-nodata-all, graf-nodata-ok, graf-prov-nodata-default, graf-api-defaults, exp-graf-modes]
+
+  exec_err_state:
+    title: Grafana rule 的 exec_err_state
+    kind: config
+    systems: [grafana_alerting]
+    tokens: [exec_err_state, execErrState]
+    where: "每條 Grafana-managed rule 的「Alert state if execution error or timeout」；provisioning 檔的 `execErrState`；API 的 `exec_err_state`"
+    default: "Alerting（API 與 provisioning 沒寫時；UI 預設未核對）"
+    observe:
+      - "`/api/v1/provisioning/alert-rules` 每條 rule 的 `execErrState`"
+      - "`grafana_alerting_alerts{state=\"error\"}`：只數 Error 這一種"
+    note: "選項：Error（送 DatasourceError，原 alert 2 個 interval 後 resolved）、Alerting、OK（立刻 resolved）、KeepLast。"
+    refs: [graf-error-all, graf-err-ok, graf-prov-err-default, graf-api-defaults, exp-graf-modes]
+
+  missing_series_evals_to_resolve:
+    title: Grafana 的 missing_series_evals_to_resolve
+    kind: config
+    systems: [grafana_alerting]
+    tokens: [missing_series_evals_to_resolve, missingSeriesEvalsToResolve]
+    where: "每條 rule 的 `missing_series_evals_to_resolve`"
+    default: "2；Error／NoData 狀態的 instance 固定 1"
+    note: "某個 series 沒出現在這次結果裡，連續這麼多個 interval 後送 resolved。查詢失敗時結果只有一筆沒有 label 的 Error，原本每個 series 的 alert 都算「缺席」。"
+    refs: [graf-missing-default, graf-missing-series, graf-missing-error-1]
+
+  grafana_evaluation_timeout:
+    title: Grafana 的 evaluation_timeout 與重試
+    kind: config
+    systems: [grafana_alerting]
+    tokens: [evaluation_timeout, max_attempts, initial_retry_delay, max_retry_delay]
+    where: "`[unified_alerting]` 的 `evaluation_timeout`、`max_attempts`、`initial_retry_delay`、`max_retry_delay`"
+    default: "evaluation_timeout 30s；max_attempts 3；重試延遲 1s 起、最多 4s"
+    note: "逾時是每次 attempt 各算一次；一次 evaluation 最長約 3 × 30s 加上重試延遲，期間同一條 rule 的下一個 tick 只能排隊、再被丟掉。資料來源自己的 HTTP 逾時（`[dataproxy] timeout`，預設 30s）另外生效。"
+    refs: [graf-eval-timeout, graf-default-timeout, graf-default-attempts, graf-eval-retry, graf-ini-eval-timeout]
+
+  grafana_resend:
+    title: Grafana 的續送間隔與 EndsAt
+    kind: config
+    systems: [grafana_alerting]
+    tokens: [ResendDelay, resolved_alert_retention]
+    where: "續送間隔寫死在程式裡（`state.ResendDelay`），沒有設定項；`[unified_alerting]` 的 `resolved_alert_retention` 控制 resolved 要續送多久"
+    default: "續送 30s；EndsAt = 排程時間 + 4 × max(30s, interval)；resolved_alert_retention 15m"
+    note: "EndsAt 從排程時間（tick）算，不是送出時間。評估越慢、重試越多，Alertmanager 那邊剩下的寬限越短。"
+    refs: [graf-resend-delay, graf-resend-fixed, graf-endsat, graf-eval-scheduledat, graf-resolved-retention, exp-graf-modes]
+
+  grafana_ha:
+    title: Grafana Alerting 的 HA 設定
+    kind: config
+    systems: [grafana_alerting]
+    tokens: [ha_peers, ha_single_node_evaluation, ha_redis_address]
+    where: "`[unified_alerting]` 的 `ha_peers`（gossip）或 `ha_redis_address`（Redis），以及 `ha_single_node_evaluation`"
+    default: "ha_peers 空（不組叢集）；ha_single_node_evaluation false"
+    note: "多台 Grafana 共用一個資料庫時，每台都評估全部 rule。沒設 ha_peers，內建 Alertmanager 之間不去重，每台各送一次通知。ha_single_node_evaluation 只讓叢集位置 0 的那台評估。"
+    refs: [graf-ha-single-node, graf-ha-primary, graf-ha-single-init, graf-ini-ha-peers]
+
+  alertmanagers_choice:
+    title: Grafana 送到哪個 Alertmanager（alertmanagersChoice）
+    kind: config
+    systems: [grafana_alerting]
+    tokens: [alertmanagersChoice, handleGrafanaManagedAlerts]
+    where: "每個 org 的 admin config（`/api/v1/ngalert/admin_config` 的 `alertmanagersChoice`：all、internal、external），加上 Alertmanager 資料來源的 `handleGrafanaManagedAlerts`"
+    default: "all；但 admin config 從沒設過時不會建立外部 sender"
+    observe:
+      - "`/api/v1/ngalert/alertmanagers` 的 `activeAlertManagers`"
+      - "`grafana_alerting_sender_alertmanagers_discovered`：沒有外部 sender 時這個 series 不存在"
+    refs: [graf-router-choice, graf-router-none, exp-graf-admin]
+
+  grafana_alerting_schedule_rule_evaluations_missed_total:
+    title: Grafana 丟掉的 evaluation 次數
+    kind: metric
+    systems: [grafana_alerting]
+    tokens: [grafana_alerting_schedule_rule_evaluations_missed_total]
+    where: "Grafana 的 `/metrics`，帶 `org`、`name`（rule 標題）、`reason`（slow_evaluation、state_not_warmed）"
+    note: "第一次發生前這個 series 不存在。逾時與重試造成的延遲也算 slow_evaluation。"
+    refs: [graf-metric-missed, graf-missed-slow, graf-missed-warm, exp-graf-slow]
+
+  grafana_alerting_rule_evaluation_failures_total:
+    title: Grafana rule 評估失敗次數
+    kind: metric
+    systems: [grafana_alerting]
+    tokens: [grafana_alerting_rule_evaluation_failures_total, grafana_alerting_rule_evaluation_attempt_failures_total]
+    where: "Grafana 的 `/metrics`，只帶 `org`，沒有 rule 或 group label"
+    note: "重試用完（或不可重試）才加 1；每次 attempt 的失敗看 attempt_failures_total。"
+    refs: [graf-metric-failures, graf-eval-failures, exp-graf-modes]
+
+  grafana_alerting_alerts:
+    title: Grafana 各狀態的 alert instance 數
+    kind: metric
+    systems: [grafana_alerting]
+    tokens: [grafana_alerting_alerts]
+    where: "Grafana 的 `/metrics`，`state` 是 normal、pending、alerting、recovering、nodata、error"
+    note: "數的是 instance 的狀態，不是原因。no_data_state／exec_err_state 設成 OK 或 Alerting 的 rule，資料消失時算在 normal 或 alerting。"
+    refs: [graf-metric-alerts, exp-graf-modes]
+
+  partial_response_strategy:
+    title: Thanos Ruler 的 partial response 策略
+    kind: config
+    systems: [thanos]
+    tokens: [partial_response_strategy]
+    where: "Thanos Ruler 的 rule 檔，每個 group 一個 `partial_response_strategy: warn | abort`"
+    default: "abort（沒寫時）"
+    observe:
+      - "`thanos_rule_loaded_rules` 的 `strategy` label"
+      - "`thanos_rule_evaluation_with_warnings_total{strategy=\"warn\"}`：warn group 帶 warning 的評估次數"
+    note: "abort 只對 querier 名單上的 store 有效。斷線 5 秒後 store 被排除，查詢成功、沒有 warning。"
+    refs: [th-prs-default, th-es-queryable, exp-thanos-store-loss]
+
+  thanos_store_nodes_grpc_connections:
+    title: Querier 連得到的 StoreAPI 數
+    kind: metric
+    systems: [thanos]
+    tokens: [thanos_store_nodes_grpc_connections]
+    where: "Thanos Querier（與用 gRPC endpoint 的 Ruler）的 `/metrics`，帶 `external_labels`、`store_type`"
+    observe:
+      - "依 querier 加總後和過去的最大值比較；一個 store 都沒有時整條消失，不是 0"
+    refs: [th-es-conns, exp-thanos-store-loss]
+
+  thanos_compact_halted:
+    title: Compactor 是否已 halt
+    kind: metric
+    systems: [thanos]
+    tokens: [thanos_compact_halted]
+    where: "Thanos Compactor 的 `/metrics`"
+    default: "0；遇到重疊 block 等嚴重錯誤時設 1，行程不結束"
+    refs: [th-compact-halt, exp-thanos-compact-halt]

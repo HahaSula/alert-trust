@@ -1,0 +1,323 @@
+# Thanos 元件卡與架構頁引用的原始碼位置與 lab/thanos 的實驗。
+# 行號已對照 tag 上的檔案（git clone --branch v0.42.5；Prometheus v3.9.1 = Thanos go.mod 的 v0.309.1；objstore 用 go.mod 釘的 commit）。
+refs:
+  th-rule-resend:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/rule.go"
+    line: 158
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/rule.go#L158"
+  th-rule-evalint:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/rule.go"
+    line: 160
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/rule.go#L160"
+  th-rule-offset:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/rule.go"
+    line: 162
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/rule.go#L162"
+  th-rule-endsat:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/rule.go"
+    line: 632
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/rule.go#L632"
+  th-rule-noquery:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/rule.go"
+    line: 1048
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/rule.go#L1048"
+  th-rule-warn-count:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/rule.go"
+    line: 1003
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/rule.go#L1003"
+  th-rule-dedup:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/rule.go"
+    line: 989
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/rule.go#L989"
+  th-rule-queue:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/rule.go"
+    line: 595
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/rule.go#L595"
+  th-rule-stateless:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/rule.go"
+    line: 511
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/rule.go#L511"
+  th-rule-stateful:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/rule.go"
+    line: 533
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/rule.go#L533"
+  th-rule-shipper:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/rule.go"
+    line: 904
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/rule.go#L904"
+  th-prs-default:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "pkg/store/storepb/custom.go"
+    line: 350
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/pkg/store/storepb/custom.go#L350"
+  th-rule-mgr-per-strategy:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "pkg/rules/manager.go"
+    line: 152
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/pkg/rules/manager.go#L152"
+  th-proxy-nostores:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "pkg/store/proxy.go"
+    line: 319
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/pkg/store/proxy.go#L319"
+  th-proxy-nomatch:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "pkg/store/proxy.go"
+    line: 326
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/pkg/store/proxy.go#L326"
+  th-proxy-warn:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "pkg/store/proxy.go"
+    line: 373
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/pkg/store/proxy.go#L373"
+  th-es-queryable:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "pkg/query/endpointset.go"
+    line: 733
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/pkg/query/endpointset.go#L733"
+  th-es-conns:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "pkg/query/endpointset.go"
+    line: 147
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/pkg/query/endpointset.go#L147"
+  th-es-remove:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "pkg/query/endpointset.go"
+    line: 419
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/pkg/query/endpointset.go#L419"
+  th-es-update:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/endpointset.go"
+    line: 554
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/endpointset.go#L554"
+  th-q-infotimeout:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/query.go"
+    line: 190
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/query.go#L190"
+  th-q-strict:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/query.go"
+    line: 206
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/query.go#L206"
+  th-sc-ship:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/sidecar.go"
+    line: 481
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/sidecar.go#L481"
+  th-sc-promup:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/sidecar.go"
+    line: 284
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/sidecar.go#L284"
+  th-sc-maxt:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/sidecar.go"
+    line: 580
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/sidecar.go#L580"
+  th-sc-compaction:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/sidecar.go"
+    line: 532
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/sidecar.go#L532"
+  th-ship-early:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "pkg/shipper/shipper.go"
+    line: 429
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/pkg/shipper/shipper.go#L429"
+  th-ship-failcount:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "pkg/shipper/shipper.go"
+    line: 448
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/pkg/shipper/shipper.go#L448"
+  th-ship-dirsync:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "pkg/shipper/shipper.go"
+    line: 378
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/pkg/shipper/shipper.go#L378"
+  th-store-sync:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/store.go"
+    line: 154
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/store.go#L154"
+  th-store-syncblocks:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/store.go"
+    line: 513
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/store.go#L513"
+  th-fetch-failures:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "pkg/block/fetcher.go"
+    line: 138
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/pkg/block/fetcher.go#L138"
+  th-compact-halt:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/compact.go"
+    line: 549
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/compact.go#L549"
+  th-compact-halt-default:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/compact.go"
+    line: 744
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/compact.go#L744"
+  th-compact-overlap:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "pkg/compact/compact.go"
+    line: 1177
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/pkg/compact/compact.go#L1177"
+  th-compact-delay:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/compact.go"
+    line: 759
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/compact.go#L759"
+  th-compact-todo:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "pkg/compact/compact.go"
+    line: 630
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/pkg/compact/compact.go#L630"
+  th-recv-rf:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "cmd/thanos/receive.go"
+    line: 1052
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/cmd/thanos/receive.go#L1052"
+  th-recv-quorum:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "pkg/receive/handler.go"
+    line: 1078
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/pkg/receive/handler.go#L1078"
+  th-recv-hashring-nodes:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "pkg/receive/config.go"
+    line: 234
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/pkg/receive/config.go#L234"
+  th-recv-replications:
+    kind: code
+    project: "Thanos"
+    version: "v0.42.5"
+    file: "pkg/receive/handler.go"
+    line: 212
+    url: "https://github.com/thanos-io/thanos/blob/v0.42.5/pkg/receive/handler.go#L212"
+  th-prom-eval-return:
+    kind: code
+    project: "Prometheus"
+    version: "v3.9.1"
+    file: "rules/group.go"
+    line: 538
+    url: "https://github.com/prometheus/prometheus/blob/v3.9.1/rules/group.go#L538"
+  th-prom-validuntil:
+    kind: code
+    project: "Prometheus"
+    version: "v3.9.1"
+    file: "rules/alerting.go"
+    line: 612
+    url: "https://github.com/prometheus/prometheus/blob/v3.9.1/rules/alerting.go#L612"
+  th-objstore-last-upload:
+    kind: code
+    project: "thanos-io/objstore"
+    version: "71d60dfee488"
+    file: "objstore.go"
+    line: 795
+    url: "https://github.com/thanos-io/objstore/blob/71d60dfee4881c924083ccfb7b58ae433b38d372/objstore.go#L795"
+  exp-thanos-store-loss:
+    kind: experiment
+    title: "Thanos lab：停掉 sidecar、再停 store gateway 時 abort／warn group 與 Alertmanager 的狀態（v0.42.5）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/thanos/README.md#s1-store-loss"
+  exp-thanos-query-down:
+    kind: experiment
+    title: "Thanos lab：querier 停機時 Ruler 不續送，Alertmanager 在 EndsAt 後清空（v0.42.5）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/thanos/README.md#s2-querier-down"
+  exp-thanos-compact-halt:
+    kind: experiment
+    title: "Thanos lab：重疊 block 讓 compactor halt，行程與 /metrics 仍在（v0.42.5）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/thanos/README.md#s3-compactor-halt"

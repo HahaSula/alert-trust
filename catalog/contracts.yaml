@@ -70,3 +70,24 @@ contracts:
     evidence: tested
     source: pg-lab
     refs: [exp-pg, exp-mysql, pg-timeout, my-offset]
+  thanos-partial-abort:
+    applies_to: [thanos]
+    expr: "abort 只對 querier 仍在查詢的 store 有效：store 斷線後一次健康檢查（endpoint.info-timeout，5s）就被移除"
+    violation: 被移除的 store 不算錯誤，查詢回 success、沒有 warning，abort group 照樣用少掉的資料判斷 alert
+    evidence: tested
+    source: thanos-lab
+    refs: [exp-thanos-store-loss, th-es-queryable, th-es-update, th-proxy-nomatch]
+  thanos-upload-retention:
+    applies_to: [thanos]
+    expr: "上傳中斷 + 2h（block）+ store 同步（--sync-block-duration）< Prometheus 本地保留"
+    violation: block 在上傳或被 store gateway 載入前就被 Prometheus 刪掉，那段時間查詢少資料、不報錯；沒上傳的部分永久遺失
+    evidence: code
+    source: thanos-src
+    refs: [th-sc-ship, th-sc-maxt, th-store-sync]
+  grafana-nodata-error:
+    applies_to: [grafana_alerting]
+    expr: "no_data_state、exec_err_state ≠ OK；選 NoData／Error 時，原 alert 在 missing_series_evals_to_resolve × E（預設 2E）後 resolved，DatasourceNoData／DatasourceError 要有路由"
+    violation: 設成 OK 時資料消失或查詢失敗，alert 下一次評估就 resolved，沒有任何 alert；NoData 也沒有任何 counter
+    evidence: tested
+    source: graf-lab
+    refs: [exp-graf-modes, graf-nodata-ok, graf-err-ok, graf-missing-series, graf-missing-default]

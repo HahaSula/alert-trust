@@ -179,3 +179,49 @@ Exporter 收到 scrape 才去查服務。它的期限比 `scrape_timeout` 長時
 所以預設期限偏長的 exporter，要把期限設得比 `scrape_timeout` 短，並用 `scrape_duration_seconds > 0.8 × scrape_timeout` 提前預警。
 
 架構：[Exporter](architecture/exporters.md)。
+
+## Thanos
+
+Thanos Ruler 用的是 Prometheus 的 rules manager，[視窗](#range-window)、[group](#group-within-interval)、[續送](#resend-endsat)三條契約照用（續送的公式是 `4 × max(--resend-delay, interval)`，兩者預設都是 1m）。下面兩條是 Thanos 多出來的。
+
+### Partial response 的 abort 只管還在名單上的 store {#thanos-partial-abort}
+
+store 斷線 `<` 一次健康檢查（`endpoint.info-timeout`，5s）時 abort 才會讓 rule 失敗
+
+Querier 每 5 秒檢查一次每個 StoreAPI，檢查失敗的非 strict endpoint 不再查詢[^th-es-update][^th-es-queryable]。之後同一個查詢只問剩下的 store；沒有 store 涵蓋這段時間時直接回空結果，不是錯誤[^th-proxy-nomatch]。
+
+| 情況 | warn group | abort group |
+|---|---|---|
+| store 斷線後 5 秒內（還在名單上） | 成功，帶 warning | 失敗 |
+| store 已被移除，還有其他 store | 成功，**沒有 warning**，少資料 | 成功，**沒有 warning**，少資料 |
+| 一個 store 都沒有 | 成功，空結果 | 失敗（`No StoreAPIs available`）[^th-proxy-nostores] |
+
+Lab 裡停掉 sidecar 後，兩種 group 的 `count(up) > 0` 在下一次取樣（+22s）前就被當成真的 resolved 送到 Alertmanager，rule 的 health 一直是 `ok`。[^exp-thanos-store-loss]所以要靠 querier 的 `thanos_store_nodes_grpc_connections` 告警，或把關鍵 store 設成 strict，不能只靠 abort。
+
+架構：[Querier 扇出](architecture/thanos.md#querier)。
+
+### Sidecar 上傳與 Prometheus 保留時間 {#thanos-upload-retention}
+
+上傳中斷 `+ 2h + --sync-block-duration < Prometheus 本地保留`
+
+Sidecar 每 30 秒檢查一次有沒有新的 2h block 可以上傳[^th-sc-ship]，它對 querier 宣告的時間範圍從 Prometheus 最舊的樣本開始[^th-sc-maxt]。Prometheus 依保留時間刪掉的 block，sidecar 就不再提供；這時 block 要已經上傳、而且被 store gateway 同步到（`--sync-block-duration` 預設 15m）[^th-store-sync]，否則那段時間查不到，也沒有錯誤。官方文件建議保留至少 6h（3 個 block）。
+
+架構：[Sidecar](architecture/thanos.md#sidecar)。
+
+## Grafana
+
+### 資料消失時的處理方式 {#grafana-nodata-error}
+
+`no_data_state`、`exec_err_state` ≠ OK；選 NoData／Error 時，原 alert 在 `missing_series_evals_to_resolve` × E（預設 2E）後 resolved，`DatasourceNoData`／`DatasourceError` 要有路由
+
+Grafana-managed rule 在查詢沒有結果（NoData）或查詢失敗（Error）時，不是固定行為，而是看每條 rule 的設定[^graf-nodata-all][^graf-error-all]：
+
+| 設定 | 外部 Alertmanager 收到 | 風險 |
+|---|---|---|
+| OK | 原 alert 下一次評估就 resolved[^graf-nodata-ok][^graf-err-ok] | 看起來像問題解決了；NoData 沒有任何 counter |
+| Alerting、KeepLast | 原 alert 繼續 firing | 看不出資料已經消失；API／provisioning 沒寫 `exec_err_state` 時預設就是 Alerting[^graf-api-defaults] |
+| NoData／Error | `DatasourceNoData`／`DatasourceError` firing（原名在 `rulename`），原 alert 約 2 個 interval 後 resolved[^graf-missing-series][^graf-missing-default] | 用 `alertname` 做 matcher 的路由收不到新的 alert |
+
+Lab 裡四種設定都照上表發生。[^exp-graf-modes]
+
+架構：[Grafana NoData 與 Error](architecture/grafana-alerting.md#nodata-error)。

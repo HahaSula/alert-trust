@@ -1,0 +1,327 @@
+id: thanos
+name: Thanos
+kind: infra
+family: prometheus
+status: draft
+stages: [store, query, evaluate, notify]
+versions_checked: ["v0.42.5"]
+architecture: architecture/thanos.md
+role: >-
+  把多台 Prometheus 接成一個查詢入口與長期儲存。Sidecar 把 Prometheus 的 2h block 上傳到物件儲存，
+  Querier 向所有 StoreAPI 扇出查詢並去重，Store gateway 讀 bucket，Compactor 是 bucket 唯一的寫手，
+  Ruler 透過 Querier 走網路評估 rule。每一段都可能少資料而不報錯。
+
+silent_failures:
+  - text: "Querier 對 StoreAPI 每 5 秒做一次健康檢查（`endpoint.info-timeout`），失敗的非 strict endpoint 直接不再查詢。之後的查詢回 success、沒有 warning，`partial_response_strategy: abort` 也不會讓 rule 失敗；`count(up) > 0` 這類 alert 被當成真的 resolved 送出。"
+    evidence: tested
+    source: thanos-lab
+    refs: [exp-thanos-store-loss, th-es-queryable, th-es-update, th-proxy-nomatch]
+  - text: "只有在 querier 一個 StoreAPI 都沒有時，abort group 才會失敗（`No StoreAPIs available`）；warn group 照樣回空結果。"
+    evidence: tested
+    source: thanos-lab
+    refs: [exp-thanos-store-loss, th-proxy-nostores]
+  - text: "Querier 一個 StoreAPI 都沒有時回 422 `No StoreAPIs available`，Ruler 的 lastError 卻只寫 `no query API server reachable`，和 querier 停機分不出來。"
+    evidence: tested
+    source: thanos-lab
+    refs: [exp-thanos-store-loss, th-rule-noquery]
+  - text: "Ruler 查不到 querier 時評估失敗、不續送，Alertmanager 在 EndsAt（`4 × max(--resend-delay, interval)`，預設 4 分鐘）把 alert 標成 resolved；Ruler 內部仍是 firing。和 Prometheus、vmalert 的假 resolved 同一個機制。"
+    evidence: tested
+    source: thanos-lab
+    refs: [exp-thanos-query-down, th-rule-endsat, th-prom-eval-return, th-prom-validuntil, th-rule-noquery]
+  - text: "官方 ThanosRuleHighRuleEvaluationFailures 要失敗比率 > 5% 持續 5 分鐘，比預設 4 分鐘的假 resolved 還晚。"
+    evidence: code
+    source: thanos-mixin
+    refs: [th-rule-resend, th-rule-evalint, th-prom-validuntil]
+  - text: "Compactor halt 後行程不結束（`select {}`），`up` 仍是 1；只有 `thanos_compact_halted` 會變 1。之後不再 compaction、downsampling、套用 retention。"
+    evidence: tested
+    source: thanos-lab
+    refs: [exp-thanos-compact-halt, th-compact-halt, th-compact-overlap]
+  - text: "Sidecar 上傳失敗只寫 log。預設 `--shipper.allow-out-of-order-uploads=false` 時失敗會提早 return，`thanos_shipper_upload_failures_total` 不增加，只有 `thanos_shipper_dir_sync_failures_total` 增加。"
+    evidence: code
+    source: thanos-src
+    refs: [th-ship-early, th-ship-failcount, th-ship-dirsync]
+  - text: "上傳中斷超過 Prometheus 本地保留時間減 2h，block 在上傳前就被 Prometheus 刪掉，bucket 永久少一段；查詢不報錯。"
+    evidence: code
+    source: thanos-src
+    refs: [th-sc-ship, th-sc-compaction]
+  - text: "官方 ThanosSidecarNoConnectionToStartedPrometheus 用 `on (namespace, pod)` join，非 Kubernetes 環境沒有這兩個 label 時永遠回傳空。"
+    evidence: upstream
+    source: thanos-mixin
+
+contracts: [thanos-partial-abort, thanos-upload-retention, resend-endsat, group-within-interval, range-window]
+
+signals:
+  - id: components-up
+    tier: 1
+    question: 每個 Thanos 元件都活著嗎
+    signal: 'up{job=~".*thanos-.*"} == 0，加上 absent(up{job=~".*thanos-<元件>.*"})'
+    metrics: [up]
+    evaluate_on: observer
+    evidence: code
+    source: thanos-mixin
+    refs: [th-compact-halt]
+    upstream: { status: partial, note: "*IsDown 用 absent(up == 1)，只在整個 job 都不在時才響；多副本時少一台不會響" }
+    rules: [rules/thanos/meta.yml#ThanosComponentDown, rules/thanos/meta.yml#ThanosComponentMissing]
+
+  - id: store-endpoints
+    tier: 1
+    question: Querier 還連得到每一個 StoreAPI 嗎
+    signal: "`thanos_store_nodes_grpc_connections` 依 querier 加總，比過去 1h 最大值少就告警；整條消失時另一條規則補位"
+    metrics: [thanos_store_nodes_grpc_connections]
+    evaluate_on: observer
+    silent_failure: 斷線的 store 被移除後查詢回 success，rule 用少掉的資料算出「沒事」
+    evidence: tested
+    source: thanos-lab
+    refs: [exp-thanos-store-loss, th-es-conns, th-es-queryable]
+    upstream: { status: no, note: "mixin 只有 gRPC 錯誤率與 DNS 失敗，沒有 store 數量" }
+    rules: [rules/thanos/meta.yml#ThanosQueryStoreEndpointsDropped, rules/thanos/meta.yml#ThanosQueryNoStoreEndpoints]
+    contract: thanos-partial-abort
+
+  - id: rule-eval-failures
+    tier: 1
+    question: Ruler 的查詢有沒有失敗
+    signal: rate(prometheus_rule_evaluation_failures_total{job=~".*thanos-rule.*"}[2m]) > 0，從 Ruler 以外的觀察者評估
+    metrics: [prometheus_rule_evaluation_failures_total]
+    evaluate_on: observer
+    evidence: tested
+    source: thanos-lab
+    refs: [exp-thanos-query-down, th-rule-noquery, th-prom-eval-return]
+    upstream: { status: partial, note: "ThanosRuleHighRuleEvaluationFailures 要 > 5% 持續 5m，比預設 4 分鐘的假 resolved 晚" }
+    rules: [rules/thanos/meta.yml#ThanosRuleQueryFailing]
+    contract: resend-endsat
+
+  - id: rule-notify
+    tier: 1
+    question: Ruler 送得到 Alertmanager 嗎
+    signal: thanos_alert_sender_alerts_dropped_total、thanos_alert_queue_alerts_dropped_total 增加
+    metrics: [thanos_alert_sender_alerts_dropped_total, thanos_alert_queue_alerts_dropped_total]
+    evaluate_on: observer
+    evidence: code
+    source: thanos-src
+    refs: [th-rule-queue]
+    upstream: { status: yes, note: "ThanosRuleQueueIsDroppingAlerts、ThanosRuleSenderIsFailingAlerts" }
+    rules: [rules/thanos/meta.yml#ThanosRuleSenderDropping]
+
+  - id: data-watchdog
+    tier: 1
+    question: Ruler → Querier → Sidecar → Alertmanager 整條活著嗎
+    signal: >-
+      在 Ruler 放一條讀真實資料的 heartbeat（例如 count(up{job="prometheus"}) > 0，group 用 abort），
+      送到外部 dead man's switch。vector(1) 不讀任何 StoreAPI，store 全掉時仍然 firing
+    metrics: [up]
+    evaluate_on: dedicated
+    judged_by: external
+    evidence: tested
+    source: thanos-lab
+    refs: [exp-thanos-store-loss, exp-thanos-query-down]
+    upstream: { status: no }
+    rules: []
+    contract: deadman-wait
+
+  - id: compact-halted
+    tier: 1
+    question: Compactor 還在工作嗎
+    signal: thanos_compact_halted == 1（行程活著，up 是 1）
+    metrics: [thanos_compact_halted]
+    evaluate_on: observer
+    evidence: tested
+    source: thanos-lab
+    refs: [exp-thanos-compact-halt, th-compact-halt, th-compact-halt-default]
+    upstream: { status: yes, note: "ThanosCompactHalted，for 5m" }
+    rules: [rules/thanos/meta.yml#ThanosCompactHalted]
+
+  - id: sidecar-prometheus
+    tier: 1
+    question: Sidecar 連得到 Prometheus 嗎
+    signal: thanos_sidecar_prometheus_up == 0
+    metrics: [thanos_sidecar_prometheus_up]
+    evaluate_on: observer
+    evidence: code
+    source: thanos-src
+    refs: [th-sc-promup]
+    upstream: { status: partial, note: "用 on (namespace, pod) join，非 Kubernetes 環境回傳空" }
+    rules: [rules/thanos/meta.yml#ThanosSidecarPrometheusDown]
+
+  - id: sidecar-upload
+    tier: 1
+    question: Sidecar 有在上傳 block 嗎
+    signal: time() - thanos_objstore_bucket_last_successful_upload_time{job=~".*sidecar.*"} > 3h（block 每 2h 一個），排除剛啟動的 3h
+    metrics: [thanos_objstore_bucket_last_successful_upload_time]
+    evaluate_on: observer
+    silent_failure: 中斷超過「Prometheus 保留 − 2h」就永久遺失；upload_failures_total 預設不動
+    evidence: code
+    source: thanos-src
+    refs: [th-objstore-last-upload, th-sc-ship, th-ship-early]
+    upstream: { status: no, note: "sidecar 只有 BucketOperationsFailed；HasNotRun 只看 compactor，NoUpload 只看 receive" }
+    rules: [rules/thanos/meta.yml#ThanosSidecarNoUpload]
+    contract: thanos-upload-retention
+
+  - id: receive-replication
+    tier: 1
+    question: Receive 的寫入有達到 quorum 嗎（有用 Receive 時）
+    signal: thanos_receive_replications_total{result="error"} 比率；quorum = RF/2+1，RF=2 時只要 1
+    metrics: [thanos_receive_replications_total, thanos_receive_replication_factor]
+    evaluate_on: observer
+    evidence: code
+    source: thanos-src
+    refs: [th-recv-replications, th-recv-quorum, th-recv-rf]
+    upstream: { status: partial, note: "ThanosReceiveHighReplicationFailures 只在 RF > 1 時作用，而且是 warning" }
+    rules: [rules/thanos/meta.yml#ThanosReceiveReplicationFailing]
+
+  - id: rule-partial-warnings
+    tier: 2
+    question: warn group 是不是在用不完整的資料判斷
+    signal: rate(thanos_rule_evaluation_with_warnings_total{strategy="warn"}[5m]) > 0
+    metrics: [thanos_rule_evaluation_with_warnings_total]
+    evaluate_on: observer
+    silent_failure: 只在 store 回錯的那幾秒會增加；store 被移除後不再有 warning
+    evidence: tested
+    source: thanos-lab
+    refs: [exp-thanos-store-loss, th-rule-warn-count]
+    upstream: { status: yes, note: "ThanosRuleHighRuleEvaluationWarnings，for 15m" }
+    rules: [rules/thanos/meta.yml#ThanosRulePartialResponse]
+
+  - id: partial-response-strategy
+    tier: 2
+    question: 每個 rule group 用 warn 還是 abort
+    signal: 盤點 rule 檔的 partial_response_strategy（沒寫是 abort）；thanos_rule_loaded_rules 帶 strategy label
+    metrics: [thanos_rule_loaded_rules]
+    evaluate_on: inventory
+    evidence: code
+    source: thanos-src
+    refs: [th-prs-default, th-rule-mgr-per-strategy]
+    upstream: { status: no }
+    rules: []
+    contract: thanos-partial-abort
+
+  - id: rule-group-ratio
+    tier: 2
+    question: Ruler group 跑得完嗎
+    signal: prometheus_rule_group_last_duration_seconds ÷ prometheus_rule_group_interval_seconds；查詢走網路，querier 與 store 的延遲都算在內
+    metrics: [prometheus_rule_group_last_duration_seconds, prometheus_rule_group_interval_seconds]
+    evaluate_on: observer
+    evidence: code
+    source: thanos-mixin
+    refs: [th-rule-noquery]
+    upstream: { status: partial, note: "ThanosRuleRuleEvaluationLatencyHigh 在超過 interval 才響，沒有預警" }
+    rules: [rules/thanos/meta.yml#ThanosRuleGroupSlow]
+    contract: group-within-interval
+
+  - id: shipper-failures
+    tier: 2
+    question: Shipper 同步有沒有失敗
+    signal: increase(thanos_shipper_dir_sync_failures_total[15m]) > 0；不要只看 thanos_shipper_upload_failures_total
+    metrics: [thanos_shipper_dir_sync_failures_total, thanos_shipper_upload_failures_total]
+    evaluate_on: observer
+    evidence: code
+    source: thanos-src
+    refs: [th-ship-dirsync, th-ship-early, th-ship-failcount]
+    upstream: { status: partial, note: "ThanosSidecarBucketOperationsFailed 看 objstore 操作失敗，連得上 bucket 但寫入被拒時也會增加" }
+    rules: [rules/thanos/meta.yml#ThanosShipperSyncFailing]
+
+  - id: store-sync
+    tier: 2
+    question: Store gateway 有讀到 bucket 的新 block 嗎
+    signal: increase(thanos_blocks_meta_sync_failures_total{job=~".*thanos-store.*"}[30m]) > 0；同步間隔 --sync-block-duration 預設 15m
+    metrics: [thanos_blocks_meta_sync_failures_total]
+    evaluate_on: observer
+    evidence: code
+    source: thanos-src
+    refs: [th-fetch-failures, th-store-sync, th-store-syncblocks]
+    upstream: { status: partial, note: "ThanosStoreBucketHighOperationFailures 是 objstore 失敗比率 > 5% 持續 15m" }
+    rules: [rules/thanos/meta.yml#ThanosStoreSyncFailing]
+    contract: thanos-upload-retention
+
+  - id: query-dedup
+    tier: 2
+    question: HA 的 Prometheus 有被去重嗎
+    signal: Querier 的 --query.replica-label 要等於 Prometheus external_labels 裡區分副本的 label；Ruler 一律要求 dedup
+    metrics: []
+    evaluate_on: inventory
+    evidence: inferred
+    source: thanos-src
+    refs: [th-rule-dedup]
+    upstream: { status: no }
+    rules: []
+
+  - id: query-strict-endpoints
+    tier: 2
+    question: 關鍵的 StoreAPI 是不是 strict
+    signal: 用 endpoint 設定的 strict（或已棄用的 --endpoint-strict）列出的 endpoint 健康檢查失敗也不移除，查詢會真的失敗，abort 才有作用
+    metrics: []
+    evaluate_on: inventory
+    evidence: code
+    source: thanos-src
+    refs: [th-es-queryable, th-q-strict]
+    upstream: { status: no }
+    rules: []
+    contract: thanos-partial-abort
+
+  - id: ruler-own-data
+    tier: 2
+    question: Ruler 的 recording 結果與 ALERTS 查得到嗎
+    signal: 有狀態模式寫到 Ruler 自己的 TSDB，Querier 要把 Ruler 加成 endpoint 才查得到；設了 --remote-write.config 時改成無狀態，for 從 querier 還原
+    metrics: []
+    evaluate_on: inventory
+    evidence: code
+    source: thanos-src
+    refs: [th-rule-stateful, th-rule-stateless, th-rule-shipper]
+    upstream: { status: no }
+    rules: []
+
+  - id: compact-singleton
+    tier: 2
+    question: 同一個 bucket 只有一個 compactor 嗎
+    signal: sum by (job) (up{job=~".*thanos-compact.*"}) > 1
+    metrics: [up]
+    evaluate_on: observer
+    evidence: upstream
+    source: thanos-mixin
+    upstream: { status: yes, note: "ThanosCompactMultipleRunning；不同 job 名稱指向同一個 bucket 時看不到" }
+    rules: []
+
+  - id: receive-hashring
+    tier: 2
+    question: Receive 的 hashring 設定正確、成員齊全嗎
+    signal: thanos_receive_hashring_nodes 對照預期；thanos_receive_hashrings_file_errors_total
+    metrics: [thanos_receive_hashring_nodes]
+    evaluate_on: observer
+    evidence: code
+    source: thanos-src
+    refs: [th-recv-hashring-nodes]
+    upstream: { status: partial, note: "只有 hashring 檔案刷新失敗，沒有節點數" }
+    rules: []
+
+  - id: query-errors
+    tier: 2
+    question: Querier 的 API 有沒有回錯
+    signal: http_requests_total{handler="query", code=~"5.."} 比率；grpc_client_handled_total 錯誤比率
+    metrics: [http_requests_total]
+    evaluate_on: observer
+    evidence: upstream
+    source: thanos-mixin
+    upstream: { status: yes, note: "ThanosQueryHttpRequestQueryErrorRateHigh、ThanosQueryGrpcClientErrorRate" }
+    rules: []
+
+  - id: compact-backlog
+    tier: 3
+    question: Compaction 跟得上嗎
+    signal: thanos_compact_todo_compactions 6 小時都 > 0；downsampling 看 thanos_compact_todo_downsample_blocks
+    metrics: [thanos_compact_todo_compactions, thanos_compact_todo_downsample_blocks]
+    evaluate_on: observer
+    evidence: code
+    source: thanos-src
+    refs: [th-compact-todo]
+    upstream: { status: partial, note: "只有 ThanosCompactHasNotRun（24h 沒上傳）" }
+    rules: [rules/thanos/meta.yml#ThanosCompactBacklog]
+
+  - id: compact-has-run
+    tier: 3
+    question: Compactor 最近一天有上傳過結果嗎
+    signal: time() - max_over_time(thanos_objstore_bucket_last_successful_upload_time{job=~".*thanos-compact.*"}[24h]) > 24h
+    metrics: [thanos_objstore_bucket_last_successful_upload_time]
+    evaluate_on: observer
+    evidence: upstream
+    source: thanos-mixin
+    upstream: { status: yes, note: "ThanosCompactHasNotRun" }
+    rules: []

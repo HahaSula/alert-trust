@@ -1,0 +1,20 @@
+# Thanos 卡引用的來源。key 一律以 thanos- 開頭。
+sources:
+  thanos-lab:
+    title: Thanos 輕量實驗（lab/thanos）
+    kind: experiment
+    visibility: public
+    url: https://github.com/HahaSula/alert-trust/tree/main/lab/thanos
+    checked: "2026-11-09, Thanos v0.42.5, Prometheus v3.13.5, Alertmanager v0.27.0"
+  thanos-src:
+    title: Thanos 原始碼（v0.42.5）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/thanos-io/thanos/tree/v0.42.5
+    checked: "2026-11-09, v0.42.5（最新正式版，2026-10-27）"
+  thanos-mixin:
+    title: Thanos mixin alerts（examples/alerts/alerts.yaml 是 mixin 產生的結果）
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/thanos-io/thanos/blob/v0.42.5/examples/alerts/alerts.yaml
+    checked: "2026-11-09, v0.42.5"

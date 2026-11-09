@@ -1,0 +1,30 @@
+# exp-graf-*：Grafana 13.3.0 的 Grafana-managed alert rule，對 Prometheus 3.13.5 評估，送到外部 Alertmanager 0.27.0。
+# fake 同時是 exporter（lab_value）、假 Prometheus API（可加延遲）和 webhook 接收端。
+name: at-graf
+services:
+  fake:
+    image: python:3.12.7-alpine
+    command: [python3, -u, /fake.py]
+    volumes: [./fake.py:/fake.py:ro]
+    ports: ["26080:8080"]
+  prom:
+    image: prom/prometheus:v3.13.5
+    command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.path=/prometheus]
+    volumes: [./configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro]
+    ports: ["26090:9090"]
+  am:
+    image: prom/alertmanager:v0.27.0
+    command: [--config.file=/etc/am/am.yml, --storage.path=/alertmanager, --cluster.listen-address=]
+    volumes: [./configs/alertmanager.yml:/etc/am/am.yml:ro]
+    ports: ["26093:9093"]
+  grafana:
+    image: grafana/grafana:13.3.0
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_LOG_LEVEL: info
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_UNIFIED_ALERTING_ENABLED: "true"
+    volumes: [./provisioning:/etc/grafana/provisioning:ro]
+    ports: ["26000:3000"]
+    depends_on: [fake, prom, am]

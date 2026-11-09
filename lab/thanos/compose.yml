@@ -1,0 +1,60 @@
+# Thanos 輕量 lab：Prometheus + sidecar + store + query + rule + compact + Alertmanager。
+# 物件儲存用 FILESYSTEM（共用 volume），不需要 MinIO。Host port 25090–25096。
+name: at-thanos
+x-thanos: &thanos
+  image: quay.io/thanos/thanos:v0.42.5
+  user: "0"
+services:
+  prom:
+    image: prom/prometheus:v3.13.5
+    user: "0"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.min-block-duration=2h
+      - --storage.tsdb.max-block-duration=2h
+      - --web.enable-lifecycle
+    volumes: ["./configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro", "prom:/prometheus"]
+    ports: ["25090:9090"]
+  sidecar:
+    <<: *thanos
+    command: [sidecar, --tsdb.path=/prometheus, --prometheus.url=http://prom:9090,
+              --objstore.config-file=/etc/thanos/bucket.yml,
+              --grpc-address=0.0.0.0:10901, --http-address=0.0.0.0:10902]
+    volumes: ["prom:/prometheus", "bucket:/bucket", "./configs/bucket.yml:/etc/thanos/bucket.yml:ro"]
+    ports: ["25091:10902"]
+  store:
+    <<: *thanos
+    command: [store, --data-dir=/data, --objstore.config-file=/etc/thanos/bucket.yml,
+              --sync-block-duration=30s,
+              --grpc-address=0.0.0.0:10901, --http-address=0.0.0.0:10902]
+    volumes: ["bucket:/bucket", "./configs/bucket.yml:/etc/thanos/bucket.yml:ro"]
+    ports: ["25095:10902"]
+  query:
+    <<: *thanos
+    command: [query, --endpoint=sidecar:10901, --endpoint=store:10901,
+              --query.replica-label=replica,
+              --grpc-address=0.0.0.0:10901, --http-address=0.0.0.0:10902]
+    ports: ["25092:10902"]
+  rule:
+    <<: *thanos
+    command: [rule, --data-dir=/data, --rule-file=/etc/thanos/rules.yml,
+              --query=http://query:10902, --alertmanagers.url=http://am:9093,
+              --eval-interval=15s, --resend-delay=15s, --label=ruler="lab",
+              --grpc-address=0.0.0.0:10901, --http-address=0.0.0.0:10902]
+    volumes: ["./configs/rules.yml:/etc/thanos/rules.yml:ro"]
+    ports: ["25093:10902"]
+  compact:
+    <<: *thanos
+    profiles: [compact]
+    command: [compact, --wait, --wait-interval=20s, --consistency-delay=0s,
+              --data-dir=/data, --objstore.config-file=/etc/thanos/bucket.yml,
+              --http-address=0.0.0.0:10902]
+    volumes: ["bucket:/bucket", "./configs/bucket.yml:/etc/thanos/bucket.yml:ro"]
+    ports: ["25096:10902"]
+  am:
+    image: prom/alertmanager:v0.27.0
+    command: [--config.file=/etc/am/alertmanager.yml, --storage.path=/tmp/am]
+    volumes: ["./configs/alertmanager.yml:/etc/am/alertmanager.yml:ro"]
+    ports: ["25094:9093"]
+volumes: { prom: {}, bucket: {} }

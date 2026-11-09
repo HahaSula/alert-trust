@@ -1,0 +1,128 @@
+# exp-graf-*：Grafana-managed alert rule。四條 rule 查同一個 lab_value，只差 noDataState／execErrState。
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: modes
+    folder: lab
+    interval: 10s
+    rules:
+      - uid: mode_alerting
+        title: mode_alerting
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 60, to: 0 }
+            datasourceUid: prom
+            model: { refId: A, expr: 'lab_value', instant: true, range: false }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: gt, params: [0] } }]
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 0s
+        labels: { lab: grafana }
+        annotations: { summary: "mode_alerting" }
+      - uid: mode_ok
+        title: mode_ok
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 60, to: 0 }
+            datasourceUid: prom
+            model: { refId: A, expr: 'lab_value', instant: true, range: false }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: gt, params: [0] } }]
+        noDataState: OK
+        execErrState: OK
+        for: 0s
+        labels: { lab: grafana }
+        annotations: { summary: "mode_ok" }
+      - uid: mode_nodata_error
+        title: mode_nodata_error
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 60, to: 0 }
+            datasourceUid: prom
+            model: { refId: A, expr: 'lab_value', instant: true, range: false }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: gt, params: [0] } }]
+        noDataState: NoData
+        execErrState: Error
+        for: 0s
+        labels: { lab: grafana }
+        annotations: { summary: "mode_nodata_error" }
+      - uid: mode_keeplast
+        title: mode_keeplast
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 60, to: 0 }
+            datasourceUid: prom
+            model: { refId: A, expr: 'lab_value', instant: true, range: false }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: gt, params: [0] } }]
+        noDataState: KeepLast
+        execErrState: KeepLast
+        for: 0s
+        labels: { lab: grafana }
+        annotations: { summary: "mode_keeplast" }
+  - orgId: 1
+    name: slow
+    folder: lab
+    interval: 10s
+    rules:
+      - uid: slow_query
+        title: slow_query
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 60, to: 0 }
+            datasourceUid: slow
+            model: { refId: A, expr: 'slow_value', instant: true, range: false }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions: [{ evaluator: { type: gt, params: [0] } }]
+        noDataState: NoData
+        execErrState: Error
+        for: 0s
+        labels: { lab: grafana }
+        annotations: { summary: "slow_query" }
+contactPoints:
+  - orgId: 1
+    name: hook
+    receivers:
+      - uid: hook
+        type: webhook
+        settings: { url: "http://fake:8080/hook/embedded" }
+        disableResolveMessage: false
+policies:
+  - orgId: 1
+    receiver: hook
+    group_by: [alertname, rulename]
+    group_wait: 1s
+    group_interval: 5s
+    repeat_interval: 1h

@@ -1,0 +1,1325 @@
+{
+ "duration_s": 553,
+ "snapshots": [
+  {
+   "label": "baseline",
+   "wall": "22:12:53",
+   "ruler_rules": [
+    {
+     "group": "g-abort",
+     "rule": "LabConstant",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:12:43.768484312Z"
+    },
+    {
+     "group": "g-abort",
+     "rule": "LabSeriesPresent",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:12:43.766118795Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabConstant",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:12:37.231992627Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabSeriesPresent",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:12:37.228462429Z"
+    }
+   ],
+   "am_alerts": [
+    {
+     "alert": "LabSeriesPresent",
+     "strategy": "warn",
+     "startsAt": "2026-11-09T14:11:45.556Z",
+     "endsAt": "2026-11-09T14:13:15.556Z",
+     "updatedAt": "2026-11-09T14:12:22.240Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabSeriesPresent",
+     "strategy": "abort",
+     "startsAt": "2026-11-09T14:11:48.758Z",
+     "endsAt": "2026-11-09T14:13:18.758Z",
+     "updatedAt": "2026-11-09T14:12:25.434Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabConstant",
+     "strategy": "abort",
+     "startsAt": "2026-11-09T14:11:33.758Z",
+     "endsAt": "2026-11-09T14:13:33.758Z",
+     "updatedAt": "2026-11-09T14:12:43.769Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabConstant",
+     "strategy": "warn",
+     "startsAt": "2026-11-09T14:11:30.556Z",
+     "endsAt": "2026-11-09T14:13:30.556Z",
+     "updatedAt": "2026-11-09T14:12:37.233Z",
+     "state": "active"
+    }
+   ],
+   "query": {
+    "partial_response=false": {
+     "status": "success",
+     "data": {
+      "resultType": "vector",
+      "result": [
+       {
+        "metric": {},
+        "value": [
+         1794233573.465,
+         "1"
+        ]
+       }
+      ],
+      "analysis": {}
+     }
+    },
+    "partial_response=true": {
+     "status": "success",
+     "data": {
+      "resultType": "vector",
+      "result": [
+       {
+        "metric": {},
+        "value": [
+         1794233573.469,
+         "1"
+        ]
+       }
+      ],
+      "analysis": {}
+     }
+    }
+   },
+   "query_store_conns": [
+    "thanos_store_nodes_grpc_connections{external_labels=\"no_external_labels\",store_type=\"store\"} 1",
+    "thanos_store_nodes_grpc_connections{external_labels=\"{cluster=\\\"lab\\\", replica=\\\"a\\\"}\",store_type=\"sidecar\"} 1"
+   ],
+   "ruler_metrics": [
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/ABORT/etc/thanos/rules.yml;g-abort\",strategy=\"abort\"} 0",
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/WARN/etc/thanos/rules.yml;g-warn\",strategy=\"warn\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"abort\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"warn\"} 0"
+   ]
+  },
+  {
+   "label": "sidecar-stopped+2s",
+   "wall": "22:13:05",
+   "ruler_rules": [
+    {
+     "group": "g-abort",
+     "rule": "LabConstant",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:12:43.768484312Z"
+    },
+    {
+     "group": "g-abort",
+     "rule": "LabSeriesPresent",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:12:43.766118795Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabConstant",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:12:37.231992627Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabSeriesPresent",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:12:37.228462429Z"
+    }
+   ],
+   "am_alerts": [
+    {
+     "alert": "LabSeriesPresent",
+     "strategy": "warn",
+     "startsAt": "2026-11-09T14:11:45.556Z",
+     "endsAt": "2026-11-09T14:13:15.556Z",
+     "updatedAt": "2026-11-09T14:12:22.240Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabSeriesPresent",
+     "strategy": "abort",
+     "startsAt": "2026-11-09T14:11:48.758Z",
+     "endsAt": "2026-11-09T14:13:18.758Z",
+     "updatedAt": "2026-11-09T14:12:25.434Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabConstant",
+     "strategy": "abort",
+     "startsAt": "2026-11-09T14:11:33.758Z",
+     "endsAt": "2026-11-09T14:13:33.758Z",
+     "updatedAt": "2026-11-09T14:12:43.769Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabConstant",
+     "strategy": "warn",
+     "startsAt": "2026-11-09T14:11:30.556Z",
+     "endsAt": "2026-11-09T14:13:30.556Z",
+     "updatedAt": "2026-11-09T14:12:37.233Z",
+     "state": "active"
+    }
+   ],
+   "query": {
+    "partial_response=false": {
+     "error": "timed out"
+    },
+    "partial_response=true": {
+     "status": "success",
+     "data": {
+      "resultType": "vector",
+      "result": [],
+      "analysis": {}
+     }
+    }
+   },
+   "query_store_conns": [
+    "thanos_store_nodes_grpc_connections{external_labels=\"no_external_labels\",store_type=\"store\"} 1"
+   ],
+   "ruler_metrics": [
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/ABORT/etc/thanos/rules.yml;g-abort\",strategy=\"abort\"} 0",
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/WARN/etc/thanos/rules.yml;g-warn\",strategy=\"warn\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"abort\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"warn\"} 0"
+   ]
+  },
+  {
+   "label": "sidecar-stopped+22s",
+   "wall": "22:13:29",
+   "ruler_rules": [
+    {
+     "group": "g-abort",
+     "rule": "LabConstant",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:13:17.102673557Z"
+    },
+    {
+     "group": "g-abort",
+     "rule": "LabSeriesPresent",
+     "health": "ok",
+     "state": "inactive",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:13:17.100903145Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabConstant",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:13:28.900667956Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabSeriesPresent",
+     "health": "ok",
+     "state": "inactive",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:13:28.899147887Z"
+    }
+   ],
+   "am_alerts": [
+    {
+     "alert": "LabConstant",
+     "strategy": "abort",
+     "startsAt": "2026-11-09T14:11:33.758Z",
+     "endsAt": "2026-11-09T14:14:03.758Z",
+     "updatedAt": "2026-11-09T14:13:17.104Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabConstant",
+     "strategy": "warn",
+     "startsAt": "2026-11-09T14:11:30.556Z",
+     "endsAt": "2026-11-09T14:14:00.556Z",
+     "updatedAt": "2026-11-09T14:13:15.158Z",
+     "state": "active"
+    }
+   ],
+   "query": {
+    "partial_response=false": {
+     "status": "success",
+     "data": {
+      "resultType": "vector",
+      "result": [],
+      "analysis": {}
+     }
+    },
+    "partial_response=true": {
+     "status": "success",
+     "data": {
+      "resultType": "vector",
+      "result": [],
+      "analysis": {}
+     }
+    }
+   },
+   "query_store_conns": [
+    "thanos_store_nodes_grpc_connections{external_labels=\"no_external_labels\",store_type=\"store\"} 1"
+   ],
+   "ruler_metrics": [
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/ABORT/etc/thanos/rules.yml;g-abort\",strategy=\"abort\"} 1",
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/WARN/etc/thanos/rules.yml;g-warn\",strategy=\"warn\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"abort\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"warn\"} 1"
+   ]
+  },
+  {
+   "label": "sidecar-stopped+62s",
+   "wall": "22:14:12",
+   "ruler_rules": [
+    {
+     "group": "g-abort",
+     "rule": "LabConstant",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:14:05.437842897Z"
+    },
+    {
+     "group": "g-abort",
+     "rule": "LabSeriesPresent",
+     "health": "ok",
+     "state": "inactive",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:14:05.436418132Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabConstant",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:14:02.235737251Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabSeriesPresent",
+     "health": "ok",
+     "state": "inactive",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:14:02.234044276Z"
+    }
+   ],
+   "am_alerts": [
+    {
+     "alert": "LabConstant",
+     "strategy": "abort",
+     "startsAt": "2026-11-09T14:11:33.758Z",
+     "endsAt": "2026-11-09T14:14:48.758Z",
+     "updatedAt": "2026-11-09T14:13:50.444Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabConstant",
+     "strategy": "warn",
+     "startsAt": "2026-11-09T14:11:30.556Z",
+     "endsAt": "2026-11-09T14:15:00.556Z",
+     "updatedAt": "2026-11-09T14:14:02.237Z",
+     "state": "active"
+    }
+   ],
+   "query": {
+    "partial_response=false": {
+     "status": "success",
+     "data": {
+      "resultType": "vector",
+      "result": [],
+      "analysis": {}
+     }
+    },
+    "partial_response=true": {
+     "status": "success",
+     "data": {
+      "resultType": "vector",
+      "result": [],
+      "analysis": {}
+     }
+    }
+   },
+   "query_store_conns": [
+    "thanos_store_nodes_grpc_connections{external_labels=\"no_external_labels\",store_type=\"store\"} 1"
+   ],
+   "ruler_metrics": [
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/ABORT/etc/thanos/rules.yml;g-abort\",strategy=\"abort\"} 1",
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/WARN/etc/thanos/rules.yml;g-warn\",strategy=\"warn\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"abort\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"warn\"} 1"
+   ]
+  },
+  {
+   "label": "no-stores+25s",
+   "wall": "22:14:41",
+   "ruler_rules": [
+    {
+     "group": "g-abort",
+     "rule": "LabConstant",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:14:38.771784154Z"
+    },
+    {
+     "group": "g-abort",
+     "rule": "LabSeriesPresent",
+     "health": "err",
+     "state": "inactive",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:14:38.770260962Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabConstant",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:14:35.571269446Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabSeriesPresent",
+     "health": "ok",
+     "state": "inactive",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:14:35.567720521Z"
+    }
+   ],
+   "am_alerts": [
+    {
+     "alert": "LabConstant",
+     "strategy": "abort",
+     "startsAt": "2026-11-09T14:11:33.758Z",
+     "endsAt": "2026-11-09T14:15:18.758Z",
+     "updatedAt": "2026-11-09T14:14:23.772Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabConstant",
+     "strategy": "warn",
+     "startsAt": "2026-11-09T14:11:30.556Z",
+     "endsAt": "2026-11-09T14:15:30.556Z",
+     "updatedAt": "2026-11-09T14:14:35.572Z",
+     "state": "active"
+    }
+   ],
+   "query": {
+    "partial_response=false": {
+     "http_status": 422,
+     "body": {
+      "status": "error",
+      "errorType": "execution",
+      "error": "expanding series: proxy Series(): No StoreAPIs available"
+     }
+    },
+    "partial_response=true": {
+     "status": "success",
+     "data": {
+      "resultType": "vector",
+      "result": [],
+      "analysis": {}
+     }
+    }
+   },
+   "query_store_conns": [],
+   "ruler_metrics": [
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/ABORT/etc/thanos/rules.yml;g-abort\",strategy=\"abort\"} 3",
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/WARN/etc/thanos/rules.yml;g-warn\",strategy=\"warn\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"abort\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"warn\"} 1"
+   ]
+  },
+  {
+   "label": "no-stores+65s",
+   "wall": "22:15:28",
+   "ruler_rules": [
+    {
+     "group": "g-abort",
+     "rule": "LabConstant",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:15:12.108903643Z"
+    },
+    {
+     "group": "g-abort",
+     "rule": "LabSeriesPresent",
+     "health": "err",
+     "state": "inactive",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:15:12.107587118Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabConstant",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:15:23.906843982Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabSeriesPresent",
+     "health": "ok",
+     "state": "inactive",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:15:23.905174253Z"
+    }
+   ],
+   "am_alerts": [
+    {
+     "alert": "LabConstant",
+     "strategy": "abort",
+     "startsAt": "2026-11-09T14:11:33.758Z",
+     "endsAt": "2026-11-09T14:15:48.758Z",
+     "updatedAt": "2026-11-09T14:14:57.109Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabConstant",
+     "strategy": "warn",
+     "startsAt": "2026-11-09T14:11:30.556Z",
+     "endsAt": "2026-11-09T14:16:00.556Z",
+     "updatedAt": "2026-11-09T14:15:08.912Z",
+     "state": "active"
+    }
+   ],
+   "query": {
+    "partial_response=false": {
+     "http_status": 422,
+     "body": {
+      "status": "error",
+      "errorType": "execution",
+      "error": "expanding series: proxy Series(): No StoreAPIs available"
+     }
+    },
+    "partial_response=true": {
+     "status": "success",
+     "data": {
+      "resultType": "vector",
+      "result": [],
+      "analysis": {}
+     }
+    }
+   },
+   "query_store_conns": [],
+   "ruler_metrics": [
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/ABORT/etc/thanos/rules.yml;g-abort\",strategy=\"abort\"} 5",
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/WARN/etc/thanos/rules.yml;g-warn\",strategy=\"warn\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"abort\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"warn\"} 1"
+   ]
+  },
+  {
+   "label": "stores-back+45s",
+   "wall": "22:16:17",
+   "ruler_rules": [
+    {
+     "group": "g-abort",
+     "rule": "LabConstant",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:16:03.784924239Z"
+    },
+    {
+     "group": "g-abort",
+     "rule": "LabSeriesPresent",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:16:03.776561621Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabConstant",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:16:15.577844511Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabSeriesPresent",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:16:15.574266879Z"
+    }
+   ],
+   "am_alerts": [
+    {
+     "alert": "LabSeriesPresent",
+     "strategy": "warn",
+     "startsAt": "2026-11-09T14:15:30.556Z",
+     "endsAt": "2026-11-09T14:17:15.556Z",
+     "updatedAt": "2026-11-09T14:16:15.579Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabSeriesPresent",
+     "strategy": "abort",
+     "startsAt": "2026-11-09T14:15:33.758Z",
+     "endsAt": "2026-11-09T14:17:03.758Z",
+     "updatedAt": "2026-11-09T14:16:03.788Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabConstant",
+     "strategy": "abort",
+     "startsAt": "2026-11-09T14:11:33.758Z",
+     "endsAt": "2026-11-09T14:17:03.758Z",
+     "updatedAt": "2026-11-09T14:16:03.789Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabConstant",
+     "strategy": "warn",
+     "startsAt": "2026-11-09T14:11:30.556Z",
+     "endsAt": "2026-11-09T14:17:15.556Z",
+     "updatedAt": "2026-11-09T14:16:15.579Z",
+     "state": "active"
+    }
+   ],
+   "query": {
+    "partial_response=false": {
+     "status": "success",
+     "data": {
+      "resultType": "vector",
+      "result": [
+       {
+        "metric": {},
+        "value": [
+         1794233777.894,
+         "1"
+        ]
+       }
+      ],
+      "analysis": {}
+     }
+    },
+    "partial_response=true": {
+     "status": "success",
+     "data": {
+      "resultType": "vector",
+      "result": [
+       {
+        "metric": {},
+        "value": [
+         1794233777.899,
+         "1"
+        ]
+       }
+      ],
+      "analysis": {}
+     }
+    }
+   },
+   "query_store_conns": [
+    "thanos_store_nodes_grpc_connections{external_labels=\"no_external_labels\",store_type=\"store\"} 1",
+    "thanos_store_nodes_grpc_connections{external_labels=\"{cluster=\\\"lab\\\", replica=\\\"a\\\"}\",store_type=\"sidecar\"} 1"
+   ],
+   "ruler_metrics": [
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/ABORT/etc/thanos/rules.yml;g-abort\",strategy=\"abort\"} 6",
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/WARN/etc/thanos/rules.yml;g-warn\",strategy=\"warn\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"abort\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"warn\"} 1"
+   ]
+  },
+  {
+   "label": "query-stopped+15s",
+   "wall": "22:16:36",
+   "ruler_rules": [
+    {
+     "group": "g-abort",
+     "rule": "LabConstant",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:16:22.342673107Z"
+    },
+    {
+     "group": "g-abort",
+     "rule": "LabSeriesPresent",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:16:18.776173423Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabConstant",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:16:15.577844511Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabSeriesPresent",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:16:15.574266879Z"
+    }
+   ],
+   "am_alerts": [
+    {
+     "alert": "LabSeriesPresent",
+     "strategy": "warn",
+     "startsAt": "2026-11-09T14:15:30.556Z",
+     "endsAt": "2026-11-09T14:17:15.556Z",
+     "updatedAt": "2026-11-09T14:16:15.579Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabSeriesPresent",
+     "strategy": "abort",
+     "startsAt": "2026-11-09T14:15:33.758Z",
+     "endsAt": "2026-11-09T14:17:03.758Z",
+     "updatedAt": "2026-11-09T14:16:03.788Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabConstant",
+     "strategy": "abort",
+     "startsAt": "2026-11-09T14:11:33.758Z",
+     "endsAt": "2026-11-09T14:17:03.758Z",
+     "updatedAt": "2026-11-09T14:16:03.789Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabConstant",
+     "strategy": "warn",
+     "startsAt": "2026-11-09T14:11:30.556Z",
+     "endsAt": "2026-11-09T14:17:15.556Z",
+     "updatedAt": "2026-11-09T14:16:15.579Z",
+     "state": "active"
+    }
+   ],
+   "query": {
+    "partial_response=false": {
+     "error": "<urlopen error [Errno 111] Connection refused>"
+    },
+    "partial_response=true": {
+     "error": "<urlopen error [Errno 111] Connection refused>"
+    }
+   },
+   "query_store_conns": [
+    "{\"error\": \"<urlopen error [Errno 111] Connection refused>\"}"
+   ],
+   "ruler_metrics": [
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/ABORT/etc/thanos/rules.yml;g-abort\",strategy=\"abort\"} 8",
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/WARN/etc/thanos/rules.yml;g-warn\",strategy=\"warn\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"abort\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"warn\"} 1"
+   ]
+  },
+  {
+   "label": "query-stopped+30s",
+   "wall": "22:16:51",
+   "ruler_rules": [
+    {
+     "group": "g-abort",
+     "rule": "LabConstant",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:16:37.463459399Z"
+    },
+    {
+     "group": "g-abort",
+     "rule": "LabSeriesPresent",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:16:37.109766193Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabConstant",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:16:37.463592649Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabSeriesPresent",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:16:48.907997302Z"
+    }
+   ],
+   "am_alerts": [
+    {
+     "alert": "LabSeriesPresent",
+     "strategy": "warn",
+     "startsAt": "2026-11-09T14:15:30.556Z",
+     "endsAt": "2026-11-09T14:17:15.556Z",
+     "updatedAt": "2026-11-09T14:16:15.579Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabSeriesPresent",
+     "strategy": "abort",
+     "startsAt": "2026-11-09T14:15:33.758Z",
+     "endsAt": "2026-11-09T14:17:03.758Z",
+     "updatedAt": "2026-11-09T14:16:03.788Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabConstant",
+     "strategy": "abort",
+     "startsAt": "2026-11-09T14:11:33.758Z",
+     "endsAt": "2026-11-09T14:17:03.758Z",
+     "updatedAt": "2026-11-09T14:16:03.789Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabConstant",
+     "strategy": "warn",
+     "startsAt": "2026-11-09T14:11:30.556Z",
+     "endsAt": "2026-11-09T14:17:15.556Z",
+     "updatedAt": "2026-11-09T14:16:15.579Z",
+     "state": "active"
+    }
+   ],
+   "query": {
+    "partial_response=false": {
+     "error": "<urlopen error [Errno 111] Connection refused>"
+    },
+    "partial_response=true": {
+     "error": "<urlopen error [Errno 111] Connection refused>"
+    }
+   },
+   "query_store_conns": [
+    "{\"error\": \"<urlopen error [Errno 111] Connection refused>\"}"
+   ],
+   "ruler_metrics": [
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/ABORT/etc/thanos/rules.yml;g-abort\",strategy=\"abort\"} 10",
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/WARN/etc/thanos/rules.yml;g-warn\",strategy=\"warn\"} 3",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"abort\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"warn\"} 1"
+   ]
+  },
+  {
+   "label": "query-stopped+45s",
+   "wall": "22:17:10",
+   "ruler_rules": [
+    {
+     "group": "g-abort",
+     "rule": "LabConstant",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:16:54.531130626Z"
+    },
+    {
+     "group": "g-abort",
+     "rule": "LabSeriesPresent",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:16:52.110338171Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabConstant",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:16:51.729815173Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabSeriesPresent",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:16:48.907997302Z"
+    }
+   ],
+   "am_alerts": [
+    {
+     "alert": "LabSeriesPresent",
+     "strategy": "warn",
+     "startsAt": "2026-11-09T14:15:30.556Z",
+     "endsAt": "2026-11-09T14:17:15.556Z",
+     "updatedAt": "2026-11-09T14:16:15.579Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabConstant",
+     "strategy": "warn",
+     "startsAt": "2026-11-09T14:11:30.556Z",
+     "endsAt": "2026-11-09T14:17:15.556Z",
+     "updatedAt": "2026-11-09T14:16:15.579Z",
+     "state": "active"
+    }
+   ],
+   "query": {
+    "partial_response=false": {
+     "error": "<urlopen error [Errno 111] Connection refused>"
+    },
+    "partial_response=true": {
+     "error": "<urlopen error [Errno 111] Connection refused>"
+    }
+   },
+   "query_store_conns": [
+    "{\"error\": \"<urlopen error [Errno 111] Connection refused>\"}"
+   ],
+   "ruler_metrics": [
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/ABORT/etc/thanos/rules.yml;g-abort\",strategy=\"abort\"} 12",
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/WARN/etc/thanos/rules.yml;g-warn\",strategy=\"warn\"} 4",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"abort\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"warn\"} 1"
+   ]
+  },
+  {
+   "label": "query-stopped+60s",
+   "wall": "22:17:25",
+   "ruler_rules": [
+    {
+     "group": "g-abort",
+     "rule": "LabConstant",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:17:10.807524483Z"
+    },
+    {
+     "group": "g-abort",
+     "rule": "LabSeriesPresent",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:17:10.447962414Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabConstant",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:17:10.807647669Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabSeriesPresent",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:17:22.245316857Z"
+    }
+   ],
+   "am_alerts": [],
+   "query": {
+    "partial_response=false": {
+     "error": "<urlopen error [Errno 111] Connection refused>"
+    },
+    "partial_response=true": {
+     "error": "<urlopen error [Errno 111] Connection refused>"
+    }
+   },
+   "query_store_conns": [
+    "{\"error\": \"<urlopen error [Errno 111] Connection refused>\"}"
+   ],
+   "ruler_metrics": [
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/ABORT/etc/thanos/rules.yml;g-abort\",strategy=\"abort\"} 14",
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/WARN/etc/thanos/rules.yml;g-warn\",strategy=\"warn\"} 7",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"abort\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"warn\"} 1"
+   ]
+  },
+  {
+   "label": "query-stopped+75s",
+   "wall": "22:17:43",
+   "ruler_rules": [
+    {
+     "group": "g-abort",
+     "rule": "LabConstant",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:17:27.866553553Z"
+    },
+    {
+     "group": "g-abort",
+     "rule": "LabSeriesPresent",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:17:25.447821026Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabConstant",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:17:25.055497407Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabSeriesPresent",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:17:22.245316857Z"
+    }
+   ],
+   "am_alerts": [],
+   "query": {
+    "partial_response=false": {
+     "error": "<urlopen error [Errno 111] Connection refused>"
+    },
+    "partial_response=true": {
+     "error": "<urlopen error [Errno 111] Connection refused>"
+    }
+   },
+   "query_store_conns": [
+    "{\"error\": \"<urlopen error [Errno 111] Connection refused>\"}"
+   ],
+   "ruler_metrics": [
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/ABORT/etc/thanos/rules.yml;g-abort\",strategy=\"abort\"} 16",
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/WARN/etc/thanos/rules.yml;g-warn\",strategy=\"warn\"} 8",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"abort\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"warn\"} 1"
+   ]
+  },
+  {
+   "label": "query-stopped+90s",
+   "wall": "22:17:58",
+   "ruler_rules": [
+    {
+     "group": "g-abort",
+     "rule": "LabConstant",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:17:44.158680563Z"
+    },
+    {
+     "group": "g-abort",
+     "rule": "LabSeriesPresent",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:17:43.781729868Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabConstant",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:17:44.158640882Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabSeriesPresent",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:17:55.578827125Z"
+    }
+   ],
+   "am_alerts": [],
+   "query": {
+    "partial_response=false": {
+     "error": "<urlopen error [Errno 111] Connection refused>"
+    },
+    "partial_response=true": {
+     "error": "<urlopen error [Errno 111] Connection refused>"
+    }
+   },
+   "query_store_conns": [
+    "{\"error\": \"<urlopen error [Errno 111] Connection refused>\"}"
+   ],
+   "ruler_metrics": [
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/ABORT/etc/thanos/rules.yml;g-abort\",strategy=\"abort\"} 18",
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/WARN/etc/thanos/rules.yml;g-warn\",strategy=\"warn\"} 11",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"abort\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"warn\"} 1"
+   ]
+  },
+  {
+   "label": "query-stopped+105s",
+   "wall": "22:18:16",
+   "ruler_rules": [
+    {
+     "group": "g-abort",
+     "rule": "LabConstant",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:18:01.206409742Z"
+    },
+    {
+     "group": "g-abort",
+     "rule": "LabSeriesPresent",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:17:58.781970344Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabConstant",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:17:58.386365542Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabSeriesPresent",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:17:55.578827125Z"
+    }
+   ],
+   "am_alerts": [],
+   "query": {
+    "partial_response=false": {
+     "error": "<urlopen error [Errno 111] Connection refused>"
+    },
+    "partial_response=true": {
+     "error": "<urlopen error [Errno 111] Connection refused>"
+    }
+   },
+   "query_store_conns": [
+    "{\"error\": \"<urlopen error [Errno 111] Connection refused>\"}"
+   ],
+   "ruler_metrics": [
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/ABORT/etc/thanos/rules.yml;g-abort\",strategy=\"abort\"} 20",
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/WARN/etc/thanos/rules.yml;g-warn\",strategy=\"warn\"} 12",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"abort\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"warn\"} 1"
+   ]
+  },
+  {
+   "label": "query-stopped+120s",
+   "wall": "22:18:31",
+   "ruler_rules": [
+    {
+     "group": "g-abort",
+     "rule": "LabConstant",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:18:17.450852433Z"
+    },
+    {
+     "group": "g-abort",
+     "rule": "LabSeriesPresent",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:18:17.115858604Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabConstant",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:18:17.451102198Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabSeriesPresent",
+     "health": "err",
+     "state": "firing",
+     "lastError": "no query API server reachable",
+     "lastEvaluation": "2026-11-09T14:18:28.913851646Z"
+    }
+   ],
+   "am_alerts": [],
+   "query": {
+    "partial_response=false": {
+     "error": "<urlopen error [Errno 111] Connection refused>"
+    },
+    "partial_response=true": {
+     "error": "<urlopen error [Errno 111] Connection refused>"
+    }
+   },
+   "query_store_conns": [
+    "{\"error\": \"<urlopen error [Errno 111] Connection refused>\"}"
+   ],
+   "ruler_metrics": [
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/ABORT/etc/thanos/rules.yml;g-abort\",strategy=\"abort\"} 22",
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/WARN/etc/thanos/rules.yml;g-warn\",strategy=\"warn\"} 15",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"abort\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"warn\"} 1"
+   ]
+  },
+  {
+   "label": "query-back+45s",
+   "wall": "22:19:24",
+   "ruler_rules": [
+    {
+     "group": "g-abort",
+     "rule": "LabConstant",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:19:23.789761909Z"
+    },
+    {
+     "group": "g-abort",
+     "rule": "LabSeriesPresent",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:19:23.786728124Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabConstant",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:19:17.254093966Z"
+    },
+    {
+     "group": "g-warn",
+     "rule": "LabSeriesPresent",
+     "health": "ok",
+     "state": "firing",
+     "lastError": "",
+     "lastEvaluation": "2026-11-09T14:19:17.250685957Z"
+    }
+   ],
+   "am_alerts": [
+    {
+     "alert": "LabSeriesPresent",
+     "strategy": "warn",
+     "startsAt": "2026-11-09T14:15:30.556Z",
+     "endsAt": "2026-11-09T14:20:00.556Z",
+     "updatedAt": "2026-11-09T14:19:02.254Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabSeriesPresent",
+     "strategy": "abort",
+     "startsAt": "2026-11-09T14:15:33.758Z",
+     "endsAt": "2026-11-09T14:20:18.758Z",
+     "updatedAt": "2026-11-09T14:19:23.790Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabConstant",
+     "strategy": "abort",
+     "startsAt": "2026-11-09T14:11:33.758Z",
+     "endsAt": "2026-11-09T14:20:18.758Z",
+     "updatedAt": "2026-11-09T14:19:23.791Z",
+     "state": "active"
+    },
+    {
+     "alert": "LabConstant",
+     "strategy": "warn",
+     "startsAt": "2026-11-09T14:11:30.556Z",
+     "endsAt": "2026-11-09T14:20:00.556Z",
+     "updatedAt": "2026-11-09T14:19:02.256Z",
+     "state": "active"
+    }
+   ],
+   "query": {
+    "partial_response=false": {
+     "status": "success",
+     "data": {
+      "resultType": "vector",
+      "result": [
+       {
+        "metric": {},
+        "value": [
+         1794233964.101,
+         "1"
+        ]
+       }
+      ],
+      "analysis": {}
+     }
+    },
+    "partial_response=true": {
+     "status": "success",
+     "data": {
+      "resultType": "vector",
+      "result": [
+       {
+        "metric": {},
+        "value": [
+         1794233964.105,
+         "1"
+        ]
+       }
+      ],
+      "analysis": {}
+     }
+    }
+   },
+   "query_store_conns": [
+    "thanos_store_nodes_grpc_connections{external_labels=\"no_external_labels\",store_type=\"store\"} 1",
+    "thanos_store_nodes_grpc_connections{external_labels=\"{cluster=\\\"lab\\\", replica=\\\"a\\\"}\",store_type=\"sidecar\"} 1"
+   ],
+   "ruler_metrics": [
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/ABORT/etc/thanos/rules.yml;g-abort\",strategy=\"abort\"} 23",
+    "prometheus_rule_evaluation_failures_total{rule_group=\"/data/.tmp-rules/WARN/etc/thanos/rules.yml;g-warn\",strategy=\"warn\"} 16",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"abort\"} 0",
+    "thanos_rule_evaluation_with_warnings_total{strategy=\"warn\"} 1"
+   ]
+  },
+  {
+   "label": "blocks-created",
+   "stdout": "01M70AV62MPX7VZPWW8JK4V5S3 01M70AV62MPX7VZPWW8JK4V5S0",
+   "stderr": ""
+  },
+  {
+   "label": "compact+60s",
+   "wall": "22:20:32",
+   "metrics": [
+    "thanos_compact_group_compactions_failures_total{resolution=\"0\"} 1",
+    "thanos_compact_halted 1",
+    "thanos_compact_iterations_total 0",
+    "thanos_compact_todo_compactions 1"
+   ],
+   "logs": [
+    "compact-1  | ts=2026-11-09T14:19:25.79271976Z caller=compact.go:548 level=error msg=\"critical error detected; halting\" err=\"compaction: group 0@13425895591814194272: pre compaction overlap check: overlaps found while gathering blocks. [mint: 1794223164000, maxt: 1794223749001, range: 9m45s, blocks: 2]: <ulid: 01M70AV62MPX7VZPWW8JK4V5S0, mint: 1794223164000, maxt: 1794223749001, range: 9m45s>, <ulid: 01M70AV62MPX7VZPWW8JK4V5S3, mint: 1794223164000, maxt: 1794223749001, range: 9m45s>\""
+   ],
+   "compact_state": "compact running"
+  }
+ ]
+}

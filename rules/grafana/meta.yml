@@ -1,0 +1,84 @@
+# Grafana Alerting（Grafana-managed rule）的 meta 規則，放在外部觀察者（Prometheus 或 vmalert），不要放在被監控的 Grafana 裡。
+# 依 Grafana v13.3.0 原始碼與 lab/grafana 寫成；門檻是例子。job 名稱請改成你的環境（預設比對 job=~".*grafana.*"）。
+# Grafana 官方 mixin 只有 GrafanaRequestsFailing（HTTP 5xx），沒有任何 alerting 告警，所以這裡沒有可對照的上游規則。
+groups:
+  - name: grafana-alerting-meta
+    interval: 30s
+    rules:
+      - alert: GrafanaDown
+        expr: up{job=~".*grafana.*"} == 0
+        for: 1m
+        labels: { severity: critical, component: grafana_alerting, tier: "1" }
+        annotations:
+          summary: "Grafana 停止回應；Grafana-managed rule 全部停止評估，外部 Alertmanager 約 4 × max(30s, interval) 後把 alert 標成 resolved"
+          runbook_url: https://hahasula.github.io/alert-trust/components/grafana_alerting/#grafana-down
+      - alert: GrafanaScrapeMissing
+        expr: absent(up{job=~".*grafana.*"})
+        for: 2m
+        labels: { severity: critical, component: grafana_alerting, tier: "1" }
+        annotations:
+          summary: "觀察者沒有抓 Grafana（job 名稱不符或 target 被移除），其他 Grafana meta 規則都不會響"
+          runbook_url: https://hahasula.github.io/alert-trust/components/grafana_alerting/#grafana-down
+      - alert: GrafanaRuleEvaluationsStopped
+        expr: (sum by (job) (rate(grafana_alerting_rule_evaluations_total[5m])) == 0) or (absent(grafana_alerting_rule_evaluations_total) and on() (count(up{job=~".*grafana.*"} == 1) > 0))
+        for: 5m
+        labels: { severity: critical, component: grafana_alerting, tier: "1" }
+        annotations:
+          summary: "Grafana 活著，但整個 job 都沒有在評估 rule（scheduler 停止、unified_alerting 關閉、execute_alerts=false 或 rule 全被刪）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/grafana_alerting/#evaluations-running
+      - alert: GrafanaRuleEvaluationFailures
+        expr: sum by (job, instance, org) (rate(grafana_alerting_rule_evaluation_failures_total[5m])) > 0
+        for: 1m
+        labels: { severity: critical, component: grafana_alerting, tier: "1" }
+        annotations:
+          summary: "Rule 評估失敗（重試用完）；exec_err_state 設成 OK 的 rule 此時已把 alert 標成 resolved"
+          runbook_url: https://hahasula.github.io/alert-trust/components/grafana_alerting/#evaluation-failures
+      - alert: GrafanaAlertsInErrorState
+        expr: max by (job, instance) (grafana_alerting_alerts{state="error"}) > 0
+        for: 1m
+        labels: { severity: critical, component: grafana_alerting, tier: "1" }
+        annotations:
+          summary: "有 alert instance 停在 Error；原本的 alert 會在 2 個 interval 後 resolved，改由 DatasourceError 接手"
+          runbook_url: https://hahasula.github.io/alert-trust/components/grafana_alerting/#error-nodata-states
+      - alert: GrafanaAlertsInNoDataState
+        expr: max by (job, instance) (grafana_alerting_alerts{state="nodata"}) > 0
+        for: 5m
+        labels: { severity: warning, component: grafana_alerting, tier: "2" }
+        annotations:
+          summary: "有 alert instance 停在 NoData；no_data_state 設成 OK 的 rule 不會出現在這裡"
+          runbook_url: https://hahasula.github.io/alert-trust/components/grafana_alerting/#error-nodata-states
+      - alert: GrafanaEmbeddedNotificationsFailing
+        expr: sum by (job, instance, org, integration) (increase(grafana_alerting_notifications_failed_total[10m])) > 0
+        for: 0m
+        labels: { severity: critical, component: grafana_alerting, tier: "1" }
+        annotations:
+          summary: "內建 Alertmanager 送通知失敗；這個 counter 在 0 時不輸出，所以不能寫成 == 0 的健康檢查"
+          runbook_url: https://hahasula.github.io/alert-trust/components/grafana_alerting/#embedded-notify
+      - alert: GrafanaExternalAlertmanagerSendErrors
+        expr: (sum by (job, instance, org) (rate(grafana_alerting_sender_errors_total[5m])) > 0) or (sum by (job, instance, org) (increase(grafana_alerting_sender_dropped_total[10m])) > 0)
+        for: 1m
+        labels: { severity: critical, component: grafana_alerting, tier: "1" }
+        annotations:
+          summary: "送不到外部 Alertmanager，或 queue（預設 10000）滿了被丟棄"
+          runbook_url: https://hahasula.github.io/alert-trust/components/grafana_alerting/#external-send
+      - alert: GrafanaRuleEvaluationsMissed
+        expr: sum by (job, instance, org, name) (increase(grafana_alerting_schedule_rule_evaluations_missed_total{reason="slow_evaluation"}[10m])) > 0
+        for: 0m
+        labels: { severity: warning, component: grafana_alerting, tier: "2" }
+        annotations:
+          summary: "Rule {{ $labels.name }} 評估比 interval 慢，tick 被丟掉；查詢時間仍是排程時間，資料與 EndsAt 都比實際舊"
+          runbook_url: https://hahasula.github.io/alert-trust/components/grafana_alerting/#eval-within-interval
+      - alert: GrafanaRuleEvaluationSlow
+        expr: sum by (job, instance, org) (rate(grafana_alerting_rule_evaluation_duration_seconds_sum[5m])) / sum by (job, instance, org) (rate(grafana_alerting_rule_evaluation_duration_seconds_count[5m])) > 8
+        for: 5m
+        labels: { severity: warning, component: grafana_alerting, tier: "2" }
+        annotations:
+          summary: "平均評估耗時超過 8s（例子：最短 interval 10s 的 0.8）；只有 org label，要用 missed 找出是哪條 rule"
+          runbook_url: https://hahasula.github.io/alert-trust/components/grafana_alerting/#eval-within-interval
+      - alert: GrafanaSchedulerBehind
+        expr: max by (job, instance) (grafana_alerting_scheduler_behind_seconds) > 10
+        for: 2m
+        labels: { severity: warning, component: grafana_alerting, tier: "2" }
+        annotations:
+          summary: "Scheduler 的 tick 比預定晚超過 10s（一個 base interval）；每個 tick 都要先讀 DB 的 rule 版本"
+          runbook_url: https://hahasula.github.io/alert-trust/components/grafana_alerting/#scheduler-behind

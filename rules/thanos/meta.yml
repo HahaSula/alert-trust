@@ -1,0 +1,132 @@
+# Thanos（sidecar、query、store、rule、compact、receive）的 meta 規則。放在 Thanos 以外的觀察者
+# （例如獨立的 Prometheus）評估：Thanos Ruler 自己的查詢失敗時，這些規則也不會送出。
+# job 名稱照官方 mixin 用 .*thanos-<元件>.*，名稱不同的環境要改 selector。
+# 以 Thanos v0.42.5 檢查；門檻是例子。請同時載入官方 mixin（catalog/sources.d/thanos.yaml 的 thanos-mixin）。
+groups:
+  - name: thanos-meta
+    rules:
+      - alert: ThanosComponentDown
+        expr: up{job=~".*thanos-(query|sidecar|store|rule|compact|receive).*"} == 0
+        for: 1m
+        labels: { severity: critical, component: thanos, tier: "1" }
+        annotations:
+          summary: "Thanos 元件停止回應；compactor 停機時沒有其他訊號，官方 *IsDown 只在整個 job 消失時才響"
+          runbook_url: https://hahasula.github.io/alert-trust/components/thanos/#components-up
+      - alert: ThanosComponentMissing
+        expr: |
+          absent(up{job=~".*thanos-query.*"}) or absent(up{job=~".*thanos-rule.*"})
+            or absent(up{job=~".*thanos-compact.*"})
+        for: 5m
+        labels: { severity: critical, component: thanos, tier: "1" }
+        annotations:
+          summary: "關鍵 Thanos 元件的 scrape target 不存在；沒用到的元件從表達式刪掉"
+          runbook_url: https://hahasula.github.io/alert-trust/components/thanos/#components-up
+
+      - alert: ThanosQueryStoreEndpointsDropped
+        expr: |
+          sum by (job, instance) (thanos_store_nodes_grpc_connections{job=~".*thanos-query.*"})
+            < max by (job, instance) (max_over_time(sum by (job, instance) (thanos_store_nodes_grpc_connections{job=~".*thanos-query.*"})[1h:1m]))
+        for: 1m
+        labels: { severity: critical, component: thanos, tier: "1" }
+        annotations:
+          summary: "Querier 連得到的 StoreAPI 變少；被移除的 store 不會讓查詢失敗，abort 也一樣，rule 會用少掉的資料算出結果"
+          runbook_url: https://hahasula.github.io/alert-trust/components/thanos/#store-endpoints
+      - alert: ThanosQueryNoStoreEndpoints
+        expr: |
+          max by (job, instance) (up{job=~".*thanos-query.*"} == 1)
+            unless on (job, instance) sum by (job, instance) (thanos_store_nodes_grpc_connections)
+        for: 1m
+        labels: { severity: critical, component: thanos, tier: "1" }
+        annotations:
+          summary: "Querier 活著但一個 StoreAPI 都沒有；thanos_store_nodes_grpc_connections 整條消失，上一條規則看不到"
+          runbook_url: https://hahasula.github.io/alert-trust/components/thanos/#store-endpoints
+
+      - alert: ThanosRuleQueryFailing
+        expr: sum by (job, instance, rule_group) (rate(prometheus_rule_evaluation_failures_total{job=~".*thanos-rule.*"}[2m])) > 0
+        for: 30s
+        labels: { severity: critical, component: thanos, tier: "1" }
+        annotations:
+          summary: "Thanos Ruler 評估失敗（通常是 querier 連不到）；失敗期間不續送，4 × max(resend-delay, interval) 後 Alertmanager 會把 alert 標成 resolved"
+          runbook_url: https://hahasula.github.io/alert-trust/components/thanos/#rule-eval-failures
+      - alert: ThanosRuleSenderDropping
+        expr: |
+          sum by (job, instance) (rate(thanos_alert_sender_alerts_dropped_total{job=~".*thanos-rule.*"}[5m])) > 0
+            or sum by (job, instance) (rate(thanos_alert_queue_alerts_dropped_total{job=~".*thanos-rule.*"}[5m])) > 0
+        for: 1m
+        labels: { severity: critical, component: thanos, tier: "1" }
+        annotations:
+          summary: "Thanos Ruler 送不到 Alertmanager 或 queue 滿了在丟 alert"
+          runbook_url: https://hahasula.github.io/alert-trust/components/thanos/#rule-notify
+      - alert: ThanosRulePartialResponse
+        expr: sum by (job, instance) (rate(thanos_rule_evaluation_with_warnings_total{job=~".*thanos-rule.*", strategy="warn"}[5m])) > 0
+        for: 1m
+        labels: { severity: warning, component: thanos, tier: "2" }
+        annotations:
+          summary: "warn group 的查詢帶 warning（有 StoreAPI 回錯）；結果照樣用來判斷 alert"
+          runbook_url: https://hahasula.github.io/alert-trust/components/thanos/#rule-partial-warnings
+      - alert: ThanosRuleGroupSlow
+        expr: |
+          max by (job, instance, rule_group) (prometheus_rule_group_last_duration_seconds{job=~".*thanos-rule.*"})
+            > 0.8 * max by (job, instance, rule_group) (prometheus_rule_group_interval_seconds{job=~".*thanos-rule.*"})
+        for: 5m
+        labels: { severity: warning, component: thanos, tier: "2" }
+        annotations:
+          summary: "Ruler group 耗時超過 interval 的 80%；查詢走網路，querier 或 store 變慢都算在這裡"
+          runbook_url: https://hahasula.github.io/alert-trust/components/thanos/#rule-group-ratio
+
+      - alert: ThanosSidecarPrometheusDown
+        expr: thanos_sidecar_prometheus_up{job=~".*thanos-sidecar.*"} == 0
+        for: 1m
+        labels: { severity: critical, component: thanos, tier: "1" }
+        annotations:
+          summary: "Sidecar 連不到 Prometheus；官方規則用 namespace、pod join，非 Kubernetes 環境回傳空"
+          absence_covered_by: ThanosComponentDown
+          runbook_url: https://hahasula.github.io/alert-trust/components/thanos/#sidecar-prometheus
+      - alert: ThanosSidecarNoUpload
+        expr: |
+          (time() - max by (job, instance) (thanos_objstore_bucket_last_successful_upload_time{job=~".*thanos-sidecar.*"})) > 3 * 3600
+            and on (job, instance) (time() - process_start_time_seconds{job=~".*thanos-sidecar.*"}) > 3 * 3600
+        for: 10m
+        labels: { severity: critical, component: thanos, tier: "1" }
+        annotations:
+          summary: "Sidecar 3 小時沒有上傳成功（block 每 2h 一個）；中斷超過 Prometheus 保留時間減 2h，本地 block 會在上傳前被刪掉"
+          runbook_url: https://hahasula.github.io/alert-trust/components/thanos/#sidecar-upload
+      - alert: ThanosShipperSyncFailing
+        expr: sum by (job, instance) (increase(thanos_shipper_dir_sync_failures_total[15m])) > 0
+        for: 15m
+        labels: { severity: warning, component: thanos, tier: "2" }
+        annotations:
+          summary: "Shipper 同步失敗；預設設定下上傳失敗只算這個，thanos_shipper_upload_failures_total 不會增加"
+          runbook_url: https://hahasula.github.io/alert-trust/components/thanos/#shipper-failures
+
+      - alert: ThanosStoreSyncFailing
+        expr: sum by (job, instance) (increase(thanos_blocks_meta_sync_failures_total{job=~".*thanos-store.*"}[30m])) > 0
+        for: 15m
+        labels: { severity: warning, component: thanos, tier: "2" }
+        annotations:
+          summary: "Store gateway 讀不到 bucket 的 block 清單；新上傳的 block 查不到"
+          runbook_url: https://hahasula.github.io/alert-trust/components/thanos/#store-sync
+
+      - alert: ThanosReceiveReplicationFailing
+        expr: sum by (job) (rate(thanos_receive_replications_total{result="error", job=~".*thanos-receive.*"}[5m])) > 0
+        for: 5m
+        labels: { severity: warning, component: thanos, tier: "1" }
+        annotations:
+          summary: "Receive 有複寫失敗；RF=2 時 quorum 只要 1 份，失敗不會讓寫入回錯，只是少一份副本"
+          runbook_url: https://hahasula.github.io/alert-trust/components/thanos/#receive-replication
+
+      - alert: ThanosCompactHalted
+        expr: max by (job, instance) (thanos_compact_halted{job=~".*thanos-compact.*"}) == 1
+        for: 5m
+        labels: { severity: critical, component: thanos, tier: "1" }
+        annotations:
+          summary: "Compactor 已 halt：行程活著、up 是 1，但不再 compaction、downsampling、套用 retention"
+          absence_covered_by: ThanosComponentDown, ThanosComponentMissing
+          runbook_url: https://hahasula.github.io/alert-trust/components/thanos/#compact-halted
+      - alert: ThanosCompactBacklog
+        expr: min_over_time(thanos_compact_todo_compactions{job=~".*thanos-compact.*"}[6h]) > 0
+        for: 30m
+        labels: { severity: warning, component: thanos, tier: "3" }
+        annotations:
+          summary: "Compaction 6 小時都有待做的工作；跟不上時 downsampling 與 retention 也會延後"
+          runbook_url: https://hahasula.github.io/alert-trust/components/thanos/#compact-backlog

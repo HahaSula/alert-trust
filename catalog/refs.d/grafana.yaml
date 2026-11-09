@@ -1,0 +1,422 @@
+# Grafana Alerting（Grafana-managed rule）的原始碼參考，釘在 v13.3.0（AGPL-3.0）。行號已對照 tag 上的檔案。
+refs:
+  graf-tick-behind:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/schedule/schedule.go"
+    line: 259
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/schedule/schedule.go#L259"
+  graf-tick-fetch-rules:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/schedule/schedule.go"
+    line: 284
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/schedule/schedule.go#L284"
+  graf-tick-fetch-error:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/schedule/schedule.go"
+    line: 290
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/schedule/schedule.go#L290"
+  graf-ready-to-run:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/schedule/schedule.go"
+    line: 374
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/schedule/schedule.go#L374"
+  graf-tick-spread:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/schedule/schedule.go"
+    line: 410
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/schedule/schedule.go#L410"
+  graf-missed-slow:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/schedule/schedule.go"
+    line: 446
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/schedule/schedule.go#L446"
+  graf-jitter-default:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/schedule/jitter.go"
+    line: 29
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/schedule/jitter.go#L29"
+  graf-eval-drop:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/schedule/alert_rule.go"
+    line: 214
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/schedule/alert_rule.go#L214"
+  graf-eval-retry:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/schedule/alert_rule.go"
+    line: 348
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/schedule/alert_rule.go#L348"
+  graf-eval-scheduledat:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/schedule/alert_rule.go"
+    line: 417
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/schedule/alert_rule.go#L417"
+  graf-eval-failures:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/schedule/alert_rule.go"
+    line: 454
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/schedule/alert_rule.go#L454"
+  graf-missed-warm:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/schedule/alert_rule.go"
+    line: 493
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/schedule/alert_rule.go#L493"
+  graf-stop-forget:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/schedule/alert_rule.go"
+    line: 393
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/schedule/alert_rule.go#L393"
+  graf-fetch-rules:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/schedule/fetcher.go"
+    line: 43
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/schedule/fetcher.go#L43"
+  graf-eval-timeout:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/eval/eval.go"
+    line: 76
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/eval/eval.go#L76"
+  graf-default-timeout:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/setting/setting_unified_alerting.go"
+    line: 49
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/setting/setting_unified_alerting.go#L49"
+  graf-default-attempts:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/setting/setting_unified_alerting.go"
+    line: 54
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/setting/setting_unified_alerting.go#L54"
+  graf-base-interval:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/setting/setting_unified_alerting.go"
+    line: 67
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/setting/setting_unified_alerting.go#L67"
+  graf-ha-single-node:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/setting/setting_unified_alerting.go"
+    line: 438
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/setting/setting_unified_alerting.go#L438"
+  graf-resolved-retention:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/setting/setting_unified_alerting.go"
+    line: 678
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/setting/setting_unified_alerting.go#L678"
+  graf-resend-delay:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/state/manager.go"
+    line: 23
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/state/manager.go#L23"
+  graf-resend-fixed:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/state/manager.go"
+    line: 143
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/state/manager.go#L143"
+  graf-warm-ready:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/state/manager.go"
+    line: 189
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/state/manager.go#L189"
+  graf-persist-before-send:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/state/manager.go"
+    line: 446
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/state/manager.go#L446"
+  graf-nodata-all:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/state/manager.go"
+    line: 474
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/state/manager.go#L474"
+  graf-error-all:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/state/manager.go"
+    line: 514
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/state/manager.go#L514"
+  graf-missing-series:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/state/manager.go"
+    line: 580
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/state/manager.go#L580"
+  graf-missing-error-1:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/state/manager.go"
+    line: 599
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/state/manager.go#L599"
+  graf-missing-maintain:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/state/manager.go"
+    line: 619
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/state/manager.go#L619"
+  graf-keepfiring:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/state/state.go"
+    line: 374
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/state/state.go#L374"
+  graf-err-ok:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/state/state.go"
+    line: 517
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/state/state.go#L517"
+  graf-nodata-ok:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/state/state.go"
+    line: 578
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/state/state.go#L578"
+  graf-needs-sending:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/state/state.go"
+    line: 621
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/state/state.go#L621"
+  graf-endsat:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/state/state.go"
+    line: 655
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/state/state.go#L655"
+  graf-ds-error-name:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/state/compat.go"
+    line: 27
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/state/compat.go#L27"
+  graf-missing-default:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/models/alert_rule.go"
+    line: 768
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/models/alert_rule.go#L768"
+  graf-prov-err-default:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/provisioning/alerting/rules_types.go"
+    line: 138
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/provisioning/alerting/rules_types.go#L138"
+  graf-prov-nodata-default:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/provisioning/alerting/rules_types.go"
+    line: 147
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/provisioning/alerting/rules_types.go#L147"
+  graf-api-defaults:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/api/validation/api_ruler_validation.go"
+    line: 111
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/api/validation/api_ruler_validation.go#L111"
+  graf-router-choice:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/sender/router.go"
+    line: 382
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/sender/router.go#L382"
+  graf-router-none:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/sender/router.go"
+    line: 414
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/sender/router.go#L414"
+  graf-sender-queue:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/sender/sender.go"
+    line: 31
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/sender/sender.go#L31"
+  graf-sender-drop:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/sender/notifier.go"
+    line: 337
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/sender/notifier.go#L337"
+  graf-ha-primary:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/cluster/evaluation_coordinator.go"
+    line: 39
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/cluster/evaluation_coordinator.go#L39"
+  graf-ha-single-init:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/ngalert.go"
+    line: 481
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/ngalert.go#L481"
+  graf-notif-failed:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/metrics/multi_org_alertmanager.go"
+    line: 196
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/metrics/multi_org_alertmanager.go#L196"
+  graf-notif-skipzero:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/metrics/multi_org_alertmanager.go"
+    line: 373
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/metrics/multi_org_alertmanager.go#L373"
+  graf-metric-missed:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/metrics/scheduler.go"
+    line: 183
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/metrics/scheduler.go#L183"
+  graf-metric-failures:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/metrics/scheduler.go"
+    line: 65
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/metrics/scheduler.go#L65"
+  graf-metric-behind:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/metrics/scheduler.go"
+    line: 45
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/metrics/scheduler.go#L45"
+  graf-metric-alerts:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/state/cache.go"
+    line: 134
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/state/cache.go#L134"
+  graf-persist-sync:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/state/persister_sync_rule.go"
+    line: 32
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/state/persister_sync_rule.go#L32"
+  graf-mixin-alerts:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "grafana-mixin/alerts/alerts.libsonnet"
+    line: 12
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/grafana-mixin/alerts/alerts.libsonnet#L12"
+  graf-ini-ha-peers:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "conf/defaults.ini"
+    line: 1619
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/conf/defaults.ini#L1619"
+  graf-ini-eval-timeout:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "conf/defaults.ini"
+    line: 1660
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/conf/defaults.ini#L1660"
+  graf-seq-parallel:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/schedule/sequence.go"
+    line: 120
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/schedule/sequence.go#L120"
+  graf-evaluatedat:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "pkg/services/ngalert/eval/eval.go"
+    line: 105
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/pkg/services/ngalert/eval/eval.go#L105"
+  # lab/grafana 的實驗結果
+  exp-graf-modes:
+    kind: experiment
+    title: "Grafana 13.3.0：NoData／Error 四種處理方式下外部 Alertmanager 收到什麼（lab/grafana S1、S2）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/grafana/results/summary.txt"
+    note: "NoData／Error 四種處理方式下外部 Alertmanager 收到什麼（results/summary.txt S1、S2）"
+  exp-graf-restart:
+    kind: experiment
+    title: "Grafana 13.3.0：重啟後 alert state 從資料庫還原（lab/grafana S3）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/grafana/results/summary.txt"
+    note: "Grafana 重啟後 state 還原（results/summary.txt S3）"
+  exp-graf-slow:
+    kind: experiment
+    title: "Grafana 13.3.0：資料來源比 interval、比 evaluation_timeout 慢（lab/grafana S4）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/grafana/results/summary.txt"
+    note: "資料來源比 interval 慢、比 evaluation_timeout 慢（results/summary.txt S4）"
+  exp-graf-admin:
+    kind: experiment
+    title: "Grafana 13.3.0：admin config 與 notifications_failed_total 的存在條件（lab/grafana S0）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/grafana/results/summary.txt"
+    note: "沒有 admin_config 時不送外部 Alertmanager、notifications_failed_total 在 0 時不存在（results/summary.txt S0）"

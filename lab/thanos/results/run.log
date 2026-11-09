@@ -1,0 +1,31 @@
+[22:12:53] baseline: am=4 rules=[('g-abort', 'LabConstant', 'ok'), ('g-abort', 'LabSeriesPresent', 'ok'), ('g-warn', 'LabConstant', 'ok'), ('g-warn', 'LabSeriesPresent', 'ok')]
+[22:13:05] sidecar-stopped+2s: am=4 rules=[('g-abort', 'LabConstant', 'ok'), ('g-abort', 'LabSeriesPresent', 'ok'), ('g-warn', 'LabConstant', 'ok'), ('g-warn', 'LabSeriesPresent', 'ok')]
+[22:13:29] sidecar-stopped+22s: am=2 rules=[('g-abort', 'LabConstant', 'ok'), ('g-abort', 'LabSeriesPresent', 'ok'), ('g-warn', 'LabConstant', 'ok'), ('g-warn', 'LabSeriesPresent', 'ok')]
+[22:14:12] sidecar-stopped+62s: am=2 rules=[('g-abort', 'LabConstant', 'ok'), ('g-abort', 'LabSeriesPresent', 'ok'), ('g-warn', 'LabConstant', 'ok'), ('g-warn', 'LabSeriesPresent', 'ok')]
+[22:14:41] no-stores+25s: am=2 rules=[('g-abort', 'LabConstant', 'ok'), ('g-abort', 'LabSeriesPresent', 'err'), ('g-warn', 'LabConstant', 'ok'), ('g-warn', 'LabSeriesPresent', 'ok')]
+[22:15:28] no-stores+65s: am=2 rules=[('g-abort', 'LabConstant', 'ok'), ('g-abort', 'LabSeriesPresent', 'err'), ('g-warn', 'LabConstant', 'ok'), ('g-warn', 'LabSeriesPresent', 'ok')]
+[22:16:17] stores-back+45s: am=4 rules=[('g-abort', 'LabConstant', 'ok'), ('g-abort', 'LabSeriesPresent', 'ok'), ('g-warn', 'LabConstant', 'ok'), ('g-warn', 'LabSeriesPresent', 'ok')]
+[22:16:36] query-stopped+15s: am=4 rules=[('g-abort', 'LabConstant', 'err'), ('g-abort', 'LabSeriesPresent', 'err'), ('g-warn', 'LabConstant', 'ok'), ('g-warn', 'LabSeriesPresent', 'ok')]
+[22:16:51] query-stopped+30s: am=4 rules=[('g-abort', 'LabConstant', 'err'), ('g-abort', 'LabSeriesPresent', 'err'), ('g-warn', 'LabConstant', 'err'), ('g-warn', 'LabSeriesPresent', 'err')]
+[22:17:10] query-stopped+45s: am=2 rules=[('g-abort', 'LabConstant', 'err'), ('g-abort', 'LabSeriesPresent', 'err'), ('g-warn', 'LabConstant', 'err'), ('g-warn', 'LabSeriesPresent', 'err')]
+[22:17:25] query-stopped+60s: am=0 rules=[('g-abort', 'LabConstant', 'err'), ('g-abort', 'LabSeriesPresent', 'err'), ('g-warn', 'LabConstant', 'err'), ('g-warn', 'LabSeriesPresent', 'err')]
+[22:17:43] query-stopped+75s: am=0 rules=[('g-abort', 'LabConstant', 'err'), ('g-abort', 'LabSeriesPresent', 'err'), ('g-warn', 'LabConstant', 'err'), ('g-warn', 'LabSeriesPresent', 'err')]
+[22:17:58] query-stopped+90s: am=0 rules=[('g-abort', 'LabConstant', 'err'), ('g-abort', 'LabSeriesPresent', 'err'), ('g-warn', 'LabConstant', 'err'), ('g-warn', 'LabSeriesPresent', 'err')]
+[22:18:16] query-stopped+105s: am=0 rules=[('g-abort', 'LabConstant', 'err'), ('g-abort', 'LabSeriesPresent', 'err'), ('g-warn', 'LabConstant', 'err'), ('g-warn', 'LabSeriesPresent', 'err')]
+[22:18:31] query-stopped+120s: am=0 rules=[('g-abort', 'LabConstant', 'err'), ('g-abort', 'LabSeriesPresent', 'err'), ('g-warn', 'LabConstant', 'err'), ('g-warn', 'LabSeriesPresent', 'err')]
+[22:19:24] query-back+45s: am=4 rules=[('g-abort', 'LabConstant', 'ok'), ('g-abort', 'LabSeriesPresent', 'ok'), ('g-warn', 'LabConstant', 'ok'), ('g-warn', 'LabSeriesPresent', 'ok')]
+blocks: 01M70AV62MPX7VZPWW8JK4V5S3 01M70AV62MPX7VZPWW8JK4V5S0 
+{
+ "label": "compact+60s",
+ "wall": "22:20:32",
+ "metrics": [
+  "thanos_compact_group_compactions_failures_total{resolution=\"0\"} 1",
+  "thanos_compact_halted 1",
+  "thanos_compact_iterations_total 0",
+  "thanos_compact_todo_compactions 1"
+ ],
+ "logs": [
+  "compact-1  | ts=2026-11-09T14:19:25.79271976Z caller=compact.go:548 level=error msg=\"critical error detected; halting\" err=\"compaction: group 0@13425895591814194272: pre compaction overlap check: overlaps found while gathering blocks. [mint: 1794223164000, maxt: 1794223749001, range: 9m45s, blocks: 2]: <ulid: 01M70AV62MPX7VZPWW8JK4V5S0, mint: 1794223164000, maxt: 1794223749001, range: 9m45s>, <ulid: 01M70AV62MPX7VZPWW8JK4V5S3, mint: 1794223164000, maxt: 1794223749001, range: 9m45s>\""
+ ],
+ "compact_state": "compact running"
+}

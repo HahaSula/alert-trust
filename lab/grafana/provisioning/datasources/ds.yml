@@ -1,0 +1,10 @@
+apiVersion: 1
+datasources:
+  - { name: Prometheus, uid: prom, type: prometheus, access: proxy, url: "http://prom:9090", jsonData: { timeInterval: 5s } }
+  - { name: Slow, uid: slow, type: prometheus, access: proxy, url: "http://fake:8080", jsonData: { timeInterval: 5s } }
+  - name: External AM
+    uid: extam
+    type: alertmanager
+    access: proxy
+    url: "http://am:9093"
+    jsonData: { implementation: prometheus, handleGrafanaManagedAlerts: true }

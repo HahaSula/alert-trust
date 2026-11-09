@@ -1,0 +1,43 @@
+lab/grafana 結果摘要
+2026-11-09，Grafana 13.3.0、Prometheus v3.13.5、Alertmanager v0.27.0，單次執行。
+原始輸出：run.log（快照）、run.json、grafana-log-excerpt.txt。
+這台機器的容器時鐘不可靠：只寫狀態、事件順序與計數。gap = 外部 Alertmanager 的 endsAt − updatedAt，只當參考。
+
+S0 admin config（exp-graf-admin）
+- 第一次手動試跑沒呼叫 admin config API：GET /api/v1/ngalert/admin_config 回 404 "no admin configuration available"，
+  /api/v1/ngalert/alertmanagers 的 activeAlertManagers 是空的，外部 Alertmanager 沒收到任何 alert；log 只有 "Sending alerts to local notifier"。
+- POST {"alertmanagersChoice":"all"} 之後 log 出現 "Creating new sender for the external alertmanagers"，下一次續送就送到外部。
+- 整個執行期間 webhook 都成功，grafana_alerting_notifications_failed_total 一次都沒出現在 /metrics（notifications_total 有）。
+
+S1 資料消失 → NoData（exp-graf-modes）：fake exporter 回 503，lab_value 消失
+- mode_alerting (Alerting)      : Alerting（reason NoData），health ok；外部 AM 沒有新事件，原 alert 繼續 active
+- mode_ok (OK)                  : Normal（reason NoData），health ok；外部 AM 收到 resolved:mode_ok，之後沒有任何 alert
+- mode_nodata_error (NoData)    : 先同時有 Alerting 與 NoData 兩個 instance，下一次快照只剩 NoData，health nodata；
+                                  外部 AM 收到 firing:DatasourceNoData(rulename=mode_nodata_error)，下一次快照 resolved:mode_nodata_error
+- mode_keeplast (KeepLast)      : Alerting（reason NoData, KeepLast），health ok；沒有新事件
+- 恢復後：mode_ok 重新 firing（新的 startsAt）；DatasourceNoData resolved、mode_nodata_error 重新 firing。
+
+S2 Prometheus 停機 → Error（exp-graf-modes）
+- mode_alerting     : Alerting（reason Error），health error；沒有新事件
+- mode_ok           : Normal（reason Error），health ok；resolved:mode_ok
+- mode_nodata_error : 先 Alerting＋Error，下一次快照只剩 Error；firing:DatasourceError(mode_nodata_error)，下一次快照 resolved:mode_nodata_error
+- mode_keeplast     : Alerting（reason Error, KeepLast），health ok；沒有新事件
+- 停機約 70 秒內 rule_evaluation_failures_total 到 24、attempt_failures_total 79（重試）。
+- 重試期間 gap 從約 110–120s 降到約 98–108s（EndsAt 用排程時間算）。
+- grafana_alerting_alerts{state="error"} 只數到 mode_nodata_error 一個。
+
+S3 Grafana 重啟（exp-graf-restart）：docker compose restart grafana（同一個容器與 sqlite）
+- Log："State cache has been initialized rules=5 states=5"。
+- 重啟後第一次快照 5 條 rule 都是 Alerting；外部 AM 5 個 alert 的 startsAt 與重啟前完全相同。
+- 重啟期間兩個 webhook 都沒有收到任何 firing 或 resolved。
+
+S4 資料來源變慢（exp-graf-slow）：slow_query，interval 10s，evaluation_timeout 30s、max_attempts 3（預設）
+- 延遲 25s：一直 Alerting／ok，failures_total 0；約 90 秒內 schedule_rule_evaluations_missed_total{name="slow_query",reason="slow_evaluation"} 到 5；
+            gap 從約 109s 降到約 84s；fake 的 max_in_flight 1。
+- 延遲 45s：前 75 秒 Grafana 仍顯示 Alerting／ok，gap 約 79s 且沒有更新（沒有續送）；約 90 秒時外部 AM 不再列出 slow_query，
+            webhook 收到 resolved:slow_query；之後 Grafana 變 Error，webhook 在同一次快照內收到 firing:DatasourceError 與 resolved:DatasourceError。
+            約 150 秒內 failures_total 只加 1、attempt_failures_total 3、missed 再加 12。
+            這段期間外部 AM 沒有任何 slow_query 相關的 active alert，Grafana UI 那邊是 Error。
+- 恢復 0s：下一次快照 firing:slow_query。
+
+沒有測：HA（ha_peers、ha_single_node_evaluation）、Grafana 資料庫故障、外部 Alertmanager 故障或變慢、UI 建立 rule 的預設值、Loki／SQL 資料來源。

@@ -62,10 +62,12 @@ nav:
   - 監控鏈:
       - 總覽: components/index.md
       - Prometheus: components/prometheus.md
+      - Thanos: components/thanos.md
       - vmagent: components/vmagent.md
       - VictoriaMetrics: components/victoriametrics.md
       - VictoriaLogs: components/victorialogs.md
       - vmalert: components/vmalert.md
+      - Grafana Alerting: components/grafana_alerting.md
       - Alertmanager: components/alertmanager.md
       - 外部觀察者: components/observer.md
   - 資料庫:
@@ -85,10 +87,12 @@ nav:
       - 內部架構:
           - 總覽：單序點對照: architecture/index.md
           - Prometheus: architecture/prometheus.md
+          - Thanos: architecture/thanos.md
           - vmagent: architecture/vmagent.md
           - VictoriaMetrics: architecture/victoriametrics.md
           - VictoriaLogs: architecture/victorialogs.md
           - vmalert: architecture/vmalert.md
+          - Grafana Alerting: architecture/grafana-alerting.md
           - Alertmanager: architecture/alertmanager.md
           - 資料庫 exporter: architecture/exporters.md
       - 來源: reference/sources.md

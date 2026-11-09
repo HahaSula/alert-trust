@@ -1,0 +1,261 @@
+id: grafana_alerting
+name: Grafana Alerting
+kind: infra
+family: shared
+status: draft
+stages: [evaluate, route]
+versions_checked: ["v13.3.0"]
+architecture: architecture/grafana-alerting.md
+role: >-
+  Grafana-managed alert rule：rule 與 alert state 存在 Grafana 資料庫，由 Grafana server 裡的 scheduler 評估，
+  查詢走資料來源（Prometheus、VictoriaMetrics、Loki、SQL 都一樣），再送到內建或外部 Alertmanager。
+  每條 rule 自己決定資料消失或查詢失敗時要變成什麼狀態，這個設定錯了，資料來源一掛 alert 就自動 resolved。
+
+silent_failures:
+  - text: no_data_state 或 exec_err_state 設成 OK 時，資料消失或查詢失敗的下一次評估就送 resolved，外部 Alertmanager 只收到 resolved，沒有 DatasourceNoData／DatasourceError。
+    evidence: tested
+    source: graf-lab
+    refs: [exp-graf-modes, graf-nodata-ok, graf-err-ok]
+  - text: 設成 OK 或 KeepLast 的 rule 在資料來源停機期間，/api/v1/rules 的 health 仍是 ok；grafana_alerting_alerts 也把它們算在 normal 或 alerting。
+    evidence: tested
+    source: graf-lab
+    refs: [exp-graf-modes, graf-metric-alerts]
+  - text: API 與 provisioning 沒寫 execErrState 時預設是 Alerting，資料來源掛掉時 alert 繼續 firing，看不出查詢已經失敗。
+    evidence: code
+    source: graf-ngalert
+    refs: [graf-api-defaults, graf-prov-err-default]
+  - text: NoData 沒有任何 counter；查詢沒結果不算 evaluation failure，只有 no_data_state=NoData 時 grafana_alerting_alerts{state="nodata"} 看得到。
+    evidence: tested
+    source: graf-lab
+    refs: [exp-graf-modes, graf-eval-failures]
+  - text: Org 從沒設過 admin config 時不建立外部 sender，alert 只進內建 Alertmanager；沒有錯誤 metric，grafana_alerting_sender_* 整組不存在。
+    evidence: tested
+    source: graf-lab
+    refs: [exp-graf-admin, graf-router-choice]
+  - text: grafana_alerting_notifications_failed_total 在 0 時不輸出，寫成 == 0 的健康檢查永遠不成立。
+    evidence: tested
+    source: graf-lab
+    refs: [exp-graf-admin, graf-notif-skipzero]
+  - text: EndsAt 從排程時間（tick）算，不是送出時間；評估越慢、重試越多，外部 Alertmanager 剩下的寬限越短（lab：查詢失敗重試時 endsAt − updatedAt 從約 120s 降到約 100s）。
+    evidence: tested
+    source: graf-lab
+    refs: [exp-graf-modes, graf-endsat, graf-eval-scheduledat]
+  - text: 資料來源比 evaluation_timeout（30s）慢時，一次 evaluation 重試 3 次約 95 秒都沒有續送；外部 Alertmanager 先把 alert 標成 resolved，Grafana 仍顯示 Alerting，之後的 DatasourceError 也很快被 resolved。約 150 秒內 failures_total 只加 1。
+    evidence: tested
+    source: graf-lab
+    refs: [exp-graf-slow, graf-eval-retry, graf-endsat, graf-eval-drop]
+  - text: 多台 Grafana 共用資料庫但沒設 ha_peers 時，每台都評估全部 rule，內建 Alertmanager 各送一次，通知重複。
+    evidence: code
+    source: graf-ngalert
+    refs: [graf-ha-single-node, graf-ha-primary]
+  - text: 資料庫讀不到時 scheduler 只寫 log，繼續用上一份 rule 評估；rule 的新增、修改、刪除都不會生效，也沒有錯誤 metric。
+    evidence: code
+    source: graf-ngalert
+    refs: [graf-tick-fetch-error, graf-fetch-rules]
+
+contracts: [grafana-nodata-error, deadman-wait]
+
+signals:
+  - id: grafana-down
+    tier: 1
+    question: 行程活著嗎
+    signal: up{job=~".*grafana.*"} == 0，加上 absent(up{job=~".*grafana.*"})
+    metrics: [up]
+    evaluate_on: observer
+    evidence: code
+    source: graf-ngalert
+    refs: [graf-endsat, graf-resend-delay]
+    upstream: { status: no, note: "mixin 只有 GrafanaRequestsFailing（HTTP 5xx）" }
+    rules:
+      - rules/grafana/meta.yml#GrafanaDown
+      - rules/grafana/meta.yml#GrafanaScrapeMissing
+
+  - id: watchdog
+    tier: 1
+    question: Grafana 評估到通知整條活著嗎
+    signal: 一條 Grafana-managed 的永遠成立 rule（例如 vector(1) > 0），exec_err_state 與 no_data_state 設 Error／NoData（不要設 Alerting、KeepLast），送到外部 Alertmanager，由外部 dead man's switch 判斷；等待時間用 4 × max(30s, interval) 代入
+    metrics: []
+    evaluate_on: dedicated
+    judged_by: external
+    evidence: code
+    source: graf-ngalert
+    refs: [graf-endsat, graf-resend-delay, graf-nodata-all, graf-error-all]
+    upstream: { status: no }
+    rules: []
+    contract: deadman-wait
+
+  - id: evaluations-running
+    tier: 1
+    question: Rule 還在評估嗎
+    signal: sum by (job) (rate(grafana_alerting_rule_evaluations_total[5m])) == 0，或 Grafana 活著但這個 series 不存在
+    metrics: [grafana_alerting_rule_evaluations_total]
+    evaluate_on: observer
+    evidence: code
+    source: graf-ngalert
+    refs: [graf-eval-retry, graf-ha-primary]
+    upstream: { status: no }
+    rules: [rules/grafana/meta.yml#GrafanaRuleEvaluationsStopped]
+
+  - id: evaluation-failures
+    tier: 1
+    question: 查詢有沒有失敗
+    signal: rate(grafana_alerting_rule_evaluation_failures_total[5m]) > 0（重試用完才算；只有 org label，要看 /api/v1/rules 的 health 找是哪條）
+    metrics: [grafana_alerting_rule_evaluation_failures_total, grafana_alerting_rule_evaluation_attempt_failures_total]
+    evaluate_on: observer
+    evidence: tested
+    source: graf-lab
+    refs: [exp-graf-modes, graf-eval-failures, graf-metric-failures]
+    upstream: { status: no }
+    rules: [rules/grafana/meta.yml#GrafanaRuleEvaluationFailures]
+
+  - id: state-settings
+    tier: 1
+    question: 資料消失或查詢失敗時，rule 會不會自己 resolve
+    signal: 盤點每條 rule 的 noDataState、execErrState（/api/v1/provisioning/alert-rules）；重要的 rule 不能是 OK，也不要預設的 Alerting 而沒有別的訊號
+    metrics: []
+    evaluate_on: inventory
+    evidence: tested
+    source: graf-lab
+    refs: [exp-graf-modes, graf-nodata-ok, graf-err-ok, graf-api-defaults]
+    upstream: { status: no }
+    rules: []
+    contract: grafana-nodata-error
+
+  - id: error-nodata-states
+    tier: 1
+    question: 有 alert 卡在 Error 或 NoData 嗎
+    signal: grafana_alerting_alerts{state="error"} > 0；grafana_alerting_alerts{state="nodata"} > 0（只涵蓋設成 Error／NoData 的 rule）
+    metrics: [grafana_alerting_alerts]
+    evaluate_on: observer
+    evidence: tested
+    source: graf-lab
+    refs: [exp-graf-modes, graf-metric-alerts]
+    upstream: { status: no }
+    rules:
+      - rules/grafana/meta.yml#GrafanaAlertsInErrorState
+      - rules/grafana/meta.yml#GrafanaAlertsInNoDataState
+    contract: grafana-nodata-error
+
+  - id: datasource-alert-routing
+    tier: 1
+    question: DatasourceError／DatasourceNoData 有人收嗎
+    signal: Alertmanager 路由對 alertname=~"DatasourceError|DatasourceNoData" 有 receiver；原 rule 名稱在 rulename label
+    metrics: []
+    evaluate_on: inventory
+    evidence: tested
+    source: graf-lab
+    refs: [exp-graf-modes, graf-ds-error-name]
+    upstream: { status: no }
+    rules: []
+    contract: grafana-nodata-error
+
+  - id: alertmanager-choice
+    tier: 1
+    question: Alert 真的送到外部 Alertmanager 嗎
+    signal: /api/v1/ngalert/admin_config 存在且 alertmanagersChoice 是 all 或 external；/api/v1/ngalert/alertmanagers 的 activeAlertManagers 不是空的；grafana_alerting_sender_alertmanagers_discovered ≥ 1
+    metrics: [grafana_alerting_sender_alertmanagers_discovered]
+    evaluate_on: inventory
+    evidence: tested
+    source: graf-lab
+    refs: [exp-graf-admin, graf-router-choice, graf-router-none]
+    upstream: { status: no }
+    rules: []
+
+  - id: external-send
+    tier: 1
+    question: 送得到外部 Alertmanager 嗎
+    signal: rate(grafana_alerting_sender_errors_total[5m]) > 0，或 grafana_alerting_sender_dropped_total 增加（queue 預設 10000）
+    metrics: [grafana_alerting_sender_errors_total, grafana_alerting_sender_dropped_total, grafana_alerting_sender_queue_length]
+    evaluate_on: observer
+    evidence: code
+    source: graf-ngalert
+    refs: [graf-sender-queue, graf-sender-drop]
+    upstream: { status: no }
+    rules: [rules/grafana/meta.yml#GrafanaExternalAlertmanagerSendErrors]
+
+  - id: embedded-notify
+    tier: 1
+    question: 內建 Alertmanager 送得出通知嗎
+    signal: increase(grafana_alerting_notifications_failed_total[10m]) > 0；這個 counter 在 0 時不存在。Grafana 停機時內建 Alertmanager 一起停，要靠外部 dead man's switch
+    metrics: [grafana_alerting_notifications_failed_total, grafana_alerting_notifications_total]
+    evaluate_on: observer
+    evidence: code
+    source: graf-ngalert
+    refs: [graf-notif-failed, graf-notif-skipzero]
+    upstream: { status: no }
+    rules: [rules/grafana/meta.yml#GrafanaEmbeddedNotificationsFailing]
+
+  - id: eval-within-interval
+    tier: 2
+    question: Rule 評估跑得完嗎
+    signal: increase(grafana_alerting_schedule_rule_evaluations_missed_total{reason="slow_evaluation"}[10m]) > 0（帶 rule 標題）；平均耗時 grafana_alerting_rule_evaluation_duration_seconds 對照最短的 interval
+    metrics: [grafana_alerting_schedule_rule_evaluations_missed_total, grafana_alerting_rule_evaluation_duration_seconds]
+    evaluate_on: observer
+    evidence: tested
+    source: graf-lab
+    refs: [exp-graf-slow, graf-eval-drop, graf-missed-slow, graf-metric-missed]
+    upstream: { status: no }
+    rules:
+      - rules/grafana/meta.yml#GrafanaRuleEvaluationsMissed
+      - rules/grafana/meta.yml#GrafanaRuleEvaluationSlow
+
+  - id: scheduler-behind
+    tier: 2
+    question: Scheduler 的 tick 準時嗎
+    signal: grafana_alerting_scheduler_behind_seconds > 10（一個 tick）；每個 tick 都要先讀資料庫的 rule 版本
+    metrics: [grafana_alerting_scheduler_behind_seconds, grafana_alerting_schedule_query_alert_rules_duration_seconds]
+    evaluate_on: observer
+    evidence: code
+    source: graf-ngalert
+    refs: [graf-tick-behind, graf-metric-behind, graf-tick-fetch-rules]
+    upstream: { status: no }
+    rules: [rules/grafana/meta.yml#GrafanaSchedulerBehind]
+
+  - id: endsat-grace
+    tier: 2
+    question: Alertmanager 會不會在 Grafana 停機或評估中斷時自己 resolve
+    signal: 續送寫死 30s，EndsAt = 排程時間 + 4 × max(30s, interval)；interval ≤ 30s 時只有 2 分鐘寬限，比 Prometheus 預設的 4 分鐘短
+    metrics: []
+    evaluate_on: inventory
+    evidence: tested
+    source: graf-lab
+    refs: [exp-graf-modes, graf-endsat, graf-resend-fixed]
+    upstream: { status: no }
+    rules: []
+    contract: deadman-wait
+
+  - id: state-restore
+    tier: 2
+    question: Grafana 重啟後 alert 會不會重新觸發
+    signal: State 每次評估同步寫進資料庫，啟動時讀回；確認資料庫是持久的（不是容器內的 sqlite 被重建），重啟後外部 Alertmanager 的 startsAt 不變
+    metrics: []
+    evaluate_on: inventory
+    evidence: tested
+    source: graf-lab
+    refs: [exp-graf-restart, graf-warm-ready, graf-persist-sync]
+    upstream: { status: no }
+    rules: []
+
+  - id: ha-mode
+    tier: 2
+    question: 多台 Grafana 會不會重複評估、重複通知
+    signal: 多台共用資料庫時要設 ha_peers 或 Redis；要只評估一次再加 ha_single_node_evaluation
+    metrics: []
+    evaluate_on: interview
+    evidence: code
+    source: graf-ngalert
+    refs: [graf-ha-single-node, graf-ha-primary, graf-ha-single-init, graf-ini-ha-peers]
+    upstream: { status: no }
+    rules: []
+
+  - id: rule-store-db
+    tier: 2
+    question: Grafana 資料庫壞掉時 alerting 怎麼樣
+    signal: 資料庫讀不到時用舊的 rule 繼續評估，寫不進去時 state 只寫 log；要另外監控 Grafana 的資料庫（MySQL／PostgreSQL target 卡），並看 log 的 "Failed to update alert rules"、"Failed to save alert rule state"
+    metrics: []
+    evaluate_on: interview
+    evidence: code
+    source: graf-ngalert
+    refs: [graf-tick-fetch-error, graf-persist-before-send, graf-warm-ready]
+    upstream: { status: no }
+    rules: []

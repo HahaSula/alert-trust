@@ -1,0 +1,5705 @@
+[
+ {
+  "t": 99.3,
+  "scenario": "baseline",
+  "label": "ready",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:18:30.000Z",
+    "updatedAt": "2026-11-09T14:16:30.018Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:18:30.000Z",
+    "updatedAt": "2026-11-09T14:16:35.356Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:18:30.000Z",
+    "updatedAt": "2026-11-09T14:16:37.349Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:18:30.000Z",
+    "updatedAt": "2026-11-09T14:16:39.362Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:18:30.000Z",
+    "updatedAt": "2026-11-09T14:16:41.349Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 5.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 35.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 0.6259410609999998,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 35.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 35.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 5.0
+  },
+  "hooks": {
+   "external": [
+    "firing:mode_alerting",
+    "firing:mode_keeplast",
+    "firing:mode_nodata_error",
+    "firing:mode_ok",
+    "firing:slow_query"
+   ],
+   "embedded": [
+    "firing:mode_keeplast",
+    "firing:slow_query",
+    "firing:mode_alerting",
+    "firing:mode_nodata_error",
+    "firing:mode_ok"
+   ]
+  }
+ },
+ {
+  "t": 109.4,
+  "scenario": "nodata",
+  "label": "+10s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting (NoData):mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting (NoData, KeepLast):mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:18:30.000Z",
+    "updatedAt": "2026-11-09T14:16:30.018Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:18:30.000Z",
+    "updatedAt": "2026-11-09T14:16:35.356Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:18:30.000Z",
+    "updatedAt": "2026-11-09T14:16:37.349Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:18:30.000Z",
+    "updatedAt": "2026-11-09T14:16:39.362Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:18:30.000Z",
+    "updatedAt": "2026-11-09T14:16:41.349Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 5.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 42.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 0.7228165819999997,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 42.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 42.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 5.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 119.5,
+  "scenario": "nodata",
+  "label": "+20s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting (NoData):mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "inactive",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Normal (NoData):mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "nodata",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error",
+     "NoData:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting (NoData, KeepLast):mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "DatasourceNoData",
+    "rulename": "mode_nodata_error",
+    "state": "active",
+    "startsAt": "2026-11-09T14:16:50.000Z",
+    "endsAt": "2026-11-09T14:18:50.000Z",
+    "updatedAt": "2026-11-09T14:16:54.012Z"
+   },
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:19:00.000Z",
+    "updatedAt": "2026-11-09T14:17:00.019Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:19:00.000Z",
+    "updatedAt": "2026-11-09T14:17:02.021Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:18:30.000Z",
+    "updatedAt": "2026-11-09T14:16:37.349Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:18:30.000Z",
+    "updatedAt": "2026-11-09T14:16:41.349Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 4.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 1.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 1.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 7.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 47.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 0.7898394399999997,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 47.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 47.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 9.0
+  },
+  "hooks": {
+   "external": [
+    "firing:DatasourceNoData(mode_nodata_error)",
+    "resolved:mode_ok"
+   ],
+   "embedded": [
+    "firing:DatasourceNoData(mode_nodata_error)",
+    "resolved:mode_ok"
+   ]
+  }
+ },
+ {
+  "t": 132.8,
+  "scenario": "nodata",
+  "label": "+30s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting (NoData):mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "inactive",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Normal (NoData):mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "inactive",
+    "health": "nodata",
+    "error": "",
+    "instances": [
+     "NoData:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting (NoData, KeepLast):mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "DatasourceNoData",
+    "rulename": "mode_nodata_error",
+    "state": "active",
+    "startsAt": "2026-11-09T14:16:50.000Z",
+    "endsAt": "2026-11-09T14:18:50.000Z",
+    "updatedAt": "2026-11-09T14:16:54.012Z"
+   },
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:19:00.000Z",
+    "updatedAt": "2026-11-09T14:17:00.019Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:19:00.000Z",
+    "updatedAt": "2026-11-09T14:17:02.021Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:19:00.000Z",
+    "updatedAt": "2026-11-09T14:17:11.358Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 3.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 1.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 1.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 8.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 52.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 0.8537096449999998,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 52.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 52.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 11.0
+  },
+  "hooks": {
+   "external": [
+    "resolved:mode_nodata_error"
+   ],
+   "embedded": [
+    "resolved:mode_nodata_error"
+   ]
+  }
+ },
+ {
+  "t": 142.9,
+  "scenario": "nodata",
+  "label": "+40s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting (NoData):mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "inactive",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Normal (NoData):mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "inactive",
+    "health": "nodata",
+    "error": "",
+    "instances": [
+     "NoData:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting (NoData, KeepLast):mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "DatasourceNoData",
+    "rulename": "mode_nodata_error",
+    "state": "active",
+    "startsAt": "2026-11-09T14:16:50.000Z",
+    "endsAt": "2026-11-09T14:19:20.000Z",
+    "updatedAt": "2026-11-09T14:17:24.018Z"
+   },
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:19:00.000Z",
+    "updatedAt": "2026-11-09T14:17:00.019Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:19:00.000Z",
+    "updatedAt": "2026-11-09T14:17:02.021Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:19:00.000Z",
+    "updatedAt": "2026-11-09T14:17:11.358Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 3.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 1.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 1.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 8.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 59.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 0.9390926469999997,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 59.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 59.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 13.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 152.9,
+  "scenario": "nodata",
+  "label": "+50s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting (NoData):mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "inactive",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Normal (NoData):mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "inactive",
+    "health": "nodata",
+    "error": "",
+    "instances": [
+     "NoData:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting (NoData, KeepLast):mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "DatasourceNoData",
+    "rulename": "mode_nodata_error",
+    "state": "active",
+    "startsAt": "2026-11-09T14:16:50.000Z",
+    "endsAt": "2026-11-09T14:19:20.000Z",
+    "updatedAt": "2026-11-09T14:17:24.018Z"
+   },
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:19:30.000Z",
+    "updatedAt": "2026-11-09T14:17:30.019Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:19:30.000Z",
+    "updatedAt": "2026-11-09T14:17:32.015Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:19:00.000Z",
+    "updatedAt": "2026-11-09T14:17:11.358Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 3.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 1.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 1.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 8.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 64.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 1.0034158549999999,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 64.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 64.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 15.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 166.3,
+  "scenario": "nodata",
+  "label": "+60s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting (NoData):mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "inactive",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Normal (NoData):mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "inactive",
+    "health": "nodata",
+    "error": "",
+    "instances": [
+     "NoData:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting (NoData, KeepLast):mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "DatasourceNoData",
+    "rulename": "mode_nodata_error",
+    "state": "active",
+    "startsAt": "2026-11-09T14:16:50.000Z",
+    "endsAt": "2026-11-09T14:19:20.000Z",
+    "updatedAt": "2026-11-09T14:17:24.018Z"
+   },
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:19:30.000Z",
+    "updatedAt": "2026-11-09T14:17:30.019Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:19:30.000Z",
+    "updatedAt": "2026-11-09T14:17:32.015Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:19:30.000Z",
+    "updatedAt": "2026-11-09T14:17:33.043Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 3.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 1.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 1.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 8.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 69.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 1.0634466229999997,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 69.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 69.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 16.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 176.3,
+  "scenario": "nodata",
+  "label": "+70s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting (NoData):mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "inactive",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Normal (NoData):mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "inactive",
+    "health": "nodata",
+    "error": "",
+    "instances": [
+     "NoData:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting (NoData, KeepLast):mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "DatasourceNoData",
+    "rulename": "mode_nodata_error",
+    "state": "active",
+    "startsAt": "2026-11-09T14:16:50.000Z",
+    "endsAt": "2026-11-09T14:19:50.000Z",
+    "updatedAt": "2026-11-09T14:17:54.021Z"
+   },
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:19:30.000Z",
+    "updatedAt": "2026-11-09T14:17:30.019Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:19:30.000Z",
+    "updatedAt": "2026-11-09T14:17:32.015Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:19:30.000Z",
+    "updatedAt": "2026-11-09T14:17:33.043Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 3.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 1.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 1.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 8.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 75.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 1.1488239649999996,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 75.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 75.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 18.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 186.4,
+  "scenario": "nodata-recover",
+  "label": "+10s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting (NoData):mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "inactive",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Normal (NoData):mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "inactive",
+    "health": "nodata",
+    "error": "",
+    "instances": [
+     "NoData:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting (NoData, KeepLast):mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "DatasourceNoData",
+    "rulename": "mode_nodata_error",
+    "state": "active",
+    "startsAt": "2026-11-09T14:16:50.000Z",
+    "endsAt": "2026-11-09T14:19:50.000Z",
+    "updatedAt": "2026-11-09T14:17:54.021Z"
+   },
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:20:00.000Z",
+    "updatedAt": "2026-11-09T14:18:00.030Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:20:00.000Z",
+    "updatedAt": "2026-11-09T14:18:02.021Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:20:00.000Z",
+    "updatedAt": "2026-11-09T14:18:08.015Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 3.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 1.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 1.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 8.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 80.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 1.2159825209999997,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 80.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 80.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 21.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 199.7,
+  "scenario": "nodata-recover",
+  "label": "+20s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:20:00.000Z",
+    "updatedAt": "2026-11-09T14:18:00.030Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:20:00.000Z",
+    "updatedAt": "2026-11-09T14:18:02.021Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:18:10.000Z",
+    "endsAt": "2026-11-09T14:20:10.000Z",
+    "updatedAt": "2026-11-09T14:18:17.356Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:20:00.000Z",
+    "updatedAt": "2026-11-09T14:18:08.015Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 10.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 85.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 1.2990337739999998,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 85.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 85.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 23.0
+  },
+  "hooks": {
+   "external": [
+    "firing:mode_nodata_error",
+    "resolved:DatasourceNoData(mode_nodata_error)"
+   ],
+   "embedded": [
+    "firing:mode_nodata_error",
+    "resolved:DatasourceNoData(mode_nodata_error)"
+   ]
+  }
+ },
+ {
+  "t": 209.8,
+  "scenario": "nodata-recover",
+  "label": "+30s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:20:30.000Z",
+    "updatedAt": "2026-11-09T14:18:30.016Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:20:30.000Z",
+    "updatedAt": "2026-11-09T14:18:32.020Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:18:10.000Z",
+    "endsAt": "2026-11-09T14:20:10.000Z",
+    "updatedAt": "2026-11-09T14:18:17.356Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:18:10.000Z",
+    "endsAt": "2026-11-09T14:20:20.000Z",
+    "updatedAt": "2026-11-09T14:18:29.354Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:20:00.000Z",
+    "updatedAt": "2026-11-09T14:18:08.015Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 11.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 92.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 1.4022686459999998,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 92.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 92.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 26.0
+  },
+  "hooks": {
+   "external": [
+    "firing:mode_ok"
+   ],
+   "embedded": [
+    "firing:mode_ok"
+   ]
+  }
+ },
+ {
+  "t": 219.8,
+  "scenario": "nodata-recover",
+  "label": "+40s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:20:30.000Z",
+    "updatedAt": "2026-11-09T14:18:30.016Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:20:30.000Z",
+    "updatedAt": "2026-11-09T14:18:32.020Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:18:10.000Z",
+    "endsAt": "2026-11-09T14:20:10.000Z",
+    "updatedAt": "2026-11-09T14:18:17.356Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:18:10.000Z",
+    "endsAt": "2026-11-09T14:20:20.000Z",
+    "updatedAt": "2026-11-09T14:18:29.354Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:20:30.000Z",
+    "updatedAt": "2026-11-09T14:18:38.016Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 11.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 97.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 1.4641730729999998,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 97.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 97.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 27.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 233.2,
+  "scenario": "nodata-recover",
+  "label": "+50s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:20:30.000Z",
+    "updatedAt": "2026-11-09T14:18:30.016Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:20:30.000Z",
+    "updatedAt": "2026-11-09T14:18:32.020Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:18:10.000Z",
+    "endsAt": "2026-11-09T14:20:40.000Z",
+    "updatedAt": "2026-11-09T14:18:44.013Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:18:10.000Z",
+    "endsAt": "2026-11-09T14:20:20.000Z",
+    "updatedAt": "2026-11-09T14:18:29.354Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:20:30.000Z",
+    "updatedAt": "2026-11-09T14:18:38.016Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 11.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 102.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 1.5410652399999998,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 102.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 102.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 28.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 243.8,
+  "scenario": "error",
+  "label": "+10s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:20:30.000Z",
+    "updatedAt": "2026-11-09T14:18:30.016Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:20:30.000Z",
+    "updatedAt": "2026-11-09T14:18:32.020Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:18:10.000Z",
+    "endsAt": "2026-11-09T14:20:40.000Z",
+    "updatedAt": "2026-11-09T14:18:44.013Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:18:10.000Z",
+    "endsAt": "2026-11-09T14:20:20.000Z",
+    "updatedAt": "2026-11-09T14:18:29.354Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:20:30.000Z",
+    "updatedAt": "2026-11-09T14:18:38.016Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 11.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 7.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 110.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 1.5524177359999998,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 103.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 107.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 28.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 253.8,
+  "scenario": "error",
+  "label": "+20s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "error",
+    "error": "[sse.dataQueryError] failed to execute query [A]: Post \"http://prom:9090/api/v1/query\": dial tcp: lookup prom on 127.0.0",
+    "instances": [
+     "Alerting (Error):mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "inactive",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Normal (Error):mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "error",
+    "error": "[sse.dataQueryError] failed to execute query [A]: Post \"http://prom:9090/api/v1/query\": dial tcp: lookup prom on 127.0.0",
+    "instances": [
+     "Alerting:mode_nodata_error",
+     "Error:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting (Error, KeepLast):mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "DatasourceError",
+    "rulename": "mode_nodata_error",
+    "state": "active",
+    "startsAt": "2026-11-09T14:18:50.000Z",
+    "endsAt": "2026-11-09T14:20:50.000Z",
+    "updatedAt": "2026-11-09T14:19:09.384Z"
+   },
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:21:00.000Z",
+    "updatedAt": "2026-11-09T14:19:09.332Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:21:00.000Z",
+    "updatedAt": "2026-11-09T14:19:12.212Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:18:10.000Z",
+    "endsAt": "2026-11-09T14:20:40.000Z",
+    "updatedAt": "2026-11-09T14:18:44.013Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:21:00.000Z",
+    "updatedAt": "2026-11-09T14:19:08.020Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 4.0,
+   "grafana_alerting_alerts{state=\"error\"}": 1.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 1.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 13.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 19.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 123.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 43.161902543,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 108.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 4.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 112.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 33.0
+  },
+  "hooks": {
+   "external": [
+    "firing:DatasourceError(mode_nodata_error)",
+    "resolved:mode_ok"
+   ],
+   "embedded": [
+    "firing:DatasourceError(mode_nodata_error)",
+    "resolved:mode_ok"
+   ]
+  }
+ },
+ {
+  "t": 267.2,
+  "scenario": "error",
+  "label": "+30s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "error",
+    "error": "[sse.dataQueryError] failed to execute query [A]: Post \"http://prom:9090/api/v1/query\": dial tcp: lookup prom on 127.0.0",
+    "instances": [
+     "Alerting (Error):mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "inactive",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Normal (Error):mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "inactive",
+    "health": "error",
+    "error": "[sse.dataQueryError] failed to execute query [A]: Post \"http://prom:9090/api/v1/query\": dial tcp: lookup prom on 127.0.0",
+    "instances": [
+     "Error:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting (Error, KeepLast):mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "DatasourceError",
+    "rulename": "mode_nodata_error",
+    "state": "active",
+    "startsAt": "2026-11-09T14:18:50.000Z",
+    "endsAt": "2026-11-09T14:20:50.000Z",
+    "updatedAt": "2026-11-09T14:19:09.384Z"
+   },
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:21:00.000Z",
+    "updatedAt": "2026-11-09T14:19:09.332Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:21:00.000Z",
+    "updatedAt": "2026-11-09T14:19:12.212Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:21:00.000Z",
+    "updatedAt": "2026-11-09T14:19:08.020Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 3.0,
+   "grafana_alerting_alerts{state=\"error\"}": 1.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 1.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 14.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 31.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 136.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 80.530006977,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 113.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 8.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 117.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 34.0
+  },
+  "hooks": {
+   "external": [
+    "resolved:mode_nodata_error"
+   ],
+   "embedded": [
+    "resolved:mode_nodata_error"
+   ]
+  }
+ },
+ {
+  "t": 277.2,
+  "scenario": "error",
+  "label": "+40s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "error",
+    "error": "[sse.dataQueryError] failed to execute query [A]: Post \"http://prom:9090/api/v1/query\": dial tcp: lookup prom on 127.0.0",
+    "instances": [
+     "Alerting (Error):mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "inactive",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Normal (Error):mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "inactive",
+    "health": "error",
+    "error": "[sse.dataQueryError] failed to execute query [A]: Post \"http://prom:9090/api/v1/query\": dial tcp: lookup prom on 127.0.0",
+    "instances": [
+     "Error:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting (Error, KeepLast):mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "DatasourceError",
+    "rulename": "mode_nodata_error",
+    "state": "active",
+    "startsAt": "2026-11-09T14:18:50.000Z",
+    "endsAt": "2026-11-09T14:20:50.000Z",
+    "updatedAt": "2026-11-09T14:19:09.384Z"
+   },
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:21:00.000Z",
+    "updatedAt": "2026-11-09T14:19:09.332Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:21:00.000Z",
+    "updatedAt": "2026-11-09T14:19:12.212Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:21:30.000Z",
+    "updatedAt": "2026-11-09T14:19:38.015Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 3.0,
+   "grafana_alerting_alerts{state=\"error\"}": 1.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 1.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 14.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 43.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 150.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 118.3086148,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 119.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 12.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 123.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 35.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 287.3,
+  "scenario": "error",
+  "label": "+50s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "error",
+    "error": "[sse.dataQueryError] failed to execute query [A]: Post \"http://prom:9090/api/v1/query\": dial tcp: lookup prom on 127.0.0",
+    "instances": [
+     "Alerting (Error):mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "inactive",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Normal (Error):mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "inactive",
+    "health": "error",
+    "error": "[sse.dataQueryError] failed to execute query [A]: Post \"http://prom:9090/api/v1/query\": dial tcp: lookup prom on 127.0.0",
+    "instances": [
+     "Error:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting (Error, KeepLast):mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "DatasourceError",
+    "rulename": "mode_nodata_error",
+    "state": "active",
+    "startsAt": "2026-11-09T14:18:50.000Z",
+    "endsAt": "2026-11-09T14:21:20.000Z",
+    "updatedAt": "2026-11-09T14:19:42.207Z"
+   },
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:21:30.000Z",
+    "updatedAt": "2026-11-09T14:19:42.198Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:21:30.000Z",
+    "updatedAt": "2026-11-09T14:19:45.015Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:21:30.000Z",
+    "updatedAt": "2026-11-09T14:19:38.015Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 3.0,
+   "grafana_alerting_alerts{state=\"error\"}": 1.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 1.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 14.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 55.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 163.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 159.11151286299997,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 124.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 16.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 128.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 39.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 300.6,
+  "scenario": "error",
+  "label": "+60s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "error",
+    "error": "[sse.dataQueryError] failed to execute query [A]: Post \"http://prom:9090/api/v1/query\": dial tcp: lookup prom on 127.0.0",
+    "instances": [
+     "Alerting (Error):mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "inactive",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Normal (Error):mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "inactive",
+    "health": "error",
+    "error": "[sse.dataQueryError] failed to execute query [A]: Post \"http://prom:9090/api/v1/query\": dial tcp: lookup prom on 127.0.0",
+    "instances": [
+     "Error:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting (Error, KeepLast):mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "DatasourceError",
+    "rulename": "mode_nodata_error",
+    "state": "active",
+    "startsAt": "2026-11-09T14:18:50.000Z",
+    "endsAt": "2026-11-09T14:21:20.000Z",
+    "updatedAt": "2026-11-09T14:19:42.207Z"
+   },
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:21:30.000Z",
+    "updatedAt": "2026-11-09T14:19:42.198Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:21:30.000Z",
+    "updatedAt": "2026-11-09T14:19:45.015Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:21:30.000Z",
+    "updatedAt": "2026-11-09T14:19:38.015Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 3.0,
+   "grafana_alerting_alerts{state=\"error\"}": 1.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 1.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 14.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 67.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 176.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 198.81068378099997,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 129.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 20.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 133.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 39.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 310.7,
+  "scenario": "error",
+  "label": "+70s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "error",
+    "error": "[sse.dataQueryError] failed to execute query [A]: Post \"http://prom:9090/api/v1/query\": dial tcp: lookup prom on 127.0.0",
+    "instances": [
+     "Alerting (Error):mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "inactive",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Normal (Error):mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "inactive",
+    "health": "error",
+    "error": "[sse.dataQueryError] failed to execute query [A]: Post \"http://prom:9090/api/v1/query\": dial tcp: lookup prom on 127.0.0",
+    "instances": [
+     "Error:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting (Error, KeepLast):mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "DatasourceError",
+    "rulename": "mode_nodata_error",
+    "state": "active",
+    "startsAt": "2026-11-09T14:18:50.000Z",
+    "endsAt": "2026-11-09T14:21:20.000Z",
+    "updatedAt": "2026-11-09T14:19:42.207Z"
+   },
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:21:30.000Z",
+    "updatedAt": "2026-11-09T14:19:42.198Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:21:30.000Z",
+    "updatedAt": "2026-11-09T14:19:45.015Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:22:00.000Z",
+    "updatedAt": "2026-11-09T14:20:11.355Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 3.0,
+   "grafana_alerting_alerts{state=\"error\"}": 1.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 1.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 14.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 79.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 189.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 237.93503781499996,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 134.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 24.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 138.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 40.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 316.3,
+  "scenario": "error-recover",
+  "label": "+10s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:22:00.000Z",
+    "updatedAt": "2026-11-09T14:20:15.022Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:22:00.000Z",
+    "updatedAt": "2026-11-09T14:20:16.544Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:22:10.000Z",
+    "updatedAt": "2026-11-09T14:20:15.124Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:22:00.000Z",
+    "updatedAt": "2026-11-09T14:20:11.355Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 16.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 83.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 203.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 276.06585719099996,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 147.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 27.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 147.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"mode_nodata_error\",org=\"1\",reason=\"slow_evaluation\"}": 1.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 46.0
+  },
+  "hooks": {
+   "external": [
+    "firing:mode_nodata_error",
+    "resolved:DatasourceError(mode_nodata_error)"
+   ],
+   "embedded": [
+    "firing:mode_nodata_error",
+    "resolved:DatasourceError(mode_nodata_error)"
+   ]
+  }
+ },
+ {
+  "t": 334.6,
+  "scenario": "error-recover",
+  "label": "+20s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:22:30.000Z",
+    "updatedAt": "2026-11-09T14:20:33.345Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:22:30.000Z",
+    "updatedAt": "2026-11-09T14:20:35.347Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:22:10.000Z",
+    "updatedAt": "2026-11-09T14:20:15.124Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:22:20.000Z",
+    "updatedAt": "2026-11-09T14:20:29.345Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:22:00.000Z",
+    "updatedAt": "2026-11-09T14:20:11.355Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 17.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 83.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 208.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 276.1359538339999,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 152.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 27.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 152.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"mode_nodata_error\",org=\"1\",reason=\"slow_evaluation\"}": 1.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 49.0
+  },
+  "hooks": {
+   "external": [
+    "firing:mode_ok"
+   ],
+   "embedded": [
+    "firing:mode_ok"
+   ]
+  }
+ },
+ {
+  "t": 344.6,
+  "scenario": "error-recover",
+  "label": "+30s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:22:30.000Z",
+    "updatedAt": "2026-11-09T14:20:33.345Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:22:30.000Z",
+    "updatedAt": "2026-11-09T14:20:35.347Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:22:40.000Z",
+    "updatedAt": "2026-11-09T14:20:44.017Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:22:20.000Z",
+    "updatedAt": "2026-11-09T14:20:29.345Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:22:30.000Z",
+    "updatedAt": "2026-11-09T14:20:41.343Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 17.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 83.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 215.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 276.2249167109999,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 159.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 27.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 159.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"mode_nodata_error\",org=\"1\",reason=\"slow_evaluation\"}": 1.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 51.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 358.0,
+  "scenario": "error-recover",
+  "label": "+40s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:22:30.000Z",
+    "updatedAt": "2026-11-09T14:20:33.345Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:22:30.000Z",
+    "updatedAt": "2026-11-09T14:20:35.347Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:22:40.000Z",
+    "updatedAt": "2026-11-09T14:20:44.017Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:22:50.000Z",
+    "updatedAt": "2026-11-09T14:20:56.017Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:22:30.000Z",
+    "updatedAt": "2026-11-09T14:20:41.343Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 17.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 83.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 220.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 276.3114578249999,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 164.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 27.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 164.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"mode_nodata_error\",org=\"1\",reason=\"slow_evaluation\"}": 1.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 52.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 368.1,
+  "scenario": "error-recover",
+  "label": "+50s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:23:00.000Z",
+    "updatedAt": "2026-11-09T14:21:03.361Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:23:00.000Z",
+    "updatedAt": "2026-11-09T14:21:05.356Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:22:40.000Z",
+    "updatedAt": "2026-11-09T14:20:44.017Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:22:50.000Z",
+    "updatedAt": "2026-11-09T14:20:56.017Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:23:00.000Z",
+    "updatedAt": "2026-11-09T14:21:11.359Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 17.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 83.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 226.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 276.40214063399986,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 170.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 27.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 170.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"mode_nodata_error\",org=\"1\",reason=\"slow_evaluation\"}": 1.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 55.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 378.1,
+  "scenario": "error-recover",
+  "label": "+60s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:23:00.000Z",
+    "updatedAt": "2026-11-09T14:21:03.361Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:23:00.000Z",
+    "updatedAt": "2026-11-09T14:21:05.356Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:23:10.000Z",
+    "updatedAt": "2026-11-09T14:21:14.026Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:22:50.000Z",
+    "updatedAt": "2026-11-09T14:20:56.017Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:23:00.000Z",
+    "updatedAt": "2026-11-09T14:21:11.359Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 17.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 83.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 231.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 276.4845435889998,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 175.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 27.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 175.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"mode_nodata_error\",org=\"1\",reason=\"slow_evaluation\"}": 1.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 56.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 383.0,
+  "scenario": "restart",
+  "label": "health ok",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:23:00.000Z",
+    "updatedAt": "2026-11-09T14:21:03.361Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:23:00.000Z",
+    "updatedAt": "2026-11-09T14:21:05.356Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:23:10.000Z",
+    "updatedAt": "2026-11-09T14:21:14.026Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:22:50.000Z",
+    "updatedAt": "2026-11-09T14:20:56.017Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:23:00.000Z",
+    "updatedAt": "2026-11-09T14:21:11.359Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 396.3,
+  "scenario": "restart",
+  "label": "+10s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:23:30.000Z",
+    "updatedAt": "2026-11-09T14:21:30.029Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:23:30.000Z",
+    "updatedAt": "2026-11-09T14:21:35.361Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:23:10.000Z",
+    "updatedAt": "2026-11-09T14:21:14.026Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:23:30.000Z",
+    "updatedAt": "2026-11-09T14:21:39.361Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:23:00.000Z",
+    "updatedAt": "2026-11-09T14:21:11.359Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 4.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 0.065930002,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 4.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 4.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 3.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 406.4,
+  "scenario": "restart",
+  "label": "+20s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:23:30.000Z",
+    "updatedAt": "2026-11-09T14:21:30.029Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:23:30.000Z",
+    "updatedAt": "2026-11-09T14:21:35.361Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:23:40.000Z",
+    "updatedAt": "2026-11-09T14:21:47.352Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:23:30.000Z",
+    "updatedAt": "2026-11-09T14:21:39.361Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:23:30.000Z",
+    "updatedAt": "2026-11-09T14:21:41.363Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 9.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 0.15118932499999999,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 9.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 9.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 5.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 416.4,
+  "scenario": "restart",
+  "label": "+30s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:23:30.000Z",
+    "updatedAt": "2026-11-09T14:21:30.029Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:23:30.000Z",
+    "updatedAt": "2026-11-09T14:21:35.361Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:23:40.000Z",
+    "updatedAt": "2026-11-09T14:21:47.352Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:23:30.000Z",
+    "updatedAt": "2026-11-09T14:21:39.361Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:23:30.000Z",
+    "updatedAt": "2026-11-09T14:21:41.363Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 15.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 0.23478454299999996,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 15.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 15.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 5.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 429.8,
+  "scenario": "restart",
+  "label": "+40s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:24:00.000Z",
+    "updatedAt": "2026-11-09T14:22:00.019Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:24:00.000Z",
+    "updatedAt": "2026-11-09T14:22:02.016Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:23:40.000Z",
+    "updatedAt": "2026-11-09T14:21:47.352Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:24:00.000Z",
+    "updatedAt": "2026-11-09T14:22:09.351Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:24:00.000Z",
+    "updatedAt": "2026-11-09T14:22:11.353Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 21.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 0.333903432,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 21.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 21.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 9.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 439.9,
+  "scenario": "restart",
+  "label": "+50s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:24:00.000Z",
+    "updatedAt": "2026-11-09T14:22:00.019Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:24:00.000Z",
+    "updatedAt": "2026-11-09T14:22:02.016Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:24:10.000Z",
+    "updatedAt": "2026-11-09T14:22:17.359Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:24:00.000Z",
+    "updatedAt": "2026-11-09T14:22:09.351Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:24:00.000Z",
+    "updatedAt": "2026-11-09T14:22:11.353Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 27.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 0.43303356200000004,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 27.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 27.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 10.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 449.9,
+  "scenario": "restart",
+  "label": "+60s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:24:30.000Z",
+    "updatedAt": "2026-11-09T14:22:30.013Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:24:30.000Z",
+    "updatedAt": "2026-11-09T14:22:32.015Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:24:10.000Z",
+    "updatedAt": "2026-11-09T14:22:17.359Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:24:00.000Z",
+    "updatedAt": "2026-11-09T14:22:09.351Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:24:00.000Z",
+    "updatedAt": "2026-11-09T14:22:11.353Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 32.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 0.49351909800000004,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 32.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 32.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 12.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 468.3,
+  "scenario": "slow25",
+  "label": "+15s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:24:30.000Z",
+    "updatedAt": "2026-11-09T14:22:30.013Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:24:30.000Z",
+    "updatedAt": "2026-11-09T14:22:32.015Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:24:40.000Z",
+    "updatedAt": "2026-11-09T14:22:47.355Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:24:30.000Z",
+    "updatedAt": "2026-11-09T14:22:36.018Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:24:00.000Z",
+    "updatedAt": "2026-11-09T14:22:11.353Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 39.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 0.5964956600000001,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 39.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 40.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 14.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 483.3,
+  "scenario": "slow25",
+  "label": "+30s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:25:00.000Z",
+    "updatedAt": "2026-11-09T14:23:00.015Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:25:00.000Z",
+    "updatedAt": "2026-11-09T14:23:02.023Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:24:40.000Z",
+    "updatedAt": "2026-11-09T14:22:47.355Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:25:00.000Z",
+    "updatedAt": "2026-11-09T14:23:06.021Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:24:30.000Z",
+    "updatedAt": "2026-11-09T14:23:06.354Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 47.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 25.705623562000003,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 47.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 48.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"slow_query\",org=\"1\",reason=\"slow_evaluation\"}": 1.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 18.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 501.7,
+  "scenario": "slow25",
+  "label": "+45s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:25:00.000Z",
+    "updatedAt": "2026-11-09T14:23:00.015Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:25:00.000Z",
+    "updatedAt": "2026-11-09T14:23:02.023Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:25:10.000Z",
+    "updatedAt": "2026-11-09T14:23:17.356Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:25:00.000Z",
+    "updatedAt": "2026-11-09T14:23:06.021Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:24:30.000Z",
+    "updatedAt": "2026-11-09T14:23:06.354Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 52.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 25.774527010000003,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 52.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 53.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"slow_query\",org=\"1\",reason=\"slow_evaluation\"}": 1.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 19.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 516.8,
+  "scenario": "slow25",
+  "label": "+60s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:25:30.000Z",
+    "updatedAt": "2026-11-09T14:23:30.014Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:25:30.000Z",
+    "updatedAt": "2026-11-09T14:23:32.050Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:25:10.000Z",
+    "updatedAt": "2026-11-09T14:23:17.356Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:25:30.000Z",
+    "updatedAt": "2026-11-09T14:23:36.025Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:24:30.000Z",
+    "updatedAt": "2026-11-09T14:23:06.354Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 61.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 50.991282357,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 61.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 62.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"slow_query\",org=\"1\",reason=\"slow_evaluation\"}": 3.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 22.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 535.1,
+  "scenario": "slow25",
+  "label": "+75s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:25:30.000Z",
+    "updatedAt": "2026-11-09T14:23:30.014Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:25:30.000Z",
+    "updatedAt": "2026-11-09T14:23:32.050Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:25:40.000Z",
+    "updatedAt": "2026-11-09T14:23:44.022Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:25:30.000Z",
+    "updatedAt": "2026-11-09T14:23:36.025Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:24:30.000Z",
+    "updatedAt": "2026-11-09T14:23:06.354Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 67.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 51.085005948,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 67.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 68.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"slow_query\",org=\"1\",reason=\"slow_evaluation\"}": 3.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 23.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 550.2,
+  "scenario": "slow25",
+  "label": "+90s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:26:00.000Z",
+    "updatedAt": "2026-11-09T14:24:00.016Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:26:00.000Z",
+    "updatedAt": "2026-11-09T14:24:02.014Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:25:40.000Z",
+    "updatedAt": "2026-11-09T14:23:44.022Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:26:00.000Z",
+    "updatedAt": "2026-11-09T14:24:06.016Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:25:20.000Z",
+    "updatedAt": "2026-11-09T14:24:03.147Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 75.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 76.23815141600001,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 75.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 76.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"slow_query\",org=\"1\",reason=\"slow_evaluation\"}": 5.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 27.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 568.6,
+  "scenario": "slow45",
+  "label": "+15s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:26:30.000Z",
+    "updatedAt": "2026-11-09T14:24:30.021Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:26:30.000Z",
+    "updatedAt": "2026-11-09T14:24:32.023Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:26:10.000Z",
+    "updatedAt": "2026-11-09T14:24:14.026Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:26:00.000Z",
+    "updatedAt": "2026-11-09T14:24:06.016Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:25:50.000Z",
+    "updatedAt": "2026-11-09T14:24:31.536Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 84.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 101.450760935,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 84.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 85.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"slow_query\",org=\"1\",reason=\"slow_evaluation\"}": 7.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 31.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 583.6,
+  "scenario": "slow45",
+  "label": "+30s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:26:30.000Z",
+    "updatedAt": "2026-11-09T14:24:30.021Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:26:30.000Z",
+    "updatedAt": "2026-11-09T14:24:32.023Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:26:40.000Z",
+    "updatedAt": "2026-11-09T14:24:44.015Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:26:30.000Z",
+    "updatedAt": "2026-11-09T14:24:36.018Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:25:50.000Z",
+    "updatedAt": "2026-11-09T14:24:31.536Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 90.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 101.51228808399999,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 90.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 91.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"slow_query\",org=\"1\",reason=\"slow_evaluation\"}": 7.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 33.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 602.0,
+  "scenario": "slow45",
+  "label": "+45s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:27:00.000Z",
+    "updatedAt": "2026-11-09T14:25:03.360Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:27:00.000Z",
+    "updatedAt": "2026-11-09T14:25:05.350Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:26:40.000Z",
+    "updatedAt": "2026-11-09T14:24:44.015Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:26:30.000Z",
+    "updatedAt": "2026-11-09T14:24:36.018Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:25:50.000Z",
+    "updatedAt": "2026-11-09T14:24:31.536Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 1.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 97.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 101.63341492399998,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 96.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 97.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"slow_query\",org=\"1\",reason=\"slow_evaluation\"}": 8.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 35.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 617.1,
+  "scenario": "slow45",
+  "label": "+60s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:27:00.000Z",
+    "updatedAt": "2026-11-09T14:25:03.360Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:27:00.000Z",
+    "updatedAt": "2026-11-09T14:25:05.350Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:27:10.000Z",
+    "updatedAt": "2026-11-09T14:25:14.015Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:27:00.000Z",
+    "updatedAt": "2026-11-09T14:25:09.348Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:25:50.000Z",
+    "updatedAt": "2026-11-09T14:24:31.536Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 1.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 104.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 101.73231934899998,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 103.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 104.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"slow_query\",org=\"1\",reason=\"slow_evaluation\"}": 10.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 37.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 635.5,
+  "scenario": "slow45",
+  "label": "+75s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:27:30.000Z",
+    "updatedAt": "2026-11-09T14:25:33.365Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:27:30.000Z",
+    "updatedAt": "2026-11-09T14:25:35.364Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:27:10.000Z",
+    "updatedAt": "2026-11-09T14:25:14.015Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:27:00.000Z",
+    "updatedAt": "2026-11-09T14:25:09.348Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:25:50.000Z",
+    "updatedAt": "2026-11-09T14:24:31.536Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 1.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 110.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 101.85174394299999,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 109.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 110.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"slow_query\",org=\"1\",reason=\"slow_evaluation\"}": 11.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 39.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 650.6,
+  "scenario": "slow45",
+  "label": "+90s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:27:30.000Z",
+    "updatedAt": "2026-11-09T14:25:33.365Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:27:30.000Z",
+    "updatedAt": "2026-11-09T14:25:35.364Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:27:40.000Z",
+    "updatedAt": "2026-11-09T14:25:44.020Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:27:30.000Z",
+    "updatedAt": "2026-11-09T14:25:39.364Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 2.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 119.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 101.95750904399998,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 117.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 118.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"slow_query\",org=\"1\",reason=\"slow_evaluation\"}": 13.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 41.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 668.9,
+  "scenario": "slow45",
+  "label": "+105s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:28:00.000Z",
+    "updatedAt": "2026-11-09T14:26:03.351Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:28:00.000Z",
+    "updatedAt": "2026-11-09T14:26:05.354Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:27:40.000Z",
+    "updatedAt": "2026-11-09T14:25:44.020Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:28:00.000Z",
+    "updatedAt": "2026-11-09T14:26:09.358Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 1.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 2.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 126.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 102.09548081999998,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 124.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 0.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 125.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"slow_query\",org=\"1\",reason=\"slow_evaluation\"}": 15.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 44.0
+  },
+  "hooks": {
+   "external": [
+    "resolved:slow_query"
+   ],
+   "embedded": [
+    "resolved:slow_query"
+   ]
+  }
+ },
+ {
+  "t": 684.0,
+  "scenario": "slow45",
+  "label": "+120s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "inactive",
+    "health": "error",
+    "error": "[sse.dataQueryError] failed to execute query [A]: [plugin.requestFailureError] client: failed to query data: Failed to q",
+    "instances": [
+     "Error:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:28:00.000Z",
+    "updatedAt": "2026-11-09T14:26:03.351Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:28:00.000Z",
+    "updatedAt": "2026-11-09T14:26:05.354Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:28:10.000Z",
+    "updatedAt": "2026-11-09T14:26:14.021Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:28:00.000Z",
+    "updatedAt": "2026-11-09T14:26:09.358Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 4.0,
+   "grafana_alerting_alerts{state=\"error\"}": 1.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 3.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 3.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 133.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 194.93708062899998,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 131.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 1.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 132.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"slow_query\",org=\"1\",reason=\"slow_evaluation\"}": 16.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 47.0
+  },
+  "hooks": {
+   "external": [
+    "firing:DatasourceError(slow_query)",
+    "resolved:DatasourceError(slow_query)"
+   ],
+   "embedded": [
+    "firing:DatasourceError(slow_query)",
+    "resolved:DatasourceError(slow_query)"
+   ]
+  }
+ },
+ {
+  "t": 702.4,
+  "scenario": "slow45",
+  "label": "+135s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "inactive",
+    "health": "error",
+    "error": "[sse.dataQueryError] failed to execute query [A]: [plugin.requestFailureError] client: failed to query data: Failed to q",
+    "instances": [
+     "Error:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:28:30.000Z",
+    "updatedAt": "2026-11-09T14:26:30.019Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:28:30.000Z",
+    "updatedAt": "2026-11-09T14:26:35.355Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:28:10.000Z",
+    "updatedAt": "2026-11-09T14:26:14.021Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:28:30.000Z",
+    "updatedAt": "2026-11-09T14:26:39.348Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 4.0,
+   "grafana_alerting_alerts{state=\"error\"}": 1.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 3.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 3.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 139.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 195.02310304799997,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 137.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 1.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 138.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"slow_query\",org=\"1\",reason=\"slow_evaluation\"}": 17.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 50.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 717.4,
+  "scenario": "slow-recover",
+  "label": "+15s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:29:00.000Z",
+    "updatedAt": "2026-11-09T14:27:00.018Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:28:30.000Z",
+    "updatedAt": "2026-11-09T14:26:35.355Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:28:40.000Z",
+    "updatedAt": "2026-11-09T14:26:47.351Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:28:30.000Z",
+    "updatedAt": "2026-11-09T14:26:39.348Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:26:00.000Z",
+    "endsAt": "2026-11-09T14:28:30.000Z",
+    "updatedAt": "2026-11-09T14:26:48.612Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 4.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 4.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 151.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 226.16152796399996,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 148.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 1.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 148.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"slow_query\",org=\"1\",reason=\"slow_evaluation\"}": 18.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 55.0
+  },
+  "hooks": {
+   "external": [
+    "firing:slow_query"
+   ],
+   "embedded": [
+    "firing:slow_query"
+   ]
+  }
+ },
+ {
+  "t": 735.8,
+  "scenario": "slow-recover",
+  "label": "+30s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:29:00.000Z",
+    "updatedAt": "2026-11-09T14:27:00.018Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:29:00.000Z",
+    "updatedAt": "2026-11-09T14:27:02.014Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:29:10.000Z",
+    "updatedAt": "2026-11-09T14:27:17.355Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:29:00.000Z",
+    "updatedAt": "2026-11-09T14:27:09.356Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:26:00.000Z",
+    "endsAt": "2026-11-09T14:29:00.000Z",
+    "updatedAt": "2026-11-09T14:27:11.352Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 4.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 4.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 159.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 226.29442423599997,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 156.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 1.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 156.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"slow_query\",org=\"1\",reason=\"slow_evaluation\"}": 18.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 59.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 750.9,
+  "scenario": "slow-recover",
+  "label": "+45s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:29:30.000Z",
+    "updatedAt": "2026-11-09T14:27:30.017Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:29:30.000Z",
+    "updatedAt": "2026-11-09T14:27:32.017Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:29:10.000Z",
+    "updatedAt": "2026-11-09T14:27:17.355Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:29:00.000Z",
+    "updatedAt": "2026-11-09T14:27:09.356Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:26:00.000Z",
+    "endsAt": "2026-11-09T14:29:00.000Z",
+    "updatedAt": "2026-11-09T14:27:11.352Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 4.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 4.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 168.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 226.39555158299993,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 165.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 1.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 165.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"slow_query\",org=\"1\",reason=\"slow_evaluation\"}": 18.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 61.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ },
+ {
+  "t": 769.3,
+  "scenario": "slow-recover",
+  "label": "+60s",
+  "rules": {
+   "mode_alerting": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_alerting"
+    ]
+   },
+   "mode_ok": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_ok"
+    ]
+   },
+   "mode_nodata_error": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_nodata_error"
+    ]
+   },
+   "mode_keeplast": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:mode_keeplast"
+    ]
+   },
+   "slow_query": {
+    "state": "firing",
+    "health": "ok",
+    "error": "",
+    "instances": [
+     "Alerting:slow_query"
+    ]
+   }
+  },
+  "am": [
+   {
+    "alertname": "mode_alerting",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:29:30.000Z",
+    "updatedAt": "2026-11-09T14:27:30.017Z"
+   },
+   {
+    "alertname": "mode_keeplast",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:15:30.000Z",
+    "endsAt": "2026-11-09T14:29:30.000Z",
+    "updatedAt": "2026-11-09T14:27:32.017Z"
+   },
+   {
+    "alertname": "mode_nodata_error",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:10.000Z",
+    "endsAt": "2026-11-09T14:29:40.000Z",
+    "updatedAt": "2026-11-09T14:27:47.357Z"
+   },
+   {
+    "alertname": "mode_ok",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:20:00.000Z",
+    "endsAt": "2026-11-09T14:29:30.000Z",
+    "updatedAt": "2026-11-09T14:27:36.019Z"
+   },
+   {
+    "alertname": "slow_query",
+    "rulename": null,
+    "state": "active",
+    "startsAt": "2026-11-09T14:26:00.000Z",
+    "endsAt": "2026-11-09T14:29:30.000Z",
+    "updatedAt": "2026-11-09T14:27:38.017Z"
+   }
+  ],
+  "metrics": {
+   "grafana_alerting_alerts{state=\"alerting\"}": 5.0,
+   "grafana_alerting_alerts{state=\"error\"}": 0.0,
+   "grafana_alerting_alerts{state=\"nodata\"}": 0.0,
+   "grafana_alerting_alerts{state=\"normal\"}": 0.0,
+   "grafana_alerting_alerts{state=\"pending\"}": 0.0,
+   "grafana_alerting_alerts{state=\"recovering\"}": 0.0,
+   "grafana_alerting_notifications_total{integration=\"webhook\",org=\"1\"}": 4.0,
+   "grafana_alerting_rule_evaluation_attempt_failures_total{org=\"1\"}": 4.0,
+   "grafana_alerting_rule_evaluation_attempts_total{org=\"1\"}": 177.0,
+   "grafana_alerting_rule_evaluation_duration_seconds_sum{org=\"1\"}": 226.534949372,
+   "grafana_alerting_rule_evaluation_duration_seconds_count{org=\"1\"}": 174.0,
+   "grafana_alerting_rule_evaluation_failures_total{org=\"1\"}": 1.0,
+   "grafana_alerting_rule_evaluations_total{org=\"1\"}": 174.0,
+   "grafana_alerting_schedule_rule_evaluations_missed_total{name=\"slow_query\",org=\"1\",reason=\"slow_evaluation\"}": 18.0,
+   "grafana_alerting_sender_dropped_total{org=\"1\"}": 0.0,
+   "grafana_alerting_sender_errors_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 0.0,
+   "grafana_alerting_sender_sent_total{alertmanager=\"http://am:9093/api/v2/alerts\",data_source_uid=\"extam\",org=\"1\"}": 64.0
+  },
+  "hooks": {
+   "external": [],
+   "embedded": []
+  }
+ }
+]

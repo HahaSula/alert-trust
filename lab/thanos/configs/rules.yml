@@ -1,0 +1,23 @@
+# 同樣的兩條 rule 放在 abort 與 warn 兩個 group。
+# LabSeriesPresent 要讀 sidecar 的資料；LabConstant 不讀任何 StoreAPI。
+groups:
+  - name: g-abort
+    interval: 15s
+    partial_response_strategy: abort
+    rules:
+      - alert: LabSeriesPresent
+        expr: count(up{job="prometheus"}) > 0
+        labels: { strategy: abort }
+      - alert: LabConstant
+        expr: vector(1)
+        labels: { strategy: abort }
+  - name: g-warn
+    interval: 15s
+    partial_response_strategy: warn
+    rules:
+      - alert: LabSeriesPresent
+        expr: count(up{job="prometheus"}) > 0
+        labels: { strategy: warn }
+      - alert: LabConstant
+        expr: vector(1)
+        labels: { strategy: warn }
