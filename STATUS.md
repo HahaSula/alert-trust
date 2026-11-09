@@ -25,6 +25,7 @@
 | Thanos v0.42.5、Grafana Alerting v13.3.0 元件卡、規則、架構頁與小 lab | `catalog/components/`、`rules/thanos/`、`rules/grafana/`、`lab/thanos/`、`lab/grafana/` |
 | MySQL／MariaDB 與 PostgreSQL 的 exporter 盲點用 query-exporter 5.2.2 自訂查詢補上（lab 實測） | `queries/query-exporter/`、`lab/targets/*/custom-queries/` |
 | 資料庫架構頁：關聯式（MySQL／InnoDB 對照 PostgreSQL） | `docs/architecture/db-relational.md` |
+| 資料庫監控模型調查（exporter／內建 endpoint／collector／DB 內歷史／廠商方案）與官方告警規則 | `docs/targets/models.md` |
 | `rule-review` skill 與流程圖：先確認體系與基礎設施覆蓋，再看時間契約；離線用 `tools/rules_to_snapshot.py` | `skills/rule-review/`、`docs/tools/rule-review.md` |
 
 ## 進行中
@@ -47,6 +48,8 @@
 11. **Thanos／Grafana 沒實測的部分**：Thanos 的 sidecar 上傳失敗、Receive、HA；Grafana 的 HA、DB 中斷、外部 Alertmanager 失敗、UI 預設的 NoData／Error、Loki／SQL datasource。`docs/architecture/index.md` 的單序點對照表還沒加這兩個元件。
 10. **小項目**：MySQL redo log 太小的情境沒有重現（`log_waits` 一直是 0）；`ThroughputDrop` 規則用「昨天同時段」比較，lab 沒有一天的資料無法驗證；MySQL `NoWritablePrimary` 修正後未重跑；PG17、`/probe`、auto-discover 只讀碼；契約頁的圖未截圖確認；Prometheus 報告的例子（30s／100s／120s）使用者尚未表示意見。
 12. **架構頁發現的卡片缺口**：MySQL 卡沒有 checkpoint age 訊號（`innodb-pressure` 只有 `log_waits`、`wait_free`；lab 有量到 checkpoint age）；PG 卡沒有 `synchronous_commit` 訊號。
+13. **內建 endpoint 型資料庫的標準問題**（etcd、TiDB、YugabyteDB、ClickHouse）：沒有 exporter 層，`up == 0` 分不出 DB 掛了還是抓不到；`target-pattern` 要加一個變體（scrape 耗時與回應大小、加 blackbox `/readyz` 之類的第二訊號）。做 etcd 前先定。
+14. **官方 TiDB 規則的問題**（讀規則，未實測）：TiKV `name="apply_.*"` 用 `=` 永遠不匹配；`job="tidb"`、`job="pd"` 寫死；PD 規則都以 `etcd_server_is_leader` 為前提，抓不到 leader 時全部安靜。做 TiDB 時驗證。
 
 ## 已做的決定
 

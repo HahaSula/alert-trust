@@ -1,0 +1,234 @@
+# docs/targets/models.md（資料庫的監控模型）的來源。
+sources:
+  dbm-doc-etcd-monitoring:
+    title: "Monitoring etcd（/metrics、/health、/livez、/readyz、mixin）"
+    kind: upstream-doc
+    visibility: public
+    url: https://etcd.io/docs/v3.6/op-guide/monitoring/
+    checked: "2026-11-09"
+  dbm-doc-tidb-framework:
+    title: "TiDB Monitoring Framework Overview"
+    kind: upstream-doc
+    visibility: public
+    url: https://docs.pingcap.com/tidb/stable/tidb-monitoring-framework/
+    checked: "2026-11-09"
+  dbm-doc-tidb-alert-rules:
+    title: "TiDB Cluster Alert Rules（emergency／critical／warning）"
+    kind: upstream-doc
+    visibility: public
+    url: https://docs.pingcap.com/tidb/stable/alert-rules/
+    checked: "2026-11-09"
+    note: "頁面沒有 Prometheus、Alertmanager 本身的規則"
+  dbm-doc-tidb-deploy-monitoring:
+    title: "TiDB：Deploy Monitoring Services"
+    kind: upstream-doc
+    visibility: public
+    url: https://docs.pingcap.com/tidb/stable/deploy-monitoring-services/
+    checked: "2026-11-09"
+  dbm-doc-tidb-stmt-summary:
+    title: "TiDB Statement Summary Tables"
+    kind: upstream-doc
+    visibility: public
+    url: https://docs.pingcap.com/tidb/stable/statement-summary-tables/
+    checked: "2026-11-09"
+  dbm-doc-tidb-topsql:
+    title: "TiDB Top SQL"
+    kind: upstream-doc
+    visibility: public
+    url: https://docs.pingcap.com/tidb/stable/top-sql/
+    checked: "2026-11-09"
+  dbm-doc-tidb-profiling:
+    title: "TiDB Dashboard Instance Profiling"
+    kind: upstream-doc
+    visibility: public
+    url: https://docs.pingcap.com/tidb/stable/dashboard-profiling/
+    checked: "2026-11-09"
+  dbm-doc-ch-monitoring:
+    title: "ClickHouse Monitoring（system 表、/ping、/replicas_status、內建 dashboard）"
+    kind: upstream-doc
+    visibility: public
+    url: https://clickhouse.com/docs/operations/monitoring
+    checked: "2026-11-09"
+    note: "頁面沒有告警規則或門檻"
+  dbm-doc-ch-prometheus:
+    title: "ClickHouse Prometheus protocols（/metrics 設定）"
+    kind: upstream-doc
+    visibility: public
+    url: https://clickhouse.com/docs/interfaces/prometheus
+    checked: "2026-11-09"
+  dbm-doc-ch-metric-log:
+    title: "ClickHouse system.metric_log"
+    kind: upstream-doc
+    visibility: public
+    url: https://clickhouse.com/docs/operations/system-tables/metric_log
+    checked: "2026-11-09"
+  dbm-doc-ch-cloud-prom:
+    title: "ClickHouse Cloud Prometheus endpoint（Cloud API）"
+    kind: upstream-doc
+    visibility: public
+    url: https://clickhouse.com/docs/products/cloud/features/monitoring/prometheus
+    checked: "2026-11-09"
+  dbm-doc-yb-monitor:
+    title: "Monitor YugabyteDB"
+    kind: upstream-doc
+    visibility: public
+    url: https://docs.yugabyte.com/stable/launch-and-manage/monitor-and-alert/
+    checked: "2026-11-09"
+  dbm-doc-yb-metrics:
+    title: "YugabyteDB Metrics（/prometheus-metrics 端點與過濾參數）"
+    kind: upstream-doc
+    visibility: public
+    url: https://docs.yugabyte.com/stable/launch-and-manage/monitor-and-alert/metrics/
+    checked: "2026-11-09"
+  dbm-doc-yb-prom:
+    title: "YugabyteDB Prometheus integration"
+    kind: upstream-doc
+    visibility: public
+    url: https://docs.yugabyte.com/stable/explore/observability/prometheus-integration/
+    checked: "2026-11-09"
+  dbm-doc-yb-ash:
+    title: "YugabyteDB Active Session History"
+    kind: upstream-doc
+    visibility: public
+    url: https://docs.yugabyte.com/stable/launch-and-manage/monitor-and-alert/active-session-history-monitor/
+    checked: "2026-11-09"
+  dbm-doc-yba-alert:
+    title: "YugabyteDB Anywhere alerts"
+    kind: upstream-doc
+    visibility: public
+    url: https://docs.yugabyte.com/stable/yugabyte-platform/alerts-monitoring/alert/
+    checked: "2026-11-09"
+  dbm-doc-mongo-monitoring:
+    title: "Monitoring a Self-Managed MongoDB Deployment"
+    kind: upstream-doc
+    visibility: public
+    url: https://www.mongodb.com/docs/manual/administration/monitoring/
+    checked: "2026-11-09"
+    note: "沒有提到 Prometheus"
+  dbm-doc-mongo-ftdc:
+    title: "MongoDB Full Time Diagnostic Data Capture"
+    kind: upstream-doc
+    visibility: public
+    url: https://www.mongodb.com/docs/manual/administration/full-time-diagnostic-data-capture/
+    checked: "2026-11-09"
+  dbm-doc-atlas-alerts:
+    title: "Guidance for Atlas Monitoring and Alerts（建議告警門檻）"
+    kind: upstream-doc
+    visibility: public
+    url: https://www.mongodb.com/docs/atlas/architecture/current/monitoring-alerts/
+    checked: "2026-11-09"
+  dbm-doc-opsmgr-alerts:
+    title: "MongoDB Ops Manager Alerts reference"
+    kind: upstream-doc
+    visibility: public
+    url: https://www.mongodb.com/docs/ops-manager/current/reference/alerts/
+    checked: "2026-11-09"
+  dbm-doc-valkey-latency:
+    title: "Valkey Latency monitoring"
+    kind: upstream-doc
+    visibility: public
+    url: https://valkey.io/topics/latency-monitor/
+    checked: "2026-11-09"
+    note: "沒有提到 Prometheus"
+  dbm-doc-valkey-info:
+    title: "Valkey INFO"
+    kind: upstream-doc
+    visibility: public
+    url: https://valkey.io/commands/info/
+    checked: "2026-11-09"
+  dbm-doc-redis-latency:
+    title: "Redis latency monitor"
+    kind: upstream-doc
+    visibility: public
+    url: https://redis.io/docs/latest/operate/oss_and_stack/management/optimization/latency-monitor/
+    checked: "2026-11-09"
+  dbm-doc-mysql-pfs:
+    title: "MySQL 8.4 Performance Schema"
+    kind: upstream-doc
+    visibility: public
+    url: https://dev.mysql.com/doc/refman/8.4/en/performance-schema.html
+    checked: "2026-11-09"
+  dbm-doc-pg-stats:
+    title: "PostgreSQL 17 The Cumulative Statistics System"
+    kind: upstream-doc
+    visibility: public
+    url: https://www.postgresql.org/docs/17/monitoring-stats.html
+    checked: "2026-11-09"
+  dbm-doc-pg-pgss:
+    title: "PostgreSQL 17 pg_stat_statements"
+    kind: upstream-doc
+    visibility: public
+    url: https://www.postgresql.org/docs/17/pgstatstatements.html
+    checked: "2026-11-09"
+  dbm-doc-pmm:
+    title: "Percona Monitoring and Management 3"
+    kind: tool
+    visibility: public
+    url: https://docs.percona.com/percona-monitoring-and-management/3/index.html
+    checked: "2026-11-09"
+  dbm-doc-pgwatch:
+    title: "pgwatch"
+    kind: tool
+    visibility: public
+    url: https://pgwat.ch/latest/
+    checked: "2026-11-09"
+  dbm-rules-etcd-mixin:
+    title: "etcd mixin alerts（contrib/mixin）"
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/etcd-io/etcd/blob/v3.7.3/contrib/mixin/alerts/alerts.libsonnet
+    checked: "2026-11-09, v3.7.3"
+  dbm-rules-tidb:
+    title: "TiDB alert rules"
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/pingcap/tidb/blob/v8.5.8/pkg/metrics/alertmanager/tidb.rules.yml
+    checked: "2026-11-09, v8.5.8"
+  dbm-rules-tikv:
+    title: "TiKV alert rules"
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/tikv/tikv/blob/v8.5.8/metrics/alertmanager/tikv.rules.yml
+    checked: "2026-11-09, v8.5.8"
+  dbm-rules-pd:
+    title: "PD alert rules"
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/tikv/pd/blob/v8.5.8/metrics/alertmanager/pd.rules.yml
+    checked: "2026-11-09, v8.5.8"
+  dbm-rules-tidb-platform:
+    title: "TiUP 用的 node／blacker／bypass 規則（pingcap/monitoring）"
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/pingcap/monitoring/tree/v8.5.8/platform-monitoring/ansible/rule
+    checked: "2026-11-09, v8.5.8"
+  dbm-rules-yba:
+    title: "YugabyteDB Anywhere 告警範本"
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml
+    checked: "2026-11-09, v2026.1.3.0"
+  dbm-rules-altinity-ch:
+    title: "Altinity clickhouse-operator 的 ClickHouse 規則（社群，非 ClickHouse 官方）"
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-clickhouse.yaml
+    checked: "2026-11-09, release-0.27.4"
+  dbm-rules-redis-mixin:
+    title: "redis_exporter redis-mixin"
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/oliver006/redis_exporter/tree/v1.97.0/contrib/redis-mixin
+    checked: "2026-11-09, v1.97.0"
+  dbm-rules-pmm:
+    title: "PMM 3 內建告警範本"
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/percona/pmm/tree/v3.10.0/managed/data/alerting-templates
+    checked: "2026-11-09, v3.10.0"
+  dbm-rules-pg-mixin:
+    title: "postgres_exporter postgres_mixin"
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/prometheus-community/postgres_exporter/tree/v0.20.1/postgres_mixin
+    checked: "2026-11-09, v0.20.1"

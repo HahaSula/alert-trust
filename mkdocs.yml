@@ -72,6 +72,7 @@ nav:
       - 外部觀察者: components/observer.md
   - 資料庫:
       - 總覽: targets/index.md
+      - 監控模型: targets/models.md
       - MySQL／MariaDB:
           - 怎麼監控: targets/mysql.md
           - 監控訊號: components/mysqld_exporter.md

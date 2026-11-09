@@ -1,0 +1,387 @@
+# docs/targets/models.md 的參考（資料庫的監控模型）。行號已用 tag 上的檔案核對（2026-11-09）。
+# 官方文件頁面（非 repo 檔）放在頁面內的註腳與 catalog/sources.d/db-models.yaml。
+refs:
+  dbm-etcd-listen-metrics:
+    kind: code
+    title: "--listen-metrics-urls：只放 metrics 與 health 的 listener"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/embed/config.go"
+    line: 622
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/embed/config.go#L622"
+  dbm-etcd-metrics-level:
+    kind: code
+    title: "--metrics 預設 basic；extensive 才有 server 端 gRPC histogram"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/embed/config.go"
+    line: 737
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/embed/config.go#L737"
+  dbm-etcd-mixin-insufficient:
+    kind: code
+    title: "etcd mixin：etcdInsufficientMembers 用 up 算過半"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "contrib/mixin/alerts/alerts.libsonnet"
+    line: 29
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/contrib/mixin/alerts/alerts.libsonnet#L29"
+  dbm-etcd-mixin-noleader:
+    kind: code
+    title: "etcd mixin：etcdNoLeader（has_leader == 0 for 1m）"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "contrib/mixin/alerts/alerts.libsonnet"
+    line: 43
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/contrib/mixin/alerts/alerts.libsonnet#L43"
+  dbm-etcd-mixin-fsync:
+    kind: code
+    title: "etcd mixin：WAL fsync p99 > 0.5s warning、> 1s critical"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "contrib/mixin/alerts/alerts.libsonnet"
+    line: 149
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/contrib/mixin/alerts/alerts.libsonnet#L149"
+  dbm-etcd-mixin-quota:
+    kind: code
+    title: "etcd mixin：DB 大小 / quota > 95% critical"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "contrib/mixin/alerts/alerts.libsonnet"
+    line: 194
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/contrib/mixin/alerts/alerts.libsonnet#L194"
+  dbm-tidb-status-metrics:
+    kind: code
+    title: "TiDB status port 註冊 /metrics（promhttp）"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/server/http_status.go"
+    line: 215
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/server/http_status.go#L215"
+  dbm-tidb-rules-keepalive:
+    kind: code
+    title: "tidb.rules.yml：TiDB_monitor_keep_alive（job=\"tidb\" 寫死）"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/metrics/alertmanager/tidb.rules.yml"
+    line: 78
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/metrics/alertmanager/tidb.rules.yml#L78"
+  dbm-tidb-rules-query:
+    kind: code
+    title: "tidb.rules.yml：TiDB_query_duration p99 > 1s"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/metrics/alertmanager/tidb.rules.yml"
+    line: 114
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/metrics/alertmanager/tidb.rules.yml#L114"
+  dbm-tikv-rules-stall:
+    kind: code
+    title: "tikv.rules.yml：TiKV_write_stall"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/tikv.rules.yml"
+    line: 64
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/metrics/alertmanager/tikv.rules.yml#L64"
+  dbm-tikv-rules-apply-matcher:
+    kind: code
+    title: "tikv.rules.yml：apply worker 規則用 name=\"apply_.*\"（= 不是 =~）"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/tikv.rules.yml"
+    line: 173
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/metrics/alertmanager/tikv.rules.yml#L173"
+  dbm-pd-rules-store-down:
+    kind: code
+    title: "pd.rules.yml：PD_cluster_down_tikv_nums（只在 etcd leader 上算）"
+    project: "PD"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/pd.rules.yml"
+    line: 4
+    url: "https://github.com/tikv/pd/blob/v8.5.8/metrics/alertmanager/pd.rules.yml#L4"
+  dbm-pd-rules-fsync:
+    kind: code
+    title: "pd.rules.yml：內嵌 etcd 的 WAL fsync p99 > 1s"
+    project: "PD"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/pd.rules.yml"
+    line: 16
+    url: "https://github.com/tikv/pd/blob/v8.5.8/metrics/alertmanager/pd.rules.yml#L16"
+  dbm-tiup-rule-files:
+    kind: code
+    title: "TiUP 產生的 prometheus.yml：載入的 rule 檔清單"
+    project: "TiUP"
+    version: "v1.17.1"
+    file: "embed/templates/config/prometheus.yml.tpl"
+    line: 21
+    url: "https://github.com/pingcap/tiup/blob/v1.17.1/embed/templates/config/prometheus.yml.tpl#L21"
+  dbm-tiup-monitor-probe:
+    kind: code
+    title: "TiUP monitor_port_probe：只 TCP 探測 pushgateway、grafana、node_exporter、blackbox"
+    project: "TiUP"
+    version: "v1.17.1"
+    file: "embed/templates/config/prometheus.yml.tpl"
+    line: 438
+    url: "https://github.com/pingcap/tiup/blob/v1.17.1/embed/templates/config/prometheus.yml.tpl#L438"
+  dbm-tidb-blacker-blackbox:
+    kind: code
+    title: "blacker.rules.yml：Blackbox_exporter_server_is_down（由 blackbox 自己探測）"
+    project: "pingcap/monitoring"
+    version: "v8.5.8"
+    file: "platform-monitoring/ansible/rule/blacker.rules.yml"
+    line: 76
+    url: "https://github.com/pingcap/monitoring/blob/v8.5.8/platform-monitoring/ansible/rule/blacker.rules.yml#L76"
+  dbm-yb-prom-endpoint:
+    kind: code
+    title: "YugabyteDB webserver 註冊 /prometheus-metrics"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/server/default-path-handlers.cc"
+    line: 802
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/server/default-path-handlers.cc#L802"
+  dbm-yb-max-entries:
+    kind: code
+    title: "/prometheus-metrics 的 max_metric_entries 參數"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/server/default-path-handlers.cc"
+    line: 688
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/server/default-path-handlers.cc#L688"
+  dbm-yb-alert-query-failed:
+    kind: code
+    title: "YBA 告警範本：ALERT_QUERY_FAILED（ybp_alert_query_status）"
+    project: "YugabyteDB Anywhere"
+    version: "v2026.1.3.0"
+    file: "managed/src/main/resources/alert/alert_templates.yml"
+    line: 65
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml#L65"
+  dbm-yb-clock-skew:
+    kind: code
+    title: "YBA 告警範本：CLOCK_SKEW（hybrid_clock_skew）"
+    project: "YugabyteDB Anywhere"
+    version: "v2026.1.3.0"
+    file: "managed/src/main/resources/alert/alert_templates.yml"
+    line: 193
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml#L193"
+  dbm-yb-leaderless:
+    kind: code
+    title: "YBA 告警範本：LEADERLESS_TABLETS"
+    project: "YugabyteDB Anywhere"
+    version: "v2026.1.3.0"
+    file: "managed/src/main/resources/alert/alert_templates.yml"
+    line: 870
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml#L870"
+  dbm-yb-metric-collection:
+    kind: code
+    title: "YBA 告警範本：UNIVERSE_METRIC_COLLECTION_FAILURE"
+    project: "YugabyteDB Anywhere"
+    version: "v2026.1.3.0"
+    file: "managed/src/main/resources/alert/alert_templates.yml"
+    line: 1507
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml#L1507"
+  dbm-yb-license:
+    kind: code
+    title: "YugabyteDB 核心 Apache 2.0；YBA（managed/）Polyform Free Trial"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "README.md"
+    line: 185
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/README.md#L185"
+  dbm-ch-prom-commented:
+    kind: code
+    title: "預設 config.xml 的 <prometheus> 區塊是註解掉的"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "programs/server/config.xml"
+    line: 1237
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/programs/server/config.xml#L1237"
+  dbm-ch-metric-log:
+    kind: code
+    title: "預設 config.xml 開啟 metric_log"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "programs/server/config.xml"
+    line: 1450
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/programs/server/config.xml#L1450"
+  dbm-altinity-exporter-down:
+    kind: code
+    title: "Altinity operator 規則：ClickHouseMetricsExporterDown"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "deploy/prometheus/prometheus-alert-rules-clickhouse.yaml"
+    line: 13
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-clickhouse.yaml#L13"
+  dbm-altinity-parts:
+    kind: code
+    title: "Altinity operator 規則：MaxPartCountForPartition > 100"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "deploy/prometheus/prometheus-alert-rules-clickhouse.yaml"
+    line: 150
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-clickhouse.yaml#L150"
+  dbm-altinity-replica-delay:
+    kind: code
+    title: "Altinity operator 規則：ReplicasMaxAbsoluteDelay > 300"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "deploy/prometheus/prometheus-alert-rules-clickhouse.yaml"
+    line: 230
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-clickhouse.yaml#L230"
+  dbm-mongo-otel-prom:
+    kind: code
+    title: "openTelemetryPrometheusMetricsDirectory：OTel metrics 以 Prometheus 格式寫到檔案"
+    project: "MongoDB"
+    version: "r8.3.13"
+    file: "src/mongo/otel/metrics/metrics_settings.idl"
+    line: 58
+    url: "https://github.com/mongodb/mongo/blob/r8.3.13/src/mongo/otel/metrics/metrics_settings.idl#L58"
+  dbm-mongo-otel-names:
+    kind: code
+    title: "OTel metric 名稱登錄表（只有少數連線與 index build metric）"
+    project: "MongoDB"
+    version: "r8.3.13"
+    file: "src/mongo/otel/metrics/metric_names.h"
+    line: 94
+    url: "https://github.com/mongodb/mongo/blob/r8.3.13/src/mongo/otel/metrics/metric_names.h#L94"
+  dbm-mongo-license:
+    kind: code
+    title: "MongoDB Community 授權為 SSPL v1"
+    project: "MongoDB"
+    version: "r8.0.34"
+    file: "LICENSE-Community.txt"
+    line: 1
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/LICENSE-Community.txt#L1"
+  dbm-mongodb-exporter-versions:
+    kind: code
+    title: "mongodb_exporter 支援 MongoDB 6.0 以上"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "README.md"
+    line: 24
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/README.md#L24"
+  dbm-mongodb-exporter-roles:
+    kind: code
+    title: "mongodb_exporter 需要 clusterMonitor 與 local 的 read"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "README.md"
+    line: 91
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/README.md#L91"
+  dbm-redis-exp-checkkeys:
+    kind: code
+    title: "redis_exporter：--check-keys 大量 key 會讓 scrape 跑不完"
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "README.md"
+    line: 201
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/README.md#L201"
+  dbm-redis-exp-batch:
+    kind: code
+    title: "redis_exporter：Redis 單執行緒，SCAN COUNT 太大會影響正式環境"
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "README.md"
+    line: 207
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/README.md#L207"
+  dbm-redis-mixin-down:
+    kind: code
+    title: "redis-mixin：RedisDown（redis_up == 0 for 5m）"
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "contrib/redis-mixin/alerts/redis.libsonnet"
+    line: 8
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/contrib/redis-mixin/alerts/redis.libsonnet#L8"
+  dbm-valkey-commandlog:
+    kind: code
+    title: "valkey.conf：commandlog-execution-slower-than 10000（取代 slowlog 設定）"
+    project: "Valkey"
+    version: "9.1.3"
+    file: "valkey.conf"
+    line: 2188
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/valkey.conf#L2188"
+  dbm-valkey-latency-default:
+    kind: code
+    title: "valkey.conf：latency-monitor-threshold 0（預設關）"
+    project: "Valkey"
+    version: "9.1.3"
+    file: "valkey.conf"
+    line: 2244
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/valkey.conf#L2244"
+  dbm-mysqld-mixin-down:
+    kind: code
+    title: "mysqld-mixin general.yaml：只有 MySQLDown 一條"
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "mysqld-mixin/alerts/general.yaml"
+    line: 4
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/mysqld-mixin/alerts/general.yaml#L4"
+  dbm-mysqld-mixin-repl:
+    kind: code
+    title: "mysqld-mixin galera.yaml：MySQLReplicationNotRunning 等複寫規則"
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "mysqld-mixin/alerts/galera.yaml"
+    line: 40
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/mysqld-mixin/alerts/galera.yaml#L40"
+  dbm-pg-mixin-down:
+    kind: code
+    title: "postgres_mixin：PostgreSQLDown"
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "postgres_mixin/alerts/postgres.libsonnet"
+    line: 46
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/postgres_mixin/alerts/postgres.libsonnet#L46"
+  dbm-pg-mixin-exporter-errors:
+    kind: code
+    title: "postgres_mixin：PostgresHasExporterErrors"
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "postgres_mixin/alerts/postgres.libsonnet"
+    line: 211
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/postgres_mixin/alerts/postgres.libsonnet#L211"
+  dbm-pmm-agent-down:
+    kind: code
+    title: "PMM 告警範本：pmm_agent_down"
+    project: "PMM"
+    version: "v3.10.0"
+    file: "managed/data/alerting-templates/agent_down.yml"
+    line: 6
+    url: "https://github.com/percona/pmm/blob/v3.10.0/managed/data/alerting-templates/agent_down.yml#L6"
+  dbm-pmm-vm-down:
+    kind: code
+    title: "PMM 告警範本：pmm_victoriametrics_down（PMM 自己的 TSDB）"
+    project: "PMM"
+    version: "v3.10.0"
+    file: "managed/data/alerting-templates/victoriametrics_down.yml"
+    line: 3
+    url: "https://github.com/percona/pmm/blob/v3.10.0/managed/data/alerting-templates/victoriametrics_down.yml#L3"
+  dbm-otel-mysql:
+    kind: code
+    title: "OTel Collector mysqlreceiver：metrics beta"
+    project: "opentelemetry-collector-contrib"
+    version: "v0.165.0"
+    file: "receiver/mysqlreceiver/metadata.yaml"
+    line: 7
+    url: "https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.165.0/receiver/mysqlreceiver/metadata.yaml#L7"
+  dbm-otel-postgresql:
+    kind: code
+    title: "OTel Collector postgresqlreceiver：metrics beta"
+    project: "opentelemetry-collector-contrib"
+    version: "v0.165.0"
+    file: "receiver/postgresqlreceiver/metadata.yaml"
+    line: 10
+    url: "https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.165.0/receiver/postgresqlreceiver/metadata.yaml#L10"
+  dbm-otel-redis:
+    kind: code
+    title: "OTel Collector redisreceiver：metrics beta"
+    project: "opentelemetry-collector-contrib"
+    version: "v0.165.0"
+    file: "receiver/redisreceiver/metadata.yaml"
+    line: 12
+    url: "https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.165.0/receiver/redisreceiver/metadata.yaml#L12"
+  dbm-otel-mongodb:
+    kind: code
+    title: "OTel Collector mongodbreceiver：metrics beta"
+    project: "opentelemetry-collector-contrib"
+    version: "v0.165.0"
+    file: "receiver/mongodbreceiver/metadata.yaml"
+    line: 13
+    url: "https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.165.0/receiver/mongodbreceiver/metadata.yaml#L13"
