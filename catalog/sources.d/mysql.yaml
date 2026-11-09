@@ -112,3 +112,91 @@ sources:
     visibility: public
     url: https://mariadb.com/kb/en/performance-schema-overview/
     checked: "2026-11-08"
+  # ---- 九個面向補缺（cluster、protection、capacity、maintenance）與 MariaDB ASH 頁 ----
+  art-mysql-asp:
+    title: MySQL 8.4 Group Replication、MariaDB Galera、binlog 保留、auto_increment 與 ASH 取樣器的輕量實驗
+    kind: experiment
+    visibility: public
+    url: https://github.com/HahaSula/alert-trust/tree/main/lab/targets/mysql/ash
+    checked: "2026-11-09, mariadb:11.4（11.4.13、galera-4 26.4.27）、mysql:8.4.7、prom/mysqld-exporter:v0.21.0"
+    note: GR 三台暫停兩台、Galera 三台暫停兩台、flow control 嘗試、MariaDB 無 replica 時的 binlog 過期、MySQL information_schema 統計快取、每秒取樣 PROCESSLIST＋performance_schema
+  mysql-gr-monitoring:
+    title: MySQL 8.4 手冊：Group Replication 監控（replication_group_members、member_stats、成員狀態）
+    kind: upstream-doc
+    visibility: public
+    url: https://dev.mysql.com/doc/refman/8.4/en/group-replication-monitoring.html
+    checked: "2026-11-09"
+  mysql-gr-partition:
+    title: MySQL 8.4 手冊：Group Replication 網路分割與失去多數
+    kind: upstream-doc
+    visibility: public
+    url: https://dev.mysql.com/doc/refman/8.4/en/group-replication-network-partitioning.html
+    checked: "2026-11-09"
+    note: 多數成員 UNREACHABLE 時群組擋住寫入，要人用 group_replication_force_members 處理或等成員回來
+  mysql-gr-flow-control:
+    title: MySQL 8.4 手冊：Group Replication flow control
+    kind: upstream-doc
+    visibility: public
+    url: https://dev.mysql.com/doc/refman/8.4/en/group-replication-flow-control.html
+    checked: "2026-11-09"
+    note: Gr_flow_control_* 統計由 Enterprise 的 component 提供；8.4.7 社群版原始碼的 components/ 裡沒有這個 component
+  galera-status-vars:
+    title: MariaDB 手冊：Galera Cluster status variables（wsrep_cluster_status、wsrep_flow_control_paused、wsrep_local_recv_queue）
+    kind: upstream-doc
+    visibility: public
+    url: https://mariadb.com/kb/en/galera-cluster-status-variables/
+    checked: "2026-11-09"
+  galera-src:
+    title: Galera 26.4.27 原始碼（replicator_smm_stats.cpp 的 wsrep_* 狀態變數）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/codership/galera/tree/release_26.4.27
+    checked: "2026-11-09, release_26.4.27（mariadb:11.4 映像內的 galera-4 版本）"
+  mysql-pitr:
+    title: MySQL 8.4 手冊：用 binlog 做 point-in-time recovery
+    kind: upstream-doc
+    visibility: public
+    url: https://dev.mysql.com/doc/refman/8.4/en/point-in-time-recovery.html
+    checked: "2026-11-09"
+  mariadb-binlog-purge:
+    title: MariaDB 手冊：binlog 的保留與刪除（binlog_expire_logs_seconds、max_binlog_total_size、slave_connections_needed_for_purge）
+    kind: upstream-doc
+    visibility: public
+    url: https://mariadb.com/kb/en/using-and-maintaining-the-binary-log/
+    checked: "2026-11-09"
+  node-exporter-textfile:
+    title: node_exporter textfile collector（批次工作把 metric 寫成檔案）
+    kind: tool
+    visibility: public
+    url: https://github.com/prometheus/node_exporter#textfile-collector
+    checked: "2026-11-09"
+  mysql-is-stats-expiry:
+    title: MySQL 8.4 手冊：information_schema_stats_expiry（TABLES 的統計值快取）
+    kind: upstream-doc
+    visibility: public
+    url: https://dev.mysql.com/doc/refman/8.4/en/server-system-variables.html#sysvar_information_schema_stats_expiry
+    checked: "2026-11-09"
+  mariadb-show-explain:
+    title: MariaDB 手冊：SHOW EXPLAIN／SHOW ANALYZE FOR <thread>（看執行中查詢的計畫）
+    kind: upstream-doc
+    visibility: public
+    url: https://mariadb.com/kb/en/show-explain/
+    checked: "2026-11-09"
+  mariadb-slow-log-extended:
+    title: MariaDB 手冊：slow query log 擴充統計（log_slow_verbosity）
+    kind: upstream-doc
+    visibility: public
+    url: https://mariadb.com/kb/en/slow-query-log-extended-statistics/
+    checked: "2026-11-09"
+  mariadb-sys-schema:
+    title: MariaDB 手冊：sys schema（10.6 起內建，資料來自 performance_schema）
+    kind: upstream-doc
+    visibility: public
+    url: https://mariadb.com/kb/en/sys-schema/
+    checked: "2026-11-09"
+  query-exporter:
+    title: query-exporter（把自訂 SQL 結果輸出成 Prometheus metric）
+    kind: tool
+    visibility: public
+    url: https://github.com/albertodonato/query-exporter
+    checked: "2026-11-09"

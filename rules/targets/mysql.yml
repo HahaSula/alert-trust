@@ -209,7 +209,8 @@ groups:
           summary: "Semi-sync 開著但已退回 async（等 ACK 逾時）；commit 照常成功，只有這個狀態會變"
           runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#semi-sync
 
-  - name: mysql-galera
+  # 叢集與共識：MariaDB Galera 與 MySQL Group Replication。規則都只在對應的元件存在時才有資料（applies_when）。
+  - name: mysql-cluster
     rules:
       - alert: MySQLGaleraNotReady
         expr: |
@@ -231,6 +232,192 @@ groups:
           summary: "Galera 節點不在 Synced 狀態，也不是刻意 desync"
           runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#galera-state
           absence_covered_by: "MySQLExporterDown, MySQLCollectorsMissing"
+      - alert: MySQLGaleraNonPrimary
+        expr: |
+          mysql_global_status_wsrep_cluster_status{job="mysql"} != 1
+            and on (job, instance) mysql_global_variables_wsrep_on{job="mysql"} == 1
+        for: 1m
+        labels: { severity: critical, component: mysqld_exporter, tier: "2" }
+        annotations:
+          summary: "Galera 節點不在 Primary component（失去 quorum 或斷線），拒絕讀寫；exporter 把 Primary 轉成 1、non-Primary／Disconnected 轉成 0；沒開 Galera 的 MariaDB 也是 0，所以要用 wsrep_on 過濾"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#galera-quorum
+          absence_covered_by: "MySQLExporterDown, MySQLNotReachable, MySQLCollectorsMissing"
+      - alert: MySQLGaleraClusterShrunk
+        expr: |
+          mysql_global_status_wsrep_cluster_size{job="mysql"}
+            < max_over_time(mysql_global_status_wsrep_cluster_size{job="mysql"}[1h])
+          and on (job, instance) mysql_global_variables_wsrep_on{job="mysql"} == 1
+        for: 5m
+        labels: { severity: warning, component: mysqld_exporter, tier: "2" }
+        annotations:
+          summary: "Galera 叢集成員數比一小時內的最大值少（{{ $value }}）；再少一台可能失去 quorum。刻意移除節點後這條會持續一小時"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#galera-quorum
+          absence_covered_by: "MySQLExporterDown, MySQLNotReachable, MySQLCollectorsMissing"
+      - alert: MySQLGaleraFlowControl
+        expr: |
+          rate(mysql_global_status_wsrep_flow_control_paused_ns{job="mysql"}[5m]) / 1e9 > 0.1
+        for: 10m
+        labels: { severity: warning, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "Galera 有 {{ $value | humanizePercentage }} 的時間因 flow control 暫停複寫（整個叢集的寫入一起等最慢的節點）；看各節點的 wsrep_local_recv_queue 與 wsrep_flow_control_sent 找出是誰送的"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#galera-flow-control
+      - alert: MySQLGroupMemberNotOnline
+        expr: mysql_perf_schema_replication_group_member_info{job="mysql", member_state!="ONLINE"}
+        for: 5m
+        labels: { severity: warning, component: mysqld_exporter, tier: "2" }
+        annotations:
+          summary: "{{ $labels.instance }} 看到 Group Replication 成員 {{ $labels.member_host }} 是 {{ $labels.member_state }}；要 --collect.perf_schema.replication_group_members（預設關）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#gr-member-state
+          absence_covered_by: "MySQLGroupMembersMissing, MySQLCollectorFailed"
+      - alert: MySQLGroupMembersMissing
+        expr: |
+          (
+            count by (job, instance) (mysql_perf_schema_replication_group_member_info{job="mysql"})
+              < max_over_time(count by (job, instance) (mysql_perf_schema_replication_group_member_info{job="mysql"})[1h:1m])
+          )
+          or
+          (
+            count by (job, instance) (mysql_perf_schema_replication_group_member_info{job="mysql"} offset 1h)
+              unless on (job, instance) mysql_perf_schema_replication_group_member_info{job="mysql"}
+            and on (job, instance) mysql_up{job="mysql"} == 1
+          )
+        for: 5m
+        labels: { severity: warning, component: mysqld_exporter, tier: "2" }
+        annotations:
+          summary: "{{ $labels.instance }} 看到的 Group Replication 成員比一小時內少，或整組成員資料不見了（被踢出群組、STOP GROUP_REPLICATION、collector 被關）；被踢出的成員不會留在其他成員的表裡"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#gr-member-state
+      - alert: MySQLGroupQuorumLost
+        expr: |
+          count by (job, instance) (mysql_perf_schema_replication_group_member_info{job="mysql", member_state="UNREACHABLE"}) * 2
+            >= count by (job, instance) (mysql_perf_schema_replication_group_member_info{job="mysql"})
+        for: 1m
+        labels: { severity: critical, component: mysqld_exporter, tier: "2" }
+        annotations:
+          summary: "{{ $labels.instance }} 有一半以上的成員 UNREACHABLE，Group Replication 失去多數、寫入被擋住（plugin 的判斷是 members − unreachable ≤ members / 2）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#gr-quorum
+          absence_covered_by: "MySQLGroupMembersMissing, MySQLNotReachable"
+      - alert: MySQLGroupApplierQueueHigh
+        expr: |
+          (
+            mysql_perf_schema_transactions_remote_in_applier_queue{job="mysql"}
+              > on (job, instance) (0.5 * mysql_global_variables_group_replication_flow_control_applier_threshold{job="mysql"})
+          )
+          or
+          (
+            mysql_perf_schema_transactions_in_queue{job="mysql"}
+              > on (job, instance) (0.5 * mysql_global_variables_group_replication_flow_control_certifier_threshold{job="mysql"})
+          )
+        for: 10m
+        labels: { severity: warning, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "Group Replication 的 applier 或 certifier 佇列超過 flow control 門檻的一半，再長下去整個群組的寫入會被節流；要 --collect.perf_schema.replication_group_member_stats（只輸出本機成員）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#gr-flow-control
+          absence_covered_by: "MySQLCollectorFailed"
+
+  # 資料維護與完整性：救援模式、表的碎片（長交易與 undo history 在 mysql-stability）
+  - name: mysql-maintenance
+    rules:
+      - alert: MySQLInnoDBForceRecovery
+        expr: mysql_global_variables_innodb_force_recovery{job="mysql"} != 0
+        for: 2m
+        labels: { severity: warning, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "innodb_force_recovery 開著，資料庫在救援模式（≥4 時 InnoDB 唯讀）；通常代表之前遇到損毀，救完要改回 0 並重啟"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#force-recovery
+          absence_covered_by: "MySQLCollectorFailed, MySQLCollectorsMissing"
+      - alert: MySQLTableFragmented
+        expr: |
+          mysql_info_schema_table_size{job="mysql", component="data_free"} > 1e9
+          and on (job, instance, schema, table)
+            mysql_info_schema_table_size{job="mysql", component="data_free"}
+              > on (job, instance, schema, table) (0.5 * sum without (component) (mysql_info_schema_table_size{job="mysql", component=~"data_length|index_length"}))
+        for: 1h
+        labels: { severity: info, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "{{ $labels.schema }}.{{ $labels.table }} 的未使用空間超過 1 GB 且大於資料加索引的一半（大量 DELETE 後），考慮 OPTIMIZE／重建；要 --collect.info_schema.tables（每張表一組 series），MySQL 的值最多晚 information_schema_stats_expiry（預設一天）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#table-fragmentation
+
+  # 資料保護：PITR 需要的 binlog、耐久性設定、備份新鮮度（備份工具要自己輸出 metric）
+  - name: mysql-protection
+    rules:
+      - alert: MySQLBinlogDisabled
+        expr: mysql_global_variables_log_bin{job="mysql", pitr!="false"} == 0
+        for: 30m
+        labels: { severity: warning, component: mysqld_exporter, tier: "2" }
+        annotations:
+          summary: "binlog 沒開，只能還原到最後一次完整備份（沒有 point-in-time recovery）；MariaDB 預設關、MySQL 8.4 預設開。不需要 PITR 的節點用 pitr=\"false\" label 排除（label 是佔位符）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#binlog-pitr
+          absence_covered_by: "MySQLCollectorFailed, MySQLCollectorsMissing"
+      - alert: MySQLBinlogRetentionShort
+        expr: |
+          mysql_global_variables_binlog_expire_logs_seconds{job="mysql"} > 0
+            and mysql_global_variables_binlog_expire_logs_seconds{job="mysql"} < 7 * 86400
+            and on (job, instance) mysql_global_variables_log_bin{job="mysql"} == 1
+        for: 30m
+        labels: { severity: warning, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "binlog 保留 {{ $value | humanizeDuration }}，比完整備份週期（例子：7 天）短，兩次備份之間的 PITR 會缺一段；0 代表不依時間刪除"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#binlog-pitr
+          absence_covered_by: "MySQLCollectorFailed, MySQLCollectorsMissing"
+      - alert: MySQLDurabilityRelaxed
+        expr: |
+          (mysql_global_variables_sync_binlog{job="mysql"} != 1 and on (job, instance) mysql_global_variables_log_bin{job="mysql"} == 1)
+          or mysql_global_variables_innodb_flush_log_at_trx_commit{job="mysql"} != 1
+        for: 30m
+        labels: { severity: info, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "sync_binlog 或 innodb_flush_log_at_trx_commit 不是 1，主機斷電時可能少掉最近已 commit 的交易，binlog 與資料也可能不一致；MariaDB 的 sync_binlog 預設是 0"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#durability-settings
+          absence_covered_by: "MySQLCollectorFailed, MySQLCollectorsMissing"
+      - alert: MySQLBackupStale
+        expr: time() - max by (cluster) (mysql_backup_last_success_timestamp_seconds) > 26 * 3600
+        for: 10m
+        labels: { severity: warning, component: mysqld_exporter, tier: "2" }
+        annotations:
+          summary: "叢集 {{ $labels.cluster }} 超過 26 小時沒有成功的備份；mysqld_exporter 沒有備份 metric，這個 metric 要由備份 job 寫 textfile 或推到 Pushgateway（名稱與 26h 是例子）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#backup-freshness
+          absence_covered_by: "MySQLBackupMetricMissing"
+      - alert: MySQLBackupMetricMissing
+        expr: absent(mysql_backup_last_success_timestamp_seconds)
+        for: 1h
+        labels: { severity: warning, component: mysqld_exporter, tier: "2" }
+        annotations:
+          summary: "完全沒有備份的 metric：備份 job 沒在寫、textfile 路徑錯，或 node_exporter 沒開 textfile collector；這時 MySQLBackupStale 回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#backup-freshness
+
+  # 容量與成長：趨勢與預測
+  - name: mysql-capacity
+    rules:
+      - alert: MySQLDataDiskFillingSoon
+        expr: |
+          predict_linear(node_filesystem_avail_bytes{job="node", mountpoint="/var/lib/mysql"}[6h], 24 * 3600) < 0
+          and node_filesystem_avail_bytes{job="node", mountpoint="/var/lib/mysql"}
+            / node_filesystem_size_bytes{job="node", mountpoint="/var/lib/mysql"} < 0.4
+        for: 1h
+        labels: { severity: warning, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "照過去 6 小時的速度，資料目錄 24 小時內會滿；binlog 沒在清（MariaDB 沒有 replica 連著時預設不刪）、大量匯入、暫存表都會讓它變快"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#disk-space
+      - alert: MySQLAutoIncrementNearMax
+        expr: |
+          mysql_info_schema_auto_increment_column{job="mysql"}
+            / on (job, instance, schema, table, column) mysql_info_schema_auto_increment_column_max{job="mysql"} > 0.8
+        for: 1h
+        labels: { severity: warning, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "{{ $labels.schema }}.{{ $labels.table }}.{{ $labels.column }} 已用掉 {{ $value | humanizePercentage }} 的整數範圍，用完後 INSERT 回 duplicate key；要 --collect.auto_increment.columns，MySQL 的值最多晚 information_schema_stats_expiry（預設一天）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#autoinc-exhaustion
+          absence_covered_by: "MySQLCollectorFailed"
+      - alert: MySQLConnectionPeakNearMax
+        expr: |
+          mysql_global_status_max_used_connections{job="mysql"}
+            / on (job, instance) mysql_global_variables_max_connections{job="mysql"} >= 0.9
+        for: 5m
+        labels: { severity: info, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "重啟（或 FLUSH STATUS）以來連線數曾到 max_connections 的 {{ $value | humanizePercentage }}；這個高水位在 exporter 被擋在外面時也會記下來（打滿時是 max_connections + 1）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#connection-headroom
+          absence_covered_by: "MySQLNotReachable, MySQLCollectorFailed"
 
 
   - name: mysql-stability
@@ -241,13 +428,6 @@ groups:
         annotations:
           summary: "MySQL 五分鐘內重啟過（含 crash、OOM kill）；停機時間短於 for 的話 mysql_up 規則不會響"
           runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#restarts
-      - alert: MySQLInnoDBForceRecovery
-        expr: mysql_global_variables_innodb_force_recovery{job="mysql"} != 0
-        for: 2m
-        labels: { severity: warning, component: mysqld_exporter, tier: "3" }
-        annotations:
-          summary: "innodb_force_recovery 開著，資料庫在救援模式（≥4 時 InnoDB 唯讀）"
-          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#restarts
       - alert: MySQLDataDiskFilling
         expr: |
           node_filesystem_avail_bytes{job="node", mountpoint="/var/lib/mysql"}
@@ -255,7 +435,7 @@ groups:
         for: 10m
         labels: { severity: warning, component: mysqld_exporter, tier: "2" }
         annotations:
-          summary: "資料目錄剩不到 10%；寫滿時 MySQL 不報錯而是卡住等空間，mysqld_exporter 看不到磁碟，要靠 node_exporter（job、mountpoint 是佔位符）"
+          summary: "資料目錄剩不到 10%；InnoDB 資料檔長不出去時立刻回 ERROR 1114（實測），binlog 等寫入則會卡住重試（手冊）；mysqld_exporter 看不到磁碟，要靠 node_exporter（job、mountpoint 是佔位符）"
           runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#disk-space
       - alert: MySQLLongTransaction
         expr: max by (instance) (mysql_info_schema_innodb_trx_oldest_transaction_age_seconds{job="mysql"}) > 300

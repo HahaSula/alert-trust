@@ -72,6 +72,7 @@ nav:
   - Target 怎麼監控:
       - MySQL／MariaDB: targets/mysql.md
       - MySQL／MariaDB 附錄：原始碼到 metric: targets/mysql-appendix.md
+      - MariaDB 的 ASH 缺口與建議: targets/mariadb-ash.md
       - PostgreSQL: targets/postgres.md
       - PostgreSQL 附錄：原始碼到 metric: targets/postgres-appendix.md
   - 內部架構:

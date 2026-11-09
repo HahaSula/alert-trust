@@ -1,0 +1,110 @@
+# 九個面向補缺的輕量實驗＋MariaDB ASH 取樣器原型。
+#   mdb：單台 MariaDB 11.4（binlog、performance_schema、EVENT 取樣器）
+#   gal1..gal3：三台 MariaDB Galera（26.4.27，映像內建）
+#   gr1..gr3：三台 MySQL 8.4.7 Group Replication（single-primary）
+# 每台要看的節點配一台 mysqld_exporter v0.21.0，直接 curl /metrics，不起 Prometheus。
+# Host port 只開 127.0.0.1:22801–22804。執行：./run.sh；結束後自動 docker compose down -v。
+name: at-myasp
+x-ex: &ex
+  image: prom/mysqld-exporter:v0.21.0
+  environment: { MYSQLD_EXPORTER_PASSWORD: exporterpw }
+x-gal: &gal
+  image: mariadb:11.4
+  environment: { MARIADB_ROOT_PASSWORD: rootpw }
+  volumes: [./init-mdb.sql:/docker-entrypoint-initdb.d/init.sql:ro]
+  mem_limit: 512m
+  healthcheck:
+    test: ["CMD", "healthcheck.sh", "--connect"]
+    interval: 3s
+    retries: 80
+x-gr: &gr
+  image: mysql:8.4.7
+  environment: { MYSQL_ROOT_PASSWORD: rootpw }
+  volumes: [./init-gr.sql:/docker-entrypoint-initdb.d/init.sql:ro]
+  mem_limit: 768m
+  healthcheck:
+    test: ["CMD", "mysqladmin", "ping", "-uroot", "-prootpw", "--silent"]
+    interval: 3s
+    retries: 80
+services:
+  mdb:
+    image: mariadb:11.4
+    environment: { MARIADB_ROOT_PASSWORD: rootpw }
+    command:
+      - --log-bin=mdb-bin
+      - --binlog-expire-logs-seconds=20     # 讓 purge 在幾十秒內就該發生
+      - --performance-schema=ON
+      - --event-scheduler=ON
+      - --innodb-lock-wait-timeout=30
+      - --innodb-buffer-pool-size=64M
+    volumes: [./init-mdb.sql:/docker-entrypoint-initdb.d/init.sql:ro, ./ash-sampler.sql:/ash-sampler.sql:ro]
+    mem_limit: 768m
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 3s
+      retries: 60
+  gal1:
+    <<: *gal
+    command: [--wsrep-on=ON, --wsrep-provider=/usr/lib/galera/libgalera_smm.so, --wsrep-cluster-name=at,
+              "--wsrep-cluster-address=gcomm://gal1,gal2,gal3", --wsrep-sst-method=rsync, --binlog-format=ROW,
+              --innodb-autoinc-lock-mode=2, --innodb-buffer-pool-size=64M, --wsrep-node-name=gal1, --wsrep-new-cluster]
+  gal2:
+    <<: *gal
+    command: [--wsrep-on=ON, --wsrep-provider=/usr/lib/galera/libgalera_smm.so, --wsrep-cluster-name=at,
+              "--wsrep-cluster-address=gcomm://gal1,gal2,gal3", --wsrep-sst-method=rsync, --binlog-format=ROW,
+              --innodb-autoinc-lock-mode=2, --innodb-buffer-pool-size=64M, --wsrep-node-name=gal2]
+    depends_on: { gal1: { condition: service_healthy } }
+  gal3:
+    <<: *gal
+    command: [--wsrep-on=ON, --wsrep-provider=/usr/lib/galera/libgalera_smm.so, --wsrep-cluster-name=at,
+              "--wsrep-cluster-address=gcomm://gal1,gal2,gal3", --wsrep-sst-method=rsync, --binlog-format=ROW,
+              --innodb-autoinc-lock-mode=2, --innodb-buffer-pool-size=64M, --wsrep-node-name=gal3]
+    depends_on: { gal2: { condition: service_healthy } }
+  gr1:
+    <<: *gr
+    command:
+      - --server-id=1
+      - --report-host=gr1
+      - --loose-group-replication-local-address=gr1:33061
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+      - --plugin-load-add=group_replication.so
+      - --loose-group-replication-group-name=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa
+      - --loose-group-replication-start-on-boot=OFF
+      - --loose-group-replication-group-seeds=gr1:33061,gr2:33061,gr3:33061
+      - --loose-group-replication-recovery-get-public-key=ON
+      - --innodb-buffer-pool-size=64M
+  gr2:
+    <<: *gr
+    command: [--server-id=2, --report-host=gr2, --loose-group-replication-local-address=gr2:33061, --gtid-mode=ON,
+              --enforce-gtid-consistency=ON, --plugin-load-add=group_replication.so,
+              --loose-group-replication-group-name=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa, --loose-group-replication-start-on-boot=OFF,
+              "--loose-group-replication-group-seeds=gr1:33061,gr2:33061,gr3:33061", --loose-group-replication-recovery-get-public-key=ON,
+              --innodb-buffer-pool-size=64M]
+  gr3:
+    <<: *gr
+    command: [--server-id=3, --report-host=gr3, --loose-group-replication-local-address=gr3:33061, --gtid-mode=ON,
+              --enforce-gtid-consistency=ON, --plugin-load-add=group_replication.so,
+              --loose-group-replication-group-name=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa, --loose-group-replication-start-on-boot=OFF,
+              "--loose-group-replication-group-seeds=gr1:33061,gr2:33061,gr3:33061", --loose-group-replication-recovery-get-public-key=ON,
+              --innodb-buffer-pool-size=64M]
+  ex-mdb:
+    <<: *ex
+    entrypoint: ["/bin/mysqld_exporter", "--mysqld.address=mdb:3306", "--mysqld.username=exporter",
+                 --collect.binlog_size, --collect.info_schema.schema_size, --collect.auto_increment.columns,
+                 --collect.info_schema.processlist, --collect.info_schema.innodb_metrics]
+    ports: ["127.0.0.1:22801:9104"]
+  ex-gr1:
+    <<: *ex
+    entrypoint: ["/bin/mysqld_exporter", "--mysqld.address=gr1:3306", "--mysqld.username=exporter",
+                 --collect.perf_schema.replication_group_members, --collect.perf_schema.replication_group_member_stats,
+                 --collect.binlog_size, --collect.info_schema.schema_size, --collect.auto_increment.columns]
+    ports: ["127.0.0.1:22802:9104"]
+  ex-gal1:
+    <<: *ex
+    entrypoint: ["/bin/mysqld_exporter", "--mysqld.address=gal1:3306", "--mysqld.username=exporter"]
+    ports: ["127.0.0.1:22803:9104"]
+  ex-gal2:
+    <<: *ex
+    entrypoint: ["/bin/mysqld_exporter", "--mysqld.address=gal2:3306", "--mysqld.username=exporter"]
+    ports: ["127.0.0.1:22804:9104"]

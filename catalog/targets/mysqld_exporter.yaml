@@ -12,7 +12,8 @@ role: >-
   而是整組消失，所以用 != 1 或 == 0 寫的規則會回傳空。
   MySQL 與 MariaDB 用同一張卡；只適用其中一種、或只在 replication、Galera、/probe 模式下才有的訊號用 applies_when 標示。
   規則範例在 rules/targets/mysql.yml，job="mysql" 是佔位符。
-  訊號分四組（aspect 欄位）：exporter（它真的在量嗎）、stability（穩定）、usage（使用）、ha（replication 與角色）。
+  訊號依九個面向分組（aspect 欄位）：exporter、availability、workload、saturation、replication、cluster（Galera、Group Replication）、
+  maintenance（purge、救援模式、碎片）、protection（binlog、耐久性、備份）、capacity（磁碟、auto_increment、連線高水位）。
   資料庫本身該監控什麼、每個訊號由哪個 collector 提供、需要什麼權限，整理在 docs/targets/mysql.md。
 
 silent_failures:
@@ -300,15 +301,15 @@ signals:
     tier: 3
     question: 資料庫重啟過或在救援模式嗎
     signal: >-
-      uptime < 300（crash、OOM kill、手動重啟都會歸零）；innodb_force_recovery != 0。
+      uptime < 300（crash、OOM kill、手動重啟都會歸零）。救援模式（innodb_force_recovery）見 force-recovery。
       停機短於 MySQLNotReachable 的 for 時只有 uptime 看得出來；OOM 的原因要看 kernel log 或容器事件，exporter 看不到
-    metrics: [mysql_global_status_uptime, mysql_global_variables_innodb_force_recovery]
+    metrics: [mysql_global_status_uptime]
     evaluate_on: self
     evidence: tested
     source: art-mysql-ha
     refs: [exp-mysql-ha]
     upstream: { status: yes, note: "awesome 用 uptime < 60，短於一個 scrape 週期加 for 時容易漏" }
-    rules: [rules/targets/mysql.yml#MySQLRestarted, rules/targets/mysql.yml#MySQLInnoDBForceRecovery]
+    rules: [rules/targets/mysql.yml#MySQLRestarted]
 
   - id: crash-oom
     aspect: availability
@@ -330,7 +331,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLRestarted, rules/targets/mysql.yml#MySQLRestartedRepeatedly, rules/targets/mysql.yml#MySQLNotReachable]
 
   - id: disk-space
-    aspect: availability
+    aspect: capacity
     tier: 2
     question: 資料目錄與 binlog 的磁碟還夠嗎
     signal: >-
@@ -346,10 +347,10 @@ signals:
     source: mysql-full-disk
     refs: [exp-mysql-perf]
     upstream: { status: no, note: "mixin 與 awesome 都沒有；要靠 node_exporter 的通用磁碟規則，且要知道資料目錄在哪個掛載點" }
-    rules: [rules/targets/mysql.yml#MySQLDataDiskFilling]
+    rules: [rules/targets/mysql.yml#MySQLDataDiskFilling, rules/targets/mysql.yml#MySQLDataDiskFillingSoon]
 
   - id: long-transactions
-    aspect: availability
+    aspect: maintenance
     tier: 2
     question: 有沒有開太久的交易
     signal: >-
@@ -365,7 +366,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLLongTransaction]
 
   - id: undo-history
-    aspect: availability
+    aspect: maintenance
     tier: 2
     question: Undo history 有沒有被擋住無法 purge
     signal: >-
@@ -384,7 +385,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLInnoDBHistoryLength]
 
   - id: deadlocks
-    aspect: availability
+    aspect: workload
     tier: 3
     question: Deadlock 變多了嗎
     signal: >-
@@ -468,7 +469,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLRowLockWaits, rules/targets/mysql.yml#MySQLRowLockWaitTime]
 
   - id: slow-queries
-    aspect: saturation
+    aspect: workload
     tier: 3
     question: 有新的慢查詢嗎
     signal: >-
@@ -527,7 +528,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLTableOpenCacheOverflows]
 
   - id: aborted-connects
-    aspect: saturation
+    aspect: workload
     tier: 3
     question: 連線建立失敗變多了嗎
     signal: >-
@@ -543,7 +544,7 @@ signals:
 
   # ---------- 效能情境（lab/targets/mysql/perf）----------
   - id: throughput-drop
-    aspect: saturation
+    aspect: workload
     tier: 3
     question: 吞吐量（TPS／QPS）掉下來了嗎
     signal: >-
@@ -590,7 +591,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLMetadataLockWaits]
 
   - id: slow-sql-visibility
-    aspect: saturation
+    aspect: workload
     tier: 3
     question: 慢的是哪一種 SQL
     signal: >-
@@ -616,7 +617,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLSlowDigest, rules/targets/mysql.yml#MySQLSlowQueries]
 
   - id: statement-errors
-    aspect: saturation
+    aspect: workload
     tier: 3
     question: 語句錯誤（lock wait timeout、table is full）變多了嗎
     signal: >-
@@ -766,7 +767,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLNoWritablePrimary, rules/targets/mysql.yml#MySQLMultipleWritable]
 
   - id: primary-writable
-    aspect: replication
+    aspect: availability
     tier: 2
     question: Primary 寫得進去嗎
     signal: >-
@@ -822,7 +823,7 @@ signals:
     rules: [rules/targets/mysql.yml#MySQLSemiSyncDegraded]
 
   - id: galera-state
-    aspect: replication
+    aspect: cluster
     tier: 3
     question: Galera 節點可以服務嗎
     signal: >-
@@ -840,3 +841,310 @@ signals:
     refs: [exp-mysql, exp-mysql-ha]
     upstream: { status: partial, note: "mixin 與 awesome 有，但沒用 wsrep_on 過濾，普通 MariaDB 會誤報" }
     rules: [rules/targets/mysql.yml#MySQLGaleraNotReady, rules/targets/mysql.yml#MySQLGaleraOutOfSync]
+
+  # ---------- 叢集與共識：Group Replication（MySQL）、Galera（MariaDB）----------
+  - id: gr-member-state
+    aspect: cluster
+    tier: 2
+    question: Group Replication 每個成員都 ONLINE 嗎
+    signal: >-
+      --collect.perf_schema.replication_group_members（預設關）把 performance_schema.replication_group_members 的每一列輸出成
+      mysql_perf_schema_replication_group_member_info{member_host,member_state,member_role,...} = 1，所有欄位都變成 label。
+      member_state 不是 ONLINE（RECOVERING、OFFLINE、ERROR、UNREACHABLE）時告警；被踢出群組的成員不會留在其他成員的表裡，
+      所以另外比「看到的成員數比一小時內少」
+    metrics: [mysql_perf_schema_replication_group_member_info]
+    evaluate_on: self
+    applies_when: "MySQL Group Replication／InnoDB Cluster"
+    silent_failure: >-
+      狀態是 label 不是值：狀態一變，舊 series 消失、新 series 出現，只寫 == 0 的規則永遠不會響。
+      沒裝 plugin 時表是空的，collector 回報成功但沒有 series；member_id、member_version 也是 label，升版或重建成員會換一組 series
+    evidence: tested
+    source: art-mysql-asp
+    refs: [my-asp-exp, my-asp-ex-grm-query, my-asp-ex-grm-labels, my-asp-ex-grm-metric, my-asp-my-grm-state-col, my-asp-my-grm-unreachable, my-asp-ex-def-grm]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有 Group Replication 規則" }
+    rules: [rules/targets/mysql.yml#MySQLGroupMemberNotOnline, rules/targets/mysql.yml#MySQLGroupMembersMissing]
+
+  - id: gr-quorum
+    aspect: cluster
+    tier: 2
+    question: Group Replication 還有多數嗎
+    signal: >-
+      每台成員自己看到的 UNREACHABLE 數 × 2 ≥ 成員數時失去多數（plugin 的判斷是 members − unreachable ≤ members / 2），寫入被擋住。
+      實驗：三台暫停兩台 24 秒後，倖存的 gr1 看到 2 台 UNREACHABLE、自己仍是 ONLINE／PRIMARY，exporter 照常回應（mysql_up 1），
+      INSERT 卡住到 5 秒 timeout；恢復後那筆 INSERT 其實 commit 了
+    metrics: [mysql_perf_schema_replication_group_member_info]
+    evaluate_on: self
+    applies_when: "MySQL Group Replication／InnoDB Cluster"
+    silent_failure: >-
+      失去多數的成員自己仍是 ONLINE，只看 member_state != ONLINE 的規則會對 UNREACHABLE 的那幾列響，但看不出群組已經不能寫；
+      group_replication_unreachable_majority_timeout 預設 0（一直等），群組不會自己恢復。客戶端逾時不代表交易沒寫入
+    evidence: tested
+    source: art-mysql-asp
+    refs: [my-asp-exp, my-asp-my-gr-quorum, my-asp-my-gr-blocked, my-asp-ex-grm-labels]
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLGroupQuorumLost]
+
+  - id: gr-flow-control
+    aspect: cluster
+    tier: 3
+    question: Group Replication 的佇列快碰到 flow control 門檻了嗎
+    signal: >-
+      --collect.perf_schema.replication_group_member_stats（預設關，只查本機成員：WHERE MEMBER_ID=@@server_uuid）輸出
+      mysql_perf_schema_transactions_in_queue（等 certification）與 transactions_remote_in_applier_queue（等套用）；
+      門檻是 group_replication_flow_control_certifier_threshold／applier_threshold（預設 25000，global_variables 有輸出）
+    metrics:
+      - mysql_perf_schema_transactions_in_queue
+      - mysql_perf_schema_transactions_remote_in_applier_queue
+      - mysql_global_variables_group_replication_flow_control_applier_threshold
+      - mysql_global_variables_group_replication_flow_control_certifier_threshold
+    evaluate_on: self
+    applies_when: "MySQL Group Replication／InnoDB Cluster"
+    silent_failure: >-
+      「目前正在被節流多久」的 Gr_flow_control_* 統計只有 Enterprise 的 component 有；社群版 8.4.7 的 global status 有 Gr_* 共識計數，
+      但沒有 flow control 的，只能看佇列長度。member_stats 只輸出本機，要每台都抓
+    evidence: code
+    source: mysql-gr-flow-control
+    refs: [my-asp-exp, my-asp-ex-grms-query, my-asp-ex-grms-queue, my-asp-ex-grms-applier, my-asp-my-grms-queue-col, my-asp-my-grms-applier-col, my-asp-my-gr-fc-applier, my-asp-my-gr-fc-certifier]
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLGroupApplierQueueHigh]
+
+  - id: galera-quorum
+    aspect: cluster
+    tier: 2
+    question: Galera 節點還在 Primary component 嗎
+    signal: >-
+      wsrep_cluster_status 是字串（Primary、non-Primary、Disconnected），exporter 的 parseStatus 把 Primary 轉成 1、其他兩個轉成 0，
+      輸出 mysql_global_status_wsrep_cluster_status；wsrep_cluster_size 是目前 view 的成員數。
+      實驗：三台暫停兩台 29 秒後，倖存的 gal1 是 non-Primary（0）、size 1、wsrep_ready 0，讀取回 ERROR 1047；exporter 照常回應
+    metrics:
+      - mysql_global_status_wsrep_cluster_status
+      - mysql_global_status_wsrep_cluster_size
+      - mysql_global_variables_wsrep_on
+    evaluate_on: self
+    applies_when: mariadb galera
+    silent_failure: >-
+      沒開 Galera 的 MariaDB 也輸出 wsrep_cluster_status 0（Disconnected）與 wsrep_cluster_size 0，不用 wsrep_on 過濾會對每台普通 MariaDB 誤報。
+      cluster_size 掉一台時其餘節點仍是 Primary，只看 cluster_status 要等到再少一台、失去 quorum 才響
+    evidence: tested
+    source: art-mysql-asp
+    refs: [my-asp-exp, my-asp-mdb-wsrep-status-var, my-asp-mdb-wsrep-primary, my-asp-mdb-wsrep-nonprimary, my-asp-mdb-wsrep-disconnected, my-asp-mdb-wsrep-size-set, my-asp-ex-gs-wsrep-status, my-asp-ex-parse-nonprimary]
+    upstream: { status: no, note: "mixin 的 galera.yaml 只有 wsrep_ready、wsrep_local_state、donor 落後三條，沒有 cluster_status 或 cluster_size" }
+    rules: [rules/targets/mysql.yml#MySQLGaleraNonPrimary, rules/targets/mysql.yml#MySQLGaleraClusterShrunk]
+
+  - id: galera-flow-control
+    aspect: cluster
+    tier: 3
+    question: Galera 有沒有因為 flow control 暫停寫入
+    signal: >-
+      wsrep_flow_control_paused_ns 是累計的暫停奈秒數（Galera provider 給的，SHOW GLOBAL STATUS 經 wsrep_show_status 帶出來），
+      rate(...) / 1e9 就是暫停時間比例；wsrep_flow_control_paused 是「自上次 FLUSH STATUS 以來」的平均，不適合寫規則。
+      找出送 flow control 的節點看 wsrep_flow_control_sent 與 wsrep_local_recv_queue
+    metrics:
+      - mysql_global_status_wsrep_flow_control_paused_ns
+      - mysql_global_status_wsrep_flow_control_sent
+      - mysql_global_status_wsrep_local_recv_queue
+      - mysql_global_status_wsrep_local_cert_failures
+    evaluate_on: self
+    applies_when: mariadb galera
+    silent_failure: wsrep_flow_control_active 是字串 true／false，exporter 不認得、直接跳過
+    evidence: code
+    source: galera-src
+    refs: [my-asp-gal-fc-paused-ns, my-asp-gal-fc-paused, my-asp-gal-fc-sent, my-asp-gal-recv-queue, my-asp-gal-cert-failures, my-asp-gal-fc-active, my-asp-mdb-wsrep-provider-vars, my-asp-mdb-wsrep-provider-status, my-asp-exp]
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLGaleraFlowControl]
+
+  # ---------- 資料維護與完整性：救援模式、碎片、損毀 ----------
+  - id: force-recovery
+    aspect: maintenance
+    tier: 3
+    question: 資料庫在 InnoDB 救援模式嗎
+    signal: >-
+      innodb_force_recovery != 0（global_variables 預設有輸出）。≥ 4 時 InnoDB 唯讀，但 read_only 仍可能是 0；
+      通常是之前遇到損毀，救完要改回 0 並重啟
+    metrics: [mysql_global_variables_innodb_force_recovery]
+    evaluate_on: self
+    evidence: code
+    source: mysql-force-recovery
+    refs: [my-asp-my-force-recovery, my-asp-mdb-force-recovery, my-global-variables-parse]
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLInnoDBForceRecovery]
+
+  - id: table-fragmentation
+    aspect: maintenance
+    tier: 3
+    question: 有沒有表在大量刪除後留下很多未使用空間
+    signal: >-
+      --collect.info_schema.tables（預設關）讀 information_schema.TABLES，每張表輸出 mysql_info_schema_table_size{component=data_length|index_length|data_free}。
+      data_free 大且超過資料加索引的一半時考慮重建
+    metrics: [mysql_info_schema_table_size, mysql_info_schema_table_rows]
+    evaluate_on: self
+    silent_failure: >-
+      每張表三條以上的 series，表多時 cardinality 高，可用 --collect.info_schema.tables.databases 限定 schema。
+      MySQL 的值來自統計快取（information_schema_stats_expiry 預設一天），實驗中新表在 ANALYZE TABLE 之前完全沒出現在 auto_increment 結果裡；
+      innodb_file_per_table=OFF 時 data_free 是共用 tablespace 的剩餘空間，每張表都一樣
+    evidence: code
+    source: mysqld-exporter-src
+    refs: [my-asp-ex-tables-query, my-asp-ex-tables-datafree, my-asp-ex-def-tables, my-asp-my-is-stats-expiry, my-asp-exp]
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLTableFragmented]
+
+  - id: corruption-signals
+    aspect: maintenance
+    tier: 2
+    question: 有頁面損毀或 checksum 錯誤嗎
+    signal: >-
+      exporter 看不到：MySQL 8.4 與 MariaDB 11.4 都沒有「讀到損毀頁」的 status 計數（MariaDB 只有 page compression 的
+      Innodb_num_pages_page_compression_error）；損毀只寫在 error log。補法：log pipeline 對 error log 的 InnoDB 損毀訊息告警，
+      加上定期 CHECK TABLE（或 mariadb-check／mysqlcheck）把結果寫成 textfile metric；innodb_force_recovery 被打開是事後訊號
+    metrics: [mysql_global_status_innodb_num_pages_page_compression_error, mysql_global_variables_innodb_force_recovery]
+    evaluate_on: external
+    silent_failure: >-
+      實驗（perf lab）中 tablespace 檔案不見時 crash recovery 失敗、2 秒退出、進入重啟迴圈，metric 上只看得到 mysql_up 0；
+      只讀到某一頁時才發現的損毀不會讓任何 mysql_* 改變
+    evidence: code
+    source: mariadb-server-src
+    refs: [my-asp-mdb-page-compress-err, my-asp-my-force-recovery, exp-mysql-perf]
+    upstream: { status: no }
+    rules: []
+
+  # ---------- 資料保護：PITR、耐久性、備份 ----------
+  - id: binlog-pitr
+    aspect: protection
+    tier: 2
+    question: binlog 有開、保留得夠久，可以做 point-in-time recovery 嗎
+    signal: >-
+      log_bin == 0 代表只能還原到最後一次完整備份；binlog_expire_logs_seconds 要比完整備份週期長（0 代表不依時間刪除）。
+      實驗：MySQL 8.4 預設 log_bin 1、expire 2592000（30 天）；MariaDB 預設 log_bin 0、expire 0。binlog 用量用 --collect.binlog_size
+    metrics:
+      - mysql_global_variables_log_bin
+      - mysql_global_variables_binlog_expire_logs_seconds
+      - mysql_binlog_size_bytes
+      - mysql_binlog_files
+    evaluate_on: self
+    silent_failure: >-
+      binlog_size collector 在 log_bin=0 時直接回傳、沒有任何 series（collector_success 仍是 1），「沒開 binlog」和「沒開 collector」看起來一樣，
+      要看 mysql_global_variables_log_bin。binlog 開著不代表有被保存到別處：binlog 和資料在同一顆磁碟上時，磁碟壞掉一起沒了
+    evidence: tested
+    source: art-mysql-asp
+    refs: [my-asp-exp, my-asp-ex-binlog-logbin, my-asp-ex-binlog-skip, my-asp-ex-binlog-query, my-asp-my-log-bin, my-asp-my-binlog-expire, my-asp-mdb-log-bin, my-asp-mdb-binlog-expire, my-asp-ex-def-binlog]
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLBinlogDisabled, rules/targets/mysql.yml#MySQLBinlogRetentionShort]
+
+  - id: durability-settings
+    aspect: protection
+    tier: 3
+    question: 斷電時會不會少掉已 commit 的交易
+    signal: >-
+      sync_binlog != 1（binlog 開著時）或 innodb_flush_log_at_trx_commit != 1。實驗：MariaDB 11.4 的 sync_binlog 預設 0、MySQL 8.4 預設 1；
+      flush_log_at_trx_commit 兩邊預設都是 1
+    metrics: [mysql_global_variables_sync_binlog, mysql_global_variables_innodb_flush_log_at_trx_commit]
+    evaluate_on: self
+    evidence: tested
+    source: art-mysql-asp
+    refs: [my-asp-exp, my-asp-my-sync-binlog, my-asp-mdb-sync-binlog, my-asp-my-flush-log-trx]
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLDurabilityRelaxed]
+
+  - id: backup-freshness
+    aspect: protection
+    tier: 2
+    question: 最近一次成功的備份是什麼時候
+    signal: >-
+      mysqld_exporter 沒有任何備份相關的 collector。做法：備份 job（mariabackup、xtrabackup、mysqldump、MySQL Shell dump）成功後
+      寫 textfile metric，例如 mysql_backup_last_success_timestamp_seconds{cluster} 與 mysql_backup_size_bytes，由 node_exporter 的
+      textfile collector 或 Pushgateway 送進來；告警看「多久沒有成功」與「metric 整個不見」。還原測試另外記錄
+    metrics: [mysql_backup_last_success_timestamp_seconds]
+    evaluate_on: external
+    silent_failure: >-
+      只在失敗時發通知的備份 job，cron 沒跑或主機停機時什麼都不會發；所以要用「最後成功時間」而不是「失敗事件」，並且 absent 要另外一條規則
+    evidence: inferred
+    source: node-exporter-textfile
+    refs: [my-default-collectors]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有；metric 名稱是本專案的例子" }
+    rules: [rules/targets/mysql.yml#MySQLBackupStale, rules/targets/mysql.yml#MySQLBackupMetricMissing]
+
+  # ---------- 容量與成長 ----------
+  - id: autoinc-exhaustion
+    aspect: capacity
+    tier: 3
+    question: 有沒有 AUTO_INCREMENT 欄位快用完整數範圍
+    signal: >-
+      --collect.auto_increment.columns（預設關）輸出 mysql_info_schema_auto_increment_column 與 ..._column_max（依型別算 2^n − 1）。
+      實驗：MariaDB 的 TINYINT 表插入 100 列後是 128／127（已超過上限，下一筆 INSERT 會失敗）
+    metrics: [mysql_info_schema_auto_increment_column, mysql_info_schema_auto_increment_column_max]
+    evaluate_on: self
+    silent_failure: >-
+      MySQL 8.4 的 information_schema.TABLES.AUTO_INCREMENT 走統計快取（information_schema_stats_expiry 預設 86400 秒）：
+      實驗中新表插入 10 列、再插入 50 列，兩次 scrape 都沒有這張表；ANALYZE TABLE 之後才出現（74）。最慢要一天才看得到
+    evidence: tested
+    source: art-mysql-asp
+    refs: [my-asp-exp, my-asp-ex-autoinc-query, my-asp-ex-def-autoinc, my-asp-my-is-stats-expiry]
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLAutoIncrementNearMax]
+
+  - id: connection-headroom
+    aspect: capacity
+    tier: 3
+    question: 連線數的高峰離 max_connections 還有多遠
+    signal: >-
+      Max_used_connections 是重啟（或 FLUSH STATUS）以來的高水位，scrape 之間的尖峰與 exporter 被擋在外面的那段時間都會記下來
+      （ha lab：打滿後是 max_connections + 1）。和 threads_connected / max_connections 的即時比例互補
+    metrics: [mysql_global_status_max_used_connections, mysql_global_variables_max_connections]
+    evaluate_on: self
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-trace-my-max-used, my-trace-mdb-max-used]
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLConnectionPeakNearMax]
+
+  - id: binlog-growth
+    aspect: capacity
+    tier: 3
+    question: binlog 有照設定刪除嗎
+    signal: >-
+      mysql_binlog_files 與 mysql_binlog_size_bytes 的趨勢；磁碟預測用 MySQLDataDiskFillingSoon。
+      MariaDB 的 slave_connections_needed_for_purge 預設 1：沒有 replica 連著時，binlog_expire_logs_seconds 到期也不刪。
+      實驗：expire 20 秒，30 秒後 FLUSH，檔案數 5 → 6；改成 0 再 FLUSH 才變 3
+    metrics: [mysql_binlog_files, mysql_binlog_size_bytes, mysql_global_variables_slave_connections_needed_for_purge]
+    evaluate_on: self
+    silent_failure: 單機 MariaDB 開 binlog 做 PITR 時，binlog 會一直長到磁碟滿；設定看起來對（expire 有設），只有檔案數會一直增加
+    evidence: tested
+    source: art-mysql-asp
+    refs: [my-asp-exp, my-asp-mdb-purge-needs-slave, my-asp-ex-binlog-query]
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLDataDiskFillingSoon]
+
+  - id: data-growth
+    aspect: capacity
+    tier: 3
+    question: 資料量長多快
+    signal: >-
+      --collect.info_schema.schema_size（預設關）每個 schema 一條 mysql_info_schema_schema_size_bytes（DATA_LENGTH + INDEX_LENGTH 加總，
+      不含 mysql、sys、performance_schema、information_schema），用來畫趨勢與做容量規劃；告警交給磁碟預測
+    metrics: [mysql_info_schema_schema_size_bytes]
+    evaluate_on: self
+    silent_failure: 是估計值；MySQL 走統計快取（最多晚一天），不等於磁碟上的檔案大小（不含 binlog、redo、undo、暫存檔）
+    evidence: tested
+    source: art-mysql-asp
+    refs: [my-asp-exp, my-asp-ex-schema-size-query, my-asp-ex-def-schema-size, my-asp-my-is-stats-expiry]
+    upstream: { status: no }
+    rules: []
+
+  # ---------- 工作量：active session ----------
+  - id: active-sessions
+    aspect: workload
+    tier: 3
+    question: 此刻有多少 session 在做事、在等什麼
+    signal: >-
+      processlist collector（預設關）每次 scrape 依 command、state 計數，等於一個以 scrape 間隔取樣的簡化 ASH：
+      sum(mysql_info_schema_processlist_threads{command!~"sleep|daemon|binlog_dump.*"}) 是 active session 數。
+      要知道是哪個語句、等哪個事件，用 docs/targets/mariadb-ash.md 的取樣器（每秒取樣 PROCESSLIST＋performance_schema、彙總成有界的 metric）
+    metrics: [mysql_info_schema_processlist_threads, mysql_info_schema_processlist_seconds]
+    evaluate_on: self
+    silent_failure: >-
+      等 row lock 的 session state 是 updating，看不出在等鎖；只有 scrape 那一刻的快照，scrape 之間的尖峰看不到；沒有語句或 digest 的維度
+    evidence: tested
+    source: art-mysql-asp
+    refs: [my-asp-exp-ash, my-processlist-query, my-asp-ex-processlist-group]
+    upstream: { status: no }
+    rules: []

@@ -2,7 +2,7 @@
 
 [元件卡](../components/mysqld_exporter.md)回答「exporter 真的有在量嗎」。這頁回答另一個問題：**MySQL 與 MariaDB 本身該看哪些訊號**，每個訊號從資料庫的哪裡來、mysqld_exporter v0.21.0 有沒有輸出、預設有沒有開、要什麼權限。
 
-依據是 mysqld_exporter、MySQL 8.4.7、MariaDB 11.4.13 的原始碼與官方手冊，加上一組小實驗：兩種資料庫各一組 primary + async replica（GTID），開長交易、做 deadlock、讓 replica 延遲三種方式、讓 replication 因衝突停下、讓 semi-sync 退回 async、打滿連線、kill -9 primary、做一次 failover 並讓舊 primary 回來。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql-ha]
+依據是 mysqld_exporter、MySQL 8.4.7、MariaDB 11.4.13 的原始碼與官方手冊，加上一組小實驗：兩種資料庫各一組 primary + async replica（GTID），開長交易、做 deadlock、讓 replica 延遲三種方式、讓 replication 因衝突停下、讓 semi-sync 退回 async、打滿連線、kill -9 primary、做一次 failover 並讓舊 primary 回來。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql-ha]叢集、資料保護與容量三個面向另外做了一組：三台 Group Replication 與三台 Galera 各暫停兩台、MariaDB 沒有 replica 時的 binlog 過期、MySQL 的 information_schema 統計快取。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp]
 
 ## 先講結論
 
@@ -13,6 +13,9 @@
 5. **Semi-sync 退回 async 時 commit 照常成功。**唯一的變化是 `rpl_semi_sync_*_status` 從 1 變 0。MariaDB 內建 semi-sync，沒開時 status 也是 0，所以要和 `enabled == 1` 一起看。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql-ha]
 6. **MySQL 與 MariaDB 的同一個訊號名稱不同。**Undo history、deadlock 在 MariaDB 是預設就有的 global status；MySQL 沒有這兩個 status，只能開 `info_schema.innodb_metrics`，而且 deadlock 的 metric 在 MySQL 有 `_total`、在 MariaDB 沒有。規則要用 `or` 把兩種名稱接起來。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql-ha][^my-innodb-metrics-name][^mariadb-innodb-deadlocks]
 7. **很多關鍵訊號預設沒開。**長交易（`info_schema.innodb_trx`）、MySQL 的 undo history 與 deadlock（`info_schema.innodb_metrics`）、metadata lock 等待（`info_schema.processlist`）、heartbeat、每帳號連線數（`sys.user_summary`、`mysql.user`）都預設關。預設只開 6 個 collector。[^my-default-collectors]
+8. **失去 quorum 時 exporter 照常回應。**Group Replication 三台暫停兩台後，倖存節點自己仍是 ONLINE、`mysql_up` 1，寫入卻卡住（client 逾時的那筆在恢復後其實 commit 了）；Galera 倖存節點變 non-Primary、讀取回 ERROR 1047。要用成員數或 `wsrep_cluster_status` 判斷，不能靠 `mysql_up`。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp]
+9. **單機 MariaDB 的 binlog 不會過期刪除。**`slave_connections_needed_for_purge` 預設 1，沒有 replica 連著時 `binlog_expire_logs_seconds` 到期也不刪，binlog 會一直長到磁碟滿。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp][^my-asp-mdb-purge-needs-slave]
+10. **備份與損毀，exporter 都看不到。**沒有備份 collector，頁面損毀沒有 status 計數；備份要由備份 job 自己輸出最後成功時間，損毀要看 error log。MySQL 的 information_schema 統計（auto_increment、表大小）最多晚一天。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp][^my-asp-my-is-stats-expiry]
 
 ## 誰看得到什麼
 
@@ -33,48 +36,111 @@ flowchart LR
   RS -.->|"gtid_executed 是字串<br/>exporter 不輸出"| X((盲點))
 ```
 
-## 穩定 {#stability}
+## 九個面向一覽 {#aspects}
+
+訊號依[元件卡](../components/mysqld_exporter.md)的 `aspect` 分成九組，每節最後有一張**證據鏈**表：規則 → 資料庫原始碼（值在哪裡產生）→ 表或變數 → exporter 原始碼與 SQL → metric。更細的逐行追蹤在[附錄](mysql-appendix.md)。
+
+| 面向 | 訊號數 | 主要盲點 | 一節 |
+|---|---|---|---|
+| 監測自檢 | 10 | exporter 或資料庫停機時 series 整組消失 | [exporter](#exporter) |
+| 可用性 | 3 | 單次 OOM kill 只看得到 uptime 歸零 | [availability](#availability) |
+| 工作量與效能 | 7 | 執行中的語句是哪一個（MariaDB 沒有 digest、quantile） | [workload](#workload) |
+| 資源與飽和 | 8 | 連線打滿時連線數 metric 消失 | [saturation](#saturation) |
+| 複寫與 HA | 8 | Seconds_Behind 斷線時是 NULL；errant GTID 看不到 | [replication](#replication) |
+| 叢集與共識 | 6 | 狀態是 label 或字串；沒開 Galera 的 MariaDB 也有 wsrep_* | [cluster](#cluster) |
+| 資料維護與完整性 | 5 | 頁面損毀沒有任何 metric | [maintenance](#maintenance) |
+| 資料保護 | 3 | exporter 沒有備份 metric | [protection](#protection) |
+| 容量與成長 | 5 | MySQL 的 information_schema 統計值最多晚一天 | [capacity](#capacity) |
+
+## 監測自檢（exporter） {#exporter}
+
+exporter 有三層「活著」：`up`、`mysql_up`、`mysql_exporter_collector_success`，每一層壞掉時下一層的 series 整組消失。規則、門檻與實驗都在[元件卡](../components/mysqld_exporter.md)的 exporter 一組，這頁不重複。和資料庫本體有關的只有兩點：
+
+- **連線打滿時 exporter 自己也進不來**，`mysql_up` 變 0，所以飽和類規則要搭配 `MySQLNotReachable`（見[資源與飽和](#saturation)）。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql-ha]
+- **exporter 的 SQL 與原始碼一致**，`general_log` 記到的語句和 collector 檔案裡的常數一字不差。[^exp-mysql-trace]
+
+## 可用性 {#availability}
+
+<a id="stability"></a>
 
 | 要看什麼 | 資料庫的來源 | exporter metric（collector） | 預設 | 權限 | 證據 |
 |---|---|---|---|---|---|
 | 服務在不在 | 連線 + ping | `mysql_up`（exporter 本體） | 開 | 能登入即可 | 實測[^exp-mysql] |
 | 重啟、crash、OOM kill | `Uptime` | `mysql_global_status_uptime`（global_status） | 開 | — | 實測：kill -9 後 uptime 歸零[^exp-mysql-ha] |
-| 救援模式 | `innodb_force_recovery` | `mysql_global_variables_innodb_force_recovery`（global_variables） | 開 | — | 手冊 |
-| 磁碟滿 | 不在資料庫裡 | 沒有；用 node_exporter。binlog 用量：`mysql_binlog_size_bytes`（binlog_size） | 關 | REPLICATION CLIENT | 手冊 |
-| 長交易 | `information_schema.INNODB_TRX` | `mysql_info_schema_innodb_trx_oldest_transaction_age_seconds{state}`（info_schema.innodb_trx） | 關 | PROCESS | 實測[^exp-mysql-ha][^my-innodb-trx-query] |
-| Undo history | MariaDB：`Innodb_history_list_length`；MySQL：`INNODB_METRICS.trx_rseg_history_len` | MariaDB：`mysql_global_status_innodb_history_list_length`；MySQL：`mysql_info_schema_innodb_metrics_transaction_trx_rseg_history_len` | MariaDB 開；MySQL 關 | MySQL 要 PROCESS | 實測[^exp-mysql-ha] |
+| primary 能不能寫 | `read_only` | `mysql_global_variables_read_only`（global_variables） | 開 | — | 實測[^exp-mysql-ha] |
+
+- **OOM kill 在 metric 上只是一次重啟。**`uptime` 歸零、`mysql_up` 短暫變 0；原因要看 kernel log 或容器事件。停機短於 `MySQLNotReachable` 的 `for` 時，只有 `MySQLRestarted` 會響；起不來的 crash loop 則相反，只有 `mysql_up` 規則看得到，見 [OOM kill](#perf-oom)。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql-ha][^exp-mysql-perf]
+- **`mysql_up` 只做 ping**，不代表寫得進去；真正的寫入要外部探測，或 heartbeat 寫入程式自己回報成功時間。
+- Group Replication 失去多數、Galera 變成 non-Primary 時 `mysql_up` 仍是 1，寫入或讀取卻被擋住，見[叢集與共識](#cluster)。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp]
+
+| 規則 | DB 原始碼 | 表／變數 | exporter 原始碼與 SQL | metric |
+|---|---|---|---|---|
+| `MySQLNotReachable` | — | 連線與 `SELECT @@version` | 開連線失敗就讓 `mysql_up` = 0[^my-trace-ex-up][^my-trace-ex-version-query] | `mysql_up` |
+| `MySQLRestarted`、`MySQLRestartedRepeatedly` | MySQL[^my-trace-my-uptime]、MariaDB[^my-trace-mdb-uptime] | `Uptime` | `SHOW GLOBAL STATUS`[^my-trace-ex-gs-query] | `mysql_global_status_uptime` |
+| `MySQLPrimaryReadOnly` | MySQL[^my-trace-my-readonly]、MariaDB[^my-trace-mdb-readonly] | `read_only` | `SHOW GLOBAL VARIABLES`[^my-trace-ex-gv-query] | `mysql_global_variables_read_only` |
+
+## 工作量與效能 {#workload}
+
+| 要看什麼 | 資料庫的來源 | exporter metric（collector） | 預設 | 權限 | 證據 |
+|---|---|---|---|---|---|
+| 吞吐量 | `Com_commit`、`Queries` | `mysql_global_status_commands_total{command="commit"}`、`mysql_global_status_queries` | 開 | — | 實測[^exp-mysql-perf][^my-perf-ex-commands] |
+| 慢查詢 | `Slow_queries` | `mysql_global_status_slow_queries` | 開 | — | 實測：`SLEEP(30)` 也算[^my-trace-my-slow][^my-trace-mdb-slow] |
+| 哪個 SQL 慢 | `events_statements_summary_by_digest` | `mysql_perf_schema_events_statements_*`（perf_schema.eventsstatements） | 關 | SELECT | 實測[^exp-mysql-perf][^my-perf-ex-stmt-query] |
+| 語句錯誤 | 同一張表加總 | `mysql_perf_schema_events_statements_sum_errors`（perf_schema.eventsstatementssum） | 關 | SELECT | 實測[^my-perf-ex-stmtsum-query] |
 | Deadlock | MariaDB：`Innodb_deadlocks`；兩者：`INNODB_METRICS.lock_deadlocks` | `mysql_global_status_innodb_deadlocks`；`..._lock_lock_deadlocks_total`（MySQL）／`..._lock_lock_deadlocks`（MariaDB） | MariaDB 開；MySQL 關 | PROCESS | 實測[^exp-mysql-ha][^mariadb-innodb-deadlocks] |
-| Replication 因錯誤停下 | `Last_SQL_Errno` | `mysql_slave_status_last_sql_errno`（slave_status） | 開 | 見 [HA](#ha) | 實測[^exp-mysql-ha] |
+| 連線建立失敗 | `Aborted_connects` | `mysql_global_status_aborted_connects` | 開 | — | 實測[^exp-mysql-ha] |
+| 此刻在做事的 session | `PROCESSLIST` 的 command、state | `mysql_info_schema_processlist_threads{command,state}`（info_schema.processlist） | 關 | PROCESS | 實測[^my-asp-exp-ash][^my-processlist-query] |
 
-- **磁碟滿時資料庫不會停。**手冊說的「卡在寫入、每分鐘檢查一次空間並寫 error log」是 MyISAM、binlog 這類寫入；InnoDB 資料檔長不出去時是立刻回 `ERROR 1114`，見[磁碟滿](#perf-disk-full)。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql-perf]兩種情況 `mysql_up` 都仍是 1。mysqld_exporter 沒有磁碟用量的 metric，要用 node_exporter 看資料目錄與 binlog 目錄的掛載點。<span class="at-chip at-ev-upstream">上游</span>（[MySQL 手冊：磁碟滿](https://dev.mysql.com/doc/refman/8.4/en/full-disk.html)）
-- **OOM kill 在 metric 上只是一次重啟。**`uptime` 歸零、`mysql_up` 短暫變 0；原因要看 kernel log 或容器事件。停機短於 `MySQLNotReachable` 的 `for` 時，只有 `MySQLRestarted` 會響。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql-ha]
-- **`innodb_force_recovery` ≥ 4 時 InnoDB 是唯讀**，但 `read_only` 仍可能是 0；看 `innodb_force_recovery` 本身。（[MySQL 手冊](https://dev.mysql.com/doc/refman/8.4/en/forcing-innodb-recovery.html)）
-- **長交易在沒開 collector 時沒有任何訊號。**`innodb_trx` 在沒有交易時也不輸出 series（不是 0），所以「沒開」和「沒有長交易」看起來一樣，要靠 `collector_success` 確認。實驗中 11–16 秒的交易與等鎖的交易分成 `state="RUNNING"`、`state="LOCK WAIT"` 兩條。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql-ha]
-- **Undo history 的下降速度兩邊不同。**consistent snapshot 擋住 purge 時兩邊都到四百多；交易結束後 MariaDB 降到 1，MySQL 一段時間內仍是 500。門檻要抓得比日常高很多。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql-ha]
+- **Slow_queries 不管 slow log 有沒有開都會計數**，門檻是 `long_query_time`（預設 10 秒）。要知道是哪個查詢，開 `perf_schema.eventsstatements` 或讀 slow log，見[找慢 SQL](#perf-slow-sql)。（[MySQL 手冊](https://dev.mysql.com/doc/refman/8.4/en/server-status-variables.html)）
+- **吞吐量掉下來本身不說原因**，先動的通常是 `threads_running`，見[效能與故障情境](#performance)。
+- **processlist collector 是一個以 scrape 間隔取樣的簡化 ASH**：只有 command 與 state 兩個維度，等 row lock 的 session 是 `updating`、看不出在等鎖。MariaDB 缺 digest 的 quantile 與 CPU 時間，執行中的語句也沒有 digest；每秒取樣的取樣器原型與它怎麼接到這些訊號，見 [MariaDB 的 ASH 缺口](mariadb-ash.md)。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp-ash]
 
-## 使用 {#usage}
+| 規則 | DB 原始碼 | 表／變數 | exporter 原始碼與 SQL | metric |
+|---|---|---|---|---|
+| `MySQLThroughputDrop` | `Com_*` 由命令計數陣列產生（未逐行核對） | `Com_commit` | `com_` 前綴轉成 `commands_total{command}`[^my-perf-ex-commands] | `mysql_global_status_commands_total` |
+| `MySQLSlowQueries` | MySQL[^my-trace-my-slow]、MariaDB[^my-trace-mdb-slow] | `Slow_queries` | `SHOW GLOBAL STATUS`[^my-trace-ex-gs-query] | `mysql_global_status_slow_queries` |
+| `MySQLSlowDigest` | MySQL 摘要表[^my-asp-my-esms-quantile]、MariaDB 摘要表[^my-asp-mdb-esms-locktime] | `events_statements_summary_by_digest` | 依 `SUM_TIMER_WAIT` 取前 250 個[^my-perf-ex-stmt-query][^my-perf-ex-stmt-topn] | `mysql_perf_schema_events_statements_seconds_total`、`..._total` |
+| `MySQLStatementErrors` | 同上 | 同上（`SUM_ERRORS` 加總） | `SUM(SUM_ERRORS)`[^my-perf-ex-stmtsum-query][^my-perf-ex-stmtsum-errors] | `mysql_perf_schema_events_statements_sum_errors` |
+| `MySQLDeadlocks` | MariaDB[^my-trace-mdb-deadlock-inc]、MySQL `lock_deadlocks`[^my-trace-my-deadlock-mon] | `Innodb_deadlocks`、`INNODB_METRICS` | global status；innodb_metrics 只取 enabled 的計數器[^my-trace-ex-im-colquery][^my-innodb-metrics-name] | `mysql_global_status_innodb_deadlocks`、`..._lock_lock_deadlocks(_total)` |
+| `MySQLAbortedConnects` | MySQL[^my-asp-my-aborted-connects]、MariaDB[^my-asp-mdb-aborted-connects] | `Aborted_connects` | `SHOW GLOBAL STATUS`[^my-trace-ex-gs-query] | `mysql_global_status_aborted_connects` |
+
+## 資源與飽和 {#saturation}
+
+<a id="usage"></a>
 
 | 要看什麼 | 資料庫的來源 | exporter metric（collector） | 預設 | 權限 | 證據 |
 |---|---|---|---|---|---|
 | 連線數 | `Threads_connected`、`max_connections` | `mysql_global_status_threads_connected`、`mysql_global_variables_max_connections` | 開 | — | 實測[^exp-mysql-ha] |
 | 被拒的連線 | `Connection_errors_max_connections` | `mysql_global_status_connection_errors_total{error="max_connections"}` | 開 | — | 實測[^exp-mysql-ha][^mariadb-conn-errors] |
-| 曾經到過的最高連線數 | `Max_used_connections` | `mysql_global_status_max_used_connections` | 開 | — | 實測：打滿後是 31（max_connections + 1） |
 | 每帳號連線數 | `sys.x$user_summary.current_connections`；上限在 `mysql.user.max_user_connections` | `mysql_sys_current_connections{user}`（sys.user_summary）、`mysql_mysql_max_user_connections{mysql_user}`（mysql.user） | 關 | SELECT on sys、mysql.user；MariaDB 要開 performance_schema | 實測[^exp-mysql-ha][^my-sys-user-summary][^my-mysql-user-maxconn] |
 | 執行中的 thread | `Threads_running` | `mysql_global_status_threads_running` | 開 | — | 讀碼[^my-trace-my-threads-running]；實測：metadata lock 情境中升高[^exp-mysql-perf] |
-| 慢查詢 | `Slow_queries` | `mysql_global_status_slow_queries` | 開 | — | 手冊；實測：`SLEEP(30)` 也算 |
 | Row lock 等待 | `Innodb_row_lock_current_waits`、`Innodb_row_lock_time` | `mysql_global_status_innodb_row_lock_current_waits` 等 | 開 | — | 實測[^exp-mysql-ha] |
 | Metadata lock 等待 | `information_schema.PROCESSLIST.state` | `mysql_info_schema_processlist_threads{state="waiting_for_table_metadata_lock"}`（info_schema.processlist） | 關 | PROCESS | 實測[^exp-mysql-ha][^my-processlist-query] |
-| Table open cache | `Table_open_cache_overflows`、`_misses`、`Opened_tables` | `mysql_global_status_table_open_cache_overflows` 等 | 開 | — | 讀碼 |
-| Buffer pool 與 redo | `Innodb_buffer_pool_wait_free`、`Innodb_log_waits`、`Innodb_buffer_pool_pages_*` | `mysql_global_status_innodb_buffer_pool_wait_free`、`..._innodb_log_waits`、`mysql_global_status_buffer_pool_pages{state}` | 開 | — | 讀碼[^my-global-status-re] |
-| 暫存表落到磁碟 | `Created_tmp_disk_tables`、`Created_tmp_tables` | `mysql_global_status_created_tmp_disk_tables` 等 | 開 | — | 讀碼 |
-| 連線建立失敗 | `Aborted_connects` | `mysql_global_status_aborted_connects` | 開 | — | 實測[^exp-mysql-ha] |
+| Table open cache | `Table_open_cache_overflows`、`_misses`、`Opened_tables` | `mysql_global_status_table_open_cache_overflows` 等 | 開 | — | 讀碼[^my-asp-my-toc-overflows][^my-asp-mdb-toc-overflows] |
+| Buffer pool 與 redo | `Innodb_buffer_pool_reads`、`_wait_free`、`Innodb_log_waits` | `mysql_global_status_innodb_buffer_pool_reads`、`..._wait_free`、`..._innodb_log_waits` | 開 | — | 實測[^exp-mysql-perf]、讀碼[^my-global-status-re] |
+| 暫存表落到磁碟 | `Created_tmp_disk_tables`、`Created_tmp_tables` | `mysql_global_status_created_tmp_disk_tables` 等 | 開 | — | 實測[^exp-mysql-perf] |
 
 - **max_connections 有一條保留給管理帳號的連線。**MySQL 允許 max_connections + 1 條，最後一條只給有 CONNECTION_ADMIN（或 SUPER）的帳號。[^mysql-conn-reserved]實驗中把 CONNECTION_ADMIN 給 exporter 後 `mysql_up` 回到 1，但 exporter 預設開 2 條連線，第二條仍被拒，MySQL 上 global_variables 等 7 個 collector 失敗，`max_connections` 跟著消失，比例規則還是空。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql-ha]要讓 exporter 在打滿時仍看得到，可以考慮 MySQL 8.4 的獨立管理埠（`admin_address`）或 MariaDB 的 `extra_port`／`extra_max_connections`，未實測。
-- **被拒的計數要事後才看得到。**打滿當下 exporter 自己也進不來；連線降下後 `connection_errors_total{error="max_connections"}` 才更新，用 `increase(...[10m]) > 0` 寫規則。MariaDB 被拒時同時加 `Aborted_connects`。[^mariadb-conn-errors]
+- **被拒的計數要事後才看得到。**打滿當下 exporter 自己也進不來；連線降下後 `connection_errors_total{error="max_connections"}` 才更新，用 `increase(...[10m]) > 0` 寫規則。MariaDB 被拒時同時加 `Aborted_connects`。[^mariadb-conn-errors]高峰本身留在 `Max_used_connections`，見[容量與成長](#capacity)。
 - **超過 MAX_USER_CONNECTIONS 不算 Connection_errors。**實驗中第三條連線回 ERROR 1226，只有 `Aborted_connects` +1。要預警得用 sys.user_summary 的目前連線數除以 mysql.user 的上限；兩個 collector 的帳號 label 一個叫 `user`、一個叫 `mysql_user`，要 `label_replace`。exporter 自己用掉 3 條上限中的 2 條（0.67）。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql-ha]
-- **Slow_queries 不管 slow log 有沒有開都會計數**，門檻是 `long_query_time`（預設 10 秒）。要知道是哪個查詢，開 `perf_schema.eventsstatements` 或讀 slow log。（[MySQL 手冊](https://dev.mysql.com/doc/refman/8.4/en/server-status-variables.html)）
 
-## HA {#ha}
+| 規則 | DB 原始碼 | 表／變數 | exporter 原始碼與 SQL | metric |
+|---|---|---|---|---|
+| `MySQLTooManyConnections` | `max_connections`：MySQL[^my-asp-my-max-connections]、MariaDB[^my-asp-mdb-max-connections] | `Threads_connected`、`max_connections` | `SHOW GLOBAL STATUS`、`SHOW GLOBAL VARIABLES`[^my-trace-ex-gs-query][^my-trace-ex-gv-query] | `..._threads_connected`、`..._max_connections` |
+| `MySQLHighThreadsRunning` | MySQL[^my-trace-my-threads-running]、MariaDB[^my-trace-mdb-threads-running] | `Threads_running` | 同上 | `mysql_global_status_threads_running` |
+| `MySQLConnectionsRefused` | MySQL[^my-trace-my-connerr-var]、MariaDB[^my-trace-mdb-connerr-var] | `Connection_errors_max_connections` | `connection_errors_` 前綴轉成 label[^my-trace-ex-gs-connerr] | `mysql_global_status_connection_errors_total` |
+| `MySQLUserConnectionLimit` | sys view 與 `mysql.user`（未逐行核對） | `sys.x$user_summary`、`mysql.user` | [^my-sys-user-summary][^my-mysql-user-maxconn] | `mysql_sys_current_connections`、`mysql_mysql_max_user_connections` |
+| `MySQLRowLockWaits`、`MySQLRowLockWaitTime` | MySQL[^my-trace-my-rowlock-var]、MariaDB[^my-trace-mdb-rowlock-var] | `Innodb_row_lock_current_waits`、`Innodb_row_lock_time` | `SHOW GLOBAL STATUS`[^my-trace-ex-gs-query] | `mysql_global_status_innodb_row_lock_*` |
+| `MySQLMetadataLockWaits` | state 字串：MySQL[^my-perf-my-mdl-state]、MariaDB[^my-perf-mdb-mdl-state] | `PROCESSLIST.STATE` | `GROUP BY user, host, command, state`[^my-processlist-query][^my-trace-ex-pl-sanitize] | `mysql_info_schema_processlist_threads` |
+| `MySQLInnoDBLogWaits` | MySQL[^my-perf-my-log-waits]、MariaDB[^my-perf-mdb-log-waits] | `Innodb_log_waits` | `SHOW GLOBAL STATUS` | `mysql_global_status_innodb_log_waits` |
+| `MySQLBufferPoolWaitFree` | MySQL[^my-asp-my-bp-wait-free]、MariaDB[^my-asp-mdb-bp-wait-free] | `Innodb_buffer_pool_wait_free` | 同上 | `mysql_global_status_innodb_buffer_pool_wait_free` |
+| `MySQLBufferPoolDiskReads` | MySQL[^my-asp-my-bp-reads]、MariaDB[^my-asp-mdb-bp-reads] | `Innodb_buffer_pool_reads`、`_read_requests` | 同上 | `mysql_global_status_innodb_buffer_pool_reads` |
+| `MySQLTmpDiskTables` | MySQL[^my-asp-my-tmp-disk]、MariaDB[^my-asp-mdb-tmp-disk] | `Created_tmp_disk_tables` | 同上 | `mysql_global_status_created_tmp_disk_tables` |
+| `MySQLTableOpenCacheOverflows` | MySQL[^my-asp-my-toc-overflows]、MariaDB[^my-asp-mdb-toc-overflows] | `Table_open_cache_overflows` | 同上 | `mysql_global_status_table_open_cache_overflows` |
+
+## 複寫與 HA {#replication}
+
+<a id="ha"></a>
 
 | 要看什麼 | 資料庫的來源 | exporter metric（collector） | 預設 | 權限 | 證據 |
 |---|---|---|---|---|---|
@@ -88,8 +154,8 @@ flowchart LR
 | GTID 內容 | `gtid_executed`（MySQL）、`gtid_binlog_pos`（MariaDB） | **沒有**（字串被跳過） | — | — | 實測[^my-global-variables-parse] |
 | MariaDB replica 的 GTID 位置 | `SHOW ALL SLAVES STATUS` 的 `Gtid_Slave_Pos`、`Gtid_IO_Pos` | `mysql_slave_status_gtid_slave_pos{domain_id,server_id}`（slave_status 把 GTID 拆成 label） | 開 | SLAVE MONITOR | 實測：在 mdb2 的名稱清單裡[^my-trace-ex-slave-gtid][^my-trace-mdb-gtid-slave-pos][^exp-mysql-ha] |
 | Semi-sync | `Rpl_semi_sync_master_status`（MariaDB 內建）、`Rpl_semi_sync_source_status`（MySQL plugin） | `mysql_global_status_rpl_semi_sync_*_status`、`..._no_tx`、`..._clients` | 開（plugin 載入後才有） | — | 實測 |
-| Galera | `wsrep_*` | `mysql_global_status_wsrep_*`、`mysql_global_variables_wsrep_on` | 開 | — | 實測[^exp-mysql] |
-| Group Replication | `performance_schema.replication_group_members` | perf_schema.replication_group_members | 關 | SELECT on performance_schema | 未實測 |
+
+Galera 與 Group Replication 不是 primary／replica 的 async 複寫，放在[叢集與共識](#cluster)。
 
 ### 延遲：heartbeat 與 Seconds_Behind
 
@@ -143,13 +209,152 @@ errant transaction（replica 有、primary 沒有的交易）會讓下一次 fai
 
 實驗中 primary 開 semi-sync、replica 沒開：MySQL 開啟當下 status=1，第一筆寫入等 ACK 逾時（3 秒）後變 0；之後寫入正常、不報錯，`no_tx` 一直增加。MariaDB replica 開 semi-sync 後 status 回到 1、`clients=1`。MySQL replica 開著 `super_read_only` 時 `INSTALL PLUGIN` 會失敗（ERROR 1290），要先關掉再裝。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql-ha]
 
-### Galera（只有 MariaDB）
-
-沒開 Galera 的 MariaDB 也輸出 `wsrep_ready=0`，上游規則 `wsrep_ready != 1` 對每台普通 MariaDB 誤報。要加上 `wsrep_on == 1`。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql]
-
 ### MySQL 8.4 的改名
 
 MySQL 8.4 移除 `SHOW SLAVE STATUS`，exporter 改用 `SHOW REPLICA STATUS`，metric 名稱跟著欄位名變成 `mysql_slave_status_replica_io_running`、`..._seconds_behind_source`。MariaDB 11.4 仍是 `slave_*`、`seconds_behind_master`。規則要兩種名稱一起比對。[^my-slave-queries]
+
+
+### 證據鏈 {#chain-replication}
+
+| 規則 | DB 原始碼 | 表／變數 | exporter 原始碼與 SQL | metric |
+|---|---|---|---|---|
+| `MySQLReplicationNotRunning` | MySQL[^my-trace-my-io-running-field][^my-trace-my-io-running-val]、MariaDB[^my-trace-mdb-io-running-vals] | `Replica_IO_Running`、`Slave_SQL_Running` | 依序試 `SHOW ALL SLAVES STATUS`…`SHOW REPLICA STATUS`[^my-slave-queries][^my-trace-ex-slave-loop]；`Connecting` → 0[^my-parse-connecting] | `mysql_slave_status_{slave,replica}_{io,sql}_running` |
+| `MySQLReplicationError` | MySQL[^my-trace-my-last-sql-errno]、MariaDB[^my-trace-mdb-last-sql-errno] | `Last_SQL_Errno` | 同上 | `mysql_slave_status_last_sql_errno` |
+| `MySQLReplicaStatusMissing` | — | 同上（整組消失） | 非 replica 時沒有任何列[^my-slave-skip] | `mysql_slave_status_*` |
+| `MySQLHeartbeatLag` | pt-heartbeat 寫入的表（不是資料庫內建） | `heartbeat.heartbeat.ts` | `SELECT UNIX_TIMESTAMP(ts), UNIX_TIMESTAMP(NOW(6))`[^my-heartbeat-query][^my-trace-ex-hb-now] | `mysql_heartbeat_*_timestamp_seconds` |
+| `MySQLReplicationLag` | MySQL[^my-trace-my-sbs-field][^mysql-sbs-null]、MariaDB[^my-trace-mdb-sbm-field][^my-trace-mdb-sbm-null] | `Seconds_Behind_Source`／`_Master` | NULL 解析失敗、不輸出[^my-trace-ex-parse-float] | `mysql_slave_status_seconds_behind_*` |
+| `MySQLReplicaWritable`、`MySQLNoWritablePrimary`、`MySQLMultipleWritable` | MySQL[^my-trace-my-readonly][^my-trace-my-super-readonly]、MariaDB[^my-trace-mdb-readonly] | `read_only`、`super_read_only` | `SHOW GLOBAL VARIABLES`[^my-trace-ex-gv-query] | `mysql_global_variables_(super_)read_only` |
+| `MySQLSemiSyncDegraded` | MySQL[^my-trace-my-semisync-status]、MariaDB[^my-trace-mdb-semisync-status] | `Rpl_semi_sync_*_status` | `SHOW GLOBAL STATUS` | `mysql_global_status_rpl_semi_sync_*_status` |
+
+## 叢集與共識 {#cluster}
+
+「叢集與共識」在這裡指**成員之間要達成多數才能寫入**的架構，和 primary／replica 的 async 複寫不同：
+
+| | MySQL Group Replication（InnoDB Cluster） | MariaDB Galera |
+|---|---|---|
+| 共識 | XCom（Paxos 系）；每筆交易先在群組內 certification | Galera 的 group communication；每筆 writeset 在各節點 certification |
+| 多數 | 每個成員自己判斷：`members − unreachable ≤ members / 2` 時擋住寫入[^my-asp-my-gr-quorum][^my-asp-my-gr-blocked] | 不在 Primary component 的節點拒絕讀寫（`wsrep_cluster_status` = non-Primary） |
+| 成員狀態在哪 | `performance_schema.replication_group_members.MEMBER_STATE`：ONLINE、RECOVERING、OFFLINE、ERROR、UNREACHABLE[^my-asp-my-grm-state-col][^my-asp-my-grm-unreachable] | `wsrep_cluster_status`、`wsrep_cluster_size`（server 端）[^my-asp-mdb-wsrep-status-var][^my-asp-mdb-wsrep-size-set]、`wsrep_local_state`（provider） |
+| Flow control | applier／certifier 佇列超過門檻（預設 25000）就節流[^my-asp-my-gr-fc-applier][^my-asp-my-gr-fc-certifier] | 收到的佇列超過 `gcs.fc_limit` 就送 pause，整個叢集等最慢的節點 |
+| mysqld_exporter | `perf_schema.replication_group_members`、`perf_schema.replication_group_member_stats`（都預設關）[^my-asp-ex-def-grm] | 全在 `SHOW GLOBAL STATUS`，預設就有；provider 的計數經 `wsrep_show_status` 帶出[^my-asp-mdb-wsrep-provider-vars][^my-asp-mdb-wsrep-provider-status] |
+
+| 要看什麼 | 資料庫的來源 | exporter metric（collector） | 預設 | 權限 | 證據 |
+|---|---|---|---|---|---|
+| GR 成員狀態 | `replication_group_members` | `mysql_perf_schema_replication_group_member_info{member_host,member_state,member_role,...}` = 1 | 關 | SELECT on performance_schema | 實測[^my-asp-exp][^my-asp-ex-grm-labels] |
+| GR 佇列 | `replication_group_member_stats`（只查本機） | `mysql_perf_schema_transactions_in_queue`、`..._remote_in_applier_queue` | 關 | 同上 | 實測[^my-asp-exp][^my-asp-ex-grms-query] |
+| GR 門檻 | `group_replication_flow_control_*_threshold` | `mysql_global_variables_group_replication_flow_control_applier_threshold` 等 | 開 | — | 實測：兩個都是 25000[^my-asp-exp] |
+| Galera 能不能服務 | `wsrep_ready`、`wsrep_local_state` | `mysql_global_status_wsrep_ready`、`..._local_state` | 開 | — | 實測[^exp-mysql][^my-trace-mdb-wsrep-ready] |
+| Galera quorum | `wsrep_cluster_status`、`wsrep_cluster_size` | `mysql_global_status_wsrep_cluster_status`（Primary → 1）、`..._cluster_size` | 開 | — | 實測[^my-asp-exp][^my-asp-ex-parse-nonprimary] |
+| Galera flow control | `wsrep_flow_control_paused_ns`、`_sent`、`wsrep_local_recv_queue` | `mysql_global_status_wsrep_flow_control_paused_ns` 等 | 開 | — | 讀碼[^my-asp-gal-fc-paused-ns][^my-asp-gal-recv-queue]；實測：有輸出[^my-asp-exp] |
+
+### Group Replication
+
+- **成員狀態是 label。**collector 把每一列的所有欄位都變成 label、值固定 1，所以狀態一變，舊 series 消失、新 series 出現。規則要寫成「`member_state!="ONLINE"` 的 series 存在」，不能寫 `== 0`。<span class="at-chip at-ev-code">讀碼</span>[^my-asp-ex-grm-labels][^my-asp-ex-grm-metric]實驗中每條 series 有 8 個 label（含 `member_id`、`member_version`、`member_communication_stack`）。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp]
+- **失去多數時 exporter 照常回應。**三台暫停兩台 24 秒後，倖存的 gr1 看到自己 ONLINE／PRIMARY、另外兩台 UNREACHABLE，`mysql_up` 1、collector 成功；這時 gr1 的 INSERT 卡住，5 秒後 client 逾時。恢復後 29 秒內三台回到 ONLINE，**那筆逾時的 INSERT 其實 commit 了**（表裡有 1 列）。所以「client 逾時」不等於「沒寫入」，`MySQLGroupQuorumLost` 用 UNREACHABLE 的數量判斷，不看自己的狀態。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp]
+- **`group_replication_unreachable_majority_timeout` 預設 0**（實驗輸出確認），失去多數的成員會一直等，不會自己退出。
+- **被踢出的成員從其他成員的表裡消失**，不會留一列 ERROR；所以另外比「看到的成員數比一小時內少」（`MySQLGroupMembersMissing`）。<span class="at-chip at-ev-code">讀碼</span>（[MySQL 手冊](https://dev.mysql.com/doc/refman/8.4/en/group-replication-monitoring.html)）
+- **社群版看不到節流本身。**8.4.7 社群版的 global status 有一組 `Gr_*` 共識計數（實驗中 exporter 輸出 `mysql_global_status_gr_all_consensus_proposals_count` 等 22 個），但沒有 `Gr_flow_control_*`；那是 Enterprise component 提供的，社群版原始碼的 `components/` 裡沒有。只能看佇列長度對門檻的比例。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp]
+- **member_stats 只輸出本機**（`WHERE MEMBER_ID=@@server_uuid`），每台都要抓。[^my-asp-ex-grms-query]
+
+### Galera（只有 MariaDB）
+
+- **沒開 Galera 的 MariaDB 也有 wsrep_*。**實驗中普通 MariaDB 輸出 `wsrep_ready` 0、`wsrep_cluster_status` 0（Disconnected）、`wsrep_cluster_size` 0，上游規則 `wsrep_ready != 1` 對每台普通 MariaDB 誤報。所有 Galera 規則都要 `and on (job, instance) mysql_global_variables_wsrep_on == 1`。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql][^my-asp-exp][^my-asp-mdb-wsrep-disconnected]
+- **non-Primary 的節點拒絕讀取，但 exporter 照常。**三台暫停兩台 29 秒後，gal1 是 `non-Primary`、size 1、`wsrep_ready` OFF、`wsrep_local_state` 0（Initialized）；exporter 輸出 `wsrep_cluster_status` 0、所有 collector 成功；`SELECT` 回 `ERROR 1047 WSREP has not yet prepared node for application use`。恢復後兩台回來、size 回到 3。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp]
+- **字串狀態怎麼變成數字**：MariaDB server 依 provider 狀態把 `wsrep_cluster_status` 設成 `Primary`、`non-Primary` 或 `Disconnected`[^my-asp-mdb-wsrep-primary][^my-asp-mdb-wsrep-nonprimary]；exporter 的 `parseStatus` 把 `primary` 轉 1、`non-primary`／`disconnected` 轉 0。[^my-trace-ex-parse-primary][^my-asp-ex-parse-nonprimary]`wsrep_flow_control_active` 是 `true`／`false`，exporter 不認得，被跳過。[^my-asp-gal-fc-active]
+- **flow control 用 `_paused_ns` 的速率。**`wsrep_flow_control_paused` 是「自上次 FLUSH STATUS 以來」的比例，越久越鈍；`wsrep_flow_control_paused_ns` 是累計奈秒，`rate()/1e9` 就是這段時間的暫停比例。<span class="at-chip at-ev-code">讀碼</span>[^my-asp-gal-fc-paused-ns][^my-asp-gal-fc-paused]
+- **flow control 沒有重現。**把 gal2 限到 0.05 核、`gcs.fc_limit=1` 後在 gal1 寫 3000 筆單列交易，`flow_control_paused_ns` 與 `flow_control_sent` 都維持 0，寫入時間和不限 CPU 時一樣（43／44 秒，瓶頸是 client 逐筆送）。規則的證據停在讀碼。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp]
+
+### 證據鏈 {#chain-cluster}
+
+| 規則 | DB 原始碼 | 表／變數 | exporter 原始碼與 SQL | metric |
+|---|---|---|---|---|
+| `MySQLGroupMemberNotOnline`、`MySQLGroupMembersMissing` | MySQL[^my-asp-my-grm-state-col][^my-asp-my-grm-unreachable] | `performance_schema.replication_group_members.MEMBER_STATE` | `SELECT * FROM performance_schema.replication_group_members`，欄位全變 label[^my-asp-ex-grm-query][^my-asp-ex-grm-labels] | `mysql_perf_schema_replication_group_member_info` |
+| `MySQLGroupQuorumLost` | 多數判斷[^my-asp-my-gr-quorum] | 同上（`UNREACHABLE` 的數量） | 同上 | 同上 |
+| `MySQLGroupApplierQueueHigh` | 欄位[^my-asp-my-grms-queue-col][^my-asp-my-grms-applier-col]、門檻[^my-asp-my-gr-fc-applier][^my-asp-my-gr-fc-certifier] | `replication_group_member_stats.COUNT_TRANSACTIONS_*`、`group_replication_flow_control_*_threshold` | `... WHERE MEMBER_ID=@@server_uuid`[^my-asp-ex-grms-query][^my-asp-ex-grms-queue][^my-asp-ex-grms-applier] | `mysql_perf_schema_transactions_*_queue` |
+| `MySQLGaleraNotReady` | MariaDB[^my-trace-mdb-wsrep-ready][^my-trace-mdb-wsrep-ifdef] | `wsrep_ready` | `SHOW GLOBAL STATUS`[^my-trace-ex-gs-query] | `mysql_global_status_wsrep_ready` |
+| `MySQLGaleraOutOfSync` | provider 狀態[^my-asp-mdb-wsrep-provider-status] | `wsrep_local_state` | 同上 | `mysql_global_status_wsrep_local_state` |
+| `MySQLGaleraNonPrimary` | MariaDB[^my-asp-mdb-wsrep-status-var][^my-asp-mdb-wsrep-primary][^my-asp-mdb-wsrep-nonprimary] | `wsrep_cluster_status` | 字串轉 1／0[^my-asp-ex-parse-nonprimary][^my-asp-ex-gs-wsrep-status] | `mysql_global_status_wsrep_cluster_status` |
+| `MySQLGaleraClusterShrunk` | MariaDB[^my-asp-mdb-wsrep-size-var][^my-asp-mdb-wsrep-size-set] | `wsrep_cluster_size` | `SHOW GLOBAL STATUS` | `mysql_global_status_wsrep_cluster_size` |
+| `MySQLGaleraFlowControl` | Galera 26.4.27[^my-asp-gal-fc-paused-ns][^my-asp-gal-fc-sent][^my-asp-gal-recv-queue] | `wsrep_flow_control_paused_ns` | 同上 | `mysql_global_status_wsrep_flow_control_paused_ns` |
+
+實驗觀察：GR 與 Galera 的成員狀態、quorum 兩條鏈都在 lab 裡看到 metric 變化；flow control 只看到 metric 存在、值維持 0。[^my-asp-exp]
+
+## 資料維護與完整性 {#maintenance}
+
+| 要看什麼 | 資料庫的來源 | exporter metric（collector） | 預設 | 權限 | 證據 |
+|---|---|---|---|---|---|
+| 長交易 | `information_schema.INNODB_TRX` | `mysql_info_schema_innodb_trx_oldest_transaction_age_seconds{state}`（info_schema.innodb_trx） | 關 | PROCESS | 實測[^exp-mysql-ha][^my-innodb-trx-query] |
+| Undo history（purge 跟不上） | MariaDB：`Innodb_history_list_length`；MySQL：`INNODB_METRICS.trx_rseg_history_len` | MariaDB：`mysql_global_status_innodb_history_list_length`；MySQL：`mysql_info_schema_innodb_metrics_transaction_trx_rseg_history_len` | MariaDB 開；MySQL 關 | MySQL 要 PROCESS | 實測[^exp-mysql-ha] |
+| 救援模式 | `innodb_force_recovery` | `mysql_global_variables_innodb_force_recovery` | 開 | — | 讀碼[^my-asp-my-force-recovery][^my-asp-mdb-force-recovery] |
+| 表的未使用空間 | `information_schema.TABLES.DATA_FREE` | `mysql_info_schema_table_size{component="data_free"}`（info_schema.tables） | 關 | SELECT | 讀碼[^my-asp-ex-tables-query] |
+| 頁面損毀 | 只在 error log | **沒有** | — | — | 讀碼[^my-asp-mdb-page-compress-err] |
+
+- **長交易在沒開 collector 時沒有任何訊號。**`innodb_trx` 在沒有交易時也不輸出 series（不是 0），所以「沒開」和「沒有長交易」看起來一樣，要靠 `collector_success` 確認。實驗中 11–16 秒的交易與等鎖的交易分成 `state="RUNNING"`、`state="LOCK WAIT"` 兩條。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql-ha]
+- **Undo history 的下降速度兩邊不同。**consistent snapshot 擋住 purge 時兩邊都到四百多；交易結束後 MariaDB 降到 1，MySQL 一段時間內仍是 500。門檻要抓得比日常高很多，見 [Purge 被擋住](#perf-purge)。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql-ha]MySQL 的 `Innodb_purge_trx_id_age` 只在 debug build 有，正式版看不到。[^my-asp-my-purge-age-debug]
+- **`innodb_force_recovery` ≥ 4 時 InnoDB 是唯讀**，但 `read_only` 仍可能是 0；看 `innodb_force_recovery` 本身。（[MySQL 手冊](https://dev.mysql.com/doc/refman/8.4/en/forcing-innodb-recovery.html)）
+- **損毀沒有 status 計數。**兩邊都沒有「讀到損毀頁」的計數；MariaDB 的 `Innodb_num_pages_page_compression_error` 只算 page compression。補法：log pipeline 對 error log 的 InnoDB 損毀訊息告警，加上定期 `CHECK TABLE`（`mariadb-check`／`mysqlcheck`）把結果寫成 textfile metric。tablespace 檔案遺失時 crash recovery 失敗、進入 2 秒一次的重啟迴圈，metric 上只看得到 `mysql_up` 0，見[磁碟滿](#perf-disk-full)。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql-perf]
+- **`info_schema.tables` 是每張表一組 series**，表多時 cardinality 高，用 `--collect.info_schema.tables.databases` 限定 schema；MySQL 的值有統計快取，見[容量與成長](#capacity)。
+
+| 規則 | DB 原始碼 | 表／變數 | exporter 原始碼與 SQL | metric |
+|---|---|---|---|---|
+| `MySQLLongTransaction` | MySQL[^my-trace-my-trx-started]、MariaDB[^my-trace-mdb-trx-started] | `INNODB_TRX.trx_started` | `MAX(NOW() - trx_started)` 依 state 分組[^my-innodb-trx-query][^my-trace-ex-trx-desc] | `mysql_info_schema_innodb_trx_oldest_transaction_age_seconds` |
+| `MySQLInnoDBHistoryLength` | MariaDB[^my-trace-mdb-histlen-var][^my-trace-mdb-histlen-export]、MySQL[^my-trace-my-histlen-mon][^my-trace-my-histlen-val] | `Innodb_history_list_length`／`trx_rseg_history_len` | global status；innodb_metrics[^my-trace-ex-im-colquery] | `..._innodb_history_list_length`、`..._trx_rseg_history_len` |
+| `MySQLInnoDBForceRecovery` | MySQL[^my-asp-my-force-recovery]、MariaDB[^my-asp-mdb-force-recovery] | `innodb_force_recovery` | `SHOW GLOBAL VARIABLES`[^my-trace-ex-gv-query] | `mysql_global_variables_innodb_force_recovery` |
+| `MySQLTableFragmented` | MySQL 統計快取[^my-asp-my-is-stats-expiry] | `information_schema.TABLES.DATA_FREE` 等 | `SELECT ... ifnull(DATA_FREE, '0') ... WHERE TABLE_SCHEMA = ?`[^my-asp-ex-tables-query][^my-asp-ex-tables-datafree] | `mysql_info_schema_table_size{component}` |
+
+## 資料保護 {#protection}
+
+能不能還原到某個時間點，要三樣東西：**完整備份**、**從備份那一刻起連續的 binlog**、**有人驗證過備份能還原**。mysqld_exporter 只看得到第二樣的一部分。
+
+| 要看什麼 | 資料庫的來源 | exporter metric（collector） | 預設 | 權限 | 證據 |
+|---|---|---|---|---|---|
+| binlog 有沒有開 | `log_bin` | `mysql_global_variables_log_bin` | 開 | — | 實測：MySQL 8.4 預設 1、MariaDB 預設 0[^my-asp-exp] |
+| binlog 保留多久 | `binlog_expire_logs_seconds`（MariaDB 另有 `expire_logs_days`、`max_binlog_total_size`） | `mysql_global_variables_binlog_expire_logs_seconds` | 開 | — | 實測：MySQL 2592000、MariaDB 0[^my-asp-exp][^my-asp-my-binlog-expire][^my-asp-mdb-binlog-expire] |
+| binlog 用量 | `SHOW BINARY LOGS` | `mysql_binlog_size_bytes`、`mysql_binlog_files`、`mysql_binlog_file_number`（binlog_size） | 關 | REPLICATION CLIENT | 實測[^my-asp-ex-binlog-query] |
+| 斷電時的耐久性 | `sync_binlog`、`innodb_flush_log_at_trx_commit` | `mysql_global_variables_sync_binlog` 等 | 開 | — | 實測：MariaDB sync_binlog 預設 0、MySQL 1[^my-asp-exp] |
+| GTID（PITR 時定位交易） | `gtid_mode`、`gtid_strict_mode` | 見[複寫與 HA](#replication) | 開 | — | 實測 |
+| 最近一次成功的備份 | 不在資料庫裡 | **沒有** | — | — | 讀碼：沒有備份相關的 collector[^my-default-collectors] |
+
+- **`log_bin=0` 時 binlog_size collector 不輸出任何 series**，`collector_success` 仍是 1；「沒開 binlog」要看 `mysql_global_variables_log_bin`。<span class="at-chip at-ev-tested">實測</span>[^my-asp-ex-binlog-skip][^my-asp-exp]
+- **MariaDB 的 sync_binlog 預設是 0**（交給 OS 決定何時寫入磁碟），斷電時 binlog 可能少掉已 commit 的交易；`MySQLDurabilityRelaxed` 在預設的 MariaDB 上會響，這是刻意的。<span class="at-chip at-ev-tested">實測</span>[^my-asp-mdb-sync-binlog][^my-asp-my-sync-binlog]
+- **備份要自己輸出 metric。**建議的模式：備份 job 成功後寫一個 textfile（node_exporter 的 textfile collector），或推到 Pushgateway；告警看「多久沒有成功」與「metric 整個不見」兩條。名稱與門檻是例子：<span class="at-chip at-ev-inferred">推論</span>
+
+```text
+# /var/lib/node_exporter/textfile/mysql_backup.prom，由備份 script 最後一步原子地寫入（先寫暫存檔再 mv）
+mysql_backup_last_success_timestamp_seconds{cluster="c1",tool="mariabackup",kind="full"} 1794200000
+mysql_backup_size_bytes{cluster="c1",tool="mariabackup",kind="full"} 5.2e+09
+mysql_backup_duration_seconds{cluster="c1",tool="mariabackup",kind="full"} 840
+```
+
+- **binlog 開著不代表能還原。**binlog 和資料在同一顆磁碟上時一起壞；要確認 binlog 有被複製到別處（replica、`mysqlbinlog --read-from-remote-server --stop-never` 之類的串流）。exporter 看不到串流的進度。
+
+| 規則 | DB 原始碼 | 表／變數 | exporter 原始碼與 SQL | metric |
+|---|---|---|---|---|
+| `MySQLBinlogDisabled` | MySQL[^my-asp-my-log-bin]、MariaDB[^my-asp-mdb-log-bin] | `log_bin` | `SHOW GLOBAL VARIABLES`（ON → 1）[^my-trace-ex-gv-query][^my-parse-status] | `mysql_global_variables_log_bin` |
+| `MySQLBinlogRetentionShort` | MySQL 預設 30 天[^my-asp-my-binlog-expire]、MariaDB 預設 0[^my-asp-mdb-binlog-expire] | `binlog_expire_logs_seconds` | 同上 | `mysql_global_variables_binlog_expire_logs_seconds` |
+| `MySQLDurabilityRelaxed` | `sync_binlog`：MySQL[^my-asp-my-sync-binlog]、MariaDB[^my-asp-mdb-sync-binlog]；`innodb_flush_log_at_trx_commit`[^my-asp-my-flush-log-trx] | 兩個系統變數 | 同上 | `mysql_global_variables_sync_binlog`、`..._innodb_flush_log_at_trx_commit` |
+| `MySQLBackupStale`、`MySQLBackupMetricMissing` | — | 備份 job 自己寫的 textfile | 不經過 mysqld_exporter | `mysql_backup_last_success_timestamp_seconds`（例子） |
+
+## 容量與成長 {#capacity}
+
+| 要看什麼 | 資料庫的來源 | exporter metric（collector） | 預設 | 權限 | 證據 |
+|---|---|---|---|---|---|
+| 磁碟 | 不在資料庫裡 | 沒有；用 node_exporter | — | — | 實測[^exp-mysql-perf] |
+| binlog 有沒有照設定刪除 | `SHOW BINARY LOGS`、`slave_connections_needed_for_purge`（MariaDB） | `mysql_binlog_files`、`mysql_global_variables_slave_connections_needed_for_purge` | 關／開 | REPLICATION CLIENT | 實測[^my-asp-exp][^my-asp-mdb-purge-needs-slave] |
+| AUTO_INCREMENT 用量 | `information_schema.TABLES.AUTO_INCREMENT`、`COLUMNS.COLUMN_TYPE` | `mysql_info_schema_auto_increment_column`、`..._column_max`（auto_increment.columns） | 關 | SELECT | 實測[^my-asp-exp][^my-asp-ex-autoinc-query] |
+| 連線高水位 | `Max_used_connections` | `mysql_global_status_max_used_connections` | 開 | — | 實測[^exp-mysql-ha] |
+| 資料量 | `information_schema.TABLES` 的 `DATA_LENGTH + INDEX_LENGTH` | `mysql_info_schema_schema_size_bytes{schema}`（info_schema.schema_size） | 關 | SELECT | 實測[^my-asp-exp][^my-asp-ex-schema-size-query] |
+
+- **磁碟滿時資料庫不會停。**InnoDB 資料檔長不出去時立刻回 `ERROR 1114`，其他表照常寫入；手冊說的「卡在寫入、每分鐘檢查一次空間並寫 error log」是 MyISAM、binlog 這類寫入，見[磁碟滿](#perf-disk-full)。兩種情況 `mysql_up` 都仍是 1。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql-perf]（[MySQL 手冊：磁碟滿](https://dev.mysql.com/doc/refman/8.4/en/full-disk.html)）
+- **MariaDB 沒有 replica 連著時 binlog 不會過期刪除。**`slave_connections_needed_for_purge` 預設 1。實驗：`binlog_expire_logs_seconds=20`，FLUSH 三次後 5 個檔，等 30 秒再 FLUSH 變成 6 個（沒刪）；設成 0 後 FLUSH 變 3 個。單機 MariaDB 開 binlog 做 PITR 時，binlog 會一直長到磁碟滿，設定看起來卻是對的。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp][^my-asp-mdb-purge-needs-slave]
+- **MySQL 的 information_schema 統計值最多晚一天。**`AUTO_INCREMENT`、`DATA_LENGTH`、`DATA_FREE` 走統計快取（`information_schema_stats_expiry` 預設 86400 秒）。實驗中新表插入 10 列、再插入 50 列，兩次 scrape 都沒有這張表的 auto_increment；`ANALYZE TABLE` 之後才出現（74，`INSERT ... SELECT` 會先保留一段自動遞增值，所以比 `MAX(id)+1` 的 61 大）。MariaDB 沒有這個快取，插入 100 列後馬上是 128／127。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp][^my-asp-my-is-stats-expiry]
+- **`Max_used_connections` 在 exporter 被擋在外面時也會記下來**：打滿後是 max_connections + 1。它從重啟（或 FLUSH STATUS）起算，適合當「最近曾經多接近上限」的訊號。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql-ha]
+
+| 規則 | DB 原始碼 | 表／變數 | exporter 原始碼與 SQL | metric |
+|---|---|---|---|---|
+| `MySQLDataDiskFilling`、`MySQLDataDiskFillingSoon` | — | 檔案系統 | node_exporter（job、mountpoint 是佔位符） | `node_filesystem_avail_bytes` |
+| `MySQLAutoIncrementNearMax` | MySQL 統計快取[^my-asp-my-is-stats-expiry] | `TABLES.AUTO_INCREMENT`、`COLUMNS.DATA_TYPE` | `pow(2, case data_type ...)-1 as max_int`[^my-asp-ex-autoinc-query] | `mysql_info_schema_auto_increment_column(_max)` |
+| `MySQLConnectionPeakNearMax` | MySQL[^my-trace-my-max-used][^my-trace-my-max-used-upd]、MariaDB[^my-trace-mdb-max-used][^my-trace-mdb-max-used-upd] | `Max_used_connections`、`max_connections` | `SHOW GLOBAL STATUS`、`SHOW GLOBAL VARIABLES` | `mysql_global_status_max_used_connections` |
 
 ## 效能與故障情境 {#performance}
 
@@ -274,7 +479,7 @@ SELECT trx_mysql_thread_id, trx_started, trx_state FROM information_schema.INNOD
 
 - 10 秒內兩邊 `mysql_up` 都變 0（exporter 也被擋），其他 mysql_* 消失 25–30 秒；exporter 偶爾擠進去時 `threads_connected` 是 65／89、`threads_running` 66／88。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql-perf]
 - 原本就連著的工作負載沒有收到錯誤，但全表掃描搶 CPU，TPS 從 273 掉到 116／108。
-- 風暴結束後：`connection_errors_total{error="max_connections"}` 一分鐘內 +1,840／+4,040，`aborted_connects` +2,169／+298（MariaDB 把被拒的連線也算進 Aborted_connects，MySQL 沒有），`max_used_connections` 101（max_connections + 1）。這和[使用](#usage)一節的結論一致。
+- 風暴結束後：`connection_errors_total{error="max_connections"}` 一分鐘內 +1,840／+4,040，`aborted_connects` +2,169／+298（MariaDB 把被拒的連線也算進 Aborted_connects，MySQL 沒有），`max_used_connections` 101（max_connections + 1）。這和[資源與飽和](#saturation)一節的結論一致。
 
 ### 磁碟滿 {#perf-disk-full}
 
@@ -316,6 +521,13 @@ SELECT trx_mysql_thread_id, trx_started, trx_state FROM information_schema.INNOD
 | `events_statements_summary_by_digest` | perf_schema.eventsstatements | `mysql_perf_schema_events_statements_*` | 關 | SELECT | ✓（前 250 個 digest；quantile label 是 `"99.0"`）[^exp-mysql-perf] | 要開 performance_schema；quantile、lock_time 永遠 0 |
 | 同上加總 | perf_schema.eventsstatementssum | `mysql_perf_schema_events_statements_sum_*` | 關 | SELECT | ✓ | 要開 performance_schema |
 | `events_waits_summary_global_by_event_name` | perf_schema.eventswaits | `mysql_perf_schema_events_waits_*{event_name}` | 關 | SELECT | ✓（MDL 等待結束才累計） | MDL instrument 預設關，一直是 0 |
+| `replication_group_members` | perf_schema.replication_group_members | `mysql_perf_schema_replication_group_member_info{member_state,...}` | 關 | SELECT | ✓（Group Replication）[^my-asp-exp] | 不適用 |
+| `replication_group_member_stats`（本機） | perf_schema.replication_group_member_stats | `mysql_perf_schema_transactions_*` | 關 | SELECT | ✓[^my-asp-exp] | 不適用 |
+| `wsrep_*`（server 與 Galera provider） | global_status | `mysql_global_status_wsrep_*`、`mysql_galera_status_info` | 開 | — | 不適用 | ✓（沒開 Galera 也有一部分）[^my-asp-exp] |
+| `information_schema.TABLES`（每張表） | info_schema.tables | `mysql_info_schema_table_size{component}`、`..._table_rows` | 關 | SELECT | ✓（統計快取最多晚一天） | ✓ |
+| 同上加總 | info_schema.schema_size | `mysql_info_schema_schema_size_bytes{schema}` | 關 | SELECT | ✓ | ✓[^my-asp-exp] |
+| `TABLES.AUTO_INCREMENT` ⨝ `COLUMNS` | auto_increment.columns | `mysql_info_schema_auto_increment_column(_max)` | 關 | SELECT | ✓（統計快取）[^my-asp-exp] | ✓[^my-asp-exp] |
+| 備份紀錄 | — | 沒有 | — | — | textfile | textfile |
 | `gtid_executed`、`gtid_binlog_pos` | — | 沒有 | — | — | 盲點 | 盲點 |
 | `Gtid_Slave_Pos`（replica 狀態） | slave_status | `mysql_slave_status_gtid_slave_pos{domain_id,server_id}` | 開 | SLAVE MONITOR | 不適用 | ✓[^my-trace-ex-slave-gtid] |
 | 磁碟、記憶體、OOM | — | 沒有 | — | — | node_exporter | node_exporter |
@@ -334,6 +546,10 @@ SELECT trx_mysql_thread_id, trx_started, trx_state FROM information_schema.INNOD
 | Replica 錯誤訊息 | `Last_SQL_Error` 是字串 | 規則帶 errno，細節看 `SHOW REPLICA STATUS` |
 | MariaDB 的每帳號、每查詢統計 | performance_schema 預設關 | 開 `performance_schema=ON`（要重啟，佔記憶體） |
 | Metadata lock 細節 | 沒有 collector 讀 `performance_schema.metadata_locks` | processlist 的 state 只能看到「有人在等」 |
+| 備份新鮮度 | 沒有備份 collector | 備份 job 寫 textfile metric（`mysql_backup_last_success_timestamp_seconds`，例子），見[資料保護](#protection) |
+| 頁面損毀 | 沒有 status 計數，只在 error log | log pipeline 對 error log 告警；定期 `CHECK TABLE` 寫 textfile |
+| GR 節流時間 | `Gr_flow_control_*` 只有 Enterprise component 有 | 看 applier／certifier 佇列對門檻的比例 |
+| MariaDB 執行中語句的 digest、長尾延遲 | digest 在語句結束才寫入；沒有 quantile | [ASH 取樣器](mariadb-ash.md#sampler) |
 
 ## 建議的 exporter 設定 {#recommended}
 
@@ -345,6 +561,10 @@ SELECT trx_mysql_thread_id, trx_started, trx_state FROM information_schema.INNOD
 --collect.binlog_size                     # binlog 用量
 --collect.sys.user_summary                # 每帳號連線數（MySQL；MariaDB 要先開 performance_schema）
 --collect.mysql.user                      # 每帳號的 MAX_USER_CONNECTIONS
+--collect.perf_schema.replication_group_members        # Group Replication 成員狀態（只在 GR 節點）
+--collect.perf_schema.replication_group_member_stats   # Group Replication 佇列（只輸出本機）
+--collect.auto_increment.columns          # AUTO_INCREMENT 用量（每個欄位一組 series）
+--collect.info_schema.schema_size         # 每個 schema 的資料量
 ```
 
 帳號：
@@ -363,10 +583,12 @@ GRANT SLAVE MONITOR ON *.* TO 'exporter'@'%';
 
 ## 規則 {#rules}
 
-規則在 [`rules/targets/mysql.yml`](https://github.com/HahaSula/alert-trust/blob/main/rules/targets/mysql.yml)，分成 replication、ha、stability、usage、performance 幾組（performance 是[效能與故障情境](#performance)新增的）；每條規則的 `runbook_url` 指回[元件卡](../components/mysqld_exporter.md)上對應的訊號。佔位符：`job="mysql"`、`cluster`、`role`、node_exporter 的 `job="node"` 與 `mountpoint`。
+規則在 [`rules/targets/mysql.yml`](https://github.com/HahaSula/alert-trust/blob/main/rules/targets/mysql.yml)，分成 liveness、budget、replication、ha、cluster（Galera 與 Group Replication）、maintenance、protection、capacity、stability、usage、performance 幾組；每條規則的 `runbook_url` 指回[元件卡](../components/mysqld_exporter.md)上對應的訊號，每個面向的證據鏈在上面各節。佔位符：`job="mysql"`、`cluster`、`role`、`pitr`、node_exporter 的 `job="node"` 與 `mountpoint`、備份 metric 的名稱。
 
 ## 實驗 {#lab}
 
 [`lab/targets/mysql/ha/`](https://github.com/HahaSula/alert-trust/tree/main/lab/targets/mysql/ha)：`./run.sh` 起 4 台資料庫、4 台 exporter、1 台 Prometheus（只開 127.0.0.1:22090），跑完 9 個情境後 `docker compose down -v`，約 13 分鐘。原始結果與摘要在 `results/run-20261108.md`，各節點的 metric 名稱清單在 `results/names-*.txt`。[^exp-mysql-ha]
 
 [`lab/targets/mysql/perf/`](https://github.com/HahaSula/alert-trust/tree/main/lab/targets/mysql/perf)：`./run.sh` 跑 11 個效能與故障情境（約 21 分鐘），`./run.sh focus` 只重做 metadata lock 與 OOM（約 7 分鐘）；只開 127.0.0.1:22690，結束後 `docker compose down -v`。[^exp-mysql-perf]
+
+[`lab/targets/mysql/ash/`](https://github.com/HahaSula/alert-trust/tree/main/lab/targets/mysql/ash)：`./run.sh` 起三台 Group Replication、三台 Galera、一台 MariaDB 與四台 exporter（只開 127.0.0.1:22801–22804），做 quorum、binlog、auto_increment 與 ASH 取樣器的情境，約 6 分鐘；`./run.sh ash` 只重做 ASH（約 1 分鐘）。結果在 `results/`。[^my-asp-exp][^my-asp-exp-ash]

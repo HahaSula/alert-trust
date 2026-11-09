@@ -5,7 +5,7 @@
 ## 現況
 
 - 本機 git repo，尚未建立 GitHub repo、尚未 push。GitHub Pages 要在 repo 設定把來源設成 GitHub Actions。
-- 9 張卡（7 個監控元件、2 個資料庫 target）、121 個訊號、136 條規則；`validate.py` 0 錯誤、2 個警告；`--strict` 建置通過。
+- 9 張卡（7 個監控元件、2 個資料庫 target）、161 個訊號、180 條規則；`validate.py` 0 錯誤、2 個警告；`--strict` 建置通過。
 - 原始碼參考 105+ 筆（釘版本與行號），實驗參考多數已換成 `lab/` 的公開結果。
 
 ## 已完成
@@ -20,6 +20,9 @@
 | Claude Code plugin：selfcheck、env-profile、prometheus、victoriametrics、alertmanager、database-targets、policy-lint | `skills/`、`.claude-plugin/` |
 | Lab：metric 名稱、MySQL／MariaDB（HA、效能與故障、SQL 追蹤）、PostgreSQL（HA、效能與故障、SQL 追蹤）、pending 抖動（10 組）、Alertmanager、rule 並行與查詢 slot、VictoriaMetrics／VictoriaLogs、Prometheus（從前身 repo 搬來） | `lab/` |
 | 資料庫附錄：從 DB 原始碼到 exporter SQL 到 metric（MySQL／MariaDB、PostgreSQL） | `docs/targets/*-appendix.md` |
+| 資料庫 target 依 9 個面向分類，每條範例規則附證據鏈（DB 原始碼、表或變數、exporter 原始碼與 SQL） | `catalog/targets/`、`docs/targets/` |
+| MariaDB 的 ASH 缺口與取樣器原型 | `docs/targets/mariadb-ash.md`、`lab/targets/mysql/ash/` |
+| `rule-review` skill 與流程圖：先確認體系與基礎設施覆蓋，再看時間契約；離線用 `tools/rules_to_snapshot.py` | `skills/rule-review/`、`docs/tools/rule-review.md` |
 
 ## 進行中
 
@@ -35,11 +38,14 @@
 6. **覆蓋狀態輸出成 metric**：讓 `check_coverage.py` 定期執行並輸出每個元件、每個訊號的狀態，由外部觀察者抓取並告警，讓 monitor of monitor 的缺口本身也會通知。
 7. **CI 用的 policy lint**：舊 repo 的 `policy_lint.py`、`analyze_rules.py` 尚未改寫成讀新目錄。
 8. （已完成）GitHub repo 已建立並 push，Pages 已上線；舊 repo 的實驗搬到 `lab/prometheus/`，舊 repo 已封存。
-9. **小項目**：MySQL redo log 太小的情境沒有重現（`log_waits` 一直是 0）；`ThroughputDrop` 規則用「昨天同時段」比較，lab 沒有一天的資料無法驗證；MySQL `NoWritablePrimary` 修正後未重跑；PG17、`/probe`、auto-discover 只讀碼；契約頁的圖未截圖確認；Prometheus 報告的例子（30s／100s／120s）使用者尚未表示意見。
+9. **待驗證**：Patroni＋etcd、pgBackRest 的規則只讀碼，可做小 lab；Galera 與 Group Replication 的 flow control 沒有觸發；MariaDB ASH 的 digest 回填與 query-exporter 輸出未實測。
+10. **小項目**：MySQL redo log 太小的情境沒有重現（`log_waits` 一直是 0）；`ThroughputDrop` 規則用「昨天同時段」比較，lab 沒有一天的資料無法驗證；MySQL `NoWritablePrimary` 修正後未重跑；PG17、`/probe`、auto-discover 只讀碼；契約頁的圖未截圖確認；Prometheus 報告的例子（30s／100s／120s）使用者尚未表示意見。
 
 ## 已做的決定
 
 - Repo 名稱 `alert-trust`；舊 repo 保留不刪。
 - Alertmanager 的長週期例子用 `group_interval` 1h、失敗告警視窗 `[2h]`。
 - Plugin 以 repo 根目錄為來源，skill 才能讀目錄（代價是安裝時帶著 `lab/` 與 `docs/`）。
-- 卡片依 `family` 分組（prometheus、victoriametrics、shared、database）；target 卡的訊號依 `aspect` 分組（exporter、stability、usage、ha）。
+- 卡片依 `family` 分組（prometheus、victoriametrics、shared、database）；target 卡的訊號依 9 個 `aspect` 分組：exporter、availability、workload、saturation、replication、cluster、maintenance、protection、capacity。不適用的面向要寫 `not_applicable_aspects` 並附 why 與 refs（例如 PostgreSQL 核心沒有共識機制）。
+- 檢查使用者的 rule 檔時，一律先確認監控體系與基礎設施覆蓋，最後才看時間契約（`rule-review`）。
+- 實驗數據不準時改用原始碼佐證。

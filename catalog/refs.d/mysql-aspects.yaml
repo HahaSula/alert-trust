@@ -1,0 +1,656 @@
+# 九個面向補缺（cluster、protection、capacity、maintenance、workload）與 MariaDB ASH 頁的參考。
+# 每一行都由 gh api 取 tag 上的檔案、用關鍵字 grep 出行號（tools 在 agent 的 scratchpad，不進 repo）。
+# 版本：mysqld_exporter v0.21.0、MySQL 8.4.7、MariaDB 11.4.13、Galera 26.4.27（mariadb:11.4 映像內建的版本）。
+refs:
+  my-asp-ex-grm-query:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/perf_schema_replication_group_members.go"
+    line: 27
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/perf_schema_replication_group_members.go#L27"
+  my-asp-ex-grm-labels:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/perf_schema_replication_group_members.go"
+    line: 75
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/perf_schema_replication_group_members.go#L75"
+  my-asp-ex-grm-metric:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/perf_schema_replication_group_members.go"
+    line: 80
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/perf_schema_replication_group_members.go#L80"
+  my-asp-ex-grms-query:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/perf_schema_replication_group_member_stats.go"
+    line: 27
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/perf_schema_replication_group_member_stats.go#L27"
+  my-asp-ex-grms-queue:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/perf_schema_replication_group_member_stats.go"
+    line: 37
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/perf_schema_replication_group_member_stats.go#L37"
+  my-asp-ex-grms-applier:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/perf_schema_replication_group_member_stats.go"
+    line: 49
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/perf_schema_replication_group_member_stats.go#L49"
+  my-asp-ex-gs-wsrep-status:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/global_status.go"
+    line: 51
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/global_status.go#L51"
+  my-asp-ex-gs-galera-info:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/global_status.go"
+    line: 200
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/global_status.go#L200"
+  my-asp-ex-parse-nonprimary:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/collector.go"
+    line: 59
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/collector.go#L59"
+  my-asp-ex-binlog-logbin:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/binlog.go"
+    line: 34
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/binlog.go#L34"
+  my-asp-ex-binlog-skip:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/binlog.go"
+    line: 84
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/binlog.go#L84"
+  my-asp-ex-binlog-query:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/binlog.go"
+    line: 35
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/binlog.go#L35"
+  my-asp-ex-schema-size-query:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/info_schema_schema_size.go"
+    line: 31
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/info_schema_schema_size.go#L31"
+  my-asp-ex-tables-query:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/info_schema_tables.go"
+    line: 39
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/info_schema_tables.go#L39"
+  my-asp-ex-tables-datafree:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/info_schema_tables.go"
+    line: 170
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/info_schema_tables.go#L170"
+  my-asp-ex-autoinc-query:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/info_schema_auto_increment.go"
+    line: 28
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/info_schema_auto_increment.go#L28"
+  my-asp-ex-def-grm:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "config/config.go"
+    line: 205
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/config/config.go#L205"
+  my-asp-ex-def-binlog:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "config/config.go"
+    line: 195
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/config/config.go#L195"
+  my-asp-ex-def-schema-size:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "config/config.go"
+    line: 190
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/config/config.go#L190"
+  my-asp-ex-def-tables:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "config/config.go"
+    line: 189
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/config/config.go#L189"
+  my-asp-ex-def-autoinc:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "config/config.go"
+    line: 194
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/config/config.go#L194"
+  my-asp-ex-def-userstats:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "config/config.go"
+    line: 209
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/config/config.go#L209"
+  my-asp-ex-userstats-cpu:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/info_schema_userstats.go"
+    line: 54
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/info_schema_userstats.go#L54"
+  my-asp-ex-processlist-group:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/info_schema_processlist.go"
+    line: 41
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/info_schema_processlist.go#L41"
+  my-asp-my-grm-state-col:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/perfschema/table_replication_group_members.cc"
+    line: 138
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/perfschema/table_replication_group_members.cc#L138"
+  my-asp-my-grm-role-col:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/perfschema/table_replication_group_members.cc"
+    line: 139
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/perfschema/table_replication_group_members.cc#L139"
+  my-asp-my-grm-unreachable:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "plugin/group_replication/src/member_info.cc"
+    line: 831
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/plugin/group_replication/src/member_info.cc#L831"
+  my-asp-my-gr-quorum:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "plugin/group_replication/src/gcs_event_handlers.cc"
+    line: 702
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/plugin/group_replication/src/gcs_event_handlers.cc#L702"
+  my-asp-my-gr-blocked:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "plugin/group_replication/src/gcs_event_handlers.cc"
+    line: 704
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/plugin/group_replication/src/gcs_event_handlers.cc#L704"
+  my-asp-my-grms-queue-col:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/perfschema/table_replication_group_member_stats.cc"
+    line: 162
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/perfschema/table_replication_group_member_stats.cc#L162"
+  my-asp-my-grms-applier-col:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/perfschema/table_replication_group_member_stats.cc"
+    line: 168
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/perfschema/table_replication_group_member_stats.cc#L168"
+  my-asp-my-gr-fc-applier:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "plugin/group_replication/src/plugin.cc"
+    line: 4831
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/plugin/group_replication/src/plugin.cc#L4831"
+  my-asp-my-gr-fc-certifier:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "plugin/group_replication/src/plugin.cc"
+    line: 4817
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/plugin/group_replication/src/plugin.cc#L4817"
+  my-asp-my-binlog-expire:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/sys_vars.cc"
+    line: 2141
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/sys_vars.cc#L2141"
+  my-asp-my-binlog-auto-purge:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/sys_vars.cc"
+    line: 2144
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/sys_vars.cc#L2144"
+  my-asp-my-log-bin:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/sys_vars.cc"
+    line: 2330
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/sys_vars.cc#L2330"
+  my-asp-my-sync-binlog:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/sys_vars.cc"
+    line: 6136
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/sys_vars.cc#L6136"
+  my-asp-my-flush-log-trx:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 22338
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/handler/ha_innodb.cc#L22338"
+  my-asp-my-force-recovery:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 22788
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/handler/ha_innodb.cc#L22788"
+  my-asp-my-is-stats-expiry:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/sys_vars.cc"
+    line: 2009
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/sys_vars.cc#L2009"
+  my-asp-my-purge-age-debug:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 1304
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/handler/ha_innodb.cc#L1304"
+  my-asp-my-esms-quantile:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/perfschema/table_esms_by_digest.cc"
+    line: 89
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/perfschema/table_esms_by_digest.cc#L89"
+  my-asp-my-esms-cpu:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/perfschema/table_esms_by_digest.cc"
+    line: 83
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/perfschema/table_esms_by_digest.cc#L83"
+  my-asp-my-esms-sample:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/perfschema/table_esms_by_digest.cc"
+    line: 92
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/perfschema/table_esms_by_digest.cc#L92"
+  my-asp-my-esmh:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/perfschema/table_esmh_by_digest.cc"
+    line: 51
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/perfschema/table_esmh_by_digest.cc#L51"
+  my-asp-mdb-wsrep-status-var:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7897
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7897"
+  my-asp-mdb-wsrep-size-var:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7898
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7898"
+  my-asp-mdb-wsrep-provider-vars:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7909
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7909"
+  my-asp-mdb-wsrep-primary:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/wsrep_server_service.cc"
+    line: 364
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/wsrep_server_service.cc#L364"
+  my-asp-mdb-wsrep-nonprimary:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/wsrep_server_service.cc"
+    line: 367
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/wsrep_server_service.cc#L367"
+  my-asp-mdb-wsrep-disconnected:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/wsrep_mysqld.cc"
+    line: 286
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/wsrep_mysqld.cc#L286"
+  my-asp-mdb-wsrep-size-set:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/wsrep_server_service.cc"
+    line: 241
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/wsrep_server_service.cc#L241"
+  my-asp-mdb-wsrep-provider-status:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/wsrep_var.cc"
+    line: 1056
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/wsrep_var.cc#L1056"
+  my-asp-gal-fc-paused-ns:
+    kind: code
+    project: "Galera"
+    version: "26.4.27"
+    file: "galera/src/replicator_smm_stats.cpp"
+    line: 149
+    url: "https://github.com/codership/galera/blob/release_26.4.27/galera/src/replicator_smm_stats.cpp#L149"
+  my-asp-gal-fc-paused:
+    kind: code
+    project: "Galera"
+    version: "26.4.27"
+    file: "galera/src/replicator_smm_stats.cpp"
+    line: 150
+    url: "https://github.com/codership/galera/blob/release_26.4.27/galera/src/replicator_smm_stats.cpp#L150"
+  my-asp-gal-fc-sent:
+    kind: code
+    project: "Galera"
+    version: "26.4.27"
+    file: "galera/src/replicator_smm_stats.cpp"
+    line: 151
+    url: "https://github.com/codership/galera/blob/release_26.4.27/galera/src/replicator_smm_stats.cpp#L151"
+  my-asp-gal-recv-queue:
+    kind: code
+    project: "Galera"
+    version: "26.4.27"
+    file: "galera/src/replicator_smm_stats.cpp"
+    line: 144
+    url: "https://github.com/codership/galera/blob/release_26.4.27/galera/src/replicator_smm_stats.cpp#L144"
+  my-asp-gal-cert-failures:
+    kind: code
+    project: "Galera"
+    version: "26.4.27"
+    file: "galera/src/replicator_smm_stats.cpp"
+    line: 138
+    url: "https://github.com/codership/galera/blob/release_26.4.27/galera/src/replicator_smm_stats.cpp#L138"
+  my-asp-gal-fc-active:
+    kind: code
+    project: "Galera"
+    version: "26.4.27"
+    file: "galera/src/replicator_smm_stats.cpp"
+    line: 154
+    url: "https://github.com/codership/galera/blob/release_26.4.27/galera/src/replicator_smm_stats.cpp#L154"
+  my-asp-mdb-binlog-expire:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sys_vars.cc"
+    line: 1264
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sys_vars.cc#L1264"
+  my-asp-mdb-purge-needs-slave:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sys_vars.cc"
+    line: 1325
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sys_vars.cc#L1325"
+  my-asp-mdb-log-bin:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sys_vars.cc"
+    line: 1576
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sys_vars.cc#L1576"
+  my-asp-mdb-sync-binlog:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sys_vars.cc"
+    line: 6056
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sys_vars.cc#L6056"
+  my-asp-mdb-force-recovery:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 19476
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/handler/ha_innodb.cc#L19476"
+  my-asp-mdb-page-compress-err:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 985
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/handler/ha_innodb.cc#L985"
+  my-asp-mdb-esms-locktime:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/perfschema/table_esms_by_digest.cc"
+    line: 69
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/perfschema/table_esms_by_digest.cc#L69"
+  my-asp-mdb-pl-time-ms:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sql_show.cc"
+    line: 10146
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sql_show.cc#L10146"
+  my-asp-mdb-pl-progress:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sql_show.cc"
+    line: 10150
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sql_show.cc#L10150"
+  my-asp-mdb-pl-examined:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sql_show.cc"
+    line: 10153
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sql_show.cc#L10153"
+  my-asp-mdb-show-explain:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sql_yacc.yy"
+    line: 14458
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sql_yacc.yy#L14458"
+  my-asp-mdb-show-analyze:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sql_yacc.yy"
+    line: 14279
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sql_yacc.yy#L14279"
+  my-asp-mdb-slow-verbosity:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sys_vars.cc"
+    line: 6856
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sys_vars.cc#L6856"
+  my-asp-mdb-optimizer-trace:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sys_vars.cc"
+    line: 3031
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sys_vars.cc#L3031"
+  my-asp-mdb-userstat-var:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sys_vars.cc"
+    line: 6902
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sys_vars.cc#L6902"
+  my-asp-mdb-userstat-cpu:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "plugin/userstat/user_stats.cc"
+    line: 10
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/plugin/userstat/user_stats.cc#L10"
+  my-asp-mdb-pfs-processlist:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/perfschema/table_processlist.cc"
+    line: 56
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/perfschema/table_processlist.cc#L56"
+  my-asp-mdb-pfs-stmt-digest:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/perfschema/table_events_statements.cc"
+    line: 369
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/perfschema/table_events_statements.cc#L369"
+  my-asp-mdb-pfs-digest-at-end:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/perfschema/pfs.cc"
+    line: 5516
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/perfschema/pfs.cc#L5516"
+  my-asp-my-pfs-digest-at-parse:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/perfschema/pfs.cc"
+    line: 8130
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/perfschema/pfs.cc#L8130"
+  my-asp-my-tmp-disk:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/mysqld.cc"
+    line: 11350
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/mysqld.cc#L11350"
+  my-asp-my-toc-overflows:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/mysqld.cc"
+    line: 11622
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/mysqld.cc#L11622"
+  my-asp-my-aborted-connects:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/mysqld.cc"
+    line: 11296
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/mysqld.cc#L11296"
+  my-asp-my-bp-reads:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 1181
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/handler/ha_innodb.cc#L1181"
+  my-asp-my-bp-wait-free:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 1183
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/handler/ha_innodb.cc#L1183"
+  my-asp-my-max-connections:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/sys_vars.cc"
+    line: 2790
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/sys_vars.cc#L2790"
+  my-asp-mdb-tmp-disk:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7680
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7680"
+  my-asp-mdb-toc-overflows:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7870
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7870"
+  my-asp-mdb-aborted-connects:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7653
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7653"
+  my-asp-mdb-bp-reads:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 928
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/handler/ha_innodb.cc#L928"
+  my-asp-mdb-bp-wait-free:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 929
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/handler/ha_innodb.cc#L929"
+  my-asp-mdb-max-connections:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sys_vars.cc"
+    line: 1840
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sys_vars.cc#L1840"
+  my-asp-mdb-sys-statement-analysis:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "scripts/sys_schema/views/p_s/x_statement_analysis.sql"
+    line: 50
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/scripts/sys_schema/views/p_s/x_statement_analysis.sql#L50"
+  my-asp-exp:
+    kind: experiment
+    title: "GR／Galera 失去 quorum、binlog 過期、auto_increment 統計快取、MariaDB ASH 取樣器"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/mysql/ash/results/run-20261109.md"
+  my-asp-exp-ash:
+    kind: experiment
+    title: "MariaDB ASH 取樣器（開 events_statements_current 後重跑）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/mysql/ash/results/run-ash-20261109.md"
