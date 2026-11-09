@@ -1,0 +1,33 @@
+1794183563 update <no value>
+1794183563 exec_create: mysql -uroot -prootpw -N -e SET GLOBAL innodb_buffer_pool_size=1073741824; CREATE TABLE app.oom (id INT AUTO_INCREMENT PRIMARY KEY, pad VARCHAR(4000)); INSERT INTO app.oom (pad) SELECT REPEAT('z',4000) FROM app.d; <no value>
+1794183563 exec_start: mysql -uroot -prootpw -N -e SET GLOBAL innodb_buffer_pool_size=1073741824; CREATE TABLE app.oom (id INT AUTO_INCREMENT PRIMARY KEY, pad VARCHAR(4000)); INSERT INTO app.oom (pad) SELECT REPEAT('z',4000) FROM app.d; <no value>
+1794183563 exec_die 0
+1794183563 exec_create: sh -c mysql -h127.0.0.1 -uroot -prootpw -e "INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom;" >/tmp/bg.$$.log 2>&1 <no value>
+1794183563 exec_start: sh -c mysql -h127.0.0.1 -uroot -prootpw -e "INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom; INSERT INTO app.oom (pad) SELECT pad FROM app.oom;" >/tmp/bg.$$.log 2>&1 <no value>
+1794183564 exec_create: mysqladmin ping -uroot -prootpw --silent <no value>
+1794183564 exec_start: mysqladmin ping -uroot -prootpw --silent <no value>
+1794183564 exec_die 0
+1794183564 oom <no value>
+1794183564 exec_die 137
+1794183564 die 137
+1794183564 start <no value>
+1794183567 exec_create: mysqladmin ping -uroot -prootpw --silent <no value>
+1794183567 exec_start: mysqladmin ping -uroot -prootpw --silent <no value>
+1794183568 exec_die 1
+1794183571 exec_create: mysqladmin ping -uroot -prootpw --silent <no value>
+1794183571 exec_start: mysqladmin ping -uroot -prootpw --silent <no value>
+1794183571 update <no value>
+1794183571 exec_die 0
+1794183571 health_status: healthy <no value>
+1794183574 exec_create: mysqladmin ping -uroot -prootpw --silent <no value>
+1794183574 exec_start: mysqladmin ping -uroot -prootpw --silent <no value>
+1794183574 exec_die 0
+1794183577 exec_create: mysqladmin ping -uroot -prootpw --silent <no value>
+1794183577 exec_start: mysqladmin ping -uroot -prootpw --silent <no value>
+1794183577 exec_die 0
+1794183580 exec_create: mysqladmin ping -uroot -prootpw --silent <no value>
+1794183580 exec_start: mysqladmin ping -uroot -prootpw --silent <no value>
+1794183580 exec_die 0
+1794183583 exec_create: mysqladmin ping -uroot -prootpw --silent <no value>
+1794183583 exec_start: mysqladmin ping -uroot -prootpw --silent <no value>
+1794183583 exec_die 0

@@ -1,0 +1,210 @@
+# 效能與故障情境（docs/targets/mysql.md「效能與故障情境」、lab/targets/mysql/perf）的參考。
+# 原始碼行號已用 tag 上的檔案核對：mysqld_exporter v0.21.0、mysql-8.4.7、mariadb-11.4.13。
+refs:
+  my-perf-ex-stmt-query:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/perf_schema_events_statements.go"
+    line: 30
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/perf_schema_events_statements.go#L30"
+  my-perf-ex-stmt-digest-text:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/perf_schema_events_statements.go"
+    line: 34
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/perf_schema_events_statements.go#L34"
+  my-perf-ex-stmt-lastseen:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/perf_schema_events_statements.go"
+    line: 51
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/perf_schema_events_statements.go#L51"
+  my-perf-ex-stmt-topn:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/perf_schema_events_statements.go"
+    line: 70
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/perf_schema_events_statements.go#L70"
+  my-perf-ex-stmt-labels:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/perf_schema_events_statements.go"
+    line: 135
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/perf_schema_events_statements.go#L135"
+  my-perf-ex-stmt-8028:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/perf_schema_events_statements.go"
+    line: 229
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/perf_schema_events_statements.go#L229"
+  my-perf-ex-stmt-latency:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/perf_schema_events_statements.go"
+    line: 334
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/perf_schema_events_statements.go#L334"
+  my-perf-ex-stmt-defaults:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "config/config.go"
+    line: 77
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/config/config.go#L77"
+  my-perf-ex-stmt-off:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "config/config.go"
+    line: 199
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/config/config.go#L199"
+  my-perf-ex-stmt-flags:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "mysqld_exporter.go"
+    line: 115
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/mysqld_exporter.go#L115"
+  my-perf-ex-stmtsum-query:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/perf_schema_events_statements_sum.go"
+    line: 26
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/perf_schema_events_statements_sum.go#L26"
+  my-perf-ex-stmtsum-errors:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/perf_schema_events_statements_sum.go"
+    line: 70
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/perf_schema_events_statements_sum.go#L70"
+  my-perf-ex-waits-query:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/perf_schema_events_waits.go"
+    line: 26
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/perf_schema_events_waits.go#L26"
+  my-perf-ex-commands:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/global_status.go"
+    line: 57
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/global_status.go#L57"
+  my-perf-ex-row-ops:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/global_status.go"
+    line: 87
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/global_status.go#L87"
+  my-perf-my-pfs-default:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/sys_vars.cc"
+    line: 529
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/sys_vars.cc#L529"
+  my-perf-mdb-pfs-default:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sys_vars.cc"
+    line: 88
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sys_vars.cc#L88"
+  my-perf-my-mdl-state:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/mdl.cc"
+    line: 120
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/mdl.cc#L120"
+  my-perf-mdb-mdl-state:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mdl.cc"
+    line: 102
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mdl.cc#L102"
+  my-perf-my-lock-wait-timeout:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "sql/sys_vars.cc"
+    line: 2316
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/sys_vars.cc#L2316"
+  my-perf-mdb-lock-wait-timeout:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sys_vars.cc"
+    line: 1562
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sys_vars.cc#L1562"
+  my-perf-ex-stmt-quantile:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/perf_schema_events_statements.go"
+    line: 335
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/perf_schema_events_statements.go#L335"
+  my-perf-ex-stmt-locktime:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/perf_schema_events_statements.go"
+    line: 287
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/perf_schema_events_statements.go#L287"
+  my-perf-my-rows-read:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 1270
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/handler/ha_innodb.cc#L1270"
+  my-perf-my-log-waits:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 1231
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/handler/ha_innodb.cc#L1231"
+  my-perf-my-redo-lsn:
+    kind: code
+    project: "MySQL"
+    version: "8.4.7"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 1212
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/handler/ha_innodb.cc#L1212"
+  my-perf-mdb-no-rows:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 970
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/handler/ha_innodb.cc#L970"
+  my-perf-mdb-checkpoint-age:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 931
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/handler/ha_innodb.cc#L931"
+  my-perf-mdb-log-waits:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 946
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/handler/ha_innodb.cc#L946"
+  exp-mysql-perf:
+    kind: experiment
+    title: "MySQL 8.4／MariaDB 11.4 效能與故障情境：慢查詢、row lock、metadata lock、purge、CPU、buffer pool、暫存表、redo、連線風暴、磁碟滿、OOM"
+    url: "https://github.com/HahaSula/alert-trust/tree/main/lab/targets/mysql/perf"

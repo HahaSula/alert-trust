@@ -18,7 +18,8 @@
 | 覆蓋檢查器（含驗證 lab） | `tools/check_coverage.py`、`lab/coverage/` |
 | 唯讀蒐集器 | `tools/collect.py` |
 | Claude Code plugin：selfcheck、env-profile、prometheus、victoriametrics、alertmanager、database-targets、policy-lint | `skills/`、`.claude-plugin/` |
-| Lab：metric 名稱、MySQL／MariaDB、PostgreSQL、pending 抖動（10 組）、Alertmanager、rule 並行與查詢 slot、VictoriaMetrics／VictoriaLogs（延遲矩陣、故障、resendDelay、log rule） | `lab/` |
+| Lab：metric 名稱、MySQL／MariaDB（HA、效能與故障、SQL 追蹤）、PostgreSQL（HA、效能與故障、SQL 追蹤）、pending 抖動（10 組）、Alertmanager、rule 並行與查詢 slot、VictoriaMetrics／VictoriaLogs、Prometheus（從前身 repo 搬來） | `lab/` |
+| 資料庫附錄：從 DB 原始碼到 exporter SQL 到 metric（MySQL／MariaDB、PostgreSQL） | `docs/targets/*-appendix.md` |
 
 ## 進行中
 
@@ -34,7 +35,7 @@
 6. **覆蓋狀態輸出成 metric**：讓 `check_coverage.py` 定期執行並輸出每個元件、每個訊號的狀態，由外部觀察者抓取並告警，讓 monitor of monitor 的缺口本身也會通知。
 7. **CI 用的 policy lint**：舊 repo 的 `policy_lint.py`、`analyze_rules.py` 尚未改寫成讀新目錄。
 8. （已完成）GitHub repo 已建立並 push，Pages 已上線；舊 repo 的實驗搬到 `lab/prometheus/`，舊 repo 已封存。
-9. **小項目**：MySQL `NoWritablePrimary` 修正後未重跑；PG17、`/probe`、auto-discover 只讀碼；契約頁的圖未截圖確認；Prometheus 報告的例子（30s／100s／120s）使用者尚未表示意見。
+9. **小項目**：MySQL redo log 太小的情境沒有重現（`log_waits` 一直是 0）；`ThroughputDrop` 規則用「昨天同時段」比較，lab 沒有一天的資料無法驗證；MySQL `NoWritablePrimary` 修正後未重跑；PG17、`/probe`、auto-discover 只讀碼；契約頁的圖未截圖確認；Prometheus 報告的例子（30s／100s／120s）使用者尚未表示意見。
 
 ## 已做的決定
 

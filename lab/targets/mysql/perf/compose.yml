@@ -1,0 +1,88 @@
+# 效能與故障情境：MariaDB 11.4 與 MySQL 8.4 各一台，各配一台 mysqld_exporter v0.21.0 與一個小型工作負載（Python + PyMySQL）。
+# Prometheus v3.13.5 載入 rules/targets/mysql.yml。執行：./run.sh；結束後自動 docker compose down -v。
+# 只開一個 host port：127.0.0.1:22690（Prometheus）。
+name: at-myperf
+x-exporter-args: &exargs
+  - --mysqld.username=exporter
+  - --collect.info_schema.processlist
+  - --collect.info_schema.innodb_trx
+  - --collect.info_schema.innodb_metrics
+  - --collect.perf_schema.eventsstatements
+  - --collect.perf_schema.eventsstatementssum
+  - --collect.perf_schema.eventswaits
+x-wl: &wl
+  image: python:3.12.7-alpine
+  volumes: [./workload.py:/w/workload.py:ro, pip-cache:/root/.cache/pip]
+  environment: &wlenv
+    THREADS: "8"
+    RATE: "40"          # 每個 thread 每秒最多幾筆交易（總共約 320 tx/s）
+  entrypoint: ["sh", "-c", "pip install -q --disable-pip-version-check --root-user-action=ignore pymysql==1.1.1 cryptography==43.0.3 && exec python -u /w/workload.py \"$$@\"", "--"]
+services:
+  mdb:
+    image: mariadb:11.4
+    environment: { MARIADB_ROOT_PASSWORD: rootpw }
+    command:
+      - --performance-schema=ON          # MariaDB 預設 OFF；沒開時 eventsstatements 沒有資料
+      - --max-connections=100
+      - --innodb-buffer-pool-size=128M
+      - --innodb-lock-wait-timeout=10
+      - --long-query-time=0.5
+    volumes: [./init.sql:/docker-entrypoint-initdb.d/init.sql:ro]
+    tmpfs: ["/fill:size=24m,uid=999,gid=999,mode=0750"]
+    cpus: 2
+    mem_limit: 1g
+    memswap_limit: 1g
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 3s
+      retries: 60
+  my:
+    image: mysql:8.4.7
+    environment: { MYSQL_ROOT_PASSWORD: rootpw }
+    command:
+      - --max-connections=100
+      - --innodb-buffer-pool-size=128M
+      - --innodb-buffer-pool-chunk-size=8M   # 讓執行中縮小 buffer pool 時不被進位回 128M
+      - --innodb-lock-wait-timeout=10
+      - --long-query-time=0.5
+      - --innodb-directories=/fill
+    volumes: [./init.sql:/docker-entrypoint-initdb.d/init.sql:ro]
+    tmpfs: ["/fill:size=24m,uid=999,gid=999,mode=0750"]
+    cpus: 2
+    mem_limit: 1g
+    memswap_limit: 1g
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-uroot", "-prootpw", "--silent"]
+      interval: 3s
+      retries: 60
+  ex-mdb:
+    image: prom/mysqld-exporter:v0.21.0
+    environment: { MYSQLD_EXPORTER_PASSWORD: exporterpw }
+    entrypoint: ["/bin/mysqld_exporter", "--mysqld.address=mdb:3306"]
+    command: *exargs
+  ex-my:
+    image: prom/mysqld-exporter:v0.21.0
+    environment: { MYSQLD_EXPORTER_PASSWORD: exporterpw }
+    entrypoint: ["/bin/mysqld_exporter", "--mysqld.address=my:3306"]
+    command: *exargs
+  wl-mdb:
+    <<: *wl
+    environment: { <<: *wlenv, DB_HOST: mdb }
+    command: ["run"]
+    profiles: [wl]
+  wl-my:
+    <<: *wl
+    environment: { <<: *wlenv, DB_HOST: my }
+    command: ["run"]
+    profiles: [wl]
+  prometheus:
+    image: prom/prometheus:v3.13.5
+    command: [--config.file=/etc/prometheus/prometheus.yml]
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../../../../rules/targets/mysql.yml:/etc/prometheus/mysql.yml:ro
+    ports: ["127.0.0.1:22690:9090"]
+volumes:
+  pip-cache:

@@ -118,9 +118,10 @@ silent_failures:
   - text: >-
       gtid_executed、gtid_binlog_pos 是字串，global_variables 解析失敗就跳過；在 replica 上誤寫造成的 errant GTID
       沒有任何 metric 會變。gtid_mode 的 ON_PERMISSIVE、OFF_PERMISSIVE 也一樣被跳過。
+      MariaDB replica 的 Gtid_Slave_Pos 會被拆成 mysql_slave_status_gtid_slave_pos{domain_id,server_id}，但 errant 交易在 gtid_binlog_pos，不在這裡。
     evidence: tested
     source: art-mysql-ha
-    refs: [exp-mysql-ha, my-global-variables-parse, my-global-status-skip]
+    refs: [exp-mysql-ha, my-global-variables-parse, my-global-status-skip, my-trace-ex-slave-gtid]
   - text: >-
       Semi-sync 等 ACK 逾時後退回 async，commit 照常成功，只有 rpl_semi_sync_*_status 從 1 變 0。
       MariaDB 內建 semi-sync，沒開時 status 也是 0，所以 status == 0 一定要和 enabled == 1 一起看。
@@ -309,18 +310,41 @@ signals:
     upstream: { status: yes, note: "awesome 用 uptime < 60，短於一個 scrape 週期加 for 時容易漏" }
     rules: [rules/targets/mysql.yml#MySQLRestarted, rules/targets/mysql.yml#MySQLInnoDBForceRecovery]
 
+  - id: crash-oom
+    aspect: stability
+    tier: 3
+    question: 資料庫被 OOM kill 或 crash 後，看得出來嗎
+    signal: >-
+      單次 OOM kill：容器 3–4 秒內重啟，scrape 5 秒時只抓到一次 mysql_up = 0，下一次 uptime 已是 7–8；
+      用 resets(mysql_global_status_uptime[...]) 或 uptime < 300 看。一直被 kill 但每次都起得來：resets(uptime[1h]) > 1。
+      每次啟動 2 秒就退出的 crash loop：uptime 一次都沒被抓到，只有 mysql_up 規則看得到
+    metrics: [mysql_global_status_uptime, mysql_up]
+    evaluate_on: self
+    silent_failure: >-
+      MySQLNotReachable（for 1m）在單次 OOM 時不會響；OOM 原因不在任何 mysql_* metric 裡，要看容器 oom 事件、cAdvisor 或 kernel log。
+      實驗中把 buffer pool 加到超過容器上限的那一刻就被 kill，不是慢慢長上去
+    evidence: tested
+    source: art-mysql
+    refs: [exp-mysql-perf]
+    upstream: { status: partial, note: "awesome 有 uptime < 60；沒有重複重啟的規則" }
+    rules: [rules/targets/mysql.yml#MySQLRestarted, rules/targets/mysql.yml#MySQLRestartedRepeatedly, rules/targets/mysql.yml#MySQLNotReachable]
+
   - id: disk-space
     aspect: stability
     tier: 2
     question: 資料目錄與 binlog 的磁碟還夠嗎
     signal: >-
       node_exporter 看資料目錄所在的檔案系統剩餘比例；binlog 用量用 --collect.binlog_size。
-      磁碟滿時 MySQL 不回錯誤，寫入卡住、每分鐘重試一次並寫 error log，所以 mysql_up 仍是 1
+      InnoDB 資料檔長不出去時是立刻回 ERROR 1114（實驗：24 MB tmpfs 上的表兩邊都是），其他表照常寫入；
+      手冊說的「卡住、每分鐘重試並寫 error log」是 MyISAM、binlog 這類寫入（未實測）。兩種情況 mysql_up 都仍是 1
     metrics: [node_filesystem_avail_bytes, node_filesystem_size_bytes, mysql_binlog_size_bytes]
     evaluate_on: self
-    silent_failure: mysqld_exporter 沒有任何磁碟用量的 metric；寫入卡住時 up、mysql_up 都正常，threads_running 慢慢變高
-    evidence: upstream
+    silent_failure: >-
+      mysqld_exporter 沒有任何磁碟用量的 metric；1114 只出現在語句錯誤數（perf_schema.eventsstatementssum）。
+      tablespace 檔案不見時（實驗：tmpfs 上的 DATA DIRECTORY 在重啟後是空的）MariaDB crash recovery 失敗、2 秒退出，進入重啟迴圈
+    evidence: tested
     source: mysql-full-disk
+    refs: [exp-mysql-perf]
     upstream: { status: no, note: "mixin 與 awesome 都沒有；要靠 node_exporter 的通用磁碟規則，且要知道資料目錄在哪個掛載點" }
     rules: [rules/targets/mysql.yml#MySQLDataDiskFilling]
 
@@ -428,7 +452,10 @@ signals:
     signal: >-
       InnoDB row lock：innodb_row_lock_current_waits（預設就有）。
       Metadata lock（DDL 卡住）不在任何 status 變數裡，只能從 processlist collector 的
-      state="waiting_for_table_metadata_lock" 看到（預設關，要 PROCESS）
+      state="waiting_for_table_metadata_lock" 看到（預設關，要 PROCESS），見 metadata-locks。
+      current_waits 最多等於應用的連線數：實驗中 8 條連線全部卡住時是 8，> 10 的門檻不會響；
+      rate(innodb_row_lock_time) / 1000 是平均同時在等的 session 數（實驗 8–9.8），不受連線數上限影響。
+      等鎖的 session 在 processlist 的 state 是 updating，不是 lock
     metrics:
       - mysql_global_status_innodb_row_lock_current_waits
       - mysql_global_status_innodb_row_lock_time
@@ -436,9 +463,9 @@ signals:
     evaluate_on: self
     evidence: tested
     source: art-mysql-ha
-    refs: [exp-mysql-ha, my-processlist-query]
+    refs: [exp-mysql-ha, my-processlist-query, exp-mysql-perf]
     upstream: { status: no }
-    rules: [rules/targets/mysql.yml#MySQLRowLockWaits]
+    rules: [rules/targets/mysql.yml#MySQLRowLockWaits, rules/targets/mysql.yml#MySQLRowLockWaitTime]
 
   - id: slow-queries
     aspect: usage
@@ -446,11 +473,13 @@ signals:
     question: 有新的慢查詢嗎
     signal: >-
       increase(slow_queries[5m]) > 0。Slow_queries 依 long_query_time（預設 10 秒）計數，不管 slow log 有沒有開；
-      要知道是哪個查詢，用 perf_schema.eventsstatements（預設關）或 slow log
+      要知道是哪個查詢，見 slow-sql-visibility。實驗中 long_query_time=0.5 時，兩個 client 跑 filesort 全表與 SLEEP(1)，
+      30 秒內兩邊各 +36／+38
     metrics: [mysql_global_status_slow_queries]
     evaluate_on: self
-    evidence: upstream
+    evidence: tested
     source: mysql-status-vars
+    refs: [exp-mysql-perf, my-trace-my-slow, my-trace-mdb-slow]
     upstream: { status: yes }
     rules: [rules/targets/mysql.yml#MySQLSlowQueries]
 
@@ -512,6 +541,117 @@ signals:
     upstream: { status: no }
     rules: [rules/targets/mysql.yml#MySQLAbortedConnects]
 
+  # ---------- 效能情境（lab/targets/mysql/perf）----------
+  - id: throughput-drop
+    aspect: usage
+    tier: 3
+    question: 吞吐量（TPS／QPS）掉下來了嗎
+    signal: >-
+      rate(commands_total{command="commit"}) 與 rate(queries) 和平常比；實驗中 row lock、metadata lock、CPU 限制都先讓
+      threads_running 升高（情境開始後 4–10 秒），commit 速率在同一個或之後幾個 scrape 跟著掉（row lock 與 metadata lock 掉到 0–2/s，CPU 0.1 核掉到 45–73/s）。
+      MariaDB 11.4 沒有 Innodb_rows_* 狀態變數，innodb_row_ops_total 只有 MySQL 有，列操作量在 MariaDB 要看 handlers_total
+    metrics:
+      - mysql_global_status_commands_total
+      - mysql_global_status_queries
+      - mysql_global_status_threads_running
+      - mysql_global_status_innodb_row_ops_total
+    evaluate_on: self
+    silent_failure: >-
+      吞吐量掉下來本身不說原因；限速的應用（連線池、每秒固定請求）在資料庫變慢時 QPS 不一定掉，先動的是延遲與 threads_running。
+      MySQLHighThreadsRunning 用 max_connections 的 60% 當門檻，連線池 8 條時 threads_running 最多 11–13，永遠不會響
+    evidence: tested
+    source: art-mysql
+    refs: [exp-mysql-perf, my-perf-ex-commands, my-perf-ex-row-ops, my-perf-mdb-no-rows, my-perf-my-rows-read]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有吞吐量下降的規則" }
+    rules: [rules/targets/mysql.yml#MySQLThroughputDrop]
+
+  - id: metadata-locks
+    aspect: usage
+    tier: 2
+    question: 有 DDL 卡在長交易後面、把整張表的查詢都擋住嗎
+    signal: >-
+      processlist collector 的 mysql_info_schema_processlist_threads{state="waiting_for_table_metadata_lock"}。
+      實驗：一個讀了一列沒 commit 的交易，加上一個 ALTER TABLE ADD COLUMN，10 秒內兩邊都是 9 個 session 在等，
+      commit 速率從 320/s 掉到 0，innodb_row_lock_current_waits 是 0。ALTER 預設的 lock_wait_timeout 是 MySQL 一年、MariaDB 一天，
+      不會自己放棄
+    metrics:
+      - mysql_info_schema_processlist_threads
+      - mysql_info_schema_processlist_seconds
+      - mysql_perf_schema_events_waits_seconds_total
+    evaluate_on: self
+    silent_failure: >-
+      row lock 規則與長交易規則（> 300 秒）都看不到：擋住的交易只開了 25 秒。perf_schema.eventswaits 的 wait/lock/metadata/sql/mdl
+      只在等待結束後才累計（MySQL 在交易結束時一次加 328 秒），MariaDB 預設沒開這個 instrument，一直是 0；
+      MariaDB 的 performance_schema.metadata_locks 也查不到 PENDING。要知道誰擋住，MySQL 用 sys.schema_table_lock_waits
+    evidence: tested
+    source: art-mysql
+    refs: [exp-mysql-perf, my-processlist-query, my-trace-ex-pl-sanitize, my-perf-my-mdl-state, my-perf-mdb-mdl-state, my-perf-my-lock-wait-timeout, my-perf-mdb-lock-wait-timeout, my-perf-ex-waits-query]
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLMetadataLockWaits]
+
+  - id: slow-sql-visibility
+    aspect: usage
+    tier: 3
+    question: 慢的是哪一種 SQL
+    signal: >-
+      --collect.perf_schema.eventsstatements 讀 events_statements_summary_by_digest，每個 digest 輸出次數、總時間、rows_examined、
+      錯誤、暫存表、no_index_used 等 15 個 counter 和一個 latency summary。用 rate(seconds_total) / rate(total) 算每個 digest 的平均時間。
+      只輸出依 SUM_TIMER_WAIT 排序的前 250 個（--collect.perf_schema.eventsstatements.limit），digest_text 截在 120 字
+    metrics:
+      - mysql_perf_schema_events_statements_total
+      - mysql_perf_schema_events_statements_seconds_total
+      - mysql_perf_schema_events_statements_rows_examined_total
+      - mysql_perf_schema_events_statements_latency
+      - mysql_global_status_slow_queries
+    evaluate_on: self
+    applies_when: "MySQL；MariaDB 要先開 performance_schema（預設 OFF，要重啟）"
+    silent_failure: >-
+      latency summary 的 quantile label 是 "95.0"、"99.0"、"999.0"，不是 0.95、0.99，照慣例寫 quantile="0.99" 回傳空；
+      MariaDB 的 quantile 與 lock_time、cpu_time 一直是 0（exporter 只對 MySQL ≥ 8.0.28 查這些欄位）。
+      送 300 種 digest 後 series 數固定在 250 個 digest、4771 條，排不進前 250 的 digest 看不到；exporter 看不到 slow log 原文與執行計畫
+    evidence: tested
+    source: art-mysql
+    refs: [exp-mysql-perf, my-perf-ex-stmt-query, my-perf-ex-stmt-topn, my-perf-ex-stmt-digest-text, my-perf-ex-stmt-labels, my-perf-ex-stmt-8028, my-perf-ex-stmt-quantile, my-perf-ex-stmt-locktime, my-perf-ex-stmt-defaults, my-perf-ex-stmt-flags, my-perf-mdb-pfs-default, my-perf-my-pfs-default]
+    upstream: { status: no, note: "mixin 與 awesome 只有 slow_queries 計數" }
+    rules: [rules/targets/mysql.yml#MySQLSlowDigest, rules/targets/mysql.yml#MySQLSlowQueries]
+
+  - id: statement-errors
+    aspect: usage
+    tier: 3
+    question: 語句錯誤（lock wait timeout、table is full）變多了嗎
+    signal: >-
+      --collect.perf_schema.eventsstatementssum 的 mysql_perf_schema_events_statements_sum_errors（所有 digest 加總，不受前 250 個限制）。
+      實驗中 row lock 情境的 ERROR 1205 讓 MariaDB 升到 2.1/s、MySQL 0.9/s；global status 沒有對應的計數器
+    metrics: [mysql_perf_schema_events_statements_sum_errors, mysql_perf_schema_events_statements_errors_total]
+    evaluate_on: self
+    applies_when: "MySQL；MariaDB 要先開 performance_schema"
+    silent_failure: 錯誤碼不在 metric 裡；要看 performance_schema.events_errors_summary_global_by_error（沒有 collector）
+    evidence: tested
+    source: art-mysql
+    refs: [exp-mysql-perf, my-perf-ex-stmtsum-query, my-perf-ex-stmtsum-errors]
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLStatementErrors]
+
+  - id: buffer-pool-misses
+    aspect: usage
+    tier: 3
+    question: Buffer pool 放得下工作集嗎
+    signal: >-
+      rate(innodb_buffer_pool_reads) / rate(innodb_buffer_pool_read_requests)。實驗把 buffer pool 從 128M 縮到 16M（表 44／102 MB）後，
+      磁碟讀取從 0–18/s 升到 1800–2500/s，約佔讀取請求的 25–35%；限速負載下 commit 速率幾乎不變，p99 升到 340–380 ms。
+      buffer_pool_wait_free 只有 MySQL 動（4/s），MariaDB 一直是 0
+    metrics:
+      - mysql_global_status_innodb_buffer_pool_reads
+      - mysql_global_status_innodb_buffer_pool_read_requests
+      - mysql_global_status_innodb_buffer_pool_wait_free
+      - mysql_global_variables_innodb_buffer_pool_size
+    evaluate_on: self
+    evidence: tested
+    source: art-mysql
+    refs: [exp-mysql-perf]
+    upstream: { status: no }
+    rules: [rules/targets/mysql.yml#MySQLBufferPoolDiskReads]
+
   # ---------- HA：replication、角色、semi-sync、Galera ----------
   - id: replication-running
     aspect: ha
@@ -571,7 +711,8 @@ signals:
     question: Replication 延遲量的是真的嗎
     signal: >-
       用 heartbeat 表（--collect.heartbeat，pt-heartbeat 格式）：now - stored > 30。
-      Seconds_Behind 只在 IO 與 SQL thread 都在跑時有值，IO thread 停了而 SQL 追完時是 NULL，只當輔助。
+      Seconds_Behind 只當輔助：MySQL 在 SQL thread 停、或 IO thread 停而 SQL 追完時是 NULL；
+      MariaDB 只要 IO thread 不是 Yes 就是 NULL，即使 relay log 還沒套用完（讀碼，未實測）。
       heartbeat 在每台都會變大時，代表 primary 上的寫入程式停了，不是 replica 延遲
     metrics:
       - mysql_heartbeat_now_timestamp_seconds
@@ -586,7 +727,7 @@ signals:
       failover 後若寫入程式是 primary 上的 EVENT，它在升級的 replica 上是停用的，heartbeat 從此停住
     evidence: tested
     source: art-mysql-ha
-    refs: [exp-mysql-ha, my-heartbeat-query, mysql-sbs-null, mysql-sbs-compute]
+    refs: [exp-mysql-ha, my-heartbeat-query, mysql-sbs-null, mysql-sbs-compute, my-trace-mdb-sbm-null]
     upstream: { status: partial, note: "mixin 有 MySQLHeartbeatLag 與 MySQLReplicationLag；後者只用 seconds_behind_master" }
     rules: [rules/targets/mysql.yml#MySQLHeartbeatLag, rules/targets/mysql.yml#MySQLReplicationLag]
 
@@ -644,8 +785,9 @@ signals:
     tier: 2
     question: Replica 有沒有 primary 沒有的交易（errant GTID）
     signal: >-
-      exporter 看不到：gtid_executed、gtid_purged（MySQL）與 gtid_binlog_pos、gtid_slave_pos（MariaDB）都是字串，
-      global_variables 解析失敗就跳過；gtid_mode 只有 ON／OFF 會輸出 1／0，ON_PERMISSIVE、OFF_PERMISSIVE 也被跳過。
+      exporter 看不到：gtid_executed、gtid_purged（MySQL）與 gtid_binlog_pos（MariaDB）都是字串，
+      global_variables 解析失敗就跳過（MariaDB replica 狀態裡的 Gtid_Slave_Pos 有輸出成 mysql_slave_status_gtid_slave_pos{domain_id,server_id}，
+      但那只是套用位置，errant 交易在 gtid_binlog_pos）；gtid_mode 只有 ON／OFF 會輸出 1／0，ON_PERMISSIVE、OFF_PERMISSIVE 也被跳過。
       要另外跑查詢：MySQL 用 GTID_SUBSET(replica 的 gtid_executed, primary 的 gtid_executed)，
       MariaDB 比對 replica 的 gtid_binlog_pos 是否出現 replica 自己的 server_id。failover 前一定要檢查
     metrics: [mysql_global_variables_gtid_mode, mysql_global_variables_enforce_gtid_consistency, mysql_global_variables_gtid_strict_mode]
@@ -654,7 +796,7 @@ signals:
     silent_failure: 在 replica 上寫一筆（暫時關 super_read_only）後，GTID_SUBSET 變 0，但 exporter 沒有任何 metric 改變
     evidence: tested
     source: art-mysql-ha
-    refs: [exp-mysql-ha, my-global-variables-parse]
+    refs: [exp-mysql-ha, my-global-variables-parse, my-trace-ex-slave-gtid]
     upstream: { status: no, note: "mixin 與 awesome 都沒有；Orchestrator 等 HA 工具自己會檢查" }
     rules: []
 

@@ -374,3 +374,71 @@ groups:
         annotations:
           summary: "有新的慢查詢（超過 long_query_time，不管 slow log 有沒有開都會計數）"
           runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#slow-queries
+
+  # 效能與故障情境（lab/targets/mysql/perf）。門檻是例子；比較基準用 offset 1h，請改成符合流量週期的區間。
+  - name: mysql-performance
+    rules:
+      - alert: MySQLThroughputDrop
+        expr: |
+          sum by (instance) (rate(mysql_global_status_commands_total{job="mysql", command="commit"}[5m]))
+            < 0.5 * sum by (instance) (rate(mysql_global_status_commands_total{job="mysql", command="commit"}[5m] offset 1h))
+          and sum by (instance) (rate(mysql_global_status_commands_total{job="mysql", command="commit"}[5m] offset 1h)) > 10
+        for: 10m
+        labels: { severity: warning, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "Commit 速率不到一小時前的一半；鎖、metadata lock、CPU、I/O 都會先表現成這個，原因要看同時間其他訊號；流量本來就會掉的時段要調整 offset"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#throughput-drop
+          absence_covered_by: "MySQLNotReachable, MySQLExporterDown"
+      - alert: MySQLMetadataLockWaits
+        expr: |
+          sum by (instance) (mysql_info_schema_processlist_threads{job="mysql", state=~".*metadata_lock.*"}) >= 3
+        for: 1m
+        labels: { severity: warning, component: mysqld_exporter, tier: "2" }
+        annotations:
+          summary: "{{ $value }} 個 session 在等 metadata lock（常見：ALTER TABLE 排在長交易後面，後面所有用到這張表的查詢一起排隊）；row lock 規則看不到；要 --collect.info_schema.processlist 與 PROCESS"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#metadata-locks
+          absence_covered_by: "MySQLCollectorFailed, MySQLCollectorsMissing"
+      - alert: MySQLRowLockWaitTime
+        expr: rate(mysql_global_status_innodb_row_lock_time{job="mysql"}[5m]) / 1000 > 2
+        for: 5m
+        labels: { severity: warning, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "平均隨時有 {{ $value | printf \"%.1f\" }} 個 session 在等 InnoDB row lock（innodb_row_lock_time 是毫秒）；current_waits 最多等於應用的連線數，連線池小時 MySQLRowLockWaits（> 10）不會響"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#lock-waits
+      - alert: MySQLSlowDigest
+        expr: |
+          (
+            sum by (instance, schema, digest, digest_text) (rate(mysql_perf_schema_events_statements_seconds_total{job="mysql"}[5m]))
+              / sum by (instance, schema, digest, digest_text) (rate(mysql_perf_schema_events_statements_total{job="mysql"}[5m]))
+          ) > 1
+          and sum by (instance, schema, digest, digest_text) (rate(mysql_perf_schema_events_statements_total{job="mysql"}[5m])) > 0.05
+        for: 10m
+        labels: { severity: info, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "Digest {{ $labels.digest_text }} 平均每次超過 1 秒；要 --collect.perf_schema.eventsstatements（只輸出前 limit 個 digest），MariaDB 要先開 performance_schema"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#slow-sql-visibility
+          absence_covered_by: "MySQLCollectorFailed, MySQLCollectorsMissing"
+      - alert: MySQLStatementErrors
+        expr: rate(mysql_perf_schema_events_statements_sum_errors{job="mysql"}[5m]) > 1
+        for: 10m
+        labels: { severity: info, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "語句錯誤每秒超過 1 次（lock wait timeout、table is full、語法錯都算）；要 --collect.perf_schema.eventsstatementssum；細節看 events_statements_errors_total 的 digest 或 performance_schema.events_errors_summary_global_by_error"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#statement-errors
+          absence_covered_by: "MySQLCollectorFailed, MySQLCollectorsMissing"
+      - alert: MySQLBufferPoolDiskReads
+        expr: |
+          rate(mysql_global_status_innodb_buffer_pool_reads{job="mysql"}[10m])
+            / rate(mysql_global_status_innodb_buffer_pool_read_requests{job="mysql"}[10m]) > 0.05
+          and rate(mysql_global_status_innodb_buffer_pool_reads{job="mysql"}[10m]) > 50
+        for: 15m
+        labels: { severity: info, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "超過 5% 的頁讀取要到磁碟（buffer pool 放不下工作集）；buffer_pool_wait_free 不一定會動"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#buffer-pool-misses
+      - alert: MySQLRestartedRepeatedly
+        expr: resets(mysql_global_status_uptime{job="mysql"}[1h]) > 1
+        labels: { severity: warning, component: mysqld_exporter, tier: "3" }
+        annotations:
+          summary: "一小時內重啟超過一次（crash loop、反覆 OOM kill）；重啟之間的停機短於 scrape 間隔時 mysql_up 看不到，uptime 歸零才看得到"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysqld_exporter/#crash-oom

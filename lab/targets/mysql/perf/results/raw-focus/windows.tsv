@@ -1,0 +1,4 @@
+s0 基線	1794183370	1794183413
+s3 metadata lock：ALTER TABLE 排在長交易後面	1794183460	1794183535
+s11-mdb OOM kill：mem_limit 1g → 486m（目前用量 336MiB + 150）、buffer pool 加到 1G、寫入大表	1794183536	1794183562
+s11-my OOM kill：mem_limit 1g → 730m（目前用量 580MiB + 150）、buffer pool 加到 1G、寫入大表	1794183563	1794183586
