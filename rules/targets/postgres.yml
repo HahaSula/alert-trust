@@ -588,3 +588,163 @@ groups:
           summary: "Patroni 叢集 {{ $labels.scope }} 的節點 timeline 不一致超過 10 分鐘：failover 後有複本沒有跟上新主庫（常見是需要 pg_rewind 或重建）"
           runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#patroni-timeline
           absence_covered_by: "PatroniDown, PatroniMissing"
+
+  # ---------- 用自訂查詢補上的盲點（query-exporter 5.2.2） ----------
+  # 設定：queries/query-exporter/postgres.yaml。假設 query-exporter 在 job="query-exporter"，
+  # metric 的 database label 是設定裡的資料庫名稱（primary、primary_app、standby），請依實際命名調整。
+  # query-exporter 查詢失敗時保留舊值，所以每條值規則都靠 PostgresCustomQueryStale 判斷資料是否還在更新。
+  - name: postgres-custom-queries
+    rules:
+      - alert: PostgresQueryExporterDown
+        expr: up{job="query-exporter"} == 0 or absent(up{job="query-exporter"})
+        for: 5m
+        labels: { severity: warning, component: postgres_exporter, tier: "1" }
+        annotations:
+          summary: "抓不到 query-exporter；這組規則補的盲點（同步 standby、XID age、archive 設定等）全部回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#custom-queries
+      - alert: PostgresCustomQueryStale
+        expr: |
+          time() - query_timestamp{job="query-exporter"} > 900
+        for: 5m
+        labels: { severity: warning, component: postgres_exporter, tier: "1" }
+        annotations:
+          summary: "{{ $labels.database }} 的查詢 {{ $labels.query }} 超過 15 分鐘沒有成功；query-exporter 保留舊值，依賴這個查詢的 metric 都是舊的。15 分鐘是最長 interval（5m）的 3 倍"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#custom-queries
+          absence_covered_by: "PostgresCustomQueryFailing, PostgresQueryExporterDown"
+      - alert: PostgresCustomQueryFailing
+        expr: |
+          sum by (job, instance, database, query, status) (increase(queries_total{job="query-exporter", status!="success"}[15m])) > 0
+            or sum by (job, instance, database) (increase(database_errors_total{job="query-exporter"}[15m])) > 0
+        for: 10m
+        labels: { severity: warning, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "{{ $labels.database }} 的自訂查詢失敗（{{ $labels.query }} {{ $labels.status }}），或連不上資料庫；常見原因是少了 pg_monitor、版本不支援（pg_stat_io 16 起）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#custom-queries
+      - alert: PostgresSyncStandbyMissing
+        expr: |
+          pgq_replication_sync_standbys{job="query-exporter"}
+            < on (job, instance, database) pgq_replication_sync_required{job="query-exporter"}
+        for: 1m
+        labels: { severity: critical, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "{{ $labels.database }} 的同步 standby 只有 {{ $value }} 台，少於 synchronous_standby_names 要求的數量；synchronous_commit 為 on 以上時 commit 會一直等"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#sync-replication
+          absence_covered_by: "PostgresCustomQueryStale, PostgresQueryExporterDown"
+      - alert: PostgresReplicationReplayLagHigh
+        expr: pgq_replication_replay_lag_seconds{job="query-exporter"} > 300
+        for: 5m
+        labels: { severity: warning, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "複本 {{ $labels.application_name }} 的 replay_lag 超過 5 分鐘。閒置時 replay_lag 是 NULL、這裡是 0；複本斷線時這條 series 在 expiration 後消失，由 PostgresSyncStandbyMissing 或 PostgresPrimaryWithoutStandby 接手"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#replication-lag
+          absence_covered_by: "PostgresSyncStandbyMissing, PostgresPrimaryWithoutStandby"
+      - alert: PostgresXminHorizonHeld
+        expr: |
+          label_replace(
+            {job="query-exporter", __name__=~"pgq_oldest_(backend_xid|backend_xmin|slot_xmin|slot_catalog_xmin|prepared_xact)_age"} > 1e8,
+            "holder", "$1", "__name__", "pgq_oldest_(.*)_age")
+        for: 15m
+        labels: { severity: warning, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "{{ $labels.database }} 的 {{ $labels.holder }} 擋住 vacuum，age 已超過 1 億個 XID（autovacuum_freeze_max_age 預設 2 億）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#xmin-horizon
+          absence_covered_by: "PostgresCustomQueryStale"
+      - alert: PostgresPreparedXactLingering
+        expr: pgq_prepared_xacts{job="query-exporter"} > 0
+        for: 30m
+        labels: { severity: warning, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "{{ $labels.database }} 有 {{ $value }} 個 prepared transaction 超過 30 分鐘沒有 COMMIT／ROLLBACK PREPARED；它們不屬於任何 session，重啟也不會消失，會一直擋住 vacuum"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#xmin-horizon
+      - alert: PostgresArchiveModeOff
+        expr: pgq_archive_mode{job="query-exporter", database="primary"} == 0
+        for: 15m
+        labels: { severity: warning, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "主庫 archive_mode=off：沒有 WAL archive 就沒有 PITR，而 pg_stat_archiver 看起來和剛啟動一樣。只對應該 archive 的實例啟用"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#archive-config
+          absence_covered_by: "PostgresCustomQueryStale, PostgresQueryExporterDown"
+      - alert: PostgresArchiveCommandEmpty
+        expr: |
+          pgq_archive_command_set{job="query-exporter"} == 0
+            and on (job, instance, database) pgq_archive_mode{job="query-exporter"} > 0
+        for: 15m
+        labels: { severity: warning, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "{{ $labels.database }} 的 archive_mode 開著，但 archive_command 與 archive_library 都是空的：WAL segment 一直留在 pg_wal 等 archive"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#archive-config
+          absence_covered_by: "PostgresCustomQueryStale, PostgresQueryExporterDown"
+      - alert: PostgresArchiveLastAttemptFailed
+        expr: pgq_archive_failing{job="query-exporter"} == 1 and on (job, instance, database) pgq_archive_ready_files{job="query-exporter"} > 0
+        for: 10m
+        labels: { severity: warning, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "{{ $labels.database }} 最近一次 archive 失敗晚於最後一次成功，且還有 segment 在等；last_failed_wal 用 SELECT * FROM pg_stat_archiver 查"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#archive-config
+      - alert: PostgresArchiveBacklog
+        expr: pgq_archive_ready_files{job="query-exporter"} > 20
+        for: 15m
+        labels: { severity: warning, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "{{ $labels.database }} 有 {{ $value }} 個 WAL segment 等待 archive（.ready）；archive 跟不上寫入或一直失敗，pg_wal 會成長。門檻是例子：20 × 16MB"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#archive-config
+      - alert: PostgresInvalidIndex
+        expr: pgq_invalid_indexes{job="query-exporter"} > 0
+        for: 1h
+        labels: { severity: info, component: postgres_exporter, tier: "3" }
+        annotations:
+          summary: "資料庫連線 {{ $labels.database }} 有 {{ $value }} 個 indisvalid=false 的索引（CREATE INDEX CONCURRENTLY 失敗留下的）；查詢不會用它，寫入仍要維護它。建立中的索引也是 invalid，所以 for 1h"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#invalid-indexes
+      - alert: PostgresChecksumFailure
+        expr: increase(pgq_checksum_failures_total{job="query-exporter"}[1h]) > 0
+        labels: { severity: critical, component: postgres_exporter, tier: "2" }
+        annotations:
+          summary: "{{ $labels.database }} 讀到 checksum 不符的資料頁：儲存層損毀。data_checksums 沒開時這個值永遠是 0（見 PostgresDataChecksumsOff）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#invalid-indexes
+      - alert: PostgresDataChecksumsOff
+        expr: pgq_data_checksums_enabled{job="query-exporter"} == 0
+        for: 1h
+        labels: { severity: info, component: postgres_exporter, tier: "3" }
+        annotations:
+          summary: "{{ $labels.database }} 沒有開 data_checksums，checksum_failures 是 NULL（query-exporter 輸出 0），資料頁損毀不會被計數"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#invalid-indexes
+          absence_covered_by: "PostgresCustomQueryStale, PostgresQueryExporterDown"
+      - alert: PostgresTimelineChanged
+        expr: changes(pgq_checkpoint_timeline_id{job="query-exporter"}[1h]) > 0
+        labels: { severity: info, component: postgres_exporter, tier: "3" }
+        annotations:
+          summary: "{{ $labels.database }} 的 timeline 在過去 1 小時變了（提升或 PITR）。pg_control_checkpoint 的 timeline 要等提升後第一次 checkpoint 才變"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#promotion
+      - alert: PostgresBackendsWritingBuffers
+        expr: |
+          sum by (job, instance, database) (rate(pgq_io_writes_total{job="query-exporter", backend_type="client backend"}[15m]))
+            > 0.5 * sum by (job, instance, database) (rate(pgq_io_writes_total{job="query-exporter"}[15m]))
+          and sum by (job, instance, database) (rate(pgq_io_writes_total{job="query-exporter"}[15m])) > 100
+        for: 30m
+        labels: { severity: info, component: postgres_exporter, tier: "3" }
+        annotations:
+          summary: "{{ $labels.database }} 一半以上的資料頁寫出是 client backend 自己做的（不是 checkpointer 或 bgwriter）：shared_buffers 或 bgwriter 設定跟不上。pg_stat_io 16 起才有"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#wal-io-sources
+      - alert: PostgresWalBuffersFull
+        expr: rate(pgq_wal_buffers_full_total{job="query-exporter"}[15m]) > 1
+        for: 30m
+        labels: { severity: info, component: postgres_exporter, tier: "3" }
+        annotations:
+          summary: "{{ $labels.database }} 每秒超過 1 次因 wal_buffers 滿了而必須寫出 WAL；考慮調大 wal_buffers"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#wal-io-sources
+      - alert: PostgresSessionsKilledOrFatal
+        expr: |
+          increase(pgq_db_sessions_killed_total{job="query-exporter"}[15m])
+            + increase(pgq_db_sessions_fatal_total{job="query-exporter"}[15m]) > 10
+        for: 5m
+        labels: { severity: info, component: postgres_exporter, tier: "3" }
+        annotations:
+          summary: "資料庫 {{ $labels.datname }} 15 分鐘內有超過 10 個 session 被 terminate 或以 FATAL 結束；連不存在的資料庫、認證失敗不算在任何資料庫裡"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#session-errors
+      - alert: PostgresTablesNeedVacuum
+        expr: pgq_tables_over_vacuum_threshold{job="query-exporter"} > 0
+        for: 6h
+        labels: { severity: info, component: postgres_exporter, tier: "3" }
+        annotations:
+          summary: "資料庫連線 {{ $labels.database }} 有 {{ $value }} 張表的 dead tuple 超過預設 autovacuum 門檻 6 小時；pgq_table_dead_tuples 列出前 5 張。postgres_exporter 的 stat_user_tables 只看 DSN 那一個資料庫，這條涵蓋每個設定的 DSN"
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#autovacuum

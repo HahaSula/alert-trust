@@ -114,6 +114,41 @@ signals:
     upstream: { status: no, note: "mixin 與 awesome 都只看 pg_up" }
     rules: [rules/targets/postgres.yml#PostgresExporterDown, rules/targets/postgres.yml#PostgresExporterMissing]
 
+  - id: custom-queries
+    aspect: exporter
+    tier: 1
+    question: 自訂查詢（query-exporter）還在更新嗎
+    signal: >-
+      query-exporter 查詢失敗或逾時時保留上一次的值，只有 queries_total{status="error"|"timeout"} 增加、query_timestamp 停住；
+      所以值規則要搭配 time() - query_timestamp 判斷資料是否還新。連不上資料庫時 database_errors_total 增加。
+      欄位是 NULL 時輸出 0；沒有回傳列時不更新，每列一個 series 的 metric 要設 expiration 才會消失
+    metrics: [up, query_timestamp, queries_total, database_errors_total]
+    evaluate_on: self
+    silent_failure: >-
+      實測拿掉 pg_monitor 後 archive 查詢每次 permission denied，pgq_archive_* 仍是拿掉前的值、query_timestamp 不再變；
+      停掉複本時 standby 的查詢記成 timeout，metric 同樣保留舊值
+    evidence: tested
+    source: pg-q-lab
+    refs: [pg-q-exp, pg-q-exp-raw, pg-q-qe-status, pg-q-qe-error-status, pg-q-qe-timeout-status, pg-q-qe-builtin-timestamp, pg-q-qe-null-zero, pg-q-qe-norows, pg-q-qe-expire, pg-q-qe-doomed]
+    upstream: { status: no }
+    rules: [rules/targets/postgres.yml#PostgresQueryExporterDown, rules/targets/postgres.yml#PostgresCustomQueryStale, rules/targets/postgres.yml#PostgresCustomQueryFailing]
+
+  - id: wal-io-sources
+    aspect: saturation
+    tier: 3
+    question: WAL 產生多少、資料頁是誰寫出去的
+    signal: >-
+      exporter 沒有查 pg_stat_wal（14 起）與 pg_stat_io（16 起）。自訂查詢輸出 pgq_wal_bytes_total、pgq_wal_fpi_total、pgq_wal_buffers_full_total，
+      以及依 backend_type 加總的 pgq_io_writes_total、pgq_io_fsyncs_total 等。client backend 自己寫出資料頁或 fsync 的比例高，代表 shared_buffers、bgwriter 或 checkpointer 跟不上
+    metrics: [pgq_wal_bytes_total, pgq_wal_fpi_total, pgq_wal_buffers_full_total, pgq_io_writes_total, pgq_io_fsyncs_total]
+    evaluate_on: self
+    silent_failure: 16 以下沒有 pg_stat_io，查詢每次失敗（queries_total{status="error"}），要把該 DSN 從 stat_io 的 databases 拿掉
+    evidence: tested
+    source: pg-q-lab
+    refs: [pg-q-exp, pg-q-pg16-view-statwal, pg-q-pg17-view-statwal, pg-q-pg16-view-statio, pg-q-pg17-view-statio]
+    upstream: { status: no }
+    rules: [rules/targets/postgres.yml#PostgresWalBuffersFull, rules/targets/postgres.yml#PostgresBackendsWritingBuffers]
+
   - id: db-up
     aspect: availability
     tier: 1
@@ -351,17 +386,18 @@ signals:
     signal: >-
       pg_stat_activity_max_tx_duration 依 state 分開看，state="idle in transaction" 超過幾分鐘就該處理；
       --collector.long_running_transactions 另有 pg_long_running_transactions_oldest_timestamp_seconds。
-      exporter 只給「秒數」，不給 backend_xid／backend_xmin 的 XID age，也不看 prepared transaction 與 slot 的 xmin
-    metrics: [pg_stat_activity_max_tx_duration, pg_long_running_transactions, pg_long_running_transactions_oldest_timestamp_seconds, pg_stat_user_tables_n_dead_tup]
+      exporter 只給「秒數」，不給 backend_xid／backend_xmin 的 XID age，也不看 prepared transaction 與 slot 的 xmin。
+      自訂查詢：pgq_oldest_backend_xid_age、pgq_oldest_backend_xmin_age、pgq_oldest_slot_xmin_age、pgq_oldest_slot_catalog_xmin_age、pgq_oldest_prepared_xact_age（XID 數，主庫與複本各一份）
+    metrics: [pg_stat_activity_max_tx_duration, pg_long_running_transactions, pg_long_running_transactions_oldest_timestamp_seconds, pg_stat_user_tables_n_dead_tup, pgq_oldest_backend_xid_age, pgq_oldest_backend_xmin_age, pgq_oldest_slot_xmin_age, pgq_oldest_prepared_xact_age, pgq_prepared_xacts]
     evaluate_on: self
     silent_failure: >-
       沒有 pg_monitor 時看不到別人的 session，idle in transaction 數為 0；
       pg_database_wraparound_age_datfrozenxid_seconds 是 datfrozenxid 的 age，不會因為交易卡住而反映出來
     evidence: tested
     source: pg-target-lab
-    refs: [pg-exp-target, pg-exp-target-raw, pg-c-activity-query, pg-c-longtx-query, pg-src-activity-privs]
+    refs: [pg-exp-target, pg-exp-target-raw, pg-c-activity-query, pg-c-longtx-query, pg-src-activity-privs, pg-q-exp, pg-q-pg17-view-backendxid, pg-q-pg17-view-slot-xmin, pg-q-pg17-view-prepared, pg-trace-pg17-xid-age]
     upstream: { status: partial, note: "awesome 的 long running transaction 不分 state；mixin 沒有" }
-    rules: [rules/targets/postgres.yml#PostgresLongRunningTransaction, rules/targets/postgres.yml#PostgresIdleInTransaction]
+    rules: [rules/targets/postgres.yml#PostgresLongRunningTransaction, rules/targets/postgres.yml#PostgresIdleInTransaction, rules/targets/postgres.yml#PostgresXminHorizonHeld, rules/targets/postgres.yml#PostgresPreparedXactLingering]
 
   - id: deadlocks-rollbacks
     aspect: workload
@@ -400,17 +436,18 @@ signals:
     question: autovacuum 跟得上嗎（dead tuple、bloat）
     signal: >-
       pg_stat_user_tables_n_dead_tup 佔比與 last_autovacuum 距今多久。只涵蓋 DSN 指定的那一個資料庫；
-      沒有 bloat 估算，table_size 持續成長只能當間接訊號。VACUUM 跑了但 dead tuple 沒減少，通常是 xmin-horizon 被擋住
-    metrics: [pg_stat_user_tables_n_dead_tup, pg_stat_user_tables_n_live_tup, pg_stat_user_tables_last_autovacuum, pg_stat_user_tables_table_size_bytes, pg_stat_progress_vacuum_heap_blks_scanned]
+      沒有 bloat 估算，table_size 持續成長只能當間接訊號。VACUUM 跑了但 dead tuple 沒減少，通常是 xmin-horizon 被擋住。
+      其他資料庫：query-exporter 每個資料庫一個 DSN，pgq_tables_over_vacuum_threshold 與前 5 張表的 pgq_table_dead_tuples（database label 區分）
+    metrics: [pg_stat_user_tables_n_dead_tup, pg_stat_user_tables_n_live_tup, pg_stat_user_tables_last_autovacuum, pg_stat_user_tables_table_size_bytes, pg_stat_progress_vacuum_heap_blks_scanned, pgq_tables_over_vacuum_threshold, pgq_table_dead_tuples]
     evaluate_on: self
     silent_failure: >-
       stat_user_tables 對每張表呼叫 pg_table_size()，要拿 AccessShareLock。任何一張表被 ACCESS EXCLUSIVE 鎖住（ALTER TABLE、VACUUM FULL）
       時整次 scrape 卡住，up 變 0，而且每次 scrape 都留下一條等鎖的連線
     evidence: tested
     source: pg-target-lab
-    refs: [pg-exp-target, pg-exp-target-raw, pg-c-user-tables-size]
+    refs: [pg-exp-target, pg-exp-target-raw, pg-c-user-tables-size, pg-q-exp]
     upstream: { status: partial, note: "mixin 的 TablesNotVaccumed 實際上不會響；awesome 的 bloat 規則需要自訂查詢" }
-    rules: [rules/targets/postgres.yml#PostgresTooManyDeadTuples]
+    rules: [rules/targets/postgres.yml#PostgresTooManyDeadTuples, rules/targets/postgres.yml#PostgresTablesNeedVacuum]
 
   - id: lock-blocks-exporter
     aspect: exporter
@@ -436,14 +473,15 @@ signals:
     question: 有沒有失效或損毀的索引
     signal: >-
       exporter 沒有任何 collector 看 pg_index.indisvalid（CREATE INDEX CONCURRENTLY 失敗留下的索引）或資料頁 checksum 失敗。
-      要用 queries.yaml（已棄用）或 sql_exporter 之類自訂查詢，或排程跑 amcheck，把結果當 metric 送出
-    metrics: []
-    evaluate_on: inventory
-    evidence: code
-    source: pg-exporter-collectors
-    refs: [pg-c-statio-indexes-default, pg-c-database-columns]
+      要用 queries.yaml（已棄用）或 sql_exporter 之類自訂查詢，或排程跑 amcheck，把結果當 metric 送出。
+      自訂查詢：pgq_invalid_indexes（每個 DSN 的資料庫）、pgq_checksum_failures_total 與 pgq_data_checksums_enabled（checksums 沒開時 checksum_failures 是 NULL、輸出 0）。實測失敗的 CREATE UNIQUE INDEX CONCURRENTLY 讓 primary_app 變 1，改壞一頁後 checksum_failures 0 → 1
+    metrics: [pgq_invalid_indexes, pgq_checksum_failures_total, pgq_data_checksums_enabled]
+    evaluate_on: self
+    evidence: tested
+    source: pg-q-lab
+    refs: [pg-c-statio-indexes-default, pg-c-database-columns, pg-q-exp, pg-q-pg17-indisvalid, pg-q-pg17-doc-cic-invalid, pg-q-pg17-checksum-null, pg-q-pg17-view-checksum]
     upstream: { status: partial, note: "awesome 的 invalid index 規則依賴自訂查詢 pg_genaral_index_info_pg_relation_size" }
-    rules: []
+    rules: [rules/targets/postgres.yml#PostgresInvalidIndex, rules/targets/postgres.yml#PostgresChecksumFailure, rules/targets/postgres.yml#PostgresDataChecksumsOff]
 
   - id: connection-headroom
     aspect: saturation
@@ -672,16 +710,17 @@ signals:
     signal: >-
       用主庫端的位元組：pg_stat_replication_pg_wal_lsn_diff（current_wal_lsn − replay_lsn）。
       時間延遲 pg_replication_lag_seconds 在 receive_lsn 等於 replay_lsn 時固定是 0：主庫沒寫入時是 0，複本斷線時也是 0。
-      exporter 不輸出 write_lag／flush_lag／replay_lag 與 sync_state；要時間延遲就自訂查詢或寫 heartbeat 表
-    metrics: [pg_stat_replication_pg_wal_lsn_diff, pg_replication_lag_seconds, pg_replication_last_replay_seconds]
+      exporter 不輸出 write_lag／flush_lag／replay_lag 與 sync_state；要時間延遲就自訂查詢或寫 heartbeat 表。
+      自訂查詢：pgq_replication_replay_lag_seconds 等三個時間延遲，NULL 時 query-exporter 輸出 0；複本斷線後這條 series 在 expiration 後消失
+    metrics: [pg_stat_replication_pg_wal_lsn_diff, pg_replication_lag_seconds, pg_replication_last_replay_seconds, pgq_replication_write_lag_seconds, pgq_replication_flush_lag_seconds, pgq_replication_replay_lag_seconds]
     evaluate_on: self
     applies_when: replica
     silent_failure: 複本斷線 40 秒、主庫持續寫入，pg_replication_lag_seconds 一直是 0
     evidence: tested
     source: pg-target-lab
-    refs: [pg-exp-target, pg-c-replication-lag, pg-c-statrep-query, pg-src-lag-clear]
+    refs: [pg-exp-target, pg-c-replication-lag, pg-c-statrep-query, pg-src-lag-clear, pg-q-exp, pg-q-qe-null-zero, pg-q-qe-expire, pg-trace-pg17-walsnd-lagnull]
     upstream: { status: partial, note: "awesome 用 pg_replication_lag_seconds > 5；mixin 用不存在的 pg_replication_lag" }
-    rules: [rules/targets/postgres.yml#PostgresReplicationLagBytes]
+    rules: [rules/targets/postgres.yml#PostgresReplicationLagBytes, rules/targets/postgres.yml#PostgresReplicationReplayLagHigh]
 
   - id: standby-conflicts
     aspect: replication
@@ -705,15 +744,16 @@ signals:
     question: 同步複寫的 standby 還在嗎
     signal: >-
       synchronous_standby_names 是字串、sync_state 是 pg_stat_replication 的欄位，exporter 都不輸出（settings 只輸出 bool／integer／real）。
-      同步 standby 消失時，commit 會卡住等待；要自訂查詢 sync_state 或至少用 standby-streaming 的 series 數判斷
-    metrics: [pg_stat_replication_pg_wal_lsn_diff]
-    evaluate_on: inventory
+      同步 standby 消失時，commit 會卡住等待；要自訂查詢 sync_state 或至少用 standby-streaming 的 series 數判斷。
+      自訂查詢（query-exporter）：pgq_replication_sync_standbys 與從 synchronous_standby_names 解析出的 pgq_replication_sync_required，前者小於後者就告警；實測停掉同步複本後 1 < 1 變成 0 < 1
+    metrics: [pg_stat_replication_pg_wal_lsn_diff, pgq_replication_sync_standbys, pgq_replication_sync_required, pgq_replication_standbys]
+    evaluate_on: self
     applies_when: synchronous_standby_names
     evidence: tested
     source: pg-target-lab
-    refs: [pg-exp-target, pg-c-settings-query, pg-c-statrep-query]
+    refs: [pg-exp-target, pg-c-settings-query, pg-c-statrep-query, pg-q-exp, pg-q-pg16-view-syncstate, pg-q-pg17-view-syncstate, pg-q-pg17-walsnd-quorum, pg-q-pg17-syncrep-gram-list, pg-q-pg17-syncrep-gram-any]
     upstream: { status: no }
-    rules: []
+    rules: [rules/targets/postgres.yml#PostgresSyncStandbyMissing]
 
   - id: promotion
     aspect: replication
@@ -721,16 +761,17 @@ signals:
     question: 誰是主庫？有沒有兩個主庫
     signal: >-
       pg_replication_is_replica 依 cluster label 計數：is_replica == 0 的數量 > 1 是 split brain，= 0 是沒有主庫；
-      changes(pg_replication_is_replica) 抓 failover。需要在 target 上加 cluster label；timeline 不在 exporter 裡
-    metrics: [pg_replication_is_replica, pg_stat_replication_pg_wal_lsn_diff]
+      changes(pg_replication_is_replica) 抓 failover。需要在 target 上加 cluster label；timeline 不在 exporter 裡。
+      自訂查詢：pgq_checkpoint_timeline_id（pg_control_checkpoint，提升後要等第一次 checkpoint 才變）與 pgq_in_recovery
+    metrics: [pg_replication_is_replica, pg_stat_replication_pg_wal_lsn_diff, pgq_checkpoint_timeline_id, pgq_in_recovery]
     evaluate_on: self
     applies_when: "streaming replication；target 要有 cluster label"
     silent_failure: 提升後舊主庫仍在跑，兩邊 is_replica 都是 0，各自的規則都正常；只有跨 instance 的計數看得出來
     evidence: tested
     source: pg-target-lab
-    refs: [pg-exp-target, pg-c-replication-lag]
+    refs: [pg-exp-target, pg-c-replication-lag, pg-q-exp, pg-q-pg17-control-tli]
     upstream: { status: no, note: "mixin 與 awesome 都沒有角色規則" }
-    rules: [rules/targets/postgres.yml#PostgresRoleChanged, rules/targets/postgres.yml#PostgresMultiplePrimaries, rules/targets/postgres.yml#PostgresNoPrimary]
+    rules: [rules/targets/postgres.yml#PostgresRoleChanged, rules/targets/postgres.yml#PostgresMultiplePrimaries, rules/targets/postgres.yml#PostgresNoPrimary, rules/targets/postgres.yml#PostgresTimelineChanged]
 
   - id: archiver
     aspect: protection
@@ -757,17 +798,18 @@ signals:
     signal: >-
       PostgreSQL 14 起 pg_stat_database 有 sessions_fatal、sessions_killed、sessions_abandoned（每個資料庫一條 counter），
       v0.20.1 的 stat_database collector 沒有查這幾欄。要自訂查詢（sql_exporter 或 queries.yaml）輸出成 counter，再對 increase() 告警；
-      SQL 錯誤（ERROR）沒有任何 view 計數，只在 log 裡，要用 log 管線（例如 VictoriaLogs、mtail）計數。xact_rollback 包含應用主動 ROLLBACK，不等於錯誤
-    metrics: [pg_stat_database_xact_rollback]
-    evaluate_on: inventory
+      SQL 錯誤（ERROR）沒有任何 view 計數，只在 log 裡，要用 log 管線（例如 VictoriaLogs、mtail）計數。xact_rollback 包含應用主動 ROLLBACK，不等於錯誤。
+      自訂查詢：pgq_db_sessions_killed_total、pgq_db_sessions_fatal_total、pgq_db_sessions_abandoned_total（datname label）
+    metrics: [pg_stat_database_xact_rollback, pgq_db_sessions_killed_total, pgq_db_sessions_fatal_total, pgq_db_sessions_abandoned_total]
+    evaluate_on: self
     silent_failure: >-
       實測：pg_terminate_backend 一個 session 後 sessions_killed=1，exporter 沒有任何 sessions_* series；
       連一個不存在的資料庫得到 FATAL，沒有算進任何資料庫的 sessions_fatal（連線沒進到資料庫）
     evidence: tested
     source: pg-asp-lab
-    refs: [pg-asp-exp, pg-asp-exp-raw, pg-asp-src16-statdb-sessions-fatal, pg-asp-src17-statdb-sessions-fatal, pg-asp-src16-sessions-count, pg-asp-c-statdb-columns]
+    refs: [pg-asp-exp, pg-asp-exp-raw, pg-asp-src16-statdb-sessions-fatal, pg-asp-src17-statdb-sessions-fatal, pg-asp-src16-sessions-count, pg-asp-c-statdb-columns, pg-q-exp, pg-q-pg17-view-sessions-killed]
     upstream: { status: no, note: "mixin 與 awesome 都沒有" }
-    rules: []
+    rules: [rules/targets/postgres.yml#PostgresSessionsKilledOrFatal]
 
   # protection
   - id: archive-freshness
@@ -798,15 +840,16 @@ signals:
     signal: >-
       archive_mode 是 enum、archive_command 是 string，exporter 的 settings collector 只輸出 bool／integer／real，兩者都不在 metric 裡。
       archive_mode=off 時 pg_stat_archiver 照樣存在、archived_count 一直是 0、沒有 last_archive_age，看起來和「剛啟動」一樣。
-      盤點時用 SHOW archive_mode 確認，或用自訂查詢輸出 pg_settings 的 archive_mode = 'off' 成 0／1
-    metrics: [pg_stat_archiver_archived_count, pg_settings_archive_timeout_seconds]
+      盤點時用 SHOW archive_mode 確認，或用自訂查詢輸出 pg_settings 的 archive_mode = 'off' 成 0／1。
+      自訂查詢：pgq_archive_mode（0／1／2）、pgq_archive_command_set、pgq_archive_failing（last_failed_time 晚於 last_archived_time）、pgq_archive_ready_files（pg_ls_archive_statusdir，要 pg_monitor）
+    metrics: [pg_stat_archiver_archived_count, pg_settings_archive_timeout_seconds, pgq_archive_mode, pgq_archive_command_set, pgq_archive_failing, pgq_archive_ready_files]
     evaluate_on: inventory
     silent_failure: 實測 pg_settings 有 archive_mode|on|enum，exporter 只有 pg_settings_archive_timeout_seconds
     evidence: tested
     source: pg-asp-lab
-    refs: [pg-asp-exp, pg-asp-c-settings-vartype, pg-asp-src16-guc-archive-mode, pg-asp-src17-guc-archive-mode, pg-asp-src16-guc-enum-table]
+    refs: [pg-asp-exp, pg-asp-c-settings-vartype, pg-asp-src16-guc-archive-mode, pg-asp-src17-guc-archive-mode, pg-asp-src16-guc-enum-table, pg-q-exp, pg-q-pg17-archcmd-disabled, pg-q-pg17-archstatus-grant, pg-q-pg17-archstatus-dir]
     upstream: { status: no }
-    rules: []
+    rules: [rules/targets/postgres.yml#PostgresArchiveModeOff, rules/targets/postgres.yml#PostgresArchiveCommandEmpty, rules/targets/postgres.yml#PostgresArchiveLastAttemptFailed, rules/targets/postgres.yml#PostgresArchiveBacklog]
 
   - id: backup-freshness
     aspect: protection
@@ -981,40 +1024,82 @@ blind_spots:
     why: exporter 沒有查；同步 standby 消失時 commit 會卡住
     workaround: 自訂查詢 `pg_stat_replication.sync_state`
     section: targets/postgres.md#blind-spots
+    covered_by:
+      tool: "query-exporter 5.2.2"
+      config: queries/query-exporter/postgres.yaml
+      metrics: [pgq_replication_sync_standbys, pgq_replication_sync_required, pgq_replication_standbys]
+      rules: [PostgresSyncStandbyMissing]
+      refs: [pg-q-exp, pg-q-pg17-view-syncstate, pg-q-pg17-walsnd-quorum, pg-q-pg17-syncrep-gram-any, pg-q-qe-expire]
   - what: 時間延遲（`write_lag`、`flush_lag`、`replay_lag`）
     category: exporter
     why: exporter 沒有輸出；閒置時會變 NULL
     workaround: 自訂查詢，或 heartbeat 表
     section: targets/postgres.md#blind-spots
+    covered_by:
+      tool: "query-exporter 5.2.2"
+      config: queries/query-exporter/postgres.yaml
+      metrics: [pgq_replication_write_lag_seconds, pgq_replication_flush_lag_seconds, pgq_replication_replay_lag_seconds]
+      rules: [PostgresReplicationReplayLagHigh]
+      refs: [pg-q-exp, pg-q-pg16-walsnd-lagnull, pg-trace-pg17-walsnd-lagnull, pg-q-qe-null-zero]
   - what: 誰擋住 vacuum（`backend_xid` 的 age、slot 的 `xmin`、prepared xacts）
     category: exporter
     why: exporter 沒有輸出
     workaround: 自訂查詢 `max(age(backend_xid))`、`max(age(xmin))`
     section: targets/postgres.md#blind-spots
+    covered_by:
+      tool: "query-exporter 5.2.2"
+      config: queries/query-exporter/postgres.yaml
+      metrics: [pgq_oldest_backend_xid_age, pgq_oldest_backend_xmin_age, pgq_oldest_slot_xmin_age, pgq_oldest_slot_catalog_xmin_age, pgq_oldest_prepared_xact_age, pgq_prepared_xacts]
+      rules: [PostgresXminHorizonHeld, PostgresPreparedXactLingering]
+      refs: [pg-q-exp, pg-q-pg17-view-backendxid, pg-q-pg17-view-slot-xmin, pg-q-pg17-view-prepared]
   - what: "`archive_mode`、`archive_command`、`last_failed_wal`"
     category: exporter
     why: enum 與字串設定不輸出；關掉 archive 時看起來和剛啟動一樣
     workaround: 盤點時檢查，或自訂查詢輸出 0／1
     section: targets/postgres.md#blind-spots
+    covered_by:
+      tool: "query-exporter 5.2.2"
+      config: queries/query-exporter/postgres.yaml
+      metrics: [pgq_archive_mode, pgq_archive_command_set, pgq_archive_failing, pgq_archive_ready_files]
+      rules: [PostgresArchiveModeOff, PostgresArchiveCommandEmpty, PostgresArchiveLastAttemptFailed, PostgresArchiveBacklog]
+      refs: [pg-q-exp, pg-q-pg17-archcmd-disabled, pg-q-pg17-archstatus-grant, pg-q-pg17-archstatus-dir]
   - what: 失效索引、checksum 失敗、timeline
     category: exporter
     why: exporter 沒有查
     workaround: 自訂查詢 `pg_index`、`pg_stat_database.checksum_failures`、`pg_control_checkpoint()`；排程 amcheck
     section: targets/postgres.md#blind-spots
+    covered_by:
+      tool: "query-exporter 5.2.2"
+      config: queries/query-exporter/postgres.yaml
+      metrics: [pgq_invalid_indexes, pgq_checksum_failures_total, pgq_data_checksums_enabled, pgq_checkpoint_timeline_id]
+      rules: [PostgresInvalidIndex, PostgresChecksumFailure, PostgresDataChecksumsOff, PostgresTimelineChanged]
+      refs: [pg-q-exp, pg-q-pg17-indisvalid, pg-q-pg17-checksum-null, pg-q-pg17-control-tli]
   - what: "`pg_stat_wal`、`pg_stat_io`、`sessions_*`"
     category: exporter
     why: exporter 沒有查
     workaround: 自訂查詢（`sessions_*` 從 14 起有）
     section: targets/postgres.md#blind-spots
+    covered_by:
+      tool: "query-exporter 5.2.2"
+      config: queries/query-exporter/postgres.yaml
+      metrics: [pgq_wal_bytes_total, pgq_wal_buffers_full_total, pgq_io_writes_total, pgq_io_fsyncs_total, pgq_db_sessions_killed_total, pgq_db_sessions_fatal_total, pgq_db_sessions_abandoned_total]
+      rules: [PostgresWalBuffersFull, PostgresBackendsWritingBuffers, PostgresSessionsKilledOrFatal]
+      refs: [pg-q-exp, pg-q-pg17-view-statwal, pg-q-pg17-view-statio, pg-q-pg17-view-sessions-killed]
   - what: 其他資料庫的表
     category: exporter
     why: stat_user_tables 只看 DSN 那一個資料庫
     workaround: 每個資料庫各設一個 DSN，或用 `/probe`
     section: targets/postgres.md#blind-spots
+    covered_by:
+      tool: "query-exporter 5.2.2"
+      config: queries/query-exporter/postgres.yaml
+      metrics: [pgq_invalid_indexes, pgq_tables_over_vacuum_threshold, pgq_table_dead_tuples]
+      rules: [PostgresTablesNeedVacuum]
+      refs: [pg-q-exp, pg-q-qe-db-label]
   - what: SQL 錯誤數
     category: database
-    why: 沒有任何 view 計數
-    workaround: log 管線計數
+    why: 沒有任何 view 或函式計數 ERROR；pg_stat_database 只有 xact_rollback（含應用主動 ROLLBACK）與 sessions_fatal（只算連線層級），query-exporter 這類查詢工具補不了
+    workaround: log 管線計數（log_min_messages、VictoriaLogs 或 mtail 依 SQLSTATE 計數）
     section: targets/postgres.md#blind-spots
   - what: 叢集共識（leader、quorum）
     category: database

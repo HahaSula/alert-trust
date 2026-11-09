@@ -1,0 +1,32 @@
+# query-exporter 5.2.2 自訂查詢實驗：PostgreSQL 17.11 主庫（p）＋同步複本（s，physical slot、hot_standby_feedback）＋ query-exporter。
+# archive_mode、archive_command、synchronous_standby_names 由 init.sh 用 ALTER SYSTEM 設定：放在 command 時，
+# initdb 階段的 commit 會等不到 standby 而卡住，而且命令列的值會蓋過之後的 ALTER SYSTEM（情境 E 要改 archive_command）。
+# query-exporter 讀 queries/query-exporter/postgres.yaml 的副本（run.sh 只把 interval 改成 5s、expiration 改成 20s）。
+# 只對外開 127.0.0.1:23901（query-exporter）。執行 ./run.sh，結束會 docker compose down -v。
+name: at-pgq
+services:
+  p:
+    image: postgres:17.11-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_INITDB_ARGS: --data-checksums
+    volumes:
+      - ./init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+      - ./archive.sh:/archive.sh:ro
+    command: ["postgres", "-c", "max_prepared_transactions=5"]
+  s:
+    image: postgres:17.11-alpine
+    environment: { PGPASSWORD: postgres }
+    volumes: ["./standby.sh:/standby.sh:ro", "./archive.sh:/archive.sh:ro"]
+    entrypoint: ["/bin/sh", "/standby.sh"]
+    depends_on: [p]
+  qe:
+    image: adonato/query-exporter:5.2.2
+    environment:
+      QE_PRIMARY_DSN: postgresql://qe_monitor:qe@p:5432/postgres?application_name=query-exporter
+      QE_PRIMARY_APP_DSN: postgresql://qe_monitor:qe@p:5432/app?application_name=query-exporter
+      QE_STANDBY_DSN: postgresql://qe_monitor:qe@s:5432/postgres?application_name=query-exporter
+    volumes: ["./.config.yaml:/config/config.yaml:ro"]
+    command: ["--host", "0.0.0.0", "--log-level", "info"]
+    ports: ["127.0.0.1:23901:9560"]
+    depends_on: [p, s]

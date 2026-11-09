@@ -1,0 +1,60 @@
+query-exporter 5.2.2 自訂查詢 — 摘要（2026-11-09）
+環境：postgres 17.11-alpine 主庫 p＋同步複本 s（slot s1slot、application_name=s1、hot_standby_feedback=on），--data-checksums、archive_mode=on、
+synchronous_standby_names='FIRST 1 (s1)'；adonato/query-exporter:5.2.2，帳號 qe_monitor 只有 pg_monitor；DSN primary（p/postgres）、primary_app（p/app）、standby（s/postgres）。
+設定是 repo 的 queries/query-exporter/postgres.yaml，只把 interval 全改 5s、expiration 全改 20s。原始輸出：run-20261109.txt。沒有 Prometheus，數字是 curl /metrics 當下的值。
+容器時鐘不可靠：以下只用數值與 series 有無，不解讀秒數。
+
+A 基線
+  - 所有 pgq_* 都出現。counter 輸出成 <名稱>_total，另外每條多一條 <名稱>_created（prometheus_client 的預設）。
+  - 一次 /metrics 有 248 條 pgq_* series，其中 106 條是 _created；pgq_io_* 每個 DSN 每個 metric 10 個 backend_type。
+  - 內建 metric：queries_total{database,query,status}、query_timestamp{database,query}、database_errors_total{database}；database label 是設定裡的名稱。
+  - pg_stat_replication：s1 streaming sync；pgq_replication_sync_standbys 1、pgq_replication_sync_required 1（'FIRST 1 (s1)' 解析出 1）。
+  - 啟動時 p、s 還沒起來，database_errors_total 先累積（primary 10、standby 10、primary_app 2）。
+
+B 時間延遲
+  - 寫入中：psql write/flush/replay_lag 0.005465 / 0.006615 / 0.024205 秒，metric 相同。
+  - 寫入停止 30 秒後：psql 三個都是 NULL；metric 三個都是 0.0（NULL 當 0）。
+
+C 誰擋住 vacuum（消耗 3000 個 XID 之後）
+  - 主庫持有 XID 的交易：pgq_oldest_backend_xid_age{primary} 0 → 3001（psql max(age(backend_xid)) 3001）。
+  - prepared transaction：pgq_prepared_xacts{primary} 0 → 1、pgq_oldest_prepared_xact_age 3002（psql 3002）。
+  - 複本上的 repeatable read snapshot：pgq_oldest_backend_xmin_age{standby} 3002；經 hot_standby_feedback 到主庫 slot：pgq_oldest_slot_xmin_age{primary} 0 → 3002（psql age(xmin) 3002）。
+  - 沒有 logical slot，catalog_xmin 是 NULL，pgq_oldest_slot_catalog_xmin_age 是 0。
+
+D sessions_killed 與收尾
+  - terminate 主庫那個 session：pg_stat_database.sessions_killed{postgres} 1；pgq_db_sessions_killed_total{datname="postgres"} 0 → 1。
+  - session 結束、COMMIT PREPARED 後：backend_xid／xmin age 與 prepared 回到 0；slot xmin age 仍是 3002（複本 session 被 terminate 後，slot xmin 要等下一次 feedback 才前進；本次取樣時還沒前進）。
+
+E archive
+  - archive 失敗＋pg_switch_wal 三次：psql last_failed_wal 000000010000000000000004、.ready 3 個；pgq_archive_failing{primary} 0 → 1、pgq_archive_ready_files 0 → 3。
+  - ALTER SYSTEM SET archive_command = '' 並 reload：archive_mode 仍是 on；pgq_archive_command_set{primary} 1 → 0、pgq_archive_mode 仍是 1。
+  - 複本（archive_mode=on，非 always）：archive_mode 1、command_set 1、failing 0、ready 0。
+
+F 其他資料庫
+  - app 資料庫失敗的 CREATE UNIQUE INDEX CONCURRENTLY 留下 orders_id_uq（indisvalid=f）：pgq_invalid_indexes{primary_app} 0 → 1，{primary} 維持 0。
+  - UPDATE 後 orders n_dead_tup 152504：pgq_tables_over_vacuum_threshold{primary_app} 1、pgq_table_dead_tuples{primary_app,public,orders} 152504；primary（postgres 資料庫）維持 0。
+
+G checksum 失敗
+  - checkpoint、pg_buffercache_evict 4 個 buffer、dd 改壞 victim 第 0 頁，讀取時 WARNING page verification failed＋ERROR invalid page。
+  - pg_stat_database.checksum_failures{app} 1；pgq_checksum_failures_total{primary} 0 → 1（sum 全部資料庫）。pgq_data_checksums_enabled 1。
+
+H 自檢：REVOKE pg_monitor FROM qe_monitor
+  - archive 查詢（pg_ls_archive_statusdir）permission denied：queries_total{query="archive",status="error"} 0 → 3（primary 與 standby 各 3）。
+  - pgq_archive_mode 等 metric 仍然存在、值不變；query_timestamp{query="archive"} 停在 REVOKE 前的值（兩次取樣相同）。
+
+I 停掉複本
+  - pg_stat_replication 0 列；pgq_replication_sync_standbys 1 → 0，pgq_replication_sync_required 仍是 1（PostgresSyncStandbyMissing 的條件成立）。
+  - 停止後第一次取樣：pgq_replication_standbys{application_name="s1",state="None",sync_state="None"} 1 與三個 lag 0.0 還在（NULL 的 label 值輸出成字串 None）；
+    再等 expiration（20 秒）後這 4 條 series 消失，只剩 sync_standbys 與 sync_required。
+  - 複本停機期間 standby DSN 的查詢記成 timeout（instance 5、stat_wal 5、stat_io 5、xmin_horizon 4、archive 3），database_errors_total{standby} 10 → 18。
+
+J pg_stat_wal 與 pg_stat_io
+  - pgq_wal_records_total{primary} 30857（A）→ 639564（J）、wal_bytes 1.231e7 → 5.182e7、wal_buffers_full 1580 → 7371；standby 全為 0（複本 replay 不計入）。
+  - pgq_io_writes_total{primary}：checkpointer 968 → 3058、client backend 0；fsyncs 只有 checkpointer（322 → 352）。
+
+K timeline
+  - 提升前 pgq_checkpoint_timeline_id 兩邊都是 1、pgq_in_recovery{standby} 1。
+  - pg_promote() 並 CHECKPOINT 後：pg_control_checkpoint().timeline_id 2；pgq_checkpoint_timeline_id{standby} 2、pgq_in_recovery{standby} 0；舊主庫仍是 1、in_recovery 0（兩個主庫）。
+
+沒有測：PostgreSQL 16（只讀 REL_16_15 原始碼）、query 逾時時伺服器端是否中止（只讀碼）、規則在 Prometheus 上的實際觸發、PostgresBackendsWritingBuffers 的門檻（lab 裡 client backend 寫出是 0）。
+收尾：docker compose down -v，沒有殘留容器。

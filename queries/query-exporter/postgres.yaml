@@ -1,0 +1,337 @@
+# query-exporter 5.2.2（albertodonato/query-exporter，Docker 映像 adonato/query-exporter:5.2.2）的 PostgreSQL 自訂查詢。
+# 補 postgres_exporter v0.20.1 沒有輸出的欄位：同步 standby、時間延遲、誰擋住 vacuum、archive 設定與積壓、
+# 失效索引、checksum 失敗、timeline、pg_stat_wal、pg_stat_io、sessions_*、其他資料庫的表。
+# 說明與證據：docs/targets/postgres.md#custom-queries；實驗：lab/targets/postgres/custom-queries/。
+#
+# 帳號（每個 DSN 都用同一個）：
+#   CREATE ROLE qe_monitor LOGIN PASSWORD '...';
+#   GRANT pg_monitor TO qe_monitor;
+# 需要 pg_monitor 的地方：pg_stat_activity 的 backend_xid／backend_xmin（別人的 session）、
+# pg_stat_replication 除了 pid 以外的欄位、pg_ls_archive_statusdir()（REVOKE FROM public 後只 GRANT 給 pg_monitor）。
+# 其餘（pg_replication_slots、pg_prepared_xacts、pg_control_checkpoint()、pg_stat_wal、pg_stat_io、pg_index、pg_stat_user_tables）public 可讀。
+# 沒有 pg_monitor 時不會報錯：backend_xid 的 age 變成 0、同步 standby 數變成 0，只有 archive 查詢會失敗（queries_total{status="error"}）。
+#
+# 版本：
+#   sessions_*（pg_stat_database）14 起；pg_stat_wal 14 起；pg_stat_io 16 起；archive_library 15 起（用 current_setting(..., true)，舊版回 NULL 不報錯）。
+#   只在 PostgreSQL 16.15、17.11 讀過原始碼，17.11 跑過 lab。18 把 pg_stat_wal 的 wal_write／wal_sync 移到 pg_stat_io，本檔沒有查那兩欄。
+#   版本不支援的查詢會每次都失敗並累加 queries_total{status="error"}（不是 fatal，不會被移除）；請把那個 DSN 從該查詢的 databases 拿掉。
+#
+# 行為（query-exporter 5.2.2 原始碼，見 docs）：
+#   - 欄位是 NULL 時當成 0（executor.py）。write_lag 等在閒置時是 NULL，這裡會是 0；checksums 沒開時 checksum_failures 是 NULL，也會是 0，
+#     所以另外輸出 pgq_data_checksums_enabled。
+#   - 查詢沒有回傳列時不更新任何 series；沒設 expiration 的 series 會一直留著最後的值。每列一個 series 的 metric（每台 standby、每張表）都設了 expiration。
+#   - 查詢失敗（含 timeout）時 metric 保留舊值，只有 queries_total{status="error"|"timeout"} 增加、query_timestamp 停住。規則用 query_timestamp 判斷資料是否新鮮。
+#   - timeout 是客戶端計時，到期時丟掉連線；伺服器端另用 connect-sql 的 statement_timeout 保底。
+#
+# 成本與 cardinality（每個 DSN）：
+#   - 每個 DSN 預設一條常駐連線（connection-pool size 1）；這份設定共 3 條。
+#   - 單列查詢：每個 metric 1 條 series。每列查詢：standby 數 × 4、backend_type 數（約 15）× 4、資料庫數 × 4、每個資料庫最多 5 張表。
+#   - 最貴的是每個資料庫的 pg_stat_user_tables 與 pg_index 掃描（表與索引多時），所以 interval 是 5m。
+#
+# DSN 用環境變數給，例：postgresql://qe_monitor:密碼@db1:5432/postgres?application_name=query-exporter
+#   QE_PRIMARY_DSN      主庫，資料庫 postgres（實例層級的查詢）
+#   QE_PRIMARY_APP_DSN  主庫，應用的資料庫（每個資料庫各看一次的查詢；有多個應用資料庫就照這個多加幾個）
+#   QE_STANDBY_DSN      複本（沒有複本時把 standby 從 databases 與各查詢拿掉）
+# 每個 database 名稱會變成 metric 的 database label；規則以 database 區分主庫與複本。
+
+databases:
+  primary:
+    dsn: !env QE_PRIMARY_DSN
+    connect-sql:
+      - "SET statement_timeout = '25s'"
+      - "SET lock_timeout = '1s'"
+  primary_app:
+    dsn: !env QE_PRIMARY_APP_DSN
+    connect-sql:
+      - "SET statement_timeout = '25s'"
+      - "SET lock_timeout = '1s'"
+  standby:
+    dsn: !env QE_STANDBY_DSN
+    connect-sql:
+      - "SET statement_timeout = '25s'"
+      - "SET lock_timeout = '1s'"
+
+metrics:
+  # --- 同步複寫與時間延遲（主庫） ---
+  pgq_replication_sync_standbys:
+    type: gauge
+    description: pg_stat_replication 中 sync_state 為 sync 或 quorum 的 standby 數
+  pgq_replication_sync_required:
+    type: gauge
+    description: synchronous_standby_names 要求的同步 standby 數（空字串為 0，無數字的名單為 1）
+  pgq_replication_standbys:
+    type: gauge
+    description: 每個 application_name、state、sync_state 組合的 walsender 數
+    labels: [application_name, state, sync_state]
+    expiration: 1m
+  pgq_replication_write_lag_seconds:
+    type: gauge
+    description: write_lag；NULL（閒置或剛連上）時為 0
+    labels: [application_name]
+    expiration: 1m
+  pgq_replication_flush_lag_seconds:
+    type: gauge
+    description: flush_lag；NULL 時為 0
+    labels: [application_name]
+    expiration: 1m
+  pgq_replication_replay_lag_seconds:
+    type: gauge
+    description: replay_lag；NULL 時為 0
+    labels: [application_name]
+    expiration: 1m
+
+  # --- 誰擋住 vacuum（主庫與複本） ---
+  pgq_oldest_backend_xid_age:
+    type: gauge
+    description: max(age(backend_xid))，持有 XID 的最老交易
+  pgq_oldest_backend_xmin_age:
+    type: gauge
+    description: max(age(backend_xmin))，最老的 snapshot
+  pgq_oldest_slot_xmin_age:
+    type: gauge
+    description: max(age(xmin))，replication slot（hot_standby_feedback）
+  pgq_oldest_slot_catalog_xmin_age:
+    type: gauge
+    description: max(age(catalog_xmin))，logical slot
+  pgq_oldest_prepared_xact_age:
+    type: gauge
+    description: max(age(transaction))，pg_prepared_xacts
+  pgq_prepared_xacts:
+    type: gauge
+    description: pg_prepared_xacts 列數
+
+  # --- archive（主庫與複本） ---
+  pgq_archive_mode:
+    type: gauge
+    description: archive_mode，off=0、on=1、always=2
+  pgq_archive_command_set:
+    type: gauge
+    description: archive_command 或 archive_library 有設定為 1（archive_mode=off 時 archive_command 顯示 (disabled)，算 0）
+  pgq_archive_failing:
+    type: gauge
+    description: pg_stat_archiver.last_failed_time 晚於 last_archived_time 為 1
+  pgq_archive_ready_files:
+    type: gauge
+    description: pg_wal/archive_status 下 .ready 檔數（等待 archive 的 segment）
+
+  # --- 實例：timeline、checksum ---
+  pgq_checkpoint_timeline_id:
+    type: gauge
+    description: pg_control_checkpoint().timeline_id（最後一次 checkpoint／restartpoint 的 timeline）
+  pgq_in_recovery:
+    type: gauge
+    description: pg_is_in_recovery()，複本為 1
+  pgq_data_checksums_enabled:
+    type: gauge
+    description: data_checksums 為 on 時 1；為 0 時 pgq_checksum_failures 永遠是 0
+  pgq_checksum_failures:
+    type: counter
+    description: sum(pg_stat_database.checksum_failures)，含共享物件那一列
+
+  # --- pg_stat_wal（14+） ---
+  pgq_wal_records:
+    type: counter
+    description: pg_stat_wal.wal_records
+  pgq_wal_fpi:
+    type: counter
+    description: pg_stat_wal.wal_fpi（full page image）
+  pgq_wal_bytes:
+    type: counter
+    description: pg_stat_wal.wal_bytes
+  pgq_wal_buffers_full:
+    type: counter
+    description: pg_stat_wal.wal_buffers_full（wal_buffers 滿了而必須寫出的次數）
+
+  # --- pg_stat_io（16+），依 backend_type 加總 object 與 context ---
+  pgq_io_reads:
+    type: counter
+    description: pg_stat_io.reads 的和（次數，不是 byte）
+    labels: [backend_type]
+  pgq_io_writes:
+    type: counter
+    description: pg_stat_io.writes 的和
+    labels: [backend_type]
+  pgq_io_extends:
+    type: counter
+    description: pg_stat_io.extends 的和
+    labels: [backend_type]
+  pgq_io_fsyncs:
+    type: counter
+    description: pg_stat_io.fsyncs 的和
+    labels: [backend_type]
+
+  # --- sessions_*（14+，主庫，每個資料庫一組） ---
+  pgq_db_sessions:
+    type: counter
+    description: pg_stat_database.sessions
+    labels: [datname]
+  pgq_db_sessions_abandoned:
+    type: counter
+    description: pg_stat_database.sessions_abandoned（客戶端沒有正常斷線）
+    labels: [datname]
+  pgq_db_sessions_fatal:
+    type: counter
+    description: pg_stat_database.sessions_fatal
+    labels: [datname]
+  pgq_db_sessions_killed:
+    type: counter
+    description: pg_stat_database.sessions_killed（被 terminate）
+    labels: [datname]
+
+  # --- 每個資料庫（每個 DSN 各查一次） ---
+  pgq_invalid_indexes:
+    type: gauge
+    description: 這個資料庫 pg_index.indisvalid = false 的索引數
+  pgq_tables_over_vacuum_threshold:
+    type: gauge
+    description: n_dead_tup > 50 + 0.2 × n_live_tup 的表數（近似預設的 autovacuum 門檻）
+  pgq_table_dead_tuples:
+    type: gauge
+    description: n_dead_tup 最多的 5 張表
+    labels: [schemaname, relname]
+    expiration: 15m
+
+queries:
+  replication_sync:
+    databases: [primary]
+    interval: 15s
+    timeout: 5
+    metrics: [pgq_replication_sync_standbys, pgq_replication_sync_required]
+    sql: |
+      SELECT
+        (SELECT count(*) FROM pg_stat_replication
+          WHERE sync_state IN ('sync', 'quorum')) AS pgq_replication_sync_standbys,
+        (SELECT CASE
+                  WHEN btrim(setting) = '' THEN 0
+                  WHEN setting ~* '^\s*((first|any)\s+)?[0-9]+\s*\(' THEN substring(setting FROM '([0-9]+)\s*\(')::int
+                  ELSE 1
+                END
+           FROM pg_settings WHERE name = 'synchronous_standby_names') AS pgq_replication_sync_required
+
+  replication_standbys:
+    databases: [primary]
+    interval: 15s
+    timeout: 5
+    metrics:
+      - pgq_replication_standbys
+      - pgq_replication_write_lag_seconds
+      - pgq_replication_flush_lag_seconds
+      - pgq_replication_replay_lag_seconds
+    # 同名 application_name 的多條 walsender 合成一列（取最大延遲），避免 label 重複互相覆蓋
+    sql: |
+      SELECT application_name,
+             string_agg(DISTINCT state, ',') AS state,
+             string_agg(DISTINCT sync_state, ',') AS sync_state,
+             count(*) AS pgq_replication_standbys,
+             COALESCE(max(EXTRACT(epoch FROM write_lag)), 0) AS pgq_replication_write_lag_seconds,
+             COALESCE(max(EXTRACT(epoch FROM flush_lag)), 0) AS pgq_replication_flush_lag_seconds,
+             COALESCE(max(EXTRACT(epoch FROM replay_lag)), 0) AS pgq_replication_replay_lag_seconds
+        FROM pg_stat_replication
+       GROUP BY application_name
+
+  xmin_horizon:
+    databases: [primary, standby]
+    interval: 30s
+    timeout: 5
+    metrics:
+      - pgq_oldest_backend_xid_age
+      - pgq_oldest_backend_xmin_age
+      - pgq_oldest_slot_xmin_age
+      - pgq_oldest_slot_catalog_xmin_age
+      - pgq_oldest_prepared_xact_age
+      - pgq_prepared_xacts
+    sql: |
+      SELECT
+        (SELECT max(age(backend_xid)) FROM pg_stat_activity) AS pgq_oldest_backend_xid_age,
+        (SELECT max(age(backend_xmin)) FROM pg_stat_activity) AS pgq_oldest_backend_xmin_age,
+        (SELECT max(age(xmin)) FROM pg_replication_slots) AS pgq_oldest_slot_xmin_age,
+        (SELECT max(age(catalog_xmin)) FROM pg_replication_slots) AS pgq_oldest_slot_catalog_xmin_age,
+        (SELECT max(age(transaction)) FROM pg_prepared_xacts) AS pgq_oldest_prepared_xact_age,
+        (SELECT count(*) FROM pg_prepared_xacts) AS pgq_prepared_xacts
+
+  archive:
+    databases: [primary, standby]
+    interval: 1m
+    timeout: 10
+    metrics: [pgq_archive_mode, pgq_archive_command_set, pgq_archive_failing, pgq_archive_ready_files]
+    sql: |
+      SELECT
+        CASE current_setting('archive_mode') WHEN 'off' THEN 0 WHEN 'on' THEN 1 ELSE 2 END AS pgq_archive_mode,
+        CASE WHEN current_setting('archive_command') NOT IN ('', '(disabled)')
+               OR COALESCE(current_setting('archive_library', true), '') <> '' THEN 1 ELSE 0 END AS pgq_archive_command_set,
+        (SELECT CASE WHEN last_failed_time > COALESCE(last_archived_time, '-infinity') THEN 1 ELSE 0 END
+           FROM pg_stat_archiver) AS pgq_archive_failing,
+        (SELECT count(*) FROM pg_ls_archive_statusdir() WHERE name LIKE '%.ready') AS pgq_archive_ready_files
+
+  instance:
+    databases: [primary, standby]
+    interval: 1m
+    timeout: 5
+    metrics: [pgq_checkpoint_timeline_id, pgq_in_recovery, pgq_data_checksums_enabled, pgq_checksum_failures]
+    sql: |
+      SELECT
+        (SELECT timeline_id FROM pg_control_checkpoint()) AS pgq_checkpoint_timeline_id,
+        CASE WHEN pg_is_in_recovery() THEN 1 ELSE 0 END AS pgq_in_recovery,
+        CASE WHEN current_setting('data_checksums') = 'on' THEN 1 ELSE 0 END AS pgq_data_checksums_enabled,
+        (SELECT COALESCE(sum(checksum_failures), 0) FROM pg_stat_database) AS pgq_checksum_failures
+
+  stat_wal:
+    databases: [primary, standby]
+    interval: 30s
+    timeout: 5
+    metrics: [pgq_wal_records, pgq_wal_fpi, pgq_wal_bytes, pgq_wal_buffers_full]
+    sql: |
+      SELECT wal_records AS pgq_wal_records, wal_fpi AS pgq_wal_fpi,
+             wal_bytes AS pgq_wal_bytes, wal_buffers_full AS pgq_wal_buffers_full
+        FROM pg_stat_wal
+
+  stat_io:
+    databases: [primary, standby]
+    interval: 1m
+    timeout: 5
+    metrics: [pgq_io_reads, pgq_io_writes, pgq_io_extends, pgq_io_fsyncs]
+    sql: |
+      SELECT backend_type,
+             COALESCE(sum(reads), 0) AS pgq_io_reads,
+             COALESCE(sum(writes), 0) AS pgq_io_writes,
+             COALESCE(sum(extends), 0) AS pgq_io_extends,
+             COALESCE(sum(fsyncs), 0) AS pgq_io_fsyncs
+        FROM pg_stat_io
+       GROUP BY backend_type
+
+  sessions:
+    databases: [primary]
+    interval: 1m
+    timeout: 5
+    metrics: [pgq_db_sessions, pgq_db_sessions_abandoned, pgq_db_sessions_fatal, pgq_db_sessions_killed]
+    sql: |
+      SELECT datname,
+             sessions AS pgq_db_sessions,
+             sessions_abandoned AS pgq_db_sessions_abandoned,
+             sessions_fatal AS pgq_db_sessions_fatal,
+             sessions_killed AS pgq_db_sessions_killed
+        FROM pg_stat_database
+       WHERE datname IS NOT NULL
+
+  per_database:
+    databases: [primary, primary_app]
+    interval: 5m
+    timeout: 20
+    metrics: [pgq_invalid_indexes, pgq_tables_over_vacuum_threshold]
+    sql: |
+      SELECT
+        (SELECT count(*) FROM pg_index WHERE NOT indisvalid) AS pgq_invalid_indexes,
+        (SELECT count(*) FROM pg_stat_user_tables
+          WHERE n_dead_tup > 50 + 0.2 * n_live_tup) AS pgq_tables_over_vacuum_threshold
+
+  top_dead_tables:
+    databases: [primary, primary_app]
+    interval: 5m
+    timeout: 20
+    metrics: [pgq_table_dead_tuples]
+    sql: |
+      SELECT schemaname, relname, n_dead_tup AS pgq_table_dead_tuples
+        FROM pg_stat_user_tables
+       WHERE n_dead_tup > 0
+       ORDER BY n_dead_tup DESC
+       LIMIT 5

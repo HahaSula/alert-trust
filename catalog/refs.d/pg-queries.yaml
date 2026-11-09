@@ -1,0 +1,389 @@
+# query-exporter 5.2.2 自訂查詢（queries/query-exporter/postgres.yaml）的參考。key 一律以 pg-q- 開頭。
+# 每一行都用 gh api 取 tag 上的檔案核對過（行內含關鍵字）：query-exporter 5.2.2、PostgreSQL REL_16_15／REL_17_11。
+refs:
+  pg-q-qe-null-zero:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/executor.py"
+    line: 284
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/executor.py#L284"
+  pg-q-qe-status:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/executor.py"
+    line: 212
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/executor.py#L212"
+  pg-q-qe-timeout-status:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/executor.py"
+    line: 218
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/executor.py#L218"
+  pg-q-qe-error-status:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/executor.py"
+    line: 220
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/executor.py#L220"
+  pg-q-qe-doomed:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/executor.py"
+    line: 227
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/executor.py#L227"
+  pg-q-qe-expire:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/executor.py"
+    line: 85
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/executor.py#L85"
+  pg-q-qe-counter-set:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/executor.py"
+    line: 330
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/executor.py#L330"
+  pg-q-qe-db-label:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/executor.py"
+    line: 291
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/executor.py#L291"
+  pg-q-qe-expire-on-scrape:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/main.py"
+    line: 91
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/main.py#L91"
+  pg-q-qe-norows:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/db.py"
+    line: 226
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/db.py#L226"
+  pg-q-qe-fatal:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/db.py"
+    line: 105
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/db.py#L105"
+  pg-q-qe-wait-for:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/db.py"
+    line: 381
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/db.py#L381"
+  pg-q-qe-timeout-drop:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/db.py"
+    line: 399
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/db.py#L399"
+  pg-q-qe-pool-default:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "docs/configuration.rst"
+    line: 80
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/docs/configuration.rst#L80"
+  pg-q-qe-builtin-queries:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/builtin_metrics.py"
+    line: 30
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/builtin_metrics.py#L30"
+  pg-q-qe-builtin-timestamp:
+    kind: code
+    project: "query-exporter"
+    version: "5.2.2"
+    file: "query_exporter/builtin_metrics.py"
+    line: 49
+    url: "https://github.com/albertodonato/query-exporter/blob/5.2.2/query_exporter/builtin_metrics.py#L49"
+  pg-q-pg16-view-syncstate:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/catalog/system_views.sql"
+    line: 892
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/catalog/system_views.sql#L892"
+  pg-q-pg17-view-syncstate:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/catalog/system_views.sql"
+    line: 913
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_views.sql#L913"
+  pg-q-pg16-view-writelag:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/catalog/system_views.sql"
+    line: 888
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/catalog/system_views.sql#L888"
+  pg-q-pg16-walsnd-quorum:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/replication/walsender.c"
+    line: 3752
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/replication/walsender.c#L3752"
+  pg-q-pg17-walsnd-quorum:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/replication/walsender.c"
+    line: 4091
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/replication/walsender.c#L4091"
+  pg-q-pg16-walsnd-lagnull:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/replication/walsender.c"
+    line: 3721
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/replication/walsender.c#L3721"
+  pg-q-pg16-syncrep-gram-list:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/replication/syncrep_gram.y"
+    line: 61
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/replication/syncrep_gram.y#L61"
+  pg-q-pg16-syncrep-gram-any:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/replication/syncrep_gram.y"
+    line: 63
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/replication/syncrep_gram.y#L63"
+  pg-q-pg17-syncrep-gram-list:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/replication/syncrep_gram.y"
+    line: 61
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/replication/syncrep_gram.y#L61"
+  pg-q-pg17-syncrep-gram-any:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/replication/syncrep_gram.y"
+    line: 63
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/replication/syncrep_gram.y#L63"
+  pg-q-pg16-view-backendxid:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/catalog/system_views.sql"
+    line: 863
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/catalog/system_views.sql#L863"
+  pg-q-pg17-view-backendxid:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/catalog/system_views.sql"
+    line: 884
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_views.sql#L884"
+  pg-q-pg16-view-slot-xmin:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/catalog/system_views.sql"
+    line: 994
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/catalog/system_views.sql#L994"
+  pg-q-pg17-view-slot-xmin:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1016
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_views.sql#L1016"
+  pg-q-pg16-view-prepared:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/catalog/system_views.sql"
+    line: 400
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/catalog/system_views.sql#L400"
+  pg-q-pg17-view-prepared:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/catalog/system_views.sql"
+    line: 421
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_views.sql#L421"
+  pg-q-pg16-archstatus-grant:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/catalog/system_functions.sql"
+    line: 733
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/catalog/system_functions.sql#L733"
+  pg-q-pg17-archstatus-grant:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/catalog/system_functions.sql"
+    line: 768
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_functions.sql#L768"
+  pg-q-pg17-archstatus-revoke:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/catalog/system_functions.sql"
+    line: 698
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_functions.sql#L698"
+  pg-q-pg16-archstatus-dir:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/utils/adt/genfile.c"
+    line: 735
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/utils/adt/genfile.c#L735"
+  pg-q-pg17-archstatus-dir:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/adt/genfile.c"
+    line: 689
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/adt/genfile.c#L689"
+  pg-q-pg16-archcmd-disabled:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/access/transam/xlog.c"
+    line: 4438
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/access/transam/xlog.c#L4438"
+  pg-q-pg17-archcmd-disabled:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/access/transam/xlog.c"
+    line: 4769
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/access/transam/xlog.c#L4769"
+  pg-q-pg16-checksum-null:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/utils/adt/pgstatfuncs.c"
+    line: 1136
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/utils/adt/pgstatfuncs.c#L1136"
+  pg-q-pg17-checksum-null:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/adt/pgstatfuncs.c"
+    line: 1130
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/adt/pgstatfuncs.c#L1130"
+  pg-q-pg16-view-checksum:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1043
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/catalog/system_views.sql#L1043"
+  pg-q-pg17-view-checksum:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1069
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_views.sql#L1069"
+  pg-q-pg16-control-tli:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/utils/misc/pg_controldata.c"
+    line: 111
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/utils/misc/pg_controldata.c#L111"
+  pg-q-pg17-control-tli:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/misc/pg_controldata.c"
+    line: 110
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/misc/pg_controldata.c#L110"
+  pg-q-pg16-indisvalid:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/include/catalog/pg_index.h"
+    line: 42
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/include/catalog/pg_index.h#L42"
+  pg-q-pg17-indisvalid:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/include/catalog/pg_index.h"
+    line: 42
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/include/catalog/pg_index.h#L42"
+  pg-q-pg17-doc-cic-invalid:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "doc/src/sgml/ref/create_index.sgml"
+    line: 648
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/doc/src/sgml/ref/create_index.sgml#L648"
+  pg-q-pg16-view-statio:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1122
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/catalog/system_views.sql#L1122"
+  pg-q-pg17-view-statio:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1153
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_views.sql#L1153"
+  pg-q-pg16-view-statwal:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1144
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/catalog/system_views.sql#L1144"
+  pg-q-pg17-view-statwal:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1175
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_views.sql#L1175"
+  pg-q-pg16-view-sessions-killed:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_16_15"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1053
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/catalog/system_views.sql#L1053"
+  pg-q-pg17-view-sessions-killed:
+    kind: code
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1079
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_views.sql#L1079"
+  pg-q-exp:
+    kind: experiment
+    title: query-exporter 5.2.2 自訂查詢實驗：同步 standby、時間延遲、XID age、archive、失效索引、checksum、timeline、sessions、pg_stat_wal／pg_stat_io（PostgreSQL 17.11）
+    url: https://github.com/HahaSula/alert-trust/blob/main/lab/targets/postgres/custom-queries/results/summary.txt
+  pg-q-exp-raw:
+    kind: experiment
+    title: query-exporter 5.2.2 自訂查詢實驗的原始輸出
+    url: https://github.com/HahaSula/alert-trust/blob/main/lab/targets/postgres/custom-queries/results/run-20261109.txt

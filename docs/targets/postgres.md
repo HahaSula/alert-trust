@@ -463,7 +463,57 @@ postgres_exporter v0.20.1。「預設」指沒有加 `--collector.<name>` 或 `-
 | 其他資料庫的表 | stat_user_tables 只看 DSN 的資料庫 | 每個資料庫各設一個 DSN（或 `/probe`） |
 | `pg_stat_wal`、`pg_stat_io` | WAL 產生速度、I/O 來源 | 自訂查詢 |
 
-自訂查詢的 queries.yaml 已經棄用，而且查詢失敗時沒有單獨的成功指標（見元件卡）。新部署可以考慮 sql_exporter 這類有每個查詢錯誤計數的工具。
+自訂查詢的 queries.yaml 已經棄用，而且查詢失敗時沒有單獨的成功指標（見元件卡）。這裡改用 query-exporter，每個查詢有自己的成功／失敗計數；「資料庫有、exporter 沒輸出」的項目都補上了，見[下一節](#custom-queries)。
+
+## 用自訂查詢補上 {#custom-queries}
+
+**結論**：「資料庫有、exporter 沒輸出」的盲點都可以用 query-exporter 5.2.2 的自訂查詢補上，在 PostgreSQL 17.11 主庫＋同步複本上實測過 metric 會出現、會跟著狀態變。SQL 錯誤數補不了：PostgreSQL 沒有任何 view 計數 ERROR，只能從 log 算。<span class="at-chip at-ev-tested">實測</span>[^pg-q-exp]
+
+| 項目 | 內容 |
+|---|---|
+| 工具 | query-exporter 5.2.2（Docker 映像 `adonato/query-exporter:5.2.2`，預設 port 9560） |
+| 設定 | [queries/query-exporter/postgres.yaml](https://github.com/HahaSula/alert-trust/blob/main/queries/query-exporter/postgres.yaml)：DSN 用環境變數 `QE_PRIMARY_DSN`、`QE_PRIMARY_APP_DSN`、`QE_STANDBY_DSN` |
+| 帳號 | `CREATE ROLE qe_monitor LOGIN ...; GRANT pg_monitor TO qe_monitor;`。`pg_ls_archive_statusdir()` 從 public 收回後只授權給 pg_monitor；別人 session 的 `backend_xid` 與 `pg_stat_replication` 的欄位也要 pg_monitor[^pg-q-pg17-archstatus-revoke][^pg-q-pg17-archstatus-grant][^pg-src-walsnd-privs] |
+| 版本 | `sessions_*`、`pg_stat_wal` 14 起，`pg_stat_io` 16 起；只讀過 16.15、17.11 的原始碼，17.11 實測[^pg-q-pg16-view-statio][^pg-q-pg17-view-statio][^pg-q-pg16-view-statwal] |
+| 規則 | [rules/targets/postgres.yml](https://github.com/HahaSula/alert-trust/blob/main/rules/targets/postgres.yml) 的 `postgres-custom-queries` 組，假設 `job="query-exporter"` |
+
+### query-exporter 怎麼把結果變成 metric {#custom-queries-behaviour}
+
+這幾點決定規則要怎麼寫，全部讀過 5.2.2 的原始碼，前五點也在 lab 看到（`_total`、`_created` 是 prometheus_client 的命名，只有實測）。
+
+| 行為 | 對規則的影響 | 證據 |
+|---|---|---|
+| 欄位是 NULL 時輸出 0 | `write_lag` 等閒置時是 NULL，metric 是 0；checksums 沒開時 `checksum_failures` 是 NULL，也是 0，所以另外輸出 `pgq_data_checksums_enabled` | <span class="at-chip at-ev-tested">實測</span>[^pg-q-qe-null-zero][^pg-q-pg17-checksum-null][^pg-q-exp] |
+| 查詢失敗或逾時時不清掉舊值，只增加 `queries_total{status="error"\|"timeout"}`，`query_timestamp` 停住 | 值規則看到的是舊值；要用 `time() - query_timestamp` 判斷新不新（`PostgresCustomQueryStale`） | <span class="at-chip at-ev-tested">實測</span>[^pg-q-qe-error-status][^pg-q-qe-timeout-status][^pg-q-qe-builtin-timestamp][^pg-q-exp] |
+| 查詢沒有回傳列時不更新；有設 `expiration` 的 series 在超過時間沒更新後、下一次被抓取時移除 | 每台 standby、每張表一條 series 的 metric 一定要設 `expiration`，否則複本斷線後延遲停在最後的值 | <span class="at-chip at-ev-tested">實測</span>[^pg-q-qe-norows][^pg-q-qe-expire][^pg-q-qe-expire-on-scrape][^pg-q-exp] |
+| 每個 metric 自動加 `database` label（設定裡的資料庫名稱）；label 欄位是 NULL 時輸出字串 `None` | 規則用 `database` 區分主庫、複本與各資料庫 | <span class="at-chip at-ev-tested">實測</span>[^pg-q-qe-db-label][^pg-q-exp] |
+| counter 輸出成 `_total`，另外多一條 `_created` | series 數幾乎加倍 | <span class="at-chip at-ev-tested">實測</span>[^pg-q-exp] |
+| 欄位名稱或數量對不上是 fatal：該查詢在那個資料庫上不再執行，直到重啟；SQL 錯誤（例如版本沒有這個 view）不是 fatal，每次重試 | 版本不支援的查詢要把 DSN 從該查詢的 `databases` 拿掉；被移除的查詢靠 `PostgresCustomQueryStale` 發現 | <span class="at-chip at-ev-code">讀碼</span>[^pg-q-qe-fatal][^pg-q-qe-doomed] |
+| `timeout` 是客戶端計時，到期時丟掉連線 | 設定另用 `connect-sql` 設 `statement_timeout`、`lock_timeout`，讓伺服器端也會中止 | <span class="at-chip at-ev-code">讀碼</span>[^pg-q-qe-wait-for][^pg-q-qe-timeout-drop] |
+
+### 每個盲點的查詢與證據 {#custom-queries-evidence}
+
+| 盲點 | metric | PostgreSQL 來源 | lab 看到的變化 | 規則 |
+|---|---|---|---|---|
+| 同步 standby | `pgq_replication_sync_standbys`、`pgq_replication_sync_required` | `pg_stat_replication.sync_state`（sync、quorum、potential、async）；`synchronous_standby_names` 只有名單時要求 1 台，`FIRST n`／`ANY n` 要求 n 台[^pg-q-pg17-view-syncstate][^pg-q-pg17-walsnd-quorum][^pg-q-pg17-syncrep-gram-list][^pg-q-pg17-syncrep-gram-any] | 停掉複本：1 → 0，要求仍是 1 | `PostgresSyncStandbyMissing` |
+| 時間延遲 | `pgq_replication_{write,flush,replay}_lag_seconds{application_name}` | 沒有新的延遲樣本時欄位是 NULL[^pg-q-pg16-walsnd-lagnull][^pg-trace-pg17-walsnd-lagnull] | 寫入中 replay 0.024 秒；停止 30 秒後 psql 是 NULL、metric 是 0；複本停掉後 series 在 expiration 後消失 | `PostgresReplicationReplayLagHigh` |
+| 誰擋住 vacuum | `pgq_oldest_{backend_xid,backend_xmin,slot_xmin,slot_catalog_xmin,prepared_xact}_age`、`pgq_prepared_xacts` | `pg_stat_activity.backend_xid`、`pg_replication_slots.xmin`、`pg_prepared_xacts`；`age()` 是 XID 數[^pg-q-pg17-view-backendxid][^pg-q-pg17-view-slot-xmin][^pg-q-pg17-view-prepared][^pg-trace-pg17-xid-age] | 消耗 3000 個 XID 後：backend_xid 3001、prepared 3002、複本 snapshot 經 hot_standby_feedback 讓主庫 slot xmin 3002 | `PostgresXminHorizonHeld`、`PostgresPreparedXactLingering` |
+| archive 設定與積壓 | `pgq_archive_mode`、`pgq_archive_command_set`、`pgq_archive_failing`、`pgq_archive_ready_files` | `archive_mode=off` 時 `archive_command` 顯示 `(disabled)`；`.ready` 檔在 `pg_wal/archive_status`[^pg-q-pg17-archcmd-disabled][^pg-q-pg17-archstatus-dir][^pg-asp-src17-guc-archive-mode] | archive 失敗：failing 0 → 1、ready 0 → 3；清空 archive_command：command_set 1 → 0 | `PostgresArchiveModeOff`、`PostgresArchiveCommandEmpty`、`PostgresArchiveLastAttemptFailed`、`PostgresArchiveBacklog` |
+| 失效索引 | `pgq_invalid_indexes`（每個 DSN 的資料庫） | `pg_index.indisvalid`；CREATE INDEX CONCURRENTLY 失敗會留下 invalid 的索引[^pg-q-pg17-indisvalid][^pg-q-pg17-doc-cic-invalid] | app 資料庫 0 → 1，postgres 資料庫維持 0 | `PostgresInvalidIndex` |
+| checksum 失敗 | `pgq_checksum_failures_total`、`pgq_data_checksums_enabled` | `pg_stat_database.checksum_failures`，checksums 沒開時是 NULL[^pg-q-pg17-view-checksum][^pg-q-pg17-checksum-null] | 改壞一頁再讀：0 → 1 | `PostgresChecksumFailure`、`PostgresDataChecksumsOff` |
+| timeline | `pgq_checkpoint_timeline_id`、`pgq_in_recovery` | `pg_control_checkpoint()` 的 timeline 是最後一次 checkpoint 的[^pg-q-pg17-control-tli] | 提升並 checkpoint 後複本 1 → 2、in_recovery 1 → 0；舊主庫仍是 1 | `PostgresTimelineChanged` |
+| `pg_stat_wal`、`pg_stat_io` | `pgq_wal_*_total`、`pgq_io_{reads,writes,extends,fsyncs}_total{backend_type}` | 兩個 view 的欄位[^pg-q-pg17-view-statwal][^pg-q-pg17-view-statio] | wal_records 30857 → 639564；io writes 只有 checkpointer 在增加 | `PostgresWalBuffersFull`、`PostgresBackendsWritingBuffers`（門檻未實測） |
+| `sessions_*` | `pgq_db_sessions{,_abandoned,_fatal,_killed}_total{datname}` | `pg_stat_database`（14 起）[^pg-q-pg17-view-sessions-killed][^pg-asp-src17-statdb-sessions-fatal] | terminate 一個 session：killed 0 → 1 | `PostgresSessionsKilledOrFatal` |
+| 其他資料庫的表 | `pgq_tables_over_vacuum_threshold`、`pgq_table_dead_tuples{schemaname,relname}`（前 5 張） | `pg_stat_user_tables` 只看連線的資料庫，所以每個資料庫一個 DSN | app 資料庫 dead tuple 152504，postgres 資料庫沒有 series | `PostgresTablesNeedVacuum` |
+| 自訂查詢本身 | `up`、`query_timestamp`、`queries_total`、`database_errors_total` | —— | REVOKE pg_monitor：archive 查詢 error 0 → 3、metric 保留舊值、`query_timestamp` 停住；停掉複本：standby 的查詢記成 timeout | `PostgresQueryExporterDown`、`PostgresCustomQueryStale`、`PostgresCustomQueryFailing` |
+
+### 成本與 cardinality {#custom-queries-cost}
+
+- **連線**：每個 DSN 預設一條常駐連線（`connection-pool` 的 `size` 預設 1），這份設定 3 條；要算進 `max_connections`。[^pg-q-qe-pool-default]
+- **查詢頻率**：同步與延遲 15s、XID age 與 pg_stat_wal 30s、archive、實例、pg_stat_io、sessions 1m；每個資料庫掃 `pg_index` 與 `pg_stat_user_tables` 的兩個查詢 5m、timeout 20 秒。表與索引很多時這兩個最貴。
+- **series 數**（lab，一主一從、4 個資料庫）：一次 /metrics 248 條 `pgq_*`，其中 106 條是 counter 的 `_created`；最多的是 `pgq_io_*`，每個 DSN 每個 metric 10 個 backend_type。label 都有上限：standby 數、backend_type（固定的十幾種）、資料庫數、每個資料庫 5 張表。
+- **會變動的 label**：`pgq_replication_standbys` 的 `state`、`sync_state` 與 `pgq_table_dead_tuples` 的表名會換，所以設了 `expiration`（1m、15m），舊組合會消失。
+- **沒驗證的部分**：PostgreSQL 16 只讀原始碼；18 改了 `pg_stat_wal`／`pg_stat_io` 的欄位，這份設定沒有在 18 跑過。
 
 ## 建議的 exporter 設定 {#recommended}
 
@@ -490,5 +540,7 @@ postgres_exporter v0.20.1。「預設」指沒有加 `--collector.<name>` 或 `-
 效能與故障情境的腳本與輸出在 [lab/targets/postgres/perf](https://github.com/HahaSula/alert-trust/tree/main/lab/targets/postgres/perf)：`run.sh`（S0–S9）、`run-s10.sh`（OOM），摘要 `results/summary.txt`。[^pg-perf-exp][^pg-perf-exp-raw]
 
 腳本與原始輸出在 [lab/targets/postgres/target](https://github.com/HahaSula/alert-trust/tree/main/lab/targets/postgres/target)：`run.sh` 是主要的十幾個情境，`run2.sh` 補跑 slot 失效、XID horizon 與 lock_timeout 對照，`run3.sh` 補跑 archive 失敗（前兩次用 ALTER SYSTEM 改 archive_command，被命令列設定蓋掉而沒有生效）。摘要在 `results/summary.txt`。[^pg-exp-target][^pg-exp-target-raw]
+
+自訂查詢（query-exporter 5.2.2）的腳本與輸出在 [lab/targets/postgres/custom-queries](https://github.com/HahaSula/alert-trust/tree/main/lab/targets/postgres/custom-queries)：`run.sh` 約 6 分鐘，摘要 `results/summary.txt`。[^pg-q-exp][^pg-q-exp-raw]
 
 九個面向補洞（archive 新鮮度、`archive_mode`、資料庫大小、session 錯誤計數）的腳本與輸出在 [lab/targets/postgres/aspects](https://github.com/HahaSula/alert-trust/tree/main/lab/targets/postgres/aspects)：`run.sh` 約 3 分鐘，摘要 `results/summary.txt`。Patroni、pgBackRest、node_exporter 的部分沒有實驗，只讀原始碼。[^pg-asp-exp][^pg-asp-exp-raw]

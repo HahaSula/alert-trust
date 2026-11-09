@@ -169,3 +169,17 @@ sources:
     visibility: public
     url: https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/filesystem_common.go
     checked: "2026-11-09, v1.12.1"
+  pg-query-exporter:
+    title: query-exporter（albertodonato）：SQL 結果變成 metric、NULL 當 0、expiration、queries_total 與 query_timestamp
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/albertodonato/query-exporter/tree/5.2.2
+    checked: "2026-11-09, 5.2.2；Docker 映像 adonato/query-exporter:5.2.2"
+    note: 設定在 queries/query-exporter/postgres.yaml；行為見 query_exporter/executor.py 與 db.py
+  pg-q-lab:
+    title: query-exporter 自訂查詢實驗（lab/targets/postgres/custom-queries）
+    kind: experiment
+    visibility: public
+    url: https://github.com/HahaSula/alert-trust/tree/main/lab/targets/postgres/custom-queries
+    checked: "2026-11-09, query-exporter 5.2.2, PostgreSQL 17.11（主庫＋同步複本）"
+    note: results/summary.txt 是摘要，run-20261109.txt 是原始輸出

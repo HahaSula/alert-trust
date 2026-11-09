@@ -1,0 +1,537 @@
+環境：postgres 17.11-alpine 主庫 p＋複本 s（slot s1slot、application_name=s1、hot_standby_feedback=on）、
+synchronous_standby_names='FIRST 1 (s1)'、--data-checksums、archive_mode=on；query-exporter 5.2.2（adonato/query-exporter:5.2.2），帳號 qe_monitor 只有 pg_monitor。
+設定：queries/query-exporter/postgres.yaml，interval 全改 5s、expiration 全改 20s。
+  $ [p/postgres] select version()
+    PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+  qe: query-exporter, version 5.2.2
+
+## A 基線：所有自訂 metric 與內建 metric
+  > /metrics | grep -E '^pgq_|^queries_total|^database_errors_total'
+    pgq_replication_sync_standbys{database="primary"} 1.0
+    pgq_replication_sync_required{database="primary"} 1.0
+    pgq_replication_standbys{application_name="s1",database="primary",state="streaming",sync_state="sync"} 1.0
+    pgq_replication_write_lag_seconds{application_name="s1",database="primary"} 0.031925
+    pgq_replication_flush_lag_seconds{application_name="s1",database="primary"} 0.033669
+    pgq_replication_replay_lag_seconds{application_name="s1",database="primary"} 0.033783
+    pgq_oldest_backend_xid_age{database="primary"} 0.0
+    pgq_oldest_backend_xid_age{database="standby"} 0.0
+    pgq_oldest_backend_xmin_age{database="primary"} 0.0
+    pgq_oldest_backend_xmin_age{database="standby"} 0.0
+    pgq_oldest_slot_xmin_age{database="primary"} 0.0
+    pgq_oldest_slot_xmin_age{database="standby"} 0.0
+    pgq_oldest_slot_catalog_xmin_age{database="primary"} 0.0
+    pgq_oldest_slot_catalog_xmin_age{database="standby"} 0.0
+    pgq_oldest_prepared_xact_age{database="primary"} 0.0
+    pgq_oldest_prepared_xact_age{database="standby"} 0.0
+    pgq_prepared_xacts{database="primary"} 0.0
+    pgq_prepared_xacts{database="standby"} 0.0
+    pgq_archive_mode{database="primary"} 1.0
+    pgq_archive_mode{database="standby"} 1.0
+    pgq_archive_command_set{database="primary"} 1.0
+    pgq_archive_command_set{database="standby"} 1.0
+    pgq_archive_failing{database="primary"} 0.0
+    pgq_archive_failing{database="standby"} 0.0
+    pgq_archive_ready_files{database="primary"} 0.0
+    pgq_archive_ready_files{database="standby"} 0.0
+    pgq_checkpoint_timeline_id{database="primary"} 1.0
+    pgq_checkpoint_timeline_id{database="standby"} 1.0
+    pgq_in_recovery{database="primary"} 0.0
+    pgq_in_recovery{database="standby"} 1.0
+    pgq_data_checksums_enabled{database="primary"} 1.0
+    pgq_data_checksums_enabled{database="standby"} 1.0
+    pgq_checksum_failures_total{database="primary"} 0.0
+    pgq_checksum_failures_total{database="standby"} 0.0
+    pgq_checksum_failures_created{database="primary"} 1.7942337365874724e+09
+    pgq_checksum_failures_created{database="standby"} 1.7942337415868552e+09
+    pgq_wal_records_total{database="primary"} 30857.0
+    pgq_wal_records_total{database="standby"} 0.0
+    pgq_wal_records_created{database="primary"} 1.7942337365891232e+09
+    pgq_wal_records_created{database="standby"} 1.7942337415882993e+09
+    pgq_wal_fpi_total{database="primary"} 1737.0
+    pgq_wal_fpi_total{database="standby"} 0.0
+    pgq_wal_fpi_created{database="primary"} 1.7942337365891457e+09
+    pgq_wal_fpi_created{database="standby"} 1.79423374158832e+09
+    pgq_wal_bytes_total{database="primary"} 1.231204e+07
+    pgq_wal_bytes_total{database="standby"} 0.0
+    pgq_wal_bytes_created{database="primary"} 1.7942337365899904e+09
+    pgq_wal_bytes_created{database="standby"} 1.7942337415883405e+09
+    pgq_wal_buffers_full_total{database="primary"} 1580.0
+    pgq_wal_buffers_full_total{database="standby"} 0.0
+    pgq_wal_buffers_full_created{database="primary"} 1.794233736590014e+09
+    pgq_wal_buffers_full_created{database="standby"} 1.7942337415883563e+09
+    pgq_io_reads_total{backend_type="background worker",database="primary"} 0.0
+    pgq_io_reads_total{backend_type="slotsync worker",database="primary"} 0.0
+    pgq_io_reads_total{backend_type="client backend",database="primary"} 1548.0
+    pgq_io_reads_total{backend_type="walsender",database="primary"} 0.0
+    pgq_io_reads_total{backend_type="standalone backend",database="primary"} 546.0
+    pgq_io_reads_total{backend_type="autovacuum worker",database="primary"} 0.0
+    pgq_io_reads_total{backend_type="autovacuum launcher",database="primary"} 1.0
+    pgq_io_reads_total{backend_type="background writer",database="primary"} 0.0
+    pgq_io_reads_total{backend_type="startup",database="primary"} 0.0
+    pgq_io_reads_total{backend_type="checkpointer",database="primary"} 0.0
+    pgq_io_reads_total{backend_type="background worker",database="standby"} 0.0
+    pgq_io_reads_total{backend_type="slotsync worker",database="standby"} 0.0
+    pgq_io_reads_total{backend_type="client backend",database="standby"} 220.0
+    pgq_io_reads_total{backend_type="walsender",database="standby"} 0.0
+    pgq_io_reads_total{backend_type="standalone backend",database="standby"} 0.0
+    pgq_io_reads_total{backend_type="autovacuum worker",database="standby"} 0.0
+    pgq_io_reads_total{backend_type="autovacuum launcher",database="standby"} 0.0
+    pgq_io_reads_total{backend_type="background writer",database="standby"} 0.0
+    pgq_io_reads_total{backend_type="startup",database="standby"} 0.0
+    pgq_io_reads_total{backend_type="checkpointer",database="standby"} 0.0
+    pgq_io_reads_created{backend_type="background worker",database="primary"} 1.794233736592078e+09
+    pgq_io_reads_created{backend_type="slotsync worker",database="primary"} 1.794233736592157e+09
+    pgq_io_reads_created{backend_type="client backend",database="primary"} 1.7942337365922234e+09
+    pgq_io_reads_created{backend_type="walsender",database="primary"} 1.7942337365922892e+09
+    pgq_io_reads_created{backend_type="standalone backend",database="primary"} 1.7942337365923514e+09
+    pgq_io_reads_created{backend_type="autovacuum worker",database="primary"} 1.7942337365924146e+09
+    pgq_io_reads_created{backend_type="autovacuum launcher",database="primary"} 1.794233736592486e+09
+    pgq_io_reads_created{backend_type="background writer",database="primary"} 1.7942337365925546e+09
+    pgq_io_reads_created{backend_type="startup",database="primary"} 1.7942337365926564e+09
+    pgq_io_reads_created{backend_type="checkpointer",database="primary"} 1.7942337365927167e+09
+    pgq_io_reads_created{backend_type="background worker",database="standby"} 1.7942337415914254e+09
+    pgq_io_reads_created{backend_type="slotsync worker",database="standby"} 1.7942337415915163e+09
+    pgq_io_reads_created{backend_type="client backend",database="standby"} 1.7942337415915854e+09
+    pgq_io_reads_created{backend_type="walsender",database="standby"} 1.794233741591657e+09
+    pgq_io_reads_created{backend_type="standalone backend",database="standby"} 1.79423374159172e+09
+    pgq_io_reads_created{backend_type="autovacuum worker",database="standby"} 1.7942337415917785e+09
+    pgq_io_reads_created{backend_type="autovacuum launcher",database="standby"} 1.7942337415918448e+09
+    pgq_io_reads_created{backend_type="background writer",database="standby"} 1.7942337415919695e+09
+    pgq_io_reads_created{backend_type="startup",database="standby"} 1.7942337415920277e+09
+    pgq_io_reads_created{backend_type="checkpointer",database="standby"} 1.7942337415920866e+09
+    pgq_io_writes_total{backend_type="background worker",database="primary"} 0.0
+    pgq_io_writes_total{backend_type="slotsync worker",database="primary"} 0.0
+    pgq_io_writes_total{backend_type="client backend",database="primary"} 0.0
+    pgq_io_writes_total{backend_type="walsender",database="primary"} 0.0
+    pgq_io_writes_total{backend_type="standalone backend",database="primary"} 1015.0
+    pgq_io_writes_total{backend_type="autovacuum worker",database="primary"} 0.0
+    pgq_io_writes_total{backend_type="autovacuum launcher",database="primary"} 0.0
+    pgq_io_writes_total{backend_type="background writer",database="primary"} 0.0
+    pgq_io_writes_total{backend_type="startup",database="primary"} 0.0
+    pgq_io_writes_total{backend_type="checkpointer",database="primary"} 968.0
+    pgq_io_writes_total{backend_type="background worker",database="standby"} 0.0
+    pgq_io_writes_total{backend_type="slotsync worker",database="standby"} 0.0
+    pgq_io_writes_total{backend_type="client backend",database="standby"} 0.0
+    pgq_io_writes_total{backend_type="walsender",database="standby"} 0.0
+    pgq_io_writes_total{backend_type="standalone backend",database="standby"} 0.0
+    pgq_io_writes_total{backend_type="autovacuum worker",database="standby"} 0.0
+    pgq_io_writes_total{backend_type="autovacuum launcher",database="standby"} 0.0
+    pgq_io_writes_total{backend_type="background writer",database="standby"} 0.0
+    pgq_io_writes_total{backend_type="startup",database="standby"} 0.0
+    pgq_io_writes_total{backend_type="checkpointer",database="standby"} 0.0
+    pgq_io_writes_created{backend_type="background worker",database="primary"} 1.7942337365921001e+09
+    pgq_io_writes_created{backend_type="slotsync worker",database="primary"} 1.7942337365921738e+09
+    pgq_io_writes_created{backend_type="client backend",database="primary"} 1.7942337365922399e+09
+    pgq_io_writes_created{backend_type="walsender",database="primary"} 1.7942337365923064e+09
+    pgq_io_writes_created{backend_type="standalone backend",database="primary"} 1.794233736592367e+09
+    pgq_io_writes_created{backend_type="autovacuum worker",database="primary"} 1.794233736592442e+09
+    pgq_io_writes_created{backend_type="autovacuum launcher",database="primary"} 1.7942337365924997e+09
+    pgq_io_writes_created{backend_type="background writer",database="primary"} 1.7942337365925891e+09
+    pgq_io_writes_created{backend_type="startup",database="primary"} 1.7942337365926712e+09
+    pgq_io_writes_created{backend_type="checkpointer",database="primary"} 1.7942337365927317e+09
+    pgq_io_writes_created{backend_type="background worker",database="standby"} 1.7942337415914562e+09
+    pgq_io_writes_created{backend_type="slotsync worker",database="standby"} 1.794233741591532e+09
+    pgq_io_writes_created{backend_type="client backend",database="standby"} 1.7942337415916007e+09
+    pgq_io_writes_created{backend_type="walsender",database="standby"} 1.7942337415916722e+09
+    pgq_io_writes_created{backend_type="standalone backend",database="standby"} 1.7942337415917354e+09
+    pgq_io_writes_created{backend_type="autovacuum worker",database="standby"} 1.794233741591792e+09
+    pgq_io_writes_created{backend_type="autovacuum launcher",database="standby"} 1.7942337415919015e+09
+    pgq_io_writes_created{backend_type="background writer",database="standby"} 1.7942337415919857e+09
+    pgq_io_writes_created{backend_type="startup",database="standby"} 1.794233741592043e+09
+    pgq_io_writes_created{backend_type="checkpointer",database="standby"} 1.7942337415921028e+09
+    pgq_io_extends_total{backend_type="background worker",database="primary"} 0.0
+    pgq_io_extends_total{backend_type="slotsync worker",database="primary"} 0.0
+    pgq_io_extends_total{backend_type="client backend",database="primary"} 35.0
+    pgq_io_extends_total{backend_type="walsender",database="primary"} 0.0
+    pgq_io_extends_total{backend_type="standalone backend",database="primary"} 674.0
+    pgq_io_extends_total{backend_type="autovacuum worker",database="primary"} 0.0
+    pgq_io_extends_total{backend_type="autovacuum launcher",database="primary"} 0.0
+    pgq_io_extends_total{backend_type="background writer",database="primary"} 0.0
+    pgq_io_extends_total{backend_type="startup",database="primary"} 0.0
+    pgq_io_extends_total{backend_type="checkpointer",database="primary"} 0.0
+    pgq_io_extends_total{backend_type="background worker",database="standby"} 0.0
+    pgq_io_extends_total{backend_type="slotsync worker",database="standby"} 0.0
+    pgq_io_extends_total{backend_type="client backend",database="standby"} 0.0
+    pgq_io_extends_total{backend_type="walsender",database="standby"} 0.0
+    pgq_io_extends_total{backend_type="standalone backend",database="standby"} 0.0
+    pgq_io_extends_total{backend_type="autovacuum worker",database="standby"} 0.0
+    pgq_io_extends_total{backend_type="autovacuum launcher",database="standby"} 0.0
+    pgq_io_extends_total{backend_type="background writer",database="standby"} 0.0
+    pgq_io_extends_total{backend_type="startup",database="standby"} 0.0
+    pgq_io_extends_total{backend_type="checkpointer",database="standby"} 0.0
+    pgq_io_extends_created{backend_type="background worker",database="primary"} 1.7942337365921202e+09
+    pgq_io_extends_created{backend_type="slotsync worker",database="primary"} 1.7942337365921912e+09
+    pgq_io_extends_created{backend_type="client backend",database="primary"} 1.7942337365922565e+09
+    pgq_io_extends_created{backend_type="walsender",database="primary"} 1.794233736592322e+09
+    pgq_io_extends_created{backend_type="standalone backend",database="primary"} 1.7942337365923822e+09
+    pgq_io_extends_created{backend_type="autovacuum worker",database="primary"} 1.7942337365924578e+09
+    pgq_io_extends_created{backend_type="autovacuum launcher",database="primary"} 1.7942337365925136e+09
+    pgq_io_extends_created{backend_type="background writer",database="primary"} 1.7942337365926201e+09
+    pgq_io_extends_created{backend_type="startup",database="primary"} 1.7942337365926867e+09
+    pgq_io_extends_created{backend_type="checkpointer",database="primary"} 1.7942337365927901e+09
+    pgq_io_extends_created{backend_type="background worker",database="standby"} 1.7942337415914779e+09
+    pgq_io_extends_created{backend_type="slotsync worker",database="standby"} 1.7942337415915527e+09
+    pgq_io_extends_created{backend_type="client backend",database="standby"} 1.7942337415916247e+09
+    pgq_io_extends_created{backend_type="walsender",database="standby"} 1.7942337415916886e+09
+    pgq_io_extends_created{backend_type="standalone backend",database="standby"} 1.7942337415917497e+09
+    pgq_io_extends_created{backend_type="autovacuum worker",database="standby"} 1.7942337415918112e+09
+    pgq_io_extends_created{backend_type="autovacuum launcher",database="standby"} 1.794233741591928e+09
+    pgq_io_extends_created{backend_type="background writer",database="standby"} 1.7942337415920002e+09
+    pgq_io_extends_created{backend_type="startup",database="standby"} 1.7942337415920565e+09
+    pgq_io_extends_created{backend_type="checkpointer",database="standby"} 1.794233741592122e+09
+    pgq_io_fsyncs_total{backend_type="background worker",database="primary"} 0.0
+    pgq_io_fsyncs_total{backend_type="slotsync worker",database="primary"} 0.0
+    pgq_io_fsyncs_total{backend_type="client backend",database="primary"} 0.0
+    pgq_io_fsyncs_total{backend_type="walsender",database="primary"} 0.0
+    pgq_io_fsyncs_total{backend_type="standalone backend",database="primary"} 0.0
+    pgq_io_fsyncs_total{backend_type="autovacuum worker",database="primary"} 0.0
+    pgq_io_fsyncs_total{backend_type="autovacuum launcher",database="primary"} 0.0
+    pgq_io_fsyncs_total{backend_type="background writer",database="primary"} 0.0
+    pgq_io_fsyncs_total{backend_type="startup",database="primary"} 0.0
+    pgq_io_fsyncs_total{backend_type="checkpointer",database="primary"} 322.0
+    pgq_io_fsyncs_total{backend_type="background worker",database="standby"} 0.0
+    pgq_io_fsyncs_total{backend_type="slotsync worker",database="standby"} 0.0
+    pgq_io_fsyncs_total{backend_type="client backend",database="standby"} 0.0
+    pgq_io_fsyncs_total{backend_type="walsender",database="standby"} 0.0
+    pgq_io_fsyncs_total{backend_type="standalone backend",database="standby"} 0.0
+    pgq_io_fsyncs_total{backend_type="autovacuum worker",database="standby"} 0.0
+    pgq_io_fsyncs_total{backend_type="autovacuum launcher",database="standby"} 0.0
+    pgq_io_fsyncs_total{backend_type="background writer",database="standby"} 0.0
+    pgq_io_fsyncs_total{backend_type="startup",database="standby"} 0.0
+    pgq_io_fsyncs_total{backend_type="checkpointer",database="standby"} 0.0
+    pgq_io_fsyncs_created{backend_type="background worker",database="primary"} 1.794233736592139e+09
+    pgq_io_fsyncs_created{backend_type="slotsync worker",database="primary"} 1.7942337365922072e+09
+    pgq_io_fsyncs_created{backend_type="client backend",database="primary"} 1.794233736592273e+09
+    pgq_io_fsyncs_created{backend_type="walsender",database="primary"} 1.794233736592337e+09
+    pgq_io_fsyncs_created{backend_type="standalone backend",database="primary"} 1.794233736592398e+09
+    pgq_io_fsyncs_created{backend_type="autovacuum worker",database="primary"} 1.7942337365924723e+09
+    pgq_io_fsyncs_created{backend_type="autovacuum launcher",database="primary"} 1.7942337365925276e+09
+    pgq_io_fsyncs_created{backend_type="background writer",database="primary"} 1.7942337365926397e+09
+    pgq_io_fsyncs_created{backend_type="startup",database="primary"} 1.7942337365927017e+09
+    pgq_io_fsyncs_created{backend_type="checkpointer",database="primary"} 1.7942337365928218e+09
+    pgq_io_fsyncs_created{backend_type="background worker",database="standby"} 1.794233741591498e+09
+    pgq_io_fsyncs_created{backend_type="slotsync worker",database="standby"} 1.79423374159157e+09
+    pgq_io_fsyncs_created{backend_type="client backend",database="standby"} 1.7942337415916412e+09
+    pgq_io_fsyncs_created{backend_type="walsender",database="standby"} 1.7942337415917046e+09
+    pgq_io_fsyncs_created{backend_type="standalone backend",database="standby"} 1.7942337415917635e+09
+    pgq_io_fsyncs_created{backend_type="autovacuum worker",database="standby"} 1.7942337415918262e+09
+    pgq_io_fsyncs_created{backend_type="autovacuum launcher",database="standby"} 1.7942337415919526e+09
+    pgq_io_fsyncs_created{backend_type="background writer",database="standby"} 1.7942337415920136e+09
+    pgq_io_fsyncs_created{backend_type="startup",database="standby"} 1.7942337415920715e+09
+    pgq_io_fsyncs_created{backend_type="checkpointer",database="standby"} 1.7942337415921392e+09
+    pgq_db_sessions_total{database="primary",datname="postgres"} 4.0
+    pgq_db_sessions_total{database="primary",datname="app"} 2.0
+    pgq_db_sessions_total{database="primary",datname="template1"} 0.0
+    pgq_db_sessions_total{database="primary",datname="template0"} 0.0
+    pgq_db_sessions_created{database="primary",datname="postgres"} 1.7942337365953343e+09
+    pgq_db_sessions_created{database="primary",datname="app"} 1.7942337365953786e+09
+    pgq_db_sessions_created{database="primary",datname="template1"} 1.7942337365954196e+09
+    pgq_db_sessions_created{database="primary",datname="template0"} 1.794233736595452e+09
+    pgq_db_sessions_abandoned_total{database="primary",datname="postgres"} 0.0
+    pgq_db_sessions_abandoned_total{database="primary",datname="app"} 0.0
+    pgq_db_sessions_abandoned_total{database="primary",datname="template1"} 0.0
+    pgq_db_sessions_abandoned_total{database="primary",datname="template0"} 0.0
+    pgq_db_sessions_abandoned_created{database="primary",datname="postgres"} 1.7942337365953476e+09
+    pgq_db_sessions_abandoned_created{database="primary",datname="app"} 1.7942337365953875e+09
+    pgq_db_sessions_abandoned_created{database="primary",datname="template1"} 1.7942337365954285e+09
+    pgq_db_sessions_abandoned_created{database="primary",datname="template0"} 1.7942337365954602e+09
+    pgq_db_sessions_fatal_total{database="primary",datname="postgres"} 0.0
+    pgq_db_sessions_fatal_total{database="primary",datname="app"} 0.0
+    pgq_db_sessions_fatal_total{database="primary",datname="template1"} 0.0
+    pgq_db_sessions_fatal_total{database="primary",datname="template0"} 0.0
+    pgq_db_sessions_fatal_created{database="primary",datname="postgres"} 1.7942337365953596e+09
+    pgq_db_sessions_fatal_created{database="primary",datname="app"} 1.7942337365953963e+09
+    pgq_db_sessions_fatal_created{database="primary",datname="template1"} 1.7942337365954363e+09
+    pgq_db_sessions_fatal_created{database="primary",datname="template0"} 1.7942337365954678e+09
+    pgq_db_sessions_killed_total{database="primary",datname="postgres"} 0.0
+    pgq_db_sessions_killed_total{database="primary",datname="app"} 0.0
+    pgq_db_sessions_killed_total{database="primary",datname="template1"} 0.0
+    pgq_db_sessions_killed_total{database="primary",datname="template0"} 0.0
+    pgq_db_sessions_killed_created{database="primary",datname="postgres"} 1.79423373659537e+09
+    pgq_db_sessions_killed_created{database="primary",datname="app"} 1.7942337365954044e+09
+    pgq_db_sessions_killed_created{database="primary",datname="template1"} 1.7942337365954444e+09
+    pgq_db_sessions_killed_created{database="primary",datname="template0"} 1.7942337365954757e+09
+    pgq_invalid_indexes{database="primary_app"} 0.0
+    pgq_invalid_indexes{database="primary"} 0.0
+    pgq_tables_over_vacuum_threshold{database="primary_app"} 0.0
+    pgq_tables_over_vacuum_threshold{database="primary"} 0.0
+    database_errors_total{database="standby"} 10.0
+    database_errors_total{database="primary"} 10.0
+    database_errors_total{database="primary_app"} 2.0
+    queries_total{database="primary",query="replication_sync",status="success"} 4.0
+    queries_total{database="primary",query="replication_standbys",status="success"} 4.0
+    queries_total{database="primary_app",query="per_database",status="success"} 4.0
+    queries_total{database="primary_app",query="top_dead_tables",status="success"} 4.0
+    queries_total{database="primary",query="xmin_horizon",status="success"} 4.0
+    queries_total{database="primary",query="archive",status="success"} 4.0
+    queries_total{database="primary",query="instance",status="success"} 4.0
+    queries_total{database="primary",query="stat_wal",status="success"} 4.0
+    queries_total{database="primary",query="stat_io",status="success"} 4.0
+    queries_total{database="primary",query="sessions",status="success"} 4.0
+    queries_total{database="primary",query="per_database",status="success"} 4.0
+    queries_total{database="primary",query="top_dead_tables",status="success"} 4.0
+    queries_total{database="standby",query="xmin_horizon",status="success"} 3.0
+    queries_total{database="standby",query="archive",status="success"} 3.0
+    queries_total{database="standby",query="instance",status="success"} 3.0
+    queries_total{database="standby",query="stat_wal",status="success"} 3.0
+    queries_total{database="standby",query="stat_io",status="success"} 3.0
+  $ [p/postgres] select application_name, state, sync_state, write_lag, flush_lag, replay_lag from pg_stat_replication
+    s1|streaming|sync|00:00:00.000459|00:00:00.001326|00:00:00.001487
+  $ [p/postgres] show synchronous_standby_names
+    FIRST 1 (s1)
+
+## B 時間延遲：寫入中與閒置後（NULL 變 0）
+  $ [p/postgres] select application_name, write_lag, flush_lag, replay_lag from pg_stat_replication
+    s1|00:00:00.005465|00:00:00.006615|00:00:00.024205
+  > /metrics | grep -E '^pgq_replication_(write|flush|replay)_lag_seconds'
+    pgq_replication_write_lag_seconds{application_name="s1",database="primary"} 0.005465
+    pgq_replication_flush_lag_seconds{application_name="s1",database="primary"} 0.006615
+    pgq_replication_replay_lag_seconds{application_name="s1",database="primary"} 0.024205
+  （寫入停止 30 秒後）
+  $ [p/postgres] select application_name, coalesce(write_lag::text,'NULL'), coalesce(flush_lag::text,'NULL'), coalesce(replay_lag::text,'NULL') from pg_stat_replication
+    s1|NULL|NULL|NULL
+  > /metrics | grep -E '^pgq_replication_(write|flush|replay)_lag_seconds'
+    pgq_replication_write_lag_seconds{application_name="s1",database="primary"} 0.0
+    pgq_replication_flush_lag_seconds{application_name="s1",database="primary"} 0.0
+    pgq_replication_replay_lag_seconds{application_name="s1",database="primary"} 0.0
+
+## C 誰擋住 vacuum：持有 XID 的交易、prepared xact、複本上的 snapshot（經 hot_standby_feedback 到 slot xmin）
+  > /metrics | grep -E '^pgq_oldest|^pgq_prepared'
+    pgq_oldest_backend_xid_age{database="primary"} 0.0
+    pgq_oldest_backend_xid_age{database="standby"} 0.0
+    pgq_oldest_backend_xmin_age{database="primary"} 0.0
+    pgq_oldest_backend_xmin_age{database="standby"} 0.0
+    pgq_oldest_slot_xmin_age{database="primary"} 0.0
+    pgq_oldest_slot_xmin_age{database="standby"} 0.0
+    pgq_oldest_slot_catalog_xmin_age{database="primary"} 0.0
+    pgq_oldest_slot_catalog_xmin_age{database="standby"} 0.0
+    pgq_oldest_prepared_xact_age{database="primary"} 0.0
+    pgq_oldest_prepared_xact_age{database="standby"} 0.0
+    pgq_prepared_xacts{database="primary"} 0.0
+    pgq_prepared_xacts{database="standby"} 0.0
+  消耗 3000 個 XID（每次 COMMIT）
+  $ [p/postgres] select max(age(backend_xid)), max(age(backend_xmin)) from pg_stat_activity
+    3001|3002
+  $ [p/postgres] select slot_name, xmin, age(xmin), catalog_xmin from pg_replication_slots
+    s1slot|774|3002|
+  $ [p/postgres] select gid, age(transaction) from pg_prepared_xacts
+    pq1|3002
+  $ [s/postgres] select max(age(backend_xmin)) from pg_stat_activity
+    3002
+  > /metrics | grep -E '^pgq_oldest|^pgq_prepared'
+    pgq_oldest_backend_xid_age{database="primary"} 3001.0
+    pgq_oldest_backend_xid_age{database="standby"} 0.0
+    pgq_oldest_backend_xmin_age{database="primary"} 3002.0
+    pgq_oldest_backend_xmin_age{database="standby"} 3002.0
+    pgq_oldest_slot_xmin_age{database="primary"} 3002.0
+    pgq_oldest_slot_xmin_age{database="standby"} 0.0
+    pgq_oldest_slot_catalog_xmin_age{database="primary"} 0.0
+    pgq_oldest_slot_catalog_xmin_age{database="standby"} 0.0
+    pgq_oldest_prepared_xact_age{database="primary"} 3002.0
+    pgq_oldest_prepared_xact_age{database="standby"} 0.0
+    pgq_prepared_xacts{database="primary"} 1.0
+    pgq_prepared_xacts{database="standby"} 0.0
+
+## D sessions_killed：把 C 的兩個 session terminate 掉；prepared xact 收掉
+  > /metrics | grep -E '^pgq_db_sessions_killed_total\{.*datname="postgres"'
+    pgq_db_sessions_killed_total{database="primary",datname="postgres"} 0.0
+  $ [p/postgres] select count(pg_terminate_backend(pid)) from pg_stat_activity where query like 'select pg_sleep(300)%' and pid <> pg_backend_pid()
+    1
+  $ [s/postgres] select count(pg_terminate_backend(pid)) from pg_stat_activity where query like 'select pg_sleep(300)%' and pid <> pg_backend_pid()
+    1
+  $ [p/postgres] select datname, sessions_killed, sessions_fatal, sessions_abandoned from pg_stat_database where datname='postgres'
+    postgres|1|0|0
+  > /metrics | grep -E '^pgq_db_sessions_killed_total\{.*datname="postgres"|^pgq_oldest|^pgq_prepared'
+    pgq_oldest_backend_xid_age{database="primary"} 0.0
+    pgq_oldest_backend_xid_age{database="standby"} 0.0
+    pgq_oldest_backend_xmin_age{database="primary"} 0.0
+    pgq_oldest_backend_xmin_age{database="standby"} 0.0
+    pgq_oldest_slot_xmin_age{database="primary"} 3002.0
+    pgq_oldest_slot_xmin_age{database="standby"} 0.0
+    pgq_oldest_slot_catalog_xmin_age{database="primary"} 0.0
+    pgq_oldest_slot_catalog_xmin_age{database="standby"} 0.0
+    pgq_oldest_prepared_xact_age{database="primary"} 0.0
+    pgq_oldest_prepared_xact_age{database="standby"} 0.0
+    pgq_prepared_xacts{database="primary"} 0.0
+    pgq_prepared_xacts{database="standby"} 0.0
+    pgq_db_sessions_killed_total{database="primary",datname="postgres"} 1.0
+
+## E archive：失敗、.ready 積壓、archive_command 清空
+  > /metrics | grep -E '^pgq_archive'
+    pgq_archive_mode{database="primary"} 1.0
+    pgq_archive_mode{database="standby"} 1.0
+    pgq_archive_command_set{database="primary"} 1.0
+    pgq_archive_command_set{database="standby"} 1.0
+    pgq_archive_failing{database="primary"} 0.0
+    pgq_archive_failing{database="standby"} 0.0
+    pgq_archive_ready_files{database="primary"} 0.0
+    pgq_archive_ready_files{database="standby"} 0.0
+  $ [p/postgres] select archived_count, failed_count, last_archived_wal, last_failed_wal from pg_stat_archiver
+    4|6|000000010000000000000003|000000010000000000000004
+  $ [p/postgres] select count(*) from pg_ls_archive_statusdir() where name like '%.ready'
+    3
+  > /metrics | grep -E '^pgq_archive'
+    pgq_archive_mode{database="primary"} 1.0
+    pgq_archive_mode{database="standby"} 1.0
+    pgq_archive_command_set{database="primary"} 1.0
+    pgq_archive_command_set{database="standby"} 1.0
+    pgq_archive_failing{database="primary"} 1.0
+    pgq_archive_failing{database="standby"} 0.0
+    pgq_archive_ready_files{database="primary"} 3.0
+    pgq_archive_ready_files{database="standby"} 0.0
+  $ [p/postgres] select coalesce(nullif(current_setting('archive_command'),''),'<empty>'), current_setting('archive_mode')
+    <empty>|on
+  > /metrics | grep -E '^pgq_archive_(mode|command_set)'
+    pgq_archive_mode{database="primary"} 1.0
+    pgq_archive_mode{database="standby"} 1.0
+    pgq_archive_command_set{database="primary"} 0.0
+    pgq_archive_command_set{database="standby"} 1.0
+
+## F 其他資料庫：app 的失效索引與 dead tuple（primary DSN 是 postgres，primary_app DSN 是 app）
+  > /metrics | grep -E '^pgq_invalid_indexes|^pgq_tables_over|^pgq_table_dead'
+    pgq_invalid_indexes{database="primary_app"} 0.0
+    pgq_invalid_indexes{database="primary"} 0.0
+    pgq_tables_over_vacuum_threshold{database="primary_app"} 0.0
+    pgq_tables_over_vacuum_threshold{database="primary"} 0.0
+  $ [p/app] create unique index concurrently orders_id_uq on orders (id)
+    ERROR:  could not create unique index "orders_id_uq"
+    DETAIL:  Key (id)=(128) is duplicated.
+  $ [p/app] update orders set v = 'u' where id < 500
+  $ [p/app] select indexrelid::regclass, indisvalid from pg_index where not indisvalid
+    orders_id_uq|f
+  $ [p/app] select relname, n_live_tup, n_dead_tup from pg_stat_user_tables order by n_dead_tup desc limit 3
+    orders|305004|152504
+    victim|200|0
+  > /metrics | grep -E '^pgq_invalid_indexes|^pgq_tables_over|^pgq_table_dead'
+    pgq_invalid_indexes{database="primary_app"} 1.0
+    pgq_invalid_indexes{database="primary"} 0.0
+    pgq_tables_over_vacuum_threshold{database="primary_app"} 1.0
+    pgq_tables_over_vacuum_threshold{database="primary"} 0.0
+    pgq_table_dead_tuples{database="primary_app",relname="orders",schemaname="public"} 152504.0
+
+## G checksum 失敗：破壞 app.victim 的一個資料頁（先 checkpoint、清掉 shared buffer）
+  > /metrics | grep -E '^pgq_checksum|^pgq_data_checksums'
+    pgq_data_checksums_enabled{database="primary"} 1.0
+    pgq_data_checksums_enabled{database="standby"} 1.0
+    pgq_checksum_failures_total{database="primary"} 0.0
+    pgq_checksum_failures_total{database="standby"} 0.0
+    pgq_checksum_failures_created{database="primary"} 1.7942337365874724e+09
+    pgq_checksum_failures_created{database="standby"} 1.7942337415868552e+09
+  $ [p/app] select count(pg_buffercache_evict(bufferid)) from pg_buffercache where relfilenode = pg_relation_filenode('victim')
+    4
+  $ [p/app] select count(*) from victim
+    WARNING:  page verification failed, calculated checksum 61836 but expected 55613
+    ERROR:  invalid page in block 0 of relation base/16386/16401
+  $ [p/app] select datname, checksum_failures from pg_stat_database where datname='app'
+    app|1
+  > /metrics | grep -E '^pgq_checksum|^pgq_data_checksums'
+    pgq_data_checksums_enabled{database="primary"} 1.0
+    pgq_data_checksums_enabled{database="standby"} 1.0
+    pgq_checksum_failures_total{database="primary"} 1.0
+    pgq_checksum_failures_total{database="standby"} 0.0
+    pgq_checksum_failures_created{database="primary"} 1.7942337365874724e+09
+    pgq_checksum_failures_created{database="standby"} 1.7942337415868552e+09
+
+## H 自檢：拿掉 pg_monitor，archive 查詢失敗後 metric 還在（舊值），只有錯誤計數與 query_timestamp 透露
+  > /metrics | grep -E '^query_timestamp\{.*query="archive"|^queries_total\{.*query="archive"|^pgq_archive_mode'
+    pgq_archive_mode{database="primary"} 1.0
+    pgq_archive_mode{database="standby"} 1.0
+    queries_total{database="primary",query="archive",status="success"} 23.0
+    queries_total{database="standby",query="archive",status="success"} 22.0
+    query_timestamp{database="primary",query="archive"} 1.794233866536432e+09
+    query_timestamp{database="standby",query="archive"} 1.7942338665307038e+09
+  $ [p/postgres] select pg_terminate_backend(pid) is not null from pg_stat_activity where usename='qe_monitor' limit 0
+  > /metrics | grep -E '^query_timestamp\{.*query="archive"|^queries_total\{.*query="archive"|^pgq_archive_mode'
+    pgq_archive_mode{database="primary"} 1.0
+    pgq_archive_mode{database="standby"} 1.0
+    queries_total{database="primary",query="archive",status="success"} 23.0
+    queries_total{database="standby",query="archive",status="success"} 22.0
+    queries_total{database="standby",query="archive",status="error"} 3.0
+    queries_total{database="primary",query="archive",status="error"} 3.0
+    query_timestamp{database="primary",query="archive"} 1.794233866536432e+09
+    query_timestamp{database="standby",query="archive"} 1.7942338665307038e+09
+  log: qe-1  | psycopg2.errors.InsufficientPrivilege: permission denied for function pg_ls_archive_statusdir
+
+## I 同步 standby 消失：停掉複本
+  $ [p/postgres] select count(*) from pg_stat_replication
+    0
+  > /metrics | grep -E '^pgq_replication'
+    pgq_replication_sync_standbys{database="primary"} 0.0
+    pgq_replication_sync_required{database="primary"} 1.0
+    pgq_replication_standbys{application_name="s1",database="primary",state="None",sync_state="None"} 1.0
+    pgq_replication_write_lag_seconds{application_name="s1",database="primary"} 0.0
+    pgq_replication_flush_lag_seconds{application_name="s1",database="primary"} 0.0
+    pgq_replication_replay_lag_seconds{application_name="s1",database="primary"} 0.0
+  （再等 expiration 20s 之後）
+  > /metrics | grep -E '^pgq_replication'
+    pgq_replication_sync_standbys{database="primary"} 0.0
+    pgq_replication_sync_required{database="primary"} 1.0
+
+## J WAL 與 I/O 計數（A 之後一直有寫入）
+  > /metrics | grep -E '^pgq_wal_|^pgq_io_writes_total\{.*database="primary"|^pgq_io_fsyncs_total\{.*database="primary"'
+    pgq_wal_records_total{database="primary"} 639564.0
+    pgq_wal_records_total{database="standby"} 0.0
+    pgq_wal_records_created{database="primary"} 1.7942337365891232e+09
+    pgq_wal_records_created{database="standby"} 1.7942337415882993e+09
+    pgq_wal_fpi_total{database="primary"} 1824.0
+    pgq_wal_fpi_total{database="standby"} 0.0
+    pgq_wal_fpi_created{database="primary"} 1.7942337365891457e+09
+    pgq_wal_fpi_created{database="standby"} 1.79423374158832e+09
+    pgq_wal_bytes_total{database="primary"} 5.1818857e+07
+    pgq_wal_bytes_total{database="standby"} 0.0
+    pgq_wal_bytes_created{database="primary"} 1.7942337365899904e+09
+    pgq_wal_bytes_created{database="standby"} 1.7942337415883405e+09
+    pgq_wal_buffers_full_total{database="primary"} 7371.0
+    pgq_wal_buffers_full_total{database="standby"} 0.0
+    pgq_wal_buffers_full_created{database="primary"} 1.794233736590014e+09
+    pgq_wal_buffers_full_created{database="standby"} 1.7942337415883563e+09
+    pgq_io_writes_total{backend_type="background worker",database="primary"} 0.0
+    pgq_io_writes_total{backend_type="slotsync worker",database="primary"} 0.0
+    pgq_io_writes_total{backend_type="client backend",database="primary"} 0.0
+    pgq_io_writes_total{backend_type="walsender",database="primary"} 0.0
+    pgq_io_writes_total{backend_type="standalone backend",database="primary"} 1015.0
+    pgq_io_writes_total{backend_type="autovacuum worker",database="primary"} 0.0
+    pgq_io_writes_total{backend_type="autovacuum launcher",database="primary"} 0.0
+    pgq_io_writes_total{backend_type="background writer",database="primary"} 0.0
+    pgq_io_writes_total{backend_type="startup",database="primary"} 0.0
+    pgq_io_writes_total{backend_type="checkpointer",database="primary"} 3058.0
+    pgq_io_fsyncs_total{backend_type="background worker",database="primary"} 0.0
+    pgq_io_fsyncs_total{backend_type="slotsync worker",database="primary"} 0.0
+    pgq_io_fsyncs_total{backend_type="client backend",database="primary"} 0.0
+    pgq_io_fsyncs_total{backend_type="walsender",database="primary"} 0.0
+    pgq_io_fsyncs_total{backend_type="standalone backend",database="primary"} 0.0
+    pgq_io_fsyncs_total{backend_type="autovacuum worker",database="primary"} 0.0
+    pgq_io_fsyncs_total{backend_type="autovacuum launcher",database="primary"} 0.0
+    pgq_io_fsyncs_total{backend_type="background writer",database="primary"} 0.0
+    pgq_io_fsyncs_total{backend_type="startup",database="primary"} 0.0
+    pgq_io_fsyncs_total{backend_type="checkpointer",database="primary"} 352.0
+
+## K timeline：複本提升後
+  > /metrics | grep -E '^pgq_checkpoint_timeline_id|^pgq_in_recovery'
+    pgq_checkpoint_timeline_id{database="primary"} 1.0
+    pgq_checkpoint_timeline_id{database="standby"} 1.0
+    pgq_in_recovery{database="primary"} 0.0
+    pgq_in_recovery{database="standby"} 1.0
+  $ [s/postgres] select pg_promote()
+    t
+  $ [s/postgres] select timeline_id from pg_control_checkpoint()
+    2
+  > /metrics | grep -E '^pgq_checkpoint_timeline_id|^pgq_in_recovery'
+    pgq_checkpoint_timeline_id{database="primary"} 1.0
+    pgq_checkpoint_timeline_id{database="standby"} 2.0
+    pgq_in_recovery{database="primary"} 0.0
+    pgq_in_recovery{database="standby"} 0.0
+
+## L 收尾
+  > /metrics | grep -E '^queries_total\{.*status="(error|timeout|invalid-value)"|^database_errors_total'
+    database_errors_total{database="standby"} 18.0
+    database_errors_total{database="primary"} 10.0
+    database_errors_total{database="primary_app"} 2.0
+    queries_total{database="standby",query="archive",status="error"} 3.0
+    queries_total{database="primary",query="archive",status="error"} 3.0
+    queries_total{database="standby",query="instance",status="timeout"} 5.0
+    queries_total{database="standby",query="stat_wal",status="timeout"} 5.0
+    queries_total{database="standby",query="stat_io",status="timeout"} 5.0
+    queries_total{database="standby",query="xmin_horizon",status="timeout"} 4.0
+    queries_total{database="standby",query="archive",status="timeout"} 3.0
+結束
