@@ -1,0 +1,148 @@
+環境：valkey 9.1.3-alpine（vk1 主、vk2 複本、s1-s3）、redis_exporter v1.97.0、prometheus v3.13.5；scrape 5s、timeout 4s
+
+## R0 Sentinel 是否在 TILT（第一輪 Sentinel 完全沒有動作）（23:24:44）
+  s1 sentinel_tilt:0 sentinel_tilt_since_seconds:-1 sentinel_total_tilt:0 
+  s2 sentinel_tilt:0 sentinel_tilt_since_seconds:-1 sentinel_total_tilt:0 
+  s3 sentinel_tilt:0 sentinel_tilt_since_seconds:-1 sentinel_total_tilt:0 
+  s1 log 的 +tilt 次數：0
+  > redis_sentinel_tilt
+    e-s1         redis_sentinel_tilt{job=sentinel,cluster=vk} = 0
+
+## R1 heartbeat：vk1 每秒 SET at:heartbeat <伺服器時間>，複本端 exporter 用 --check-single-keys 讀（23:24:45）
+  > time() - redis_key_value{key="at:heartbeat"}
+    e-hb         {job=valkey-hb,db=db0,key=at:heartbeat,cluster=vk} = 2.5169999599456787
+  > redis_master_link_up{instance="e-vk2"}
+    e-vk2        redis_master_link_up{job=valkey,master_host=vk1,master_port=6379,cluster=vk} = 1
+  -- vk2 斷線 20 秒
+  > time() - redis_key_value{key="at:heartbeat"}
+    e-hb         {job=valkey-hb,db=db0,key=at:heartbeat,cluster=vk} = 25.06599998474121
+  > redis_master_link_up{instance="e-vk2"}
+    e-vk2        redis_master_link_up{job=valkey,master_host=vk1,master_port=6379,cluster=vk} = 0
+  > redis_master_last_io_seconds_ago{instance="e-vk2"}
+    e-vk2        redis_master_last_io_seconds_ago{job=valkey,master_host=vk1,master_port=6379,cluster=vk} = -1
+  > redis_connected_slave_lag_seconds
+    (空)
+  > redis_script_values{key="master_link_down_since_seconds",instance="e-vk2"}
+    e-vk2        redis_script_values{job=valkey,filename=/q/valkey-extra.lua,key=master_link_down_since_seconds,cluster=vk} = 18
+  -- 接回 15 秒後
+  > time() - redis_key_value{key="at:heartbeat"}
+    e-hb         {job=valkey-hb,db=db0,key=at:heartbeat,cluster=vk} = 3.2239999771118164
+  > redis_master_link_up{instance="e-vk2"}
+    e-vk2        redis_master_link_up{job=valkey,master_host=vk1,master_port=6379,cluster=vk} = 1
+
+## R2 ACL 不給 CONFIG：ACL SETUSER mon on >monpw +@all -config ~* &*（23:25:42）
+  $ [vk1] ACL SETUSER mon on >monpw +@all -config ~* &*
+    OK
+  > up{instance="e-noconf"}
+    e-noconf     up{job=valkey-noconf,cluster=vk} = 1
+  > redis_up{instance="e-noconf"}
+    e-noconf     redis_up{job=valkey-noconf,cluster=vk} = 1
+  > redis_exporter_last_scrape_error{instance="e-noconf"}
+    e-noconf     redis_exporter_last_scrape_error{job=valkey-noconf,cluster=vk} = 0
+  > redis_config_maxclients
+    e-hb         redis_config_maxclients{job=valkey-hb,cluster=vk} = 10000
+    e-vk1        redis_config_maxclients{job=valkey,cluster=vk} = 40
+    e-vk2        redis_config_maxclients{job=valkey,cluster=vk} = 10000
+  > redis_config_maxmemory
+    e-hb         redis_config_maxmemory{job=valkey-hb,cluster=vk} = 0
+    e-vk1        redis_config_maxmemory{job=valkey,cluster=vk} = 0
+    e-vk2        redis_config_maxmemory{job=valkey,cluster=vk} = 0
+  > scrape_samples_scraped{instance=~"e-noconf|e-vk1"}
+    e-noconf     scrape_samples_scraped{job=valkey-noconf,cluster=vk} = 530
+    e-vk1        scrape_samples_scraped{job=valkey,cluster=vk} = 554
+  > redis_up{job="valkey-noconf"} == 1 unless on (job, instance) redis_config_maxclients{job="valkey-noconf"}
+    e-noconf     redis_up{job=valkey-noconf,cluster=vk} = 1
+
+## R3 BGSAVE 失敗時 Sentinel 看到什麼（每 4 秒讀 SENTINEL MASTER；down-after 10s）（23:25:54）
+  前：flags=master last-ok-ping-reply=619 last-ping-reply=619 down-after-milliseconds=10000 
+  $ [vk1] PING
+    MISCONF Valkey is configured to save RDB snapshots, but it's currently unable to persist to disk. Commands that may modify the data set are disabled, because this instance is configured to report errors during writes if RDB snapshotting fails (stop-writes-on-bgsave-error option). Please check the Valkey logs for details about the RDB error.
+    
+    +4s flags=master last-ping-sent=10494 last-ok-ping-reply=11574 last-ping-reply=952 
+    +8s flags=master last-ping-sent=14659 last-ok-ping-reply=15739 last-ping-reply=891 
+    +12s flags=master last-ping-sent=18823 last-ok-ping-reply=19903 last-ping-reply=884 
+    +16s flags=master last-ping-sent=22975 last-ok-ping-reply=24055 last-ping-reply=848 
+    +20s flags=master last-ping-sent=27124 last-ok-ping-reply=28204 last-ping-reply=882 
+    +24s flags=master last-ping-sent=31275 last-ok-ping-reply=32355 last-ping-reply=874 
+    +28s flags=master last-ping-sent=38767 last-ok-ping-reply=39847 last-ping-reply=973 
+    +32s flags=master last-ping-sent=42921 last-ok-ping-reply=44001 last-ping-reply=1024 
+  vk1 commandstats／errorstats：
+    cmdstat_ping:calls=247,usec=285,usec_per_call=1.15,rejected_calls=145,failed_calls=0
+    errorstat_MISCONF:count=181
+    rdb_last_bgsave_status:ok
+
+## R5 failover：docker pause vk1 45 秒（23:26:42）
+  前：flags=master config-epoch=0 
+ Container at-vk-lab-vk1-1 Paused 
+    +5s ip=vk1 flags=master config-epoch=0 num-other-sentinels=2  tilt=sentinel_tilt:1
+    +10s ip=vk1 flags=master config-epoch=0 num-other-sentinels=2  tilt=sentinel_tilt:1
+    +15s ip=vk1 flags=master config-epoch=0 num-other-sentinels=2  tilt=sentinel_tilt:1
+    +20s ip=vk1 flags=master config-epoch=0 num-other-sentinels=2  tilt=sentinel_tilt:1
+    +25s ip=vk1 flags=master config-epoch=0 num-other-sentinels=2  tilt=sentinel_tilt:1
+    +30s ip=vk1 flags=master config-epoch=0 num-other-sentinels=2  tilt=sentinel_tilt:1
+    +35s ip=vk1 flags=master config-epoch=0 num-other-sentinels=2  tilt=sentinel_tilt:1
+    +40s ip=vk1 flags=master config-epoch=0 num-other-sentinels=2  tilt=sentinel_tilt:1
+    +45s ip=vk1 flags=master config-epoch=0 num-other-sentinels=2  tilt=sentinel_tilt:1
+  > redis_instance_info{job="valkey"}
+    e-vk2        redis_instance_info{job=valkey,role=slave,redis_version=7.2.4,valkey_version=9.1.3,maxmemory_policy=noeviction,cluster=vk} = 1
+  > redis_sentinel_master_config_epoch
+    e-s1         redis_sentinel_master_config_epoch{job=sentinel,master_name=mymaster,cluster=vk} = 0
+  > redis_sentinel_master_status
+    e-s1         redis_sentinel_master_status{job=sentinel,master_name=mymaster,master_status=ok,cluster=vk} = 1
+ Container at-vk-lab-vk1-1 Unpaused 
+  恢復後每 2 秒看 vk1、vk2 自己的 role：
+    +2s vk1 role:master vk2 role:slave
+    +4s vk1 role:master vk2 role:slave
+    +6s vk1 role:master vk2 role:slave
+    +8s vk1 role:master vk2 role:slave
+    +10s vk1 role:master vk2 role:slave
+    +12s vk1 role:master vk2 role:slave
+    +14s vk1 role:master vk2 role:slave
+    +16s vk1 role:master vk2 role:slave
+  > max_over_time(count by (cluster) (count by (cluster, run_id) (redis_instance_info{job="valkey", role="master"}))[1m:5s])
+    -            {cluster=vk} = 1
+  > changes(redis_sentinel_master_config_epoch[3m])
+    e-s1         {job=sentinel,master_name=mymaster,cluster=vk} = 0
+  > redis_master_link_up
+    e-hb         redis_master_link_up{job=valkey-hb,master_host=vk1,master_port=6379,cluster=vk} = 1
+    e-vk2        redis_master_link_up{job=valkey,master_host=vk1,master_port=6379,cluster=vk} = 1
+    s1-1  | 1:X 09 Nov 2026 15:26:32.966 # +tilt #tilt mode entered
+    s1-1  | 1:X 09 Nov 2026 15:26:57.653 # +tilt #tilt mode entered
+    s1-1  | 1:X 09 Nov 2026 15:27:06.231 # +tilt #tilt mode entered
+    s1-1  | 1:X 09 Nov 2026 15:27:30.918 # +tilt #tilt mode entered
+    s1-1  | 1:X 09 Nov 2026 15:27:39.543 # +tilt #tilt mode entered
+
+## R4 複本重啟（docker compose restart vk2）（23:28:01）
+  > changes(redis_start_time_seconds{instance="e-vk1"}[2m])
+    e-vk1        {job=valkey,cluster=vk} = 0
+  > redis_uptime_in_seconds{cluster="vk"}
+    e-hb         redis_uptime_in_seconds{job=valkey-hb,cluster=vk} = 215
+    e-noconf     redis_uptime_in_seconds{job=valkey-noconf,cluster=vk} = 218
+    e-s1         redis_uptime_in_seconds{job=sentinel,cluster=vk} = 212
+    e-vk1        redis_uptime_in_seconds{job=valkey,cluster=vk} = 216
+    e-vk2        redis_uptime_in_seconds{job=valkey,cluster=vk} = 213
+    sync_full:1
+    sync_partial_ok:3
+    sync_partial_err:0
+  > redis_uptime_in_seconds{cluster="vk"}
+    e-hb         redis_uptime_in_seconds{job=valkey-hb,cluster=vk} = 15
+    e-noconf     redis_uptime_in_seconds{job=valkey-noconf,cluster=vk} = 236
+    e-s1         redis_uptime_in_seconds{job=sentinel,cluster=vk} = 235
+    e-vk1        redis_uptime_in_seconds{job=valkey,cluster=vk} = 234
+    e-vk2        redis_uptime_in_seconds{job=valkey,cluster=vk} = 13
+  > changes(redis_start_time_seconds{instance="e-vk2"}[1m])
+    e-vk2        {job=valkey,cluster=vk} = 1
+  > redis_master_link_up
+    e-hb         redis_master_link_up{job=valkey-hb,master_host=vk1,master_port=6379,cluster=vk} = 1
+    e-vk2        redis_master_link_up{job=valkey,master_host=vk1,master_port=6379,cluster=vk} = 1
+    sync_full:1
+    sync_partial_ok:4
+    sync_partial_err:0
+    vk2-1  | 7:S 09 Nov 2026 15:28:02.059 * Done loading RDB, keys loaded: 1, keys expired: 0, all fields expired hashes: 0.
+    vk2-1  | 7:S 09 Nov 2026 15:28:02.060 * DB loaded from disk: 0.000 seconds
+    vk2-1  | 7:S 09 Nov 2026 15:28:02.061 * Trying a partial resynchronization (request 547b590a44d096706237acea153ea2cc626ced2f:66280).
+    vk2-1  | 7:S 09 Nov 2026 15:28:02.061 * Successful partial resynchronization with primary.
+    vk2-1  | 7:S 09 Nov 2026 15:28:02.061 * PRIMARY <-> REPLICA sync: Primary accepted a Partial Resynchronization.
+
+## 清理（23:28:26）
+  完成（23:28:28）

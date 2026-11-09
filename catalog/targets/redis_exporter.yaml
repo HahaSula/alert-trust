@@ -1,0 +1,674 @@
+id: redis_exporter
+name: redis_exporter＋Valkey／Redis
+kind: target
+family: database
+model: exporter
+status: draft
+stages: [source]
+versions_checked: ["v1.97.0", "Valkey 9.1.3", "Redis 7.2.17", "Redis 8.10.3"]
+architecture: architecture/db-kv.md
+role: >-
+  每次 scrape 開一條連線，依序送 INFO ALL、CONFIG GET *、LATENCY、SLOWLOG、COMMANDLOG（叢集再加 CLUSTER INFO，Sentinel 再加 SENTINEL MASTERS／CKQUORUM），
+  把 INFO 的欄位依對照表改名輸出。沒有每個 collector 的成功指標：連不上或 INFO 失敗才讓 redis_up 變 0，CONFIG GET 失敗只記 debug log，
+  --script 失敗反而讓 redis_up 變 0。所有指令都排在伺服器唯一的主執行緒上，伺服器忙時 exporter 跟著等。
+  訊號依九個面向分組；cluster 面向只在用 Sentinel 或 Cluster 時適用。Valkey 9.1 與 Redis 7.2／8.10 的差異寫在每個訊號裡，
+  INFO 欄位到 metric 的對照見[Valkey／Redis 怎麼監控](../targets/valkey.md)與[原始碼到 metric](../targets/valkey-appendix.md)。
+
+silent_failures:
+  - text: >-
+      mixin 的 RedisDown 與 awesome 的 RedisDown 都是 redis_up == 0：exporter 停機時 redis_up 跟著消失。伺服器忙（一個 7 秒的指令）時，
+      --connection-timeout 預設 15 秒比 scrape_timeout 長，Prometheus 先放棄，up=0、redis_up 也消失；兩條規則都不響。
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, rx-mixin-down, rx-flag-timeout, rx-dial-timeouts]
+  - text: >-
+      --script 指定的 Lua script 出錯時 exporter 把 redis_up 設成 0、redis_exporter_last_scrape_error=1，其他 450 個 sample 照常輸出。
+      只看 redis_up 的規則會把「監控用的 script 壞了」當成「資料庫掛了」。
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, rx-lua-err-up, rx-lua-result0]
+  - text: >-
+      exporter 帳號沒有 CONFIG 權限（ACL -config）時 redis_up=1、redis_exporter_last_scrape_error=0，所有 redis_config_*（maxclients、maxmemory、
+      repl-backlog-size、io-threads）消失；連線數對 maxclients 的比例規則（awesome 的 RedisTooManyConnections 用 redis_config_maxclients）回傳空。
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp2, rx-config-get, rx-config-get-silent]
+  - text: >-
+      mixin 的 RedisOutOfMemory 與 awesome 的同名規則用 redis_total_system_memory_bytes，這個 metric 要 --include-system-metrics 才有（預設關），
+      實測四台都沒有；規則永遠回傳空。maxmemory 預設 0 時 redis_memory_max_bytes 也是 0。
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, rx-sysmem, rx-mixin-oom, awe-oom-sys]
+  - text: >-
+      maxclients 額滿時 exporter 自己也被拒絕：up=1、redis_up=0，redis_connected_clients 與 redis_rejected_connections_total 在額滿期間沒有資料，
+      額滿結束後 rejected 才一次跳到 21。Valkey 沒有保留給監控的連線。
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, vk-maxclients-reject, vk-cfg-maxclients]
+  - text: >-
+      複本斷線時 redis_master_last_io_seconds_ago 是 -1（不是很大的數字），主節點端 redis_connected_slave_lag_seconds 與 offset 整條消失；
+      「延遲 > N」的規則回傳空。INFO 的 master_link_down_since_seconds 才是斷線多久，exporter 不輸出。
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, vk-info-last-io, vk-info-link-down-since, rx-last-io]
+  - text: >-
+      BGSAVE 失敗後（stop-writes-on-bgsave-error 預設 yes）寫入與 PING 都回 MISCONF；exporter 不送 PING，redis_up 仍是 1。
+      awesome 的 RedisMissingBackup 用 rdb_last_save_timestamp 超過 48 小時，失敗當下不會響。
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, vk-misconf-ping, vk-misconf-cond, awe-backup]
+  - text: >-
+      Sentinel 進入 TILT 時（這台機器的容器時鐘跳動，每 25～30 秒一次）主節點被 pause 45 秒，redis_sentinel_master_status 一直是 1（ok）、
+      config-epoch 不變、沒有 failover。TILT 期間 Sentinel 照常收資料但不判斷 sdown，status 欄位不會變。
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp2, vk-sen-tilt, vk-sen-info-tilt, vdoc-sentinel-tilt]
+  - text: >-
+      awesome 的 RedisMissingMaster 與 RedisTooManyMasters 用 count(redis_instance_info{role="master"}) 不分組：多組主從共用一個 Prometheus 時，
+      一組沒有主節點會被其他組的主節點蓋過。同一台被兩個 job 抓時也會重複計算（實測 vk1 被三個 job 抓，count 是 3）。
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, awe-missing-master, awe-multi-master]
+  - text: >-
+      --check-key-groups 每次 scrape 掃整個 keyspace：40 萬個 key 時一次 scrape 從 0.01 秒變 1.1 秒，每批 1000 個 key 是一個 1.2～2ms 的 EVALSHA，
+      slowlog（門檻 1ms）128 筆全被 exporter 自己佔滿，應用的慢指令被擠出去。
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, rx-kg-scan, rx-kg-memusage, rx-kg-loop]
+
+contracts: [exporter-deadline]
+
+signals:
+  # ---------- exporter：監測自檢 ----------
+  - id: exporter-up
+    aspect: exporter
+    tier: 1
+    question: Exporter 抓得到嗎
+    signal: >-
+      up{job="valkey"} == 0，加上 absent(up{job="valkey"})。伺服器主執行緒忙到 INFO 回不來、而 --connection-timeout（預設 15s）比 scrape_timeout 長時，
+      也是落在這裡（實測 DEBUG SLEEP 7：up=0、scrape_duration 4.0 秒＝timeout）
+    metrics: [up, scrape_duration_seconds]
+    evaluate_on: self
+    silent_failure: exporter 停機或 scrape 逾時時 redis_up 消失，只看 redis_up 的規則（mixin、awesome）回傳空
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, rx-collect-up, rx-flag-timeout, rx-mixin-down]
+    upstream: { status: no, note: "mixin 與 awesome 都只看 redis_up" }
+    rules: [rules/targets/valkey.yml#ValkeyExporterDown, rules/targets/valkey.yml#ValkeyExporterMissing]
+
+  - id: collectors-present
+    aspect: exporter
+    tier: 1
+    question: INFO 成功時，CONFIG 這組 metric 還在嗎
+    signal: >-
+      redis_exporter 沒有 collector 成功指標，對應的寫法是 redis_up == 1 unless on(job, instance) redis_config_maxclients。
+      鏈：exporter.go 的 CONFIG GET * 失敗只記 debug log、不回傳錯誤 → redis_config_*（maxclients、maxmemory、repl_backlog_size、io_threads）整組消失。
+      ACL 沒給 CONFIG、CONFIG 被 rename、--config-command=- 都會這樣。Valkey 與 Redis 相同
+    metrics: [redis_up, redis_config_maxclients, redis_config_maxmemory]
+    evaluate_on: self
+    silent_failure: 實測 ACL -config：redis_up=1、last_scrape_error=0，redis_config_* 全部消失，sample 數 554 → 530
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp2, rx-config-get, rx-config-get-silent, rx-config-maxclients]
+    upstream: { status: no }
+    rules: [rules/targets/valkey.yml#ValkeyConfigMetricsMissing, rules/targets/valkey.yml#ValkeyScriptMissing]
+
+  - id: collector-success
+    aspect: exporter
+    tier: 1
+    question: 這次 scrape 有沒有出錯（含 --script）
+    signal: >-
+      redis_exporter_last_scrape_error == 1（err label 是錯誤訊息）；用 --script 時加上 redis_script_result != 1（0＝錯誤、2＝空結果）。
+      script 出錯時 exporter 把 redis_up 設成 0，所以 redis_up == 0 要先看 err label 再判斷是不是資料庫的問題
+    metrics: [redis_exporter_last_scrape_error, redis_script_result, redis_up]
+    evaluate_on: self
+    silent_failure: 實測壞 script：redis_up=0、err="ERR Unknown command called from script"，其他 metric 照常輸出
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, rx-scrape-err, rx-lua-err-up, rx-lua-result0]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有 exporter_last_scrape_error 或 script_result" }
+    rules: [rules/targets/valkey.yml#ValkeyExporterScrapeError, rules/targets/valkey.yml#ValkeyExporterScriptFailed, rules/targets/valkey.yml#ValkeyScriptMissing]
+
+  - id: scrape-budget
+    aspect: exporter
+    tier: 2
+    question: Scrape 來得及在 scrape_timeout 內完成嗎
+    signal: >-
+      scrape_duration_seconds 對照 scrape_timeout（80%）；redis_exporter_last_scrape_duration_seconds 是 exporter 自己量的。
+      --connection-timeout（連線、讀、寫逾時都用它，預設 15s）要比 scrape_timeout 短，exporter 才會自己回 redis_up=0 與錯誤訊息
+      （實測 2s：2.2 秒回應、up=1、redis_up=0），而不是被 Prometheus 中斷
+    metrics: [scrape_duration_seconds, redis_exporter_last_scrape_duration_seconds, redis_exporter_last_scrape_connect_time_seconds]
+    evaluate_on: self
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, rx-flag-timeout, rx-dial-timeouts]
+    upstream: { status: no }
+    contract: exporter-deadline
+    rules: [rules/targets/valkey.yml#ValkeyScrapeNearTimeout]
+
+  - id: probe-blast-radius
+    aspect: exporter
+    tier: 2
+    question: Multi-target exporter 本身活著嗎
+    signal: >-
+      /scrape?target= 模式下 exporter 自己的 /metrics 另設一個 job 做 up 與 absent。每個 /scrape 請求建立自己的 exporter 物件，
+      一台目標卡住不影響同一個 exporter 抓的其他目標（實測 vk1 卡 7 秒時 multi-vk1 up=0、multi-vk2 與 exporter 本身 up=1）；
+      exporter 程序掛掉則全部一起消失
+    metrics: [up, redis_up]
+    evaluate_on: self
+    applies_when: multi-target（/scrape）
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, rx-scrape-handler-new]
+    upstream: { status: no, note: "README 有設定範例，沒有規則" }
+    rules: [rules/targets/valkey.yml#ValkeyMultiTargetExporterDown]
+
+  - id: exporter-query-timeout
+    aspect: exporter
+    tier: 2
+    question: 伺服器忙或連線額滿時，exporter 會不會跟著看不到
+    signal: >-
+      所有指令都在伺服器主執行緒上依序執行，exporter 的 INFO 排在慢指令後面；maxclients 額滿時 exporter 的連線也被拒（沒有保留位子）。
+      分辨方式：up=0 是 exporter 等太久被 Prometheus 中斷，up=1 且 redis_up=0 是 exporter 自己逾時或被拒（看 err label）。
+      把 --connection-timeout 設得比 scrape_timeout 短；maxclients 留餘裕，額滿要靠應用端或 node 層的連線數補位
+    metrics: [up, redis_up, redis_exporter_last_scrape_error, redis_connected_clients, redis_config_maxclients]
+    evaluate_on: self
+    silent_failure: >-
+      實測 DEBUG SLEEP 7：預設 exporter 的 HTTP 回應花 9.5 秒（主機牆鐘），Prometheus 在 4 秒放棄；額滿時 redis_connected_clients 與
+      redis_rejected_connections_total 正好在需要它們的那段時間沒有資料
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, rx-flag-timeout, rx-dial-timeouts, rx-info-all, vk-maxclients-reject]
+    upstream: { status: no }
+    rules: [rules/targets/valkey.yml#ValkeyExporterDown, rules/targets/valkey.yml#ValkeyDown, rules/targets/valkey.yml#ValkeyConnectionsNearLimit]
+
+  - id: key-scan-cost
+    aspect: exporter
+    tier: 2
+    question: --check-keys／--check-key-groups 會不會拖慢伺服器
+    signal: >-
+      redis_last_key_groups_scrape_duration_milliseconds 與 scrape_duration_seconds。key group 每次 scrape 用 Lua 一批一批 SCAN＋MEMORY USAGE 掃整個 keyspace，
+      每批（--check-keys-batch-size，預設 1000）是一個不可中斷的 EVALSHA；--check-keys 與 --count-keys 也是每次 SCAN 一遍。
+      --skip-checkkeys-for-role-master 只跳過 check-keys、count-keys、streams，不跳過 key group。
+      大實例改用長 scrape_interval 的獨立 job，或只在複本上跑。Redis 8 的 INFO KEYSIZES（--include-keysizes-metrics）是伺服器自己維護的分布，不用掃；Valkey 9.1 沒有這一段
+    metrics: [redis_last_key_groups_scrape_duration_milliseconds, scrape_duration_seconds, redis_key_group_count, redis_key_group_memory_usage_bytes, redis_keys_count]
+    evaluate_on: self
+    applies_when: "有用 --check-keys、--count-keys 或 --check-key-groups"
+    silent_failure: 實測 40 萬個 key：scrape 0.01 → 1.1 秒、key group 928ms、每批 1.2～2ms，slowlog 128 筆全是 exporter 的 EVALSHA
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, rx-kg-scan, rx-kg-memusage, rx-kg-loop, rx-checkkeys-scan, rx-flag-skip-master, rx-flag-batch, rx-flag-keysizes, r8-info-keysizes, rx-readme-kg-cost]
+    upstream: { status: no, note: "README 說 78 萬個 key 約 5 秒，沒有規則" }
+    rules: [rules/targets/valkey.yml#ValkeyKeyGroupScanSlow, rules/targets/valkey.yml#ValkeyScrapeNearTimeout]
+
+  - id: version-semantics
+    aspect: exporter
+    tier: 2
+    question: 這個版本真的有輸出規則用到的 metric 嗎
+    signal: >-
+      Valkey 的 redis_instance_info 帶 redis_version="7.2.4"（相容用的固定值）與另一個 valkey_version label，版本判斷要用 valkey_version。
+      預設設定下 Valkey 9.1 比 Redis 7.2 多 36 個名稱（commandlog_*、errors_total、tls_*、scripting_engine_* 等），Redis 8.10 比 7.2 多 26 個（active_clients、io_thread_*、slowlog_commands_*）。
+      redis_errors_total 的 series 在第一次出現該錯誤時才建立；redis_latency_spike_* 要 latency-monitor-threshold > 0（預設 0）才有
+    metrics: [redis_instance_info, redis_errors_total, redis_latency_spike_duration_seconds, redis_commandlog_slow_length]
+    evaluate_on: inventory
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, vk-info-redis-version, rx-instance-info, vk-cfg-latency-threshold, r72-conf-latency, rx-errorstats]
+    upstream: { status: no }
+    rules: []
+
+  # ---------- availability ----------
+  - id: db-up
+    aspect: availability
+    tier: 1
+    question: Exporter 連得到 Valkey、INFO 回得來嗎
+    signal: >-
+      redis_up == 0；要和 exporter-up 一起看（exporter 停機時 redis_up 不存在）。原因看 redis_exporter_last_scrape_error 的 err label：
+      連線被拒、認證失敗、maxclients 額滿（實測「use of closed network connection」）、--connection-timeout 內沒回應、--script 出錯
+    metrics: [redis_up, redis_exporter_last_scrape_error]
+    evaluate_on: self
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, rx-collect-up, rx-scrape-err]
+    upstream: { status: partial, note: "mixin RedisDown（for 5m）與 awesome RedisDown 都是 redis_up == 0；exporter 停機或逾時時回傳空" }
+    rules: [rules/targets/valkey.yml#ValkeyDown]
+
+  - id: writes-rejected
+    aspect: availability
+    tier: 2
+    question: 伺服器活著，但寫入被拒絕嗎
+    signal: >-
+      redis_errors_total{err=~"OOM|MISCONF|NOREPLICAS|READONLY"} 增加。鏈：server.c processCommand 拒絕（OOM：performEvictions 失敗；MISCONF：持久化失敗；
+      NOREPLICAS：min-replicas-to-write 不足）→ INFO errorstats 的 errorstat_<前綴>:count → info.go → redis_errors_total{err}；
+      每個指令另有 redis_commands_rejected_calls_total{cmd}。errorstat 只列出現過的錯誤，series 在第一次出錯時才建立，increase() 看不到第一筆，規則用 unless offset 補上
+    metrics: [redis_errors_total, redis_commands_rejected_calls_total]
+    evaluate_on: self
+    silent_failure: 實測 OOM 時 GET 照常、SET／INCR 被拒，redis_up=1；MISCONF 時 PING 也被拒，exporter 不送 PING 所以看不出來
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, vk-oom-reject, vk-misconf-deny, vk-misconf-ping, vk-info-errorstat, rx-errorstats, rx-cmd-rejected]
+    upstream: { status: no }
+    rules: [rules/targets/valkey.yml#ValkeyWritesRejected]
+
+  - id: restart
+    aspect: availability
+    tier: 2
+    question: 重啟過嗎？正在載入資料嗎
+    signal: >-
+      redis_uptime_in_seconds < 300；redis_start_time_seconds 由 exporter 用 now − uptime 算出（實測 2 分鐘內 changes() 為 0，沒有跳動），
+      載入 RDB／AOF 期間 redis_loading_dump_file == 1。主節點沒有持久化又被自動重啟時，複本會被同步成空的（valkey-doc admin）。
+      實測複本重啟：載入自己的 RDB 後 partial resync 成功，主節點 sync_full 不變
+    metrics: [redis_uptime_in_seconds, redis_start_time_seconds, redis_loading_dump_file]
+    evaluate_on: self
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp2, vdoc-admin-persistence]
+    upstream: { status: no }
+    rules: [rules/targets/valkey.yml#ValkeyRestarted, rules/targets/valkey.yml#ValkeyLoading]
+
+  # ---------- workload ----------
+  - id: slow-commands
+    aspect: workload
+    tier: 3
+    question: 有沒有慢指令或延遲尖峰
+    signal: >-
+      slowlog：redis_slowlog_last_id 的增量（gauge，是最新一筆的 id）、redis_slowlog_length、redis_last_slow_execution_duration_seconds；
+      門檻 slowlog-log-slower-than 預設 10ms。Valkey 8.1 起改名為 commandlog（commandlog-execution-slower-than，slowlog-* 是別名），另多 large-request／large-reply 兩種，
+      exporter 兩邊都讀（redis_commandlog_*）。Redis 8.8 起 INFO 有 slowlog_commands_*（redis_slowlog_commands_total）。
+      latency monitor：redis_latency_spike_duration_seconds{event_name}（fork、command、expire-cycle…），latency-monitor-threshold 預設 0，不打開就沒有 series。
+      實測 DEBUG SLEEP 0.3：Valkey 與 Redis 7.2 都是 slowlog last_id 3、spike 0.3 秒；Valkey 的 LATENCY LATEST 多回兩欄（sum、cnt），exporter 只讀前四欄
+    metrics: [redis_slowlog_last_id, redis_slowlog_length, redis_last_slow_execution_duration_seconds, redis_commandlog_slow_length, redis_latency_spike_duration_seconds, redis_latency_spike_last, redis_commands_latencies_usec]
+    evaluate_on: self
+    silent_failure: >-
+      slowlog 只記執行時間，不含排隊等待；exporter 的 key group EVALSHA 也會進 slowlog，把應用的條目擠掉（slowlog-max-len 預設 128）
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, rx-slowlog-len, rx-slowlog-lastid, rx-cmdlog, rx-latency-latest, rx-latency-ms, vk-cfg-commandlog-slower, r72-cfg-slowlog, vk-cfg-latency-threshold, vk-lat-latest, vdoc-latmon-enable]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有 slowlog 或 latency 規則" }
+    rules: [rules/targets/valkey.yml#ValkeySlowlogGrowing, rules/targets/valkey.yml#ValkeyLatencySpike]
+
+  - id: keyspace-hit-ratio
+    aspect: workload
+    tier: 3
+    question: 讀取命中率（當 cache 用時）
+    signal: >-
+      rate(redis_keyspace_hits_total) / (hits + misses)。鏈：lookupKey 命中或未命中 → INFO stats keyspace_hits／keyspace_misses → keyspace_hits_total。
+      只對 cache 用途有意義；複本上的讀取各算各的。適合畫圖，門檻與應用綁在一起
+    metrics: [redis_keyspace_hits_total, redis_keyspace_misses_total]
+    evaluate_on: self
+    evidence: code
+    source: vk-exporter
+    refs: [vk-info-hits, rx-map-hits]
+    upstream: { status: no }
+    rules: [rules/targets/valkey.yml#ValkeyKeyspaceHitRatioLow]
+
+  # ---------- saturation ----------
+  - id: maxmemory-eviction
+    aspect: saturation
+    tier: 2
+    question: 記憶體碰到 maxmemory 時，是淘汰還是拒絕寫入
+    signal: >-
+      redis_memory_used_bytes / redis_memory_max_bytes（max > 0 時）；redis_evicted_keys_total 的速率；redis_eviction_exceeded_time_ms_total（超過上限的累積時間）；
+      政策看 redis_instance_info 的 maxmemory_policy label。鏈：evict.c performEvictions → stat_evictedkeys → INFO evicted_keys → evicted_keys_total。
+      noeviction 與「沒有 TTL key 的 volatile-*」不淘汰、直接回 OOM，要和 writes-rejected 一起看。複本預設不淘汰（replica-ignore-maxmemory），用量可以超過主節點；
+      Valkey 的 import-mode 開著時主節點也不淘汰
+    metrics: [redis_memory_used_bytes, redis_memory_max_bytes, redis_evicted_keys_total, redis_eviction_exceeded_time_ms_total, redis_instance_info, redis_mem_not_counted_for_eviction_bytes]
+    evaluate_on: self
+    silent_failure: >-
+      實測 maxmemory 比用量少 2MB：noeviction 與 volatile-lru（沒有 TTL key）都是 evicted 0、OOM 錯誤 2 → 3；allkeys-lru 才淘汰 32487 個 key。
+      只看 evicted 的規則在前兩種政策下不響；maxmemory 預設 0 時比例規則除以 0
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, vk-oom-perform, vk-evict-noeviction, vk-evict-nothing, vk-evict-count, vk-info-evicted, vk-info-eviction-exceeded, rx-map-evicted, rx-map-maxmemory, vdoc-lru-volatile, vdoc-repl-monitor, vk-cfg-replica-ignore-maxmemory, vk-cfg-import-mode, vdoc-admin-maxmemory]
+    upstream: { status: partial, note: "awesome 有 used/max > 90%（要 max > 0）；mixin 的 RedisOutOfMemory 用預設不輸出的 total_system_memory" }
+    rules: [rules/targets/valkey.yml#ValkeyMemoryNearMaxmemory, rules/targets/valkey.yml#ValkeyEvictingKeys, rules/targets/valkey.yml#ValkeyMaxmemoryUnset, rules/targets/valkey.yml#ValkeyWritesRejected]
+
+  - id: fragmentation
+    aspect: saturation
+    tier: 3
+    question: RSS 和 used_memory 差多少（碎片、swap）
+    signal: >-
+      redis_mem_fragmentation_ratio（used_memory_rss / used_memory）> 1.5 且多出的絕對量夠大才有意義；< 1 表示部分記憶體在 swap。
+      allocator_frag_ratio 是 jemalloc 內部碎片，active-defrag 開著時看 redis_defrag_hits。maxmemory 比的是 used_memory，不是 RSS，碎片高時 OOM killer 可能先到
+    metrics: [redis_mem_fragmentation_ratio, redis_mem_fragmentation_bytes, redis_memory_used_rss_bytes, redis_memory_used_bytes, redis_allocator_frag_ratio]
+    evaluate_on: self
+    evidence: code
+    source: vk-valkey-src
+    refs: [vk-info-frag, rx-map-frag, vk-info-maxmemory]
+    upstream: { status: no }
+    rules: [rules/targets/valkey.yml#ValkeyHighFragmentation, rules/targets/valkey.yml#ValkeyRssBelowUsed]
+
+  - id: connections
+    aspect: saturation
+    tier: 2
+    question: 連線還有餘裕嗎
+    signal: >-
+      redis_connected_clients / redis_config_maxclients，與 redis_rejected_connections_total 的增量。鏈：networking.c 接受連線時超過 maxclients → 回
+      "-ERR max number of clients reached" 並 stat_rejected_conn++ → INFO rejected_connections → rejected_connections_total。
+      redis_config_maxclients 來自 CONFIG GET，沒有 CONFIG 權限時不存在（見 collectors-present）
+    metrics: [redis_connected_clients, redis_config_maxclients, redis_rejected_connections_total, redis_max_clients]
+    evaluate_on: self
+    silent_failure: 實測額滿 15 秒：exporter 也被拒、redis_up=0，connected_clients 與 rejected 在額滿期間沒有資料，結束後 rejected 一次跳到 21
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, vk-maxclients-reject, vk-info-rejected, rx-map-rejected, rx-config-maxclients, awe-rejected]
+    upstream: { status: partial, note: "mixin 用固定門檻 connected_clients > 100；awesome 有 maxclients 比例與 rejected，額滿時兩者都沒有資料" }
+    rules: [rules/targets/valkey.yml#ValkeyConnectionsNearLimit, rules/targets/valkey.yml#ValkeyRejectedConnections]
+
+  - id: blocked-clients
+    aspect: saturation
+    tier: 3
+    question: 有多少客戶端卡在阻塞指令
+    signal: >-
+      redis_blocked_clients（BLPOP、BRPOP、XREAD BLOCK、WAIT、CLIENT PAUSE 中的客戶端）與 redis_total_blocking_keys。
+      佇列型應用平常就有，門檻要依應用設定；突然歸零或暴增都值得看。實測一個 BLPOP 25 秒：blocked_clients 1、total_blocking_keys 1
+    metrics: [redis_blocked_clients, redis_total_blocking_keys]
+    evaluate_on: self
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, vk-info-blocked, rx-map-blocked]
+    upstream: { status: no }
+    rules: [rules/targets/valkey.yml#ValkeyBlockedClientsHigh]
+
+  - id: main-thread
+    aspect: saturation
+    tier: 3
+    question: 主執行緒的 CPU 用滿了嗎
+    signal: >-
+      rate(redis_cpu_user_main_thread_seconds_total + redis_cpu_sys_main_thread_seconds_total) 接近 1 核就是上限，加核心數沒用。
+      io-threads 只分擔網路讀寫與解析（redis_io_threads_active）；Valkey 可在執行中 CONFIG SET io-threads，Redis 7.2／8.10 只能啟動時設定。
+      Redis 8 另有每個 IO thread 的 redis_io_thread_*；Valkey 有 redis_active_time_main_thread_seconds_total
+    metrics: [redis_cpu_user_main_thread_seconds_total, redis_cpu_sys_main_thread_seconds_total, redis_io_threads_active, redis_active_time_main_thread_seconds_total]
+    evaluate_on: self
+    evidence: code
+    source: vk-valkey-src
+    refs: [vk-info-io-threads, vk-cfg-io-threads, r72-cfg-io-threads, r8-cfg-io-threads]
+    upstream: { status: no }
+    rules: [rules/targets/valkey.yml#ValkeyMainThreadBusy]
+
+  # ---------- replication ----------
+  - id: replication-link
+    aspect: replication
+    tier: 2
+    question: 複本和主節點的連線還在嗎、斷了多久
+    signal: >-
+      複本端 redis_master_link_up == 0（label master_host、master_port；failover 後 label 會換）。鏈：replication.c repl_state != CONNECTED →
+      INFO master_link_status:down → info.go → master_link_up 0。斷線時 master_last_io_seconds_ago 是 -1；斷了多久在 INFO master_link_down_since_seconds，
+      exporter 不輸出，queries/redis_exporter/valkey-extra.lua 補成 redis_script_values{key="master_link_down_since_seconds"}（實測 14～18 秒）
+    metrics: [redis_master_link_up, redis_master_last_io_seconds_ago, redis_master_sync_in_progress, redis_script_values]
+    evaluate_on: self
+    applies_when: 複本
+    silent_failure: 用 master_last_io_seconds_ago > N 判斷的規則在斷線時看到 -1，不會響
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, vk-exp2, vk-info-link-status, vk-info-last-io, vk-info-link-down-since, rx-link-up, rx-last-io, awe-link-down]
+    upstream: { status: partial, note: "awesome 有 master_link_up == 0；mixin 沒有" }
+    rules: [rules/targets/valkey.yml#ValkeyReplicaLinkDown, rules/targets/valkey.yml#ValkeyReplicaLinkDownLong]
+
+  - id: replication-lag
+    aspect: replication
+    tier: 2
+    question: Replication 延遲量的是真的嗎
+    signal: >-
+      位元組：主節點端 redis_master_repl_offset − redis_connected_slave_offset_bytes{slave_ip}。秒：Valkey／Redis 沒有「最後套用時間」，
+      slaveN 那一行的 lag 是距上次 REPLCONF ACK 幾秒（每秒一次），不是資料延遲。真正的秒數要靠 heartbeat key：主節點每秒 SET at:heartbeat <unix 秒>，
+      複本端 exporter --check-single-keys=db0=at:heartbeat，time() − redis_key_value（實測平常 2.5～3.2 秒、斷線 20 秒時 25 秒）。
+      斷線的複本在主節點 INFO 整列消失，所以還要看 redis_connected_slaves 有沒有變少
+    metrics: [redis_master_repl_offset, redis_connected_slave_offset_bytes, redis_connected_slave_lag_seconds, redis_connected_slaves, redis_slave_repl_offset, redis_key_value]
+    evaluate_on: self
+    applies_when: 主從複寫
+    silent_failure: >-
+      實測複本斷線：主節點的 connected_slave_lag_seconds 與 offset 整條消失、connected_slaves 0；「lag > N」規則回傳空。Sentinel 的 ok_slaves 18 秒後仍是 1
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, vk-exp2, vk-info-slave-lag, vk-info-slave-line, rx-slave-lag, rx-map-master-offset]
+    upstream: { status: partial, note: "awesome 用 delta(connected_slaves) 與 changes()；沒有位元組或秒數延遲" }
+    rules: [rules/targets/valkey.yml#ValkeyReplicationLagBytes, rules/targets/valkey.yml#ValkeyReplicaCountDropped, rules/targets/valkey.yml#ValkeyReplicaAckStale, rules/targets/valkey.yml#ValkeyReplicationHeartbeatLag]
+
+  - id: full-resync
+    aspect: replication
+    tier: 2
+    question: 斷線重連有沒有變成 full resync
+    signal: >-
+      主節點端 increase(redis_replica_resyncs_full) 與 redis_replica_partial_resync_denied。鏈：replication.c 的 PSYNC offset 不在 backlog 範圍 →
+      「Unable to partial resync … for lack of backlog」→ stat_sync_full++、stat_sync_partial_err++ → INFO sync_full／sync_partial_err → exporter。
+      backlog 撐多久：redis_replication_backlog_bytes / rate(redis_master_repl_offset)。repl-backlog-size 預設 Valkey 10MB、Redis 7.2／8.10 1MB。
+      full resync 要 fork 一次並傳整份 RDB（Valkey dual-channel-replication、Redis 8 repl-rdb-channel 讓 RDB 走另一條連線）
+    metrics: [redis_replica_resyncs_full, redis_replica_partial_resync_denied, redis_replica_partial_resync_accepted, redis_replication_backlog_bytes, redis_repl_backlog_history_bytes, redis_master_repl_offset]
+    evaluate_on: self
+    applies_when: 主從複寫
+    silent_failure: 實測 25 秒斷線、寫 3MB、backlog 1MB：sync_full 1 → 2、partial_err 0 → 1；複本重啟（RDB 帶 replid）則是 partial 成功
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, vk-exp2, vk-repl-no-backlog, vk-repl-full, vk-repl-partial-err, vk-info-sync-full, rx-map-sync-full, vk-cfg-backlog, r72-cfg-backlog, r8-cfg-backlog, vk-cfg-dual-channel, r8-cfg-rdb-channel]
+    upstream: { status: no }
+    rules: [rules/targets/valkey.yml#ValkeyFullResync, rules/targets/valkey.yml#ValkeyBacklogTooShort]
+
+  - id: role-detection
+    aspect: replication
+    tier: 2
+    question: 每組主從剛好有一台主節點嗎
+    signal: >-
+      依 cluster label 計數 redis_instance_info{role="master"}，並依 run_id 去重（同一台被多個 job 抓時不重複）：0 是沒有主節點，> 1 是 failover 後舊主節點回來、
+      還沒被 Sentinel 降級。failover 本身看 changes(redis_sentinel_master_config_epoch)。role 來自 INFO role（primary_host 為空就是 master）。
+      target 要加 cluster label；awesome 的 count() 不分組
+    metrics: [redis_instance_info, redis_sentinel_master_config_epoch, redis_master_link_up]
+    evaluate_on: self
+    applies_when: "主從複寫；target 要有 cluster label"
+    silent_failure: >-
+      實測 vk1 同時被三個 job 抓，未去重的 count 是 3。這台機器上 Sentinel 一直進入 TILT，pause 主節點 45 秒沒有 failover，
+      「舊主節點回來時兩台都是 master」沒有重現，failover 部分只讀碼
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, vk-exp2, vk-info-role, rx-instance-info, rx-sen-epoch, vk-sen-switch, awe-missing-master, awe-multi-master]
+    upstream: { status: partial, note: "awesome 有 RedisMissingMaster／RedisTooManyMasters，但 count() 不分組" }
+    rules: [rules/targets/valkey.yml#ValkeyNoMaster, rules/targets/valkey.yml#ValkeyMultipleMasters, rules/targets/valkey.yml#ValkeyFailoverHappened]
+
+  # ---------- cluster：Sentinel 或 Valkey Cluster ----------
+  - id: sentinel-quorum
+    aspect: cluster
+    tier: 2
+    question: Sentinel 還能做 failover 嗎
+    signal: >-
+      每台 Sentinel 一個 exporter（redis.addr 指向 26379）。redis_sentinel_master_ckquorum_status == 0（SENTINEL CKQUORUM 同時檢查 quorum 與多數；
+      message label 是回覆內容），redis_sentinel_master_ok_sentinels 變少（數字包含自己），redis_sentinel_master_status（INFO sentinel 的 status，ok／sdown／odown），
+      redis_sentinel_tilt == 1。Sentinel 的 total_tilt、tilt_since_seconds 在 INFO 裡有，exporter 只輸出 sentinel_tilt
+    metrics: [redis_sentinel_master_ckquorum_status, redis_sentinel_master_ok_sentinels, redis_sentinel_master_sentinels, redis_sentinel_master_status, redis_sentinel_tilt, redis_sentinel_master_setting_ckquorum]
+    evaluate_on: self
+    applies_when: Sentinel
+    silent_failure: >-
+      實測 TILT 期間主節點被 pause 45 秒，master_status 一直是 ok、沒有 failover；停掉 3 台中的 2 台 25 秒後 CKQUORUM 仍回「3 usable」（同樣在 TILT 干擾下，
+      這台機器測不到 sdown）。valkey-doc 建議監控系統用 CKQUORUM
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, vk-exp2, vk-sen-quorum, vk-sen-ckquorum, vk-sen-tilt, vk-sen-info-tilt, rx-sen-ckquorum, rx-sen-oksentinels-init, rx-sen-status, rx-sen-section, vdoc-sentinel-ckquorum, vdoc-sentinel-tilt]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有 Sentinel 規則" }
+    rules:
+      - rules/targets/valkey.yml#ValkeySentinelMissing
+      - rules/targets/valkey.yml#ValkeySentinelNoQuorum
+      - rules/targets/valkey.yml#ValkeySentinelPeersDown
+      - rules/targets/valkey.yml#ValkeySentinelMasterDown
+      - rules/targets/valkey.yml#ValkeySentinelTilt
+
+  - id: cluster-state
+    aspect: cluster
+    tier: 2
+    question: Valkey Cluster 的 slot 都有人負責嗎
+    signal: >-
+      redis_cluster_state == 0、redis_cluster_slots_fail > 0、redis_cluster_slots_pfail > 0（exporter 送 CLUSTER INFO，cluster_ 開頭的欄位原名輸出，ok／fail 轉成 1／0）。
+      cluster-require-full-coverage 預設 yes：任一 slot 沒人負責整個節點回 fail；節點在少數派時也是 fail。每個節點都要抓（--is-cluster 的 /discover-cluster-nodes 可產生 target）。
+      Valkey 9.1 的 INFO ALL 內含 # Cluster Info 段，exporter 跳過，照樣另送 CLUSTER INFO
+    metrics: [redis_cluster_state, redis_cluster_slots_fail, redis_cluster_slots_pfail, redis_cluster_known_nodes, redis_cluster_size, redis_cluster_slots_assigned]
+    evaluate_on: self
+    applies_when: cluster_enabled yes
+    evidence: code
+    source: vk-valkey-src
+    refs: [vk-cl-full-coverage, vk-cl-minority, vk-cl-info-state, vk-cl-info-slots-fail, r72-cl-info-state, rx-cluster-info, rx-cluster-prefix, rx-okerr, rx-skip-cluster-section, vk-info-cluster-info, rx-mixin-cluster]
+    upstream: { status: yes, note: "mixin 有 RedisClusterStateNotOk、SlotFail、SlotPfail；awesome 有前兩條" }
+    rules: [rules/targets/valkey.yml#ValkeyClusterStateFail, rules/targets/valkey.yml#ValkeyClusterSlotsFail]
+
+  # ---------- maintenance ----------
+  - id: expire-cycle
+    aspect: maintenance
+    tier: 3
+    question: 過期 key 有被及時清掉嗎
+    signal: >-
+      主動過期清理每輪有時間上限；redis_expired_time_cap_reached_total 增加且 redis_expired_stale_percentage 偏高時，過期的 key 還佔著記憶體，
+      maxmemory 下會提早觸發淘汰或 OOM。lazyfree 的 redis_lazyfree_pending_objects 持續增加表示背景釋放跟不上
+    metrics: [redis_expired_time_cap_reached_total, redis_expired_stale_percentage, redis_expired_keys_total, redis_lazyfree_pending_objects]
+    evaluate_on: self
+    evidence: inferred
+    source: vk-exporter
+    upstream: { status: no }
+    rules: [rules/targets/valkey.yml#ValkeyExpireCycleBehind]
+
+  # ---------- protection ----------
+  - id: rdb-persistence
+    aspect: protection
+    tier: 2
+    question: RDB 快照成功嗎？失敗時寫入還進得來嗎
+    signal: >-
+      redis_rdb_last_bgsave_status == 0。鏈：rdb.c 子程序寫檔失敗或 fork 失敗 → lastbgsave_status = C_ERR → INFO rdb_last_bgsave_status:err →
+      metrics.go 把 ok／err 轉成 1／0。另看 time() − redis_rdb_last_save_timestamp_seconds（只在成功時更新）與 redis_rdb_changes_since_last_save。
+      stop-writes-on-bgsave-error 預設 yes（且有 save 設定）時，所有寫入與 PING 回 MISCONF。Sentinel 只把 PONG、LOADING、MASTERDOWN 當成正常回覆，
+      照原始碼，主節點持續回 MISCONF 超過 down-after-milliseconds 會被標成 sdown（讀碼；這台機器上 Sentinel 受 TILT 干擾，30 秒內沒有標 sdown，未驗證）
+    metrics: [redis_rdb_last_bgsave_status, redis_rdb_last_save_timestamp_seconds, redis_rdb_changes_since_last_save, redis_rdb_bgsave_in_progress, redis_errors_total]
+    evaluate_on: self
+    applies_when: 有設 save
+    silent_failure: >-
+      實測 /data 唯讀後 BGSAVE：status 0、SET 與 PING 回 MISCONF、errorstat MISCONF 11 秒內 29 次（Sentinel 的 PING）、redis_up 仍是 1。
+      save 設成空字串時 status 永遠是初始值 ok，timestamp 是啟動時間
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, vk-exp2, vk-rdb-bgsave-err, vk-rdb-fork-fail, vk-info-bgsave-status, rx-map-bgsave, rx-okerr, vk-misconf-cond, vk-misconf-ping, vk-cfg-stop-writes, vk-sen-ping-valid, vk-sen-sdown, r72-misconf-ping, r8-misconf-ping, awe-backup]
+    upstream: { status: partial, note: "awesome 只有 last_save_timestamp > 48h；mixin 沒有" }
+    rules: [rules/targets/valkey.yml#ValkeyBgsaveFailed, rules/targets/valkey.yml#ValkeyRdbStale, rules/targets/valkey.yml#ValkeyWritesRejected]
+
+  - id: aof-persistence
+    aspect: protection
+    tier: 2
+    question: AOF 寫入、fsync、rewrite 成功嗎
+    signal: >-
+      redis_aof_enabled == 1 時看 redis_aof_last_write_status（寫入與背景 fsync 都成功才是 ok）、redis_aof_last_bgrewrite_status、
+      increase(redis_aof_delayed_fsync)（everysec 的 fsync 跟不上）。寫入失敗時伺服器回「MISCONF Errors writing to the AOF file」
+    metrics: [redis_aof_enabled, redis_aof_last_write_status, redis_aof_last_bgrewrite_status, redis_aof_delayed_fsync, redis_aof_rewrite_in_progress]
+    evaluate_on: self
+    applies_when: appendonly yes
+    evidence: code
+    source: vk-valkey-src
+    refs: [vk-info-aof-write-status, vk-info-aof-rewrite-status, rx-map-aof-write, rx-okerr, vk-misconf-deny]
+    upstream: { status: no }
+    rules: [rules/targets/valkey.yml#ValkeyAofWriteFailed, rules/targets/valkey.yml#ValkeyAofDelayedFsync]
+
+  - id: fork-latency
+    aspect: protection
+    tier: 3
+    question: fork 花多久、copy-on-write 吃多少記憶體
+    signal: >-
+      redis_latest_fork_seconds（exporter 把 latest_fork_usec 除以 1e6 並改名）；fork 在主執行緒上做，這段時間所有指令停住。
+      redis_rdb_last_cow_size_bytes／redis_aof_last_cow_size_bytes 是子程序期間複製的頁。次數 total_forks 在 INFO 有、exporter 不輸出，
+      valkey-extra.lua 補成 redis_script_values{key="total_forks"}。實測小資料集 fork 0.000445 秒、COW 404KB
+    metrics: [redis_latest_fork_seconds, redis_rdb_last_cow_size_bytes, redis_aof_last_cow_size_bytes, redis_script_values]
+    evaluate_on: self
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, vk-fork-time, vk-info-fork-usec, vk-info-total-forks, rx-map-fork, rx-fork-seconds, vdoc-latency-fork, vdoc-admin-overcommit]
+    upstream: { status: no }
+    rules: [rules/targets/valkey.yml#ValkeySlowFork]
+
+  # ---------- capacity ----------
+  - id: memory-growth
+    aspect: capacity
+    tier: 3
+    question: 記憶體與 key 數的成長會不會碰到 maxmemory
+    signal: >-
+      predict_linear(redis_memory_used_bytes[6h], 24h) 對照 redis_memory_max_bytes；key 數看 redis_db_keys（只輸出有 key 的 db，
+      --include-metrics-for-empty-databases 才補 0）。哪一類 key 在長，看 key-scan-cost 的 key group
+    metrics: [redis_memory_used_bytes, redis_memory_max_bytes, redis_db_keys, redis_db_keys_expiring]
+    evaluate_on: self
+    evidence: inferred
+    source: vk-exporter
+    upstream: { status: no }
+    rules: [rules/targets/valkey.yml#ValkeyMemoryFullSoon]
+
+not_applicable_aspects:
+  cluster:
+    why: >-
+      只適用於單機或手動主從（沒有 Sentinel、沒有 cluster_enabled）。這種部署沒有任何程序做故障偵測或選主：Sentinel 的 sdown／odown／quorum 與
+      Cluster 的 PFAIL／FAIL、多數派判斷都在各自的程式裡，核心的主從複寫只有 REPLICAOF 與 PSYNC。這時「誰是主節點」由 replication 面向的 role-detection 回答
+    refs: [vk-sen-sdown, vk-sen-quorum, vk-cl-minority, vk-info-role]
+
+blind_spots:
+  - what: 複本斷線多久（`master_link_down_since_seconds`）、`min_slaves_good_slaves`、`total_forks`
+    category: exporter
+    why: INFO 有，exporter 的對照表沒有這幾個欄位
+    workaround: "`--script` 讀 INFO replication／stats"
+    section: targets/valkey.md#blind-spots
+    covered_by:
+      tool: "redis_exporter v1.97.0 --script"
+      config: queries/redis_exporter/valkey-extra.lua
+      metrics: [redis_script_values, redis_script_result]
+      rules: [ValkeyReplicaLinkDownLong, ValkeyExporterScriptFailed, ValkeyScriptMissing]
+      refs: [vk-exp, vk-exp2, vk-info-link-down-since, vk-info-min-good, vk-info-total-forks, rx-lua-ro, rx-lua-err-up]
+  - what: 複寫延遲的秒數
+    category: database
+    why: Valkey／Redis 只記 offset，沒有「最後套用的寫入時間」；slaveN 的 lag 是距上次 ACK 幾秒
+    workaround: heartbeat key（主節點每秒寫入時間，複本端讀）
+    section: targets/valkey.md#blind-spots
+    covered_by:
+      tool: "redis_exporter v1.97.0 --check-single-keys"
+      config: queries/redis_exporter/exporter-flags.env
+      metrics: [redis_key_value]
+      rules: [ValkeyReplicationHeartbeatLag]
+      refs: [vk-exp2]
+  - what: 哪一類 key 佔記憶體（big key、key group）
+    category: database
+    why: Valkey 9.1 沒有 key 大小分布（Redis 8 才有 INFO KEYSIZES）；只能逐 key 用 MEMORY USAGE
+    workaround: "`--check-key-groups`（每次 scrape 掃整個 keyspace，大實例用獨立的長間隔 job 或只在複本上跑）；或離線分析 RDB"
+    section: targets/valkey.md#blind-spots
+    covered_by:
+      tool: "redis_exporter v1.97.0 --check-key-groups"
+      config: queries/redis_exporter/exporter-flags.env
+      metrics: [redis_key_group_count, redis_key_group_memory_usage_bytes, redis_last_key_groups_scrape_duration_milliseconds]
+      rules: [ValkeyKeyGroupScanSlow]
+      refs: [vk-exp, rx-kg-scan, rx-kg-memusage, r8-info-keysizes]
+  - what: CONFIG 這組 metric 有沒有成功
+    category: exporter
+    why: CONFIG GET 失敗只記 debug log，沒有成功指標
+    workaround: "`redis_up == 1 unless redis_config_maxclients`（ValkeyConfigMetricsMissing）"
+    section: targets/valkey.md#exporter
+  - what: Sentinel 的 TILT 次數與持續時間、每台複本在 Sentinel 眼中的狀態
+    category: exporter
+    why: INFO sentinel 有 sentinel_total_tilt、sentinel_tilt_since_seconds，exporter 只輸出 sentinel_tilt；Sentinel 不能跑 Lua，`--script` 補不了
+    workaround: Sentinel log 的 +tilt、+sdown 事件（log 管線計數）
+    section: targets/valkey.md#cluster
+  - what: Cluster 每個節點的 flags 與 link 狀態
+    category: exporter
+    why: exporter 只送 CLUSTER INFO（彙總）；CLUSTER NODES 只用在 /discover-cluster-nodes
+    workaround: 每個節點都抓，比較 cluster_known_nodes、cluster_size；或 `--script` 執行 CLUSTER NODES（未實測）
+    section: targets/valkey.md#cluster
+  - what: 熱 key
+    category: database
+    why: Valkey 9.1 沒有逐 key 的存取計數；LFU 政策下 OBJECT FREQ 要逐 key 查
+    workaround: "`valkey-cli --hotkeys`（掃 keyspace，離峰時跑）或應用端統計"
+    section: targets/valkey.md#blind-spots
+  - what: 主節點沒有持久化又會自動重啟
+    category: database
+    why: save 與 appendonly 是設定字串，exporter 只輸出數字型設定；重啟後空資料會同步到所有複本
+    workaround: 盤點時檢查；`--include-config-metrics` 會輸出 redis_config_key_value（含所有設定，基數高）
+    section: targets/valkey.md#protection
+  - what: 記憶體 overcommit、THP、swap、RSS 上限
+    category: other
+    why: 不在 INFO 裡；fork 失敗與延遲尖峰常來自這些
+    workaround: node_exporter（`node_memory_*`、`node_vmstat_*`）與 cAdvisor 的容器記憶體
+    section: targets/valkey.md#saturation
+  - what: RDB／AOF 所在磁碟的剩餘空間
+    category: other
+    why: 不在 INFO 裡；寫滿時 BGSAVE 失敗、寫入被拒
+    workaround: node_exporter 的 `node_filesystem_avail_bytes`
+    section: targets/valkey.md#protection
+  - what: RDB 檔案有沒有被送到別處（備份）
+    category: other
+    why: rdb_last_save_time 只代表本機寫了檔案
+    workaround: 備份工具自己的 metric 或 textfile
+    section: targets/valkey.md#protection

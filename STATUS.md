@@ -5,7 +5,7 @@
 ## 現況
 
 - GitHub repo `HahaSula/alert-trust`，Pages 由 GitHub Actions 發布。
-- 11 張卡（9 個監控元件、2 個資料庫 target）、202 個訊號、235 條規則；`validate.py` 0 錯誤、2 個警告；`--strict` 建置通過。
+- 12 張卡（9 個監控元件、3 個資料庫 target）、231 個訊號、285 條規則；`validate.py` 0 錯誤、2 個警告；`--strict` 建置通過。
 - 原始碼參考 105+ 筆（釘版本與行號），實驗參考多數已換成 `lab/` 的公開結果。
 
 ## 已完成
@@ -26,11 +26,12 @@
 | MySQL／MariaDB 與 PostgreSQL 的 exporter 盲點用 query-exporter 5.2.2 自訂查詢補上（lab 實測） | `queries/query-exporter/`、`lab/targets/*/custom-queries/` |
 | 資料庫架構頁：關聯式（MySQL／InnoDB 對照 PostgreSQL） | `docs/architecture/db-relational.md` |
 | 資料庫監控模型調查（exporter／內建 endpoint／collector／DB 內歷史／廠商方案）與官方告警規則 | `docs/targets/models.md` |
+| Valkey 9.1／Redis 7.2、8 target（redis_exporter v1.97.0）與「記憶體 KV」架構頁，lab 實測 | `catalog/targets/redis_exporter.yaml`、`docs/targets/valkey*.md`、`lab/targets/valkey/` |
 | `rule-review` skill 與流程圖：先確認體系與基礎設施覆蓋，再看時間契約；離線用 `tools/rules_to_snapshot.py` | `skills/rule-review/`、`docs/tools/rule-review.md` |
 
 ## 進行中
 
-- Valkey／Redis target（redis_exporter）與「記憶體 KV」架構頁
+- etcd target（第一張 `model: native`）與「共識（Raft）」架構頁
 
 之後的資料庫順序（使用者已同意）：etcd → TiDB → YugabyteDB → ClickHouse → MongoDB；CockroachDB（專有授權）不做。資料庫架構頁依類型分頁：關聯式、記憶體 KV、共識（Raft）、分散式 SQL、分析型、文件型。
 
@@ -50,6 +51,7 @@
 12. **架構頁發現的卡片缺口**：MySQL 卡沒有 checkpoint age 訊號（`innodb-pressure` 只有 `log_waits`、`wait_free`；lab 有量到 checkpoint age）；PG 卡沒有 `synchronous_commit` 訊號。
 13. （已完成）內建 endpoint 型資料庫的標準問題：`target-pattern.yaml` 的 `required_signals_native`，卡片寫 `model: native`。
 14. **官方 TiDB 規則的問題**（讀規則，未實測）：TiKV `name="apply_.*"` 用 `=` 永遠不匹配；`job="tidb"`、`job="pd"` 寫死；PD 規則都以 `etcd_server_is_leader` 為前提，抓不到 leader 時全部安靜。做 TiDB 時驗證。
+15. **Sentinel 沒測到**：這台機器上 Sentinel 一直進 TILT，failover、sdown、MISCONF 觸發 sdown 只讀碼。
 
 ## 已做的決定
 

@@ -1,0 +1,30 @@
+global: { scrape_interval: 5s, scrape_timeout: 4s, evaluation_interval: 5s }
+scrape_configs:
+  - job_name: valkey
+    static_configs:
+      - { targets: ["e-vk1:9121", "e-vk2:9121"], labels: { cluster: vk } }
+      - { targets: ["e-r72:9121"], labels: { cluster: r72 } }
+      - { targets: ["e-r8:9121"], labels: { cluster: r8 } }
+      - { targets: ["e-kg:9121"], labels: { cluster: kg } }
+    relabel_configs: &inst
+      - { source_labels: [__address__], regex: "([^:]+):.*", target_label: instance }
+  - job_name: valkey-short
+    static_configs: [{ targets: ["e-short:9121"], labels: { cluster: vk } }]
+    relabel_configs: *inst
+  - job_name: valkey-bad
+    static_configs: [{ targets: ["e-bad:9121"], labels: { cluster: kg } }]
+    relabel_configs: *inst
+  - job_name: sentinel
+    static_configs: [{ targets: ["e-s1:9121"], labels: { cluster: vk } }]
+    relabel_configs: *inst
+  # multi-target：每個 target 一次 /scrape；exporter 自己的 /metrics 另一個 job
+  - job_name: valkey-multi
+    metrics_path: /scrape
+    static_configs: [{ targets: ["redis://vk1:6379", "redis://vk2:6379"], labels: { cluster: vk } }]
+    relabel_configs:
+      - { source_labels: [__address__], target_label: __param_target }
+      - { source_labels: [__param_target], regex: "redis://([^:]+):.*", target_label: instance, replacement: "multi-$1" }
+      - { target_label: __address__, replacement: "e-multi:9121" }
+  - job_name: valkey-exporter
+    static_configs: [{ targets: ["e-multi:9121"] }]
+    relabel_configs: *inst

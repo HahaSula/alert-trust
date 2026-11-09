@@ -1,0 +1,16 @@
+global: { scrape_interval: 5s, scrape_timeout: 4s, evaluation_interval: 5s }
+scrape_configs:
+  - job_name: valkey
+    static_configs:
+      - { targets: ["e-vk1:9121", "e-vk2:9121"], labels: { cluster: vk } }
+    relabel_configs: &inst
+      - { source_labels: [__address__], regex: "([^:]+):.*", target_label: instance }
+  - job_name: valkey-hb
+    static_configs: [{ targets: ["e-hb:9121"], labels: { cluster: vk } }]
+    relabel_configs: *inst
+  - job_name: valkey-noconf
+    static_configs: [{ targets: ["e-noconf:9121"], labels: { cluster: vk } }]
+    relabel_configs: *inst
+  - job_name: sentinel
+    static_configs: [{ targets: ["e-s1:9121"], labels: { cluster: vk } }]
+    relabel_configs: *inst

@@ -1,0 +1,786 @@
+環境：valkey 9.1.3-alpine（vk1 主、vk2 複本、s1-s3 Sentinel、kg）、redis 7.2.17-alpine、redis 8.10.3-alpine、redis_exporter v1.97.0、prometheus v3.13.5；scrape 5s、timeout 4s
+  vk1 redis_version:7.2.4
+  vk1 server_name:valkey
+  vk1 valkey_version:9.1.3
+  r72 redis_version:7.2.17
+  r8 redis_version:8.10.3
+
+## A1 基線：up、redis_up、角色、Sentinel（23:17:49）
+  > up
+    e-bad        up{job=valkey-bad,cluster=kg} = 1
+    e-kg         up{job=valkey,cluster=kg} = 1
+    e-r72        up{job=valkey,cluster=r72} = 1
+    e-r8         up{job=valkey,cluster=r8} = 1
+    e-s1         up{job=sentinel,cluster=vk} = 1
+    e-short      up{job=valkey-short,cluster=vk} = 1
+    e-vk1        up{job=valkey,cluster=vk} = 1
+    e-vk2        up{job=valkey,cluster=vk} = 1
+    multi-vk1    up{job=valkey-multi,cluster=vk} = 1
+    multi-vk2    up{job=valkey-multi,cluster=vk} = 1
+    e-multi      up{job=valkey-exporter} = 1
+  > redis_up
+    e-bad        redis_up{job=valkey-bad,cluster=kg} = 0
+    e-kg         redis_up{job=valkey,cluster=kg} = 1
+    e-r72        redis_up{job=valkey,cluster=r72} = 1
+    e-r8         redis_up{job=valkey,cluster=r8} = 1
+    e-s1         redis_up{job=sentinel,cluster=vk} = 1
+    e-short      redis_up{job=valkey-short,cluster=vk} = 1
+    e-vk1        redis_up{job=valkey,cluster=vk} = 1
+    e-vk2        redis_up{job=valkey,cluster=vk} = 1
+    multi-vk1    redis_up{job=valkey-multi,cluster=vk} = 1
+    multi-vk2    redis_up{job=valkey-multi,cluster=vk} = 1
+  > redis_instance_info
+    e-bad        redis_instance_info{job=valkey-bad,role=master,redis_version=7.2.4,valkey_version=9.1.3,maxmemory_policy=noeviction,cluster=kg} = 1
+    e-kg         redis_instance_info{job=valkey,role=master,redis_version=7.2.4,valkey_version=9.1.3,maxmemory_policy=noeviction,cluster=kg} = 1
+    e-r72        redis_instance_info{job=valkey,role=master,redis_version=7.2.17,maxmemory_policy=noeviction,cluster=r72} = 1
+    e-r8         redis_instance_info{job=valkey,role=master,redis_version=8.10.3,maxmemory_policy=noeviction,cluster=r8} = 1
+    e-s1         redis_instance_info{job=sentinel,redis_version=7.2.4,valkey_version=9.1.3,cluster=vk} = 1
+    e-short      redis_instance_info{job=valkey-short,role=master,redis_version=7.2.4,valkey_version=9.1.3,maxmemory_policy=noeviction,cluster=vk} = 1
+    e-vk1        redis_instance_info{job=valkey,role=master,redis_version=7.2.4,valkey_version=9.1.3,maxmemory_policy=noeviction,cluster=vk} = 1
+    e-vk2        redis_instance_info{job=valkey,role=slave,redis_version=7.2.4,valkey_version=9.1.3,maxmemory_policy=noeviction,cluster=vk} = 1
+    multi-vk1    redis_instance_info{job=valkey-multi,role=master,redis_version=7.2.4,valkey_version=9.1.3,maxmemory_policy=noeviction,cluster=vk} = 1
+    multi-vk2    redis_instance_info{job=valkey-multi,role=slave,redis_version=7.2.4,valkey_version=9.1.3,maxmemory_policy=noeviction,cluster=vk} = 1
+  > redis_exporter_last_scrape_error
+    e-bad        redis_exporter_last_scrape_error{job=valkey-bad,err=ERR Unknown command called from script script: on @user_script:2.,cluster=kg} = 1
+    e-kg         redis_exporter_last_scrape_error{job=valkey,cluster=kg} = 0
+    e-r72        redis_exporter_last_scrape_error{job=valkey,cluster=r72} = 0
+    e-r8         redis_exporter_last_scrape_error{job=valkey,cluster=r8} = 0
+    e-s1         redis_exporter_last_scrape_error{job=sentinel,cluster=vk} = 0
+    e-short      redis_exporter_last_scrape_error{job=valkey-short,cluster=vk} = 0
+    e-vk1        redis_exporter_last_scrape_error{job=valkey,cluster=vk} = 0
+    e-vk2        redis_exporter_last_scrape_error{job=valkey,cluster=vk} = 0
+    multi-vk1    redis_exporter_last_scrape_error{job=valkey-multi,cluster=vk} = 0
+    multi-vk2    redis_exporter_last_scrape_error{job=valkey-multi,cluster=vk} = 0
+  > redis_sentinel_master_status
+    e-s1         redis_sentinel_master_status{job=sentinel,master_name=mymaster,master_status=ok,cluster=vk} = 1
+  > redis_sentinel_master_ckquorum_status
+    e-s1         redis_sentinel_master_ckquorum_status{job=sentinel,master_name=mymaster,message=OK 3 usable Sentinels. Quorum and failover authorization can be reached,cluster=vk} = 1
+  > redis_sentinel_master_ok_sentinels
+    e-s1         redis_sentinel_master_ok_sentinels{job=sentinel,master_name=mymaster,cluster=vk} = 3
+  > redis_sentinel_master_ok_slaves
+    e-s1         redis_sentinel_master_ok_slaves{job=sentinel,master_name=mymaster,cluster=vk} = 1
+
+## A2 版本差異：metric 名稱（Valkey 9.1 vs Redis 7.2 vs Redis 8.10，都是預設設定）（23:17:49）
+  只在 Valkey（kg，單機預設）有：
+    redis_acl_access_denied_db_total
+    redis_acl_access_denied_tls_cert_total
+    redis_active_time_main_thread_seconds_total
+    redis_allocator_muzzy_bytes
+    redis_client_output_buffer_limit_disconnections_total
+    redis_client_query_buffer_limit_disconnections_total
+    redis_commandlog_execution_slower_than
+    redis_commandlog_large_reply_length
+    redis_commandlog_large_reply_max_len
+    redis_commandlog_large_request_length
+    redis_commandlog_large_request_max_len
+    redis_commandlog_reply_larger_than
+    redis_commandlog_request_larger_than
+    redis_commandlog_slow_execution_max_len
+    redis_commandlog_slow_length
+    redis_errors_total
+    redis_evicted_scripts_total
+    redis_expired_fields_total
+    redis_expired_keys_with_volatile_items_stale_percentage
+    redis_keys_count
+    redis_mem_overhead_db_hashtable_rehashing_bytes
+    redis_mem_replicas_repl_buffer_bytes
+    redis_pubsub_clients
+    redis_replicas_waiting_psync
+    redis_scripting_engine_info
+    redis_scripting_engine_memory_overhead_bytes
+    redis_scripting_engine_memory_used_bytes
+    redis_scripting_engines_count
+    redis_scripting_engines_memory_overhead_bytes
+    redis_scripting_engines_memory_used_bytes
+    redis_tls_ca_cert_expires_in_seconds
+    redis_tls_certificate_info
+    redis_tls_client_cert_expires_in_seconds
+    redis_tls_server_cert_expires_in_seconds
+    redis_total_watched_keys
+    redis_watching_clients
+  只在 Redis 7.2 有：
+  只在 Redis 8.10 有（相對 7.2）：
+    redis_acl_access_denied_tls_cert_total
+    redis_active_clients
+    redis_allocator_muzzy_bytes
+    redis_backup_in_progress
+    redis_client_output_buffer_limit_disconnections_total
+    redis_client_processing_events_total
+    redis_client_processing_pipeline_batches_total
+    redis_client_processing_pipeline_commands_total
+    redis_client_processing_pipeline_length
+    redis_client_query_buffer_limit_disconnections_total
+    redis_eventloop_cycles_with_clients_processing_total
+    redis_evicted_scripts_total
+    redis_expired_subkeys_total
+    redis_hash_template_keys
+    redis_hash_templates
+    redis_io_thread_clients
+    redis_io_thread_reads_processed_total
+    redis_io_thread_writes_processed_total
+    redis_mem_overhead_db_hashtable_rehashing_bytes
+    redis_memory_used_hash_templates_bytes
+    redis_pubsub_clients
+    redis_slowlog_commands_duration_seconds_max
+    redis_slowlog_commands_duration_seconds_total
+    redis_slowlog_commands_total
+    redis_total_watched_keys
+    redis_watching_clients
+  mixin RedisOutOfMemory 依賴的 redis_total_system_memory_bytes（預設不輸出）：
+  > redis_total_system_memory_bytes
+    (空)
+  > redis_config_maxmemory
+    e-bad        redis_config_maxmemory{job=valkey-bad,cluster=kg} = 0
+    e-kg         redis_config_maxmemory{job=valkey,cluster=kg} = 0
+    e-r72        redis_config_maxmemory{job=valkey,cluster=r72} = 0
+    e-r8         redis_config_maxmemory{job=valkey,cluster=r8} = 0
+    e-short      redis_config_maxmemory{job=valkey-short,cluster=vk} = 0
+    e-vk1        redis_config_maxmemory{job=valkey,cluster=vk} = 0
+    e-vk2        redis_config_maxmemory{job=valkey,cluster=vk} = 0
+    multi-vk1    redis_config_maxmemory{job=valkey-multi,cluster=vk} = 0
+    multi-vk2    redis_config_maxmemory{job=valkey-multi,cluster=vk} = 0
+  > redis_memory_max_bytes
+    e-bad        redis_memory_max_bytes{job=valkey-bad,cluster=kg} = 0
+    e-kg         redis_memory_max_bytes{job=valkey,cluster=kg} = 0
+    e-r72        redis_memory_max_bytes{job=valkey,cluster=r72} = 0
+    e-r8         redis_memory_max_bytes{job=valkey,cluster=r8} = 0
+    e-short      redis_memory_max_bytes{job=valkey-short,cluster=vk} = 0
+    e-vk1        redis_memory_max_bytes{job=valkey,cluster=vk} = 0
+    e-vk2        redis_memory_max_bytes{job=valkey,cluster=vk} = 0
+    multi-vk1    redis_memory_max_bytes{job=valkey-multi,cluster=vk} = 0
+    multi-vk2    redis_memory_max_bytes{job=valkey-multi,cluster=vk} = 0
+  [kg] repl-backlog-size 10485760  io-threads 1 
+  [r72] repl-backlog-size 1048576  io-threads 1 
+  [r8] repl-backlog-size 1048576  io-threads 1 
+  > scrape_duration_seconds
+    e-bad        scrape_duration_seconds{job=valkey-bad,cluster=kg} = 0.008868889
+    e-kg         scrape_duration_seconds{job=valkey,cluster=kg} = 0.013660301
+    e-r72        scrape_duration_seconds{job=valkey,cluster=r72} = 0.006311071
+    e-r8         scrape_duration_seconds{job=valkey,cluster=r8} = 0.0062876
+    e-s1         scrape_duration_seconds{job=sentinel,cluster=vk} = 0.004769154
+    e-short      scrape_duration_seconds{job=valkey-short,cluster=vk} = 0.008759828
+    e-vk1        scrape_duration_seconds{job=valkey,cluster=vk} = 0.009958912
+    e-vk2        scrape_duration_seconds{job=valkey,cluster=vk} = 0.009146337
+    multi-vk1    scrape_duration_seconds{job=valkey-multi,cluster=vk} = 0.010379072
+    multi-vk2    scrape_duration_seconds{job=valkey-multi,cluster=vk} = 0.01015279
+    e-multi      scrape_duration_seconds{job=valkey-exporter} = 0.001207247
+  > scrape_samples_scraped
+    e-bad        scrape_samples_scraped{job=valkey-bad,cluster=kg} = 439
+    e-kg         scrape_samples_scraped{job=valkey,cluster=kg} = 454
+    e-r72        scrape_samples_scraped{job=valkey,cluster=r72} = 319
+    e-r8         scrape_samples_scraped{job=valkey,cluster=r8} = 347
+    e-s1         scrape_samples_scraped{job=sentinel,cluster=vk} = 153
+    e-short      scrape_samples_scraped{job=valkey-short,cluster=vk} = 464
+    e-vk1        scrape_samples_scraped{job=valkey,cluster=vk} = 470
+    e-vk2        scrape_samples_scraped{job=valkey,cluster=vk} = 458
+    multi-vk1    scrape_samples_scraped{job=valkey-multi,cluster=vk} = 455
+    multi-vk2    scrape_samples_scraped{job=valkey-multi,cluster=vk} = 444
+    e-multi      scrape_samples_scraped{job=valkey-exporter} = 14
+
+## B slowlog 與 latency monitor（vk1 DEBUG SLEEP 0.05 ×3、0.3 ×1；r72 同樣）（23:17:51）
+  > redis_slowlog_length
+    e-bad        redis_slowlog_length{job=valkey-bad,cluster=kg} = 0
+    e-kg         redis_slowlog_length{job=valkey,cluster=kg} = 0
+    e-r72        redis_slowlog_length{job=valkey,cluster=r72} = 4
+    e-r8         redis_slowlog_length{job=valkey,cluster=r8} = 0
+    e-short      redis_slowlog_length{job=valkey-short,cluster=vk} = 4
+    e-vk1        redis_slowlog_length{job=valkey,cluster=vk} = 4
+    e-vk2        redis_slowlog_length{job=valkey,cluster=vk} = 0
+    multi-vk1    redis_slowlog_length{job=valkey-multi,cluster=vk} = 4
+    multi-vk2    redis_slowlog_length{job=valkey-multi,cluster=vk} = 0
+  > redis_slowlog_last_id
+    e-bad        redis_slowlog_last_id{job=valkey-bad,cluster=kg} = 0
+    e-kg         redis_slowlog_last_id{job=valkey,cluster=kg} = 0
+    e-r72        redis_slowlog_last_id{job=valkey,cluster=r72} = 3
+    e-r8         redis_slowlog_last_id{job=valkey,cluster=r8} = 0
+    e-short      redis_slowlog_last_id{job=valkey-short,cluster=vk} = 3
+    e-vk1        redis_slowlog_last_id{job=valkey,cluster=vk} = 3
+    e-vk2        redis_slowlog_last_id{job=valkey,cluster=vk} = 0
+    multi-vk1    redis_slowlog_last_id{job=valkey-multi,cluster=vk} = 3
+    multi-vk2    redis_slowlog_last_id{job=valkey-multi,cluster=vk} = 0
+  > redis_last_slow_execution_duration_seconds
+    e-bad        redis_last_slow_execution_duration_seconds{job=valkey-bad,cluster=kg} = 0
+    e-kg         redis_last_slow_execution_duration_seconds{job=valkey,cluster=kg} = 0
+    e-r72        redis_last_slow_execution_duration_seconds{job=valkey,cluster=r72} = 0.300069
+    e-r8         redis_last_slow_execution_duration_seconds{job=valkey,cluster=r8} = 0
+    e-short      redis_last_slow_execution_duration_seconds{job=valkey-short,cluster=vk} = 0.300038
+    e-vk1        redis_last_slow_execution_duration_seconds{job=valkey,cluster=vk} = 0.300038
+    e-vk2        redis_last_slow_execution_duration_seconds{job=valkey,cluster=vk} = 0
+    multi-vk1    redis_last_slow_execution_duration_seconds{job=valkey-multi,cluster=vk} = 0.300038
+    multi-vk2    redis_last_slow_execution_duration_seconds{job=valkey-multi,cluster=vk} = 0
+  > redis_latency_spike_duration_seconds
+    e-r72        redis_latency_spike_duration_seconds{job=valkey,event_name=command,cluster=r72} = 0.3
+    e-short      redis_latency_spike_duration_seconds{job=valkey-short,event_name=command,cluster=vk} = 0.3
+    e-vk1        redis_latency_spike_duration_seconds{job=valkey,event_name=command,cluster=vk} = 0.3
+    multi-vk1    redis_latency_spike_duration_seconds{job=valkey-multi,event_name=command,cluster=vk} = 0.3
+  > redis_latency_spike_last
+    e-r72        redis_latency_spike_last{job=valkey,event_name=command,cluster=r72} = 1794237473
+    e-short      redis_latency_spike_last{job=valkey-short,event_name=command,cluster=vk} = 1794237472
+    e-vk1        redis_latency_spike_last{job=valkey,event_name=command,cluster=vk} = 1794237472
+    multi-vk1    redis_latency_spike_last{job=valkey-multi,event_name=command,cluster=vk} = 1794237472
+  > redis_commandlog_slow_length
+    e-bad        redis_commandlog_slow_length{job=valkey-bad,cluster=kg} = 0
+    e-kg         redis_commandlog_slow_length{job=valkey,cluster=kg} = 0
+    e-short      redis_commandlog_slow_length{job=valkey-short,cluster=vk} = 4
+    e-vk1        redis_commandlog_slow_length{job=valkey,cluster=vk} = 4
+    e-vk2        redis_commandlog_slow_length{job=valkey,cluster=vk} = 0
+    multi-vk1    redis_commandlog_slow_length{job=valkey-multi,cluster=vk} = 4
+    multi-vk2    redis_commandlog_slow_length{job=valkey-multi,cluster=vk} = 0
+  > redis_commands_latencies_usec_count{cmd="debug"}
+    e-r72        redis_commands_latencies_usec_count{job=valkey,cmd=debug,cluster=r72} = 4
+    e-short      redis_commands_latencies_usec_count{job=valkey-short,cmd=debug,cluster=vk} = 4
+    e-vk1        redis_commands_latencies_usec_count{job=valkey,cmd=debug,cluster=vk} = 4
+    multi-vk1    redis_commands_latencies_usec_count{job=valkey-multi,cmd=debug,cluster=vk} = 4
+  $ [vk1] LATENCY LATEST
+    command
+    1794237472
+    300
+    300
+    300
+    1
+  $ [r72] LATENCY LATEST
+    command
+    1794237473
+    300
+    300
+  $ [vk1] SLOWLOG GET 1
+    3
+    1794237472
+    300038
+    DEBUG
+    SLEEP
+    0.3
+    127.0.0.1:54108
+    
+
+## C blocked client（vk1 上 BLPOP 25 秒）（23:18:05）
+  > redis_blocked_clients{instance="e-vk1"}
+    e-vk1        redis_blocked_clients{job=valkey,cluster=vk} = 1
+  > redis_total_blocking_keys{instance="e-vk1"}
+    e-vk1        redis_total_blocking_keys{job=valkey,cluster=vk} = 1
+  $ [vk1] INFO clients | blocked|connected_clients
+    connected_clients:8
+    blocked_clients:1
+
+## D maxmemory：noeviction → volatile-lru（沒有 TTL）→ allkeys-lru（23:18:30）
+  used_memory=17549176，設 maxmemory=15452024（比用量少 2MB）
+  $ [vk1] SET d:1 v
+    OOM command not allowed when used memory > 'maxmemory'.
+    
+  $ [vk1] INCR d:counter
+    OOM command not allowed when used memory > 'maxmemory'.
+    
+  $ [vk1] GET fill:1
+    value:1                                                         
+  -- noeviction
+  > redis_memory_used_bytes{instance="e-vk1"}
+    e-vk1        redis_memory_used_bytes{job=valkey,cluster=vk} = 17600616
+  > redis_memory_max_bytes{instance="e-vk1"}
+    e-vk1        redis_memory_max_bytes{job=valkey,cluster=vk} = 15452024
+  > redis_errors_total{instance="e-vk1"}
+    e-vk1        redis_errors_total{job=valkey,err=OOM,cluster=vk} = 2
+  > redis_commands_rejected_calls_total{instance="e-vk1"}
+    e-vk1        redis_commands_rejected_calls_total{job=valkey,cmd=blpop,cluster=vk} = 0
+    e-vk1        redis_commands_rejected_calls_total{job=valkey,cmd=client|setname,cluster=vk} = 0
+    e-vk1        redis_commands_rejected_calls_total{job=valkey,cmd=commandlog|len,cluster=vk} = 0
+    e-vk1        redis_commands_rejected_calls_total{job=valkey,cmd=command|info,cluster=vk} = 0
+    e-vk1        redis_commands_rejected_calls_total{job=valkey,cmd=config|get,cluster=vk} = 0
+    e-vk1        redis_commands_rejected_calls_total{job=valkey,cmd=config|set,cluster=vk} = 0
+    e-vk1        redis_commands_rejected_calls_total{job=valkey,cmd=debug,cluster=vk} = 0
+    e-vk1        redis_commands_rejected_calls_total{job=valkey,cmd=eval_ro,cluster=vk} = 0
+    e-vk1        redis_commands_rejected_calls_total{job=valkey,cmd=get,cluster=vk} = 0
+    e-vk1        redis_commands_rejected_calls_total{job=valkey,cmd=incr,cluster=vk} = 1
+    e-vk1        redis_commands_rejected_calls_total{job=valkey,cmd=info,cluster=vk} = 0
+    e-vk1        redis_commands_rejected_calls_total{job=valkey,cmd=latency|histogram,cluster=vk} = 0
+    e-vk1        redis_commands_rejected_calls_total{job=valkey,cmd=latency|latest,cluster=vk} = 0
+    e-vk1        redis_commands_rejected_calls_total{job=valkey,cmd=ping,cluster=vk} = 0
+    e-vk1        redis_commands_rejected_calls_total{job=valkey,cmd=psync,cluster=vk} = 0
+    e-vk1        redis_commands_rejected_calls_total{job=valkey,cmd=publish,cluster=vk} = 0
+    e-vk1        redis_commands_rejected_calls_total{job=valkey,cmd=replconf,cluster=vk} = 0
+    e-vk1        redis_commands_rejected_calls_total{job=valkey,cmd=set,cluster=vk} = 1
+    e-vk1        redis_commands_rejected_calls_total{job=valkey,cmd=slowlog|get,cluster=vk} = 0
+    e-vk1        redis_commands_rejected_calls_total{job=valkey,cmd=slowlog|len,cluster=vk} = 0
+    e-vk1        redis_commands_rejected_calls_total{job=valkey,cmd=subscribe,cluster=vk} = 0
+  > redis_evicted_keys_total{instance="e-vk1"}
+    e-vk1        redis_evicted_keys_total{job=valkey,cluster=vk} = 0
+  > redis_up{instance="e-vk1"}
+    e-vk1        redis_up{job=valkey,cluster=vk} = 1
+  > redis_script_result{instance="e-vk1"}
+    e-vk1        redis_script_result{job=valkey,filename=/q/valkey-extra.lua,cluster=vk} = 1
+  > redis_instance_info{instance="e-vk1"}
+    e-vk1        redis_instance_info{job=valkey,role=master,redis_version=7.2.4,valkey_version=9.1.3,maxmemory_policy=noeviction,cluster=vk} = 1
+  $ [vk1] SET d:2 v
+    OOM command not allowed when used memory > 'maxmemory'.
+    
+  -- volatile-lru，沒有任何 key 有 TTL
+  > redis_errors_total{instance="e-vk1",err="OOM"}
+    e-vk1        redis_errors_total{job=valkey,err=OOM,cluster=vk} = 3
+  > redis_evicted_keys_total{instance="e-vk1"}
+    e-vk1        redis_evicted_keys_total{job=valkey,cluster=vk} = 0
+  > redis_db_keys_expiring{instance="e-vk1"}
+    e-vk1        redis_db_keys_expiring{job=valkey,db=db0,cluster=vk} = 0
+    e-vk1        redis_db_keys_expiring{job=valkey,db=db1,cluster=vk} = 0
+    e-vk1        redis_db_keys_expiring{job=valkey,db=db10,cluster=vk} = 0
+    e-vk1        redis_db_keys_expiring{job=valkey,db=db11,cluster=vk} = 0
+    e-vk1        redis_db_keys_expiring{job=valkey,db=db12,cluster=vk} = 0
+    e-vk1        redis_db_keys_expiring{job=valkey,db=db13,cluster=vk} = 0
+    e-vk1        redis_db_keys_expiring{job=valkey,db=db14,cluster=vk} = 0
+    e-vk1        redis_db_keys_expiring{job=valkey,db=db15,cluster=vk} = 0
+    e-vk1        redis_db_keys_expiring{job=valkey,db=db2,cluster=vk} = 0
+    e-vk1        redis_db_keys_expiring{job=valkey,db=db3,cluster=vk} = 0
+    e-vk1        redis_db_keys_expiring{job=valkey,db=db4,cluster=vk} = 0
+    e-vk1        redis_db_keys_expiring{job=valkey,db=db5,cluster=vk} = 0
+    e-vk1        redis_db_keys_expiring{job=valkey,db=db6,cluster=vk} = 0
+    e-vk1        redis_db_keys_expiring{job=valkey,db=db7,cluster=vk} = 0
+    e-vk1        redis_db_keys_expiring{job=valkey,db=db8,cluster=vk} = 0
+    e-vk1        redis_db_keys_expiring{job=valkey,db=db9,cluster=vk} = 0
+  $ [vk1] SET d:3 v
+    OK
+  -- allkeys-lru
+  > redis_errors_total{instance="e-vk1",err="OOM"}
+    e-vk1        redis_errors_total{job=valkey,err=OOM,cluster=vk} = 3
+  > redis_evicted_keys_total
+    e-bad        redis_evicted_keys_total{job=valkey-bad,cluster=kg} = 0
+    e-kg         redis_evicted_keys_total{job=valkey,cluster=kg} = 0
+    e-r72        redis_evicted_keys_total{job=valkey,cluster=r72} = 0
+    e-r8         redis_evicted_keys_total{job=valkey,cluster=r8} = 0
+    e-s1         redis_evicted_keys_total{job=sentinel,cluster=vk} = 0
+    e-short      redis_evicted_keys_total{job=valkey-short,cluster=vk} = 32487
+    e-vk1        redis_evicted_keys_total{job=valkey,cluster=vk} = 32487
+    e-vk2        redis_evicted_keys_total{job=valkey,cluster=vk} = 0
+    multi-vk1    redis_evicted_keys_total{job=valkey-multi,cluster=vk} = 32487
+    multi-vk2    redis_evicted_keys_total{job=valkey-multi,cluster=vk} = 0
+  > redis_memory_used_bytes{cluster="vk"}
+    e-short      redis_memory_used_bytes{job=valkey-short,cluster=vk} = 15464472
+    e-vk1        redis_memory_used_bytes{job=valkey,cluster=vk} = 15464472
+    e-vk2        redis_memory_used_bytes{job=valkey,cluster=vk} = 2466456
+    multi-vk1    redis_memory_used_bytes{job=valkey-multi,cluster=vk} = 15488048
+    multi-vk2    redis_memory_used_bytes{job=valkey-multi,cluster=vk} = 2466456
+  > redis_db_keys{cluster="vk"}
+    e-s1         redis_db_keys{job=sentinel,db=db0,cluster=vk} = 0
+    e-short      redis_db_keys{job=valkey-short,db=db0,cluster=vk} = 117534
+    e-vk1        redis_db_keys{job=valkey,db=db0,cluster=vk} = 117534
+    e-vk2        redis_db_keys{job=valkey,db=db0,cluster=vk} = 21
+    multi-vk1    redis_db_keys{job=valkey-multi,db=db0,cluster=vk} = 117534
+    multi-vk2    redis_db_keys{job=valkey-multi,db=db0,cluster=vk} = 21
+    e-s1         redis_db_keys{job=sentinel,db=db1,cluster=vk} = 0
+    e-short      redis_db_keys{job=valkey-short,db=db1,cluster=vk} = 0
+    e-vk1        redis_db_keys{job=valkey,db=db1,cluster=vk} = 0
+    e-vk2        redis_db_keys{job=valkey,db=db1,cluster=vk} = 0
+    multi-vk1    redis_db_keys{job=valkey-multi,db=db1,cluster=vk} = 0
+    multi-vk2    redis_db_keys{job=valkey-multi,db=db1,cluster=vk} = 0
+    e-s1         redis_db_keys{job=sentinel,db=db10,cluster=vk} = 0
+    e-short      redis_db_keys{job=valkey-short,db=db10,cluster=vk} = 0
+    e-vk1        redis_db_keys{job=valkey,db=db10,cluster=vk} = 0
+    e-vk2        redis_db_keys{job=valkey,db=db10,cluster=vk} = 0
+    multi-vk1    redis_db_keys{job=valkey-multi,db=db10,cluster=vk} = 0
+    multi-vk2    redis_db_keys{job=valkey-multi,db=db10,cluster=vk} = 0
+    e-s1         redis_db_keys{job=sentinel,db=db11,cluster=vk} = 0
+    e-short      redis_db_keys{job=valkey-short,db=db11,cluster=vk} = 0
+    e-vk1        redis_db_keys{job=valkey,db=db11,cluster=vk} = 0
+    e-vk2        redis_db_keys{job=valkey,db=db11,cluster=vk} = 0
+    multi-vk1    redis_db_keys{job=valkey-multi,db=db11,cluster=vk} = 0
+    multi-vk2    redis_db_keys{job=valkey-multi,db=db11,cluster=vk} = 0
+    e-s1         redis_db_keys{job=sentinel,db=db12,cluster=vk} = 0
+    e-short      redis_db_keys{job=valkey-short,db=db12,cluster=vk} = 0
+    e-vk1        redis_db_keys{job=valkey,db=db12,cluster=vk} = 0
+    e-vk2        redis_db_keys{job=valkey,db=db12,cluster=vk} = 0
+    multi-vk1    redis_db_keys{job=valkey-multi,db=db12,cluster=vk} = 0
+    multi-vk2    redis_db_keys{job=valkey-multi,db=db12,cluster=vk} = 0
+    e-s1         redis_db_keys{job=sentinel,db=db13,cluster=vk} = 0
+    e-short      redis_db_keys{job=valkey-short,db=db13,cluster=vk} = 0
+    e-vk1        redis_db_keys{job=valkey,db=db13,cluster=vk} = 0
+    e-vk2        redis_db_keys{job=valkey,db=db13,cluster=vk} = 0
+    multi-vk1    redis_db_keys{job=valkey-multi,db=db13,cluster=vk} = 0
+    multi-vk2    redis_db_keys{job=valkey-multi,db=db13,cluster=vk} = 0
+    e-s1         redis_db_keys{job=sentinel,db=db14,cluster=vk} = 0
+    e-short      redis_db_keys{job=valkey-short,db=db14,cluster=vk} = 0
+    e-vk1        redis_db_keys{job=valkey,db=db14,cluster=vk} = 0
+    e-vk2        redis_db_keys{job=valkey,db=db14,cluster=vk} = 0
+    multi-vk1    redis_db_keys{job=valkey-multi,db=db14,cluster=vk} = 0
+    multi-vk2    redis_db_keys{job=valkey-multi,db=db14,cluster=vk} = 0
+    e-s1         redis_db_keys{job=sentinel,db=db15,cluster=vk} = 0
+    e-short      redis_db_keys{job=valkey-short,db=db15,cluster=vk} = 0
+    e-vk1        redis_db_keys{job=valkey,db=db15,cluster=vk} = 0
+    e-vk2        redis_db_keys{job=valkey,db=db15,cluster=vk} = 0
+    multi-vk1    redis_db_keys{job=valkey-multi,db=db15,cluster=vk} = 0
+    multi-vk2    redis_db_keys{job=valkey-multi,db=db15,cluster=vk} = 0
+    e-s1         redis_db_keys{job=sentinel,db=db2,cluster=vk} = 0
+    e-short      redis_db_keys{job=valkey-short,db=db2,cluster=vk} = 0
+    e-vk1        redis_db_keys{job=valkey,db=db2,cluster=vk} = 0
+    e-vk2        redis_db_keys{job=valkey,db=db2,cluster=vk} = 0
+    multi-vk1    redis_db_keys{job=valkey-multi,db=db2,cluster=vk} = 0
+    multi-vk2    redis_db_keys{job=valkey-multi,db=db2,cluster=vk} = 0
+    e-s1         redis_db_keys{job=sentinel,db=db3,cluster=vk} = 0
+    e-short      redis_db_keys{job=valkey-short,db=db3,cluster=vk} = 0
+    e-vk1        redis_db_keys{job=valkey,db=db3,cluster=vk} = 0
+    e-vk2        redis_db_keys{job=valkey,db=db3,cluster=vk} = 0
+    multi-vk1    redis_db_keys{job=valkey-multi,db=db3,cluster=vk} = 0
+    multi-vk2    redis_db_keys{job=valkey-multi,db=db3,cluster=vk} = 0
+    e-s1         redis_db_keys{job=sentinel,db=db4,cluster=vk} = 0
+    e-short      redis_db_keys{job=valkey-short,db=db4,cluster=vk} = 0
+    e-vk1        redis_db_keys{job=valkey,db=db4,cluster=vk} = 0
+    e-vk2        redis_db_keys{job=valkey,db=db4,cluster=vk} = 0
+    multi-vk1    redis_db_keys{job=valkey-multi,db=db4,cluster=vk} = 0
+    multi-vk2    redis_db_keys{job=valkey-multi,db=db4,cluster=vk} = 0
+    e-s1         redis_db_keys{job=sentinel,db=db5,cluster=vk} = 0
+    e-short      redis_db_keys{job=valkey-short,db=db5,cluster=vk} = 0
+    e-vk1        redis_db_keys{job=valkey,db=db5,cluster=vk} = 0
+    e-vk2        redis_db_keys{job=valkey,db=db5,cluster=vk} = 0
+    multi-vk1    redis_db_keys{job=valkey-multi,db=db5,cluster=vk} = 0
+    multi-vk2    redis_db_keys{job=valkey-multi,db=db5,cluster=vk} = 0
+    e-s1         redis_db_keys{job=sentinel,db=db6,cluster=vk} = 0
+    e-short      redis_db_keys{job=valkey-short,db=db6,cluster=vk} = 0
+    e-vk1        redis_db_keys{job=valkey,db=db6,cluster=vk} = 0
+    e-vk2        redis_db_keys{job=valkey,db=db6,cluster=vk} = 0
+    multi-vk1    redis_db_keys{job=valkey-multi,db=db6,cluster=vk} = 0
+    multi-vk2    redis_db_keys{job=valkey-multi,db=db6,cluster=vk} = 0
+    e-s1         redis_db_keys{job=sentinel,db=db7,cluster=vk} = 0
+    e-short      redis_db_keys{job=valkey-short,db=db7,cluster=vk} = 0
+    e-vk1        redis_db_keys{job=valkey,db=db7,cluster=vk} = 0
+    e-vk2        redis_db_keys{job=valkey,db=db7,cluster=vk} = 0
+    multi-vk1    redis_db_keys{job=valkey-multi,db=db7,cluster=vk} = 0
+    multi-vk2    redis_db_keys{job=valkey-multi,db=db7,cluster=vk} = 0
+    e-s1         redis_db_keys{job=sentinel,db=db8,cluster=vk} = 0
+    e-short      redis_db_keys{job=valkey-short,db=db8,cluster=vk} = 0
+    e-vk1        redis_db_keys{job=valkey,db=db8,cluster=vk} = 0
+    e-vk2        redis_db_keys{job=valkey,db=db8,cluster=vk} = 0
+    multi-vk1    redis_db_keys{job=valkey-multi,db=db8,cluster=vk} = 0
+    multi-vk2    redis_db_keys{job=valkey-multi,db=db8,cluster=vk} = 0
+    e-s1         redis_db_keys{job=sentinel,db=db9,cluster=vk} = 0
+    e-short      redis_db_keys{job=valkey-short,db=db9,cluster=vk} = 0
+    e-vk1        redis_db_keys{job=valkey,db=db9,cluster=vk} = 0
+    e-vk2        redis_db_keys{job=valkey,db=db9,cluster=vk} = 0
+    multi-vk1    redis_db_keys{job=valkey-multi,db=db9,cluster=vk} = 0
+    multi-vk2    redis_db_keys{job=valkey-multi,db=db9,cluster=vk} = 0
+  > redis_eviction_exceeded_time_ms_total{instance="e-vk1"}
+    e-vk1        redis_eviction_exceeded_time_ms_total{job=valkey,cluster=vk} = 20322
+  $ [vk2] INFO memory | ^(used_memory|maxmemory):
+    used_memory:2464424
+    maxmemory:0
+
+## E exporter 逾時與影響範圍（vk1 DEBUG SLEEP 7；Sentinel down-after 10s，不會 failover）（23:19:10）
+  curl e-short /metrics：2.2 秒（主機牆鐘），redis_exporter_last_scrape_error{err="set tcp 172.19.0.3:41622: use of closed network connection"} 1 redis_up 0 
+  curl e-vk1 /metrics：9.5 秒（主機牆鐘），redis_exporter_last_scrape_error{err=""} 0 redis_up 1 
+  > min_over_time(up{cluster="vk"}[20s])
+    e-s1         {job=sentinel,cluster=vk} = 1
+    e-short      {job=valkey-short,cluster=vk} = 1
+    e-vk1        {job=valkey,cluster=vk} = 0
+    e-vk2        {job=valkey,cluster=vk} = 1
+    multi-vk1    {job=valkey-multi,cluster=vk} = 0
+    multi-vk2    {job=valkey-multi,cluster=vk} = 1
+  > min_over_time(redis_up{cluster="vk"}[20s])
+    e-s1         {job=sentinel,cluster=vk} = 1
+    e-short      {job=valkey-short,cluster=vk} = 0
+    e-vk1        {job=valkey,cluster=vk} = 1
+    e-vk2        {job=valkey,cluster=vk} = 1
+    multi-vk1    {job=valkey-multi,cluster=vk} = 1
+    multi-vk2    {job=valkey-multi,cluster=vk} = 1
+  > max_over_time(scrape_duration_seconds{cluster="vk"}[20s])
+    e-s1         {job=sentinel,cluster=vk} = 0.005240472
+    e-short      {job=valkey-short,cluster=vk} = 2.003545783
+    e-vk1        {job=valkey,cluster=vk} = 4.001367218
+    e-vk2        {job=valkey,cluster=vk} = 0.010154231
+    multi-vk1    {job=valkey-multi,cluster=vk} = 4.000721992
+    multi-vk2    {job=valkey-multi,cluster=vk} = 0.011791687
+  > min_over_time(up{job="valkey-exporter"}[20s])
+    e-multi      {job=valkey-exporter} = 1
+  > max_over_time(redis_exporter_last_scrape_connect_time_seconds{instance="e-short"}[20s])
+    e-short      {job=valkey-short,cluster=vk} = 0.001043827
+
+## F 連線額滿（maxclients 40，從主機開 45 條連線 15 秒）（23:19:27）
+  > up{instance="e-vk1"}
+    e-vk1        up{job=valkey,cluster=vk} = 1
+  > redis_up{cluster="vk"}
+    e-s1         redis_up{job=sentinel,cluster=vk} = 1
+    e-short      redis_up{job=valkey-short,cluster=vk} = 0
+    e-vk1        redis_up{job=valkey,cluster=vk} = 0
+    e-vk2        redis_up{job=valkey,cluster=vk} = 1
+    multi-vk1    redis_up{job=valkey-multi,cluster=vk} = 0
+    multi-vk2    redis_up{job=valkey-multi,cluster=vk} = 1
+  > redis_connected_clients{instance="e-vk1"}
+    (空)
+  > redis_rejected_connections_total{instance="e-vk1"}
+    (空)
+  > redis_exporter_last_scrape_error{instance=~"e-vk1|e-short"}
+    e-vk1        redis_exporter_last_scrape_error{job=valkey,err=set tcp 172.19.0.2:38582: use of closed network connection,cluster=vk} = 1
+    e-short      redis_exporter_last_scrape_error{job=valkey-short,err=set tcp 172.19.0.3:51198: use of closed network connection,cluster=vk} = 1
+  > redis_sentinel_master_status
+    e-s1         redis_sentinel_master_status{job=sentinel,master_name=mymaster,master_status=ok,cluster=vk} = 1
+  > redis_up{instance="e-vk1"}
+    e-vk1        redis_up{job=valkey,cluster=vk} = 1
+  > redis_rejected_connections_total{instance="e-vk1"}
+    e-vk1        redis_rejected_connections_total{job=valkey,cluster=vk} = 21
+
+## G 複本斷線與 full resync（vk2 從 default 網路拔掉 25 秒，期間 vk1 寫 3MB；repl-backlog-size 1mb、repl-timeout 5）（23:19:48）
+  $ [vk1] INFO stats | ^sync_(full|partial)
+    sync_full:1
+    sync_partial_ok:1
+    sync_partial_err:0
+  -- 斷線中
+  > redis_master_link_up
+    e-vk2        redis_master_link_up{job=valkey,master_host=vk1,master_port=6379,cluster=vk} = 0
+    multi-vk2    redis_master_link_up{job=valkey-multi,master_host=vk1,master_port=6379,cluster=vk} = 0
+  > redis_master_last_io_seconds_ago
+    e-vk2        redis_master_last_io_seconds_ago{job=valkey,master_host=vk1,master_port=6379,cluster=vk} = -1
+    multi-vk2    redis_master_last_io_seconds_ago{job=valkey-multi,master_host=vk1,master_port=6379,cluster=vk} = -1
+  > redis_script_values{key="master_link_down_since_seconds"}
+    e-vk1        redis_script_values{job=valkey,filename=/q/valkey-extra.lua,key=master_link_down_since_seconds,cluster=vk} = 0
+    e-vk2        redis_script_values{job=valkey,filename=/q/valkey-extra.lua,key=master_link_down_since_seconds,cluster=vk} = 14
+  > redis_connected_slaves{instance="e-vk1"}
+    e-vk1        redis_connected_slaves{job=valkey,cluster=vk} = 0
+  > redis_connected_slave_lag_seconds
+    (空)
+  > redis_connected_slave_offset_bytes
+    (空)
+  > redis_master_repl_offset{cluster="vk"}
+    e-short      redis_master_repl_offset{job=valkey-short,cluster=vk} = 4227191
+    e-vk1        redis_master_repl_offset{job=valkey,cluster=vk} = 4227578
+    e-vk2        redis_master_repl_offset{job=valkey,cluster=vk} = 1123560
+    multi-vk1    redis_master_repl_offset{job=valkey-multi,cluster=vk} = 4227578
+    multi-vk2    redis_master_repl_offset{job=valkey-multi,cluster=vk} = 1123560
+  > redis_slave_repl_offset
+    e-vk2        redis_slave_repl_offset{job=valkey,master_host=vk1,master_port=6379,cluster=vk} = 1123560
+    multi-vk2    redis_slave_repl_offset{job=valkey-multi,master_host=vk1,master_port=6379,cluster=vk} = 1123560
+  > up{instance=~"e-vk2|multi-vk2"}
+    e-vk2        up{job=valkey,cluster=vk} = 1
+    multi-vk2    up{job=valkey-multi,cluster=vk} = 1
+  > redis_sentinel_master_ok_slaves
+    e-s1         redis_sentinel_master_ok_slaves{job=sentinel,master_name=mymaster,cluster=vk} = 1
+  $ [vk2] INFO replication | ^(master_link|master_last_io|master_sync)
+    master_link_status:down
+    master_last_io_seconds_ago:-1
+    master_sync_in_progress:0
+    master_link_down_since_seconds:18
+  -- 接回 15 秒後
+  > redis_master_link_up
+    e-vk2        redis_master_link_up{job=valkey,master_host=vk1,master_port=6379,cluster=vk} = 1
+    multi-vk2    redis_master_link_up{job=valkey-multi,master_host=vk1,master_port=6379,cluster=vk} = 1
+  > redis_connected_slaves{instance="e-vk1"}
+    e-vk1        redis_connected_slaves{job=valkey,cluster=vk} = 1
+  > increase(redis_replica_resyncs_full{instance="e-vk1"}[1m])
+    e-vk1        {job=valkey,cluster=vk} = 1.0559232880011697
+  > redis_replica_resyncs_full{instance="e-vk1"}
+    e-vk1        redis_replica_resyncs_full{job=valkey,cluster=vk} = 2
+  > redis_replica_partial_resync_denied{instance="e-vk1"}
+    e-vk1        redis_replica_partial_resync_denied{job=valkey,cluster=vk} = 1
+  > redis_replica_partial_resync_accepted{instance="e-vk1"}
+    e-vk1        redis_replica_partial_resync_accepted{job=valkey,cluster=vk} = 1
+  > redis_master_repl_offset{instance="e-vk1"} - on(cluster) group_right redis_slave_repl_offset
+    e-vk2        {job=valkey,master_host=vk1,master_port=6379,cluster=vk} = 774
+    multi-vk2    {job=valkey-multi,master_host=vk1,master_port=6379,cluster=vk} = 0
+  $ [vk1] INFO stats | ^sync_(full|partial)
+    sync_full:2
+    sync_partial_ok:1
+    sync_partial_err:1
+  vk1 log：
+    vk1-1  | 7:M 09 Nov 2026 15:19:53.190 * Connection with replica 172.19.0.15:6379 lost.
+    vk1-1  | 7:M 09 Nov 2026 15:20:18.975 * Unable to partial resync with replica 172.19.0.15:6379 for lack of backlog (Replica request was bce46a2c5d7bb02a142a8341075ea02090d1c66c:1123561, and I can only reply with the range [3168201, 4229514]).
+  vk2 log：
+    vk2-1  | 7:S 09 Nov 2026 15:19:53.819 # PRIMARY timeout: no data nor PING received...
+    vk2-1  | 7:S 09 Nov 2026 15:19:53.819 * Connection with primary lost.
+    vk2-1  | 7:S 09 Nov 2026 15:20:18.975 * Trying a partial resynchronization (request bce46a2c5d7bb02a142a8341075ea02090d1c66c:1123561).
+    vk2-1  | 7:S 09 Nov 2026 15:20:26.647 * Full resync from primary: bce46a2c5d7bb02a142a8341075ea02090d1c66c:4230688
+
+## H BGSAVE 失敗（vk1 的 /data 改成 555；stop-writes-on-bgsave-error 預設 yes）（23:20:37）
+  $ [vk1] BGSAVE
+    Background saving started
+  $ [vk1] INFO persistence | ^rdb_(last_bgsave_status|last_save_time|bgsave_in_progress|saves)
+    rdb_bgsave_in_progress:0
+    rdb_last_save_time:1794237637
+    rdb_last_bgsave_status:err
+    rdb_saves:1
+  $ [vk1] SET h:1 v
+    MISCONF Valkey is configured to save RDB snapshots, but it's currently unable to persist to disk. Commands that may modify the data set are disabled, because this instance is configured to report errors during writes if RDB snapshotting fails (stop-writes-on-bgsave-error option). Please check the Valkey logs for details about the RDB error.
+    
+  $ [vk1] PING
+    MISCONF Valkey is configured to save RDB snapshots, but it's currently unable to persist to disk. Commands that may modify the data set are disabled, because this instance is configured to report errors during writes if RDB snapshotting fails (stop-writes-on-bgsave-error option). Please check the Valkey logs for details about the RDB error.
+    
+  > redis_rdb_last_bgsave_status{instance="e-vk1"}
+    e-vk1        redis_rdb_last_bgsave_status{job=valkey,cluster=vk} = 0
+  > redis_rdb_last_save_timestamp_seconds{instance="e-vk1"}
+    e-vk1        redis_rdb_last_save_timestamp_seconds{job=valkey,cluster=vk} = 1794237637
+  > redis_errors_total{instance="e-vk1"}
+    e-vk1        redis_errors_total{job=valkey,err=MISCONF,cluster=vk} = 29
+    e-vk1        redis_errors_total{job=valkey,err=OOM,cluster=vk} = 3
+  > redis_up{instance="e-vk1"}
+    e-vk1        redis_up{job=valkey,cluster=vk} = 1
+  > redis_script_result{instance="e-vk1"}
+    e-vk1        redis_script_result{job=valkey,filename=/q/valkey-extra.lua,cluster=vk} = 1
+  Sentinel 怎麼看這台（PING 被回 MISCONF；down-after 10s），每 5 秒看一次：
+    +5s master=vk1 master0:name=mymaster,status=ok,address=vk1:6379,slaves=1,sentinels=3
+    +10s master=vk1 master0:name=mymaster,status=ok,address=vk1:6379,slaves=1,sentinels=3
+    +15s master=vk1 master0:name=mymaster,status=ok,address=vk1:6379,slaves=1,sentinels=3
+    +20s master=vk1 master0:name=mymaster,status=ok,address=vk1:6379,slaves=1,sentinels=3
+    +25s master=vk1 master0:name=mymaster,status=ok,address=vk1:6379,slaves=1,sentinels=3
+    +30s master=vk1 master0:name=mymaster,status=ok,address=vk1:6379,slaves=1,sentinels=3
+  > redis_sentinel_master_status
+    e-s1         redis_sentinel_master_status{job=sentinel,master_name=mymaster,master_status=ok,cluster=vk} = 1
+  > redis_instance_info{cluster="vk"}
+    e-s1         redis_instance_info{job=sentinel,redis_version=7.2.4,valkey_version=9.1.3,cluster=vk} = 1
+    e-short      redis_instance_info{job=valkey-short,role=master,redis_version=7.2.4,valkey_version=9.1.3,maxmemory_policy=noeviction,cluster=vk} = 1
+    e-vk1        redis_instance_info{job=valkey,role=master,redis_version=7.2.4,valkey_version=9.1.3,maxmemory_policy=noeviction,cluster=vk} = 1
+    e-vk2        redis_instance_info{job=valkey,role=slave,redis_version=7.2.4,valkey_version=9.1.3,maxmemory_policy=noeviction,cluster=vk} = 1
+    multi-vk1    redis_instance_info{job=valkey-multi,role=master,redis_version=7.2.4,valkey_version=9.1.3,maxmemory_policy=noeviction,cluster=vk} = 1
+    multi-vk2    redis_instance_info{job=valkey-multi,role=slave,redis_version=7.2.4,valkey_version=9.1.3,maxmemory_policy=noeviction,cluster=vk} = 1
+  $ [vk1] BGSAVE
+    Background saving started
+  $ [vk1] INFO persistence | ^rdb_last_bgsave_status
+    rdb_last_bgsave_status:ok
+  > redis_rdb_last_bgsave_status{instance="e-vk1"}
+    e-vk1        redis_rdb_last_bgsave_status{job=valkey,cluster=vk} = 1
+  > redis_latest_fork_seconds{cluster="vk"}
+    e-s1         redis_latest_fork_seconds{job=sentinel,cluster=vk} = 0
+    e-short      redis_latest_fork_seconds{job=valkey-short,cluster=vk} = 0.000445
+    e-vk1        redis_latest_fork_seconds{job=valkey,cluster=vk} = 0.000445
+    e-vk2        redis_latest_fork_seconds{job=valkey,cluster=vk} = 0
+    multi-vk1    redis_latest_fork_seconds{job=valkey-multi,cluster=vk} = 0.000445
+    multi-vk2    redis_latest_fork_seconds{job=valkey-multi,cluster=vk} = 0
+  > redis_rdb_last_cow_size_bytes{cluster="vk"}
+    e-short      redis_rdb_last_cow_size_bytes{job=valkey-short,cluster=vk} = 413696
+    e-vk1        redis_rdb_last_cow_size_bytes{job=valkey,cluster=vk} = 413696
+    e-vk2        redis_rdb_last_cow_size_bytes{job=valkey,cluster=vk} = 0
+    multi-vk1    redis_rdb_last_cow_size_bytes{job=valkey-multi,cluster=vk} = 413696
+    multi-vk2    redis_rdb_last_cow_size_bytes{job=valkey-multi,cluster=vk} = 0
+  > redis_script_values{key="total_forks"}
+    e-vk1        redis_script_values{job=valkey,filename=/q/valkey-extra.lua,key=total_forks,cluster=vk} = 4
+    e-vk2        redis_script_values{job=valkey,filename=/q/valkey-extra.lua,key=total_forks,cluster=vk} = 0
+
+## I Sentinel failover（docker pause 目前的主節點 25 秒）（23:21:40）
+  Sentinel 回報的主節點：vk1；自己回報 role:master 的服務：vk1
+  > redis_sentinel_master_config_epoch
+    e-s1         redis_sentinel_master_config_epoch{job=sentinel,master_name=mymaster,cluster=vk} = 0
+ Container at-vk-lab-vk1-1 Paused 
+    +5s sentinel 回報 master=vk1
+    +10s sentinel 回報 master=vk1
+    +15s sentinel 回報 master=vk1
+    +20s sentinel 回報 master=vk1
+    +25s sentinel 回報 master=vk1
+  > redis_instance_info{cluster="vk"}
+    e-s1         redis_instance_info{job=sentinel,redis_version=7.2.4,valkey_version=9.1.3,cluster=vk} = 1
+    e-vk2        redis_instance_info{job=valkey,role=slave,redis_version=7.2.4,valkey_version=9.1.3,maxmemory_policy=noeviction,cluster=vk} = 1
+    multi-vk2    redis_instance_info{job=valkey-multi,role=slave,redis_version=7.2.4,valkey_version=9.1.3,maxmemory_policy=noeviction,cluster=vk} = 1
+  > count by (cluster) (redis_instance_info{cluster="vk",role="master"})
+    (空)
+  > redis_sentinel_master_config_epoch
+    e-s1         redis_sentinel_master_config_epoch{job=sentinel,master_name=mymaster,cluster=vk} = 0
+  > redis_sentinel_master_status
+    e-s1         redis_sentinel_master_status{job=sentinel,master_name=mymaster,master_status=ok,cluster=vk} = 1
+  > up{cluster="vk"}
+    e-s1         up{job=sentinel,cluster=vk} = 1
+    e-short      up{job=valkey-short,cluster=vk} = 1
+    e-vk1        up{job=valkey,cluster=vk} = 0
+    e-vk2        up{job=valkey,cluster=vk} = 1
+    multi-vk1    up{job=valkey-multi,cluster=vk} = 0
+    multi-vk2    up{job=valkey-multi,cluster=vk} = 1
+ Container at-vk-lab-vk1-1 Unpaused 
+  恢復後每秒看舊主節點自己的 role：
+    +1s vk1 role:master 
+    +2s vk1 role:master 
+    +3s vk1 role:master 
+    +4s vk1 role:master 
+    +5s vk1 role:master 
+    +6s vk1 role:master 
+    +7s vk1 role:master 
+    +8s vk1 role:master 
+    +9s vk1 role:master 
+    +10s vk1 role:master 
+    +11s vk1 role:master 
+    +12s vk1 role:master 
+  > count by (cluster) (redis_instance_info{cluster="vk",role="master"})
+    -            {cluster=vk} = 3
+  > max_over_time(count by (cluster) (redis_instance_info{cluster="vk",role="master"})[1m:5s])
+    -            {cluster=vk} = 3
+  > changes(redis_sentinel_master_config_epoch[2m])
+    e-s1         {job=sentinel,master_name=mymaster,cluster=vk} = 0
+  > redis_master_link_up
+    e-vk2        redis_master_link_up{job=valkey,master_host=vk1,master_port=6379,cluster=vk} = 1
+    multi-vk2    redis_master_link_up{job=valkey-multi,master_host=vk1,master_port=6379,cluster=vk} = 1
+
+## J Sentinel quorum（停掉 s2、s3 25 秒）（23:22:32）
+  > redis_sentinel_master_ckquorum_status
+    e-s1         redis_sentinel_master_ckquorum_status{job=sentinel,master_name=mymaster,message=OK 3 usable Sentinels. Quorum and failover authorization can be reached,cluster=vk} = 1
+  > redis_sentinel_master_ok_sentinels
+    e-s1         redis_sentinel_master_ok_sentinels{job=sentinel,master_name=mymaster,cluster=vk} = 3
+  > redis_sentinel_master_sentinels
+    e-s1         redis_sentinel_master_sentinels{job=sentinel,master_name=mymaster,cluster=vk} = 3
+  > redis_sentinel_master_status
+    e-s1         redis_sentinel_master_status{job=sentinel,master_name=mymaster,master_status=ok,cluster=vk} = 1
+  $ [s1] SENTINEL CKQUORUM mymaster
+    OK 3 usable Sentinels. Quorum and failover authorization can be reached 
+
+## K -script 失敗的影響（e-bad：script 呼叫不存在的指令）（23:23:02）
+  > up{instance="e-bad"}
+    e-bad        up{job=valkey-bad,cluster=kg} = 1
+  > redis_up{instance="e-bad"}
+    e-bad        redis_up{job=valkey-bad,cluster=kg} = 0
+  > redis_exporter_last_scrape_error{instance="e-bad"}
+    e-bad        redis_exporter_last_scrape_error{job=valkey-bad,err=ERR Unknown command called from script script: on @user_script:2.,cluster=kg} = 1
+  > scrape_samples_scraped{instance=~"e-bad|e-kg"}
+    e-bad        scrape_samples_scraped{job=valkey-bad,cluster=kg} = 450
+    e-kg         scrape_samples_scraped{job=valkey,cluster=kg} = 466
+  > redis_db_keys{instance="e-bad"}
+    e-bad        redis_db_keys{job=valkey-bad,db=db0,cluster=kg} = 0
+    e-bad        redis_db_keys{job=valkey-bad,db=db1,cluster=kg} = 0
+    e-bad        redis_db_keys{job=valkey-bad,db=db10,cluster=kg} = 0
+    e-bad        redis_db_keys{job=valkey-bad,db=db11,cluster=kg} = 0
+    e-bad        redis_db_keys{job=valkey-bad,db=db12,cluster=kg} = 0
+    e-bad        redis_db_keys{job=valkey-bad,db=db13,cluster=kg} = 0
+    e-bad        redis_db_keys{job=valkey-bad,db=db14,cluster=kg} = 0
+    e-bad        redis_db_keys{job=valkey-bad,db=db15,cluster=kg} = 0
+    e-bad        redis_db_keys{job=valkey-bad,db=db2,cluster=kg} = 0
+    e-bad        redis_db_keys{job=valkey-bad,db=db3,cluster=kg} = 0
+    e-bad        redis_db_keys{job=valkey-bad,db=db4,cluster=kg} = 0
+    e-bad        redis_db_keys{job=valkey-bad,db=db5,cluster=kg} = 0
+    e-bad        redis_db_keys{job=valkey-bad,db=db6,cluster=kg} = 0
+    e-bad        redis_db_keys{job=valkey-bad,db=db7,cluster=kg} = 0
+    e-bad        redis_db_keys{job=valkey-bad,db=db8,cluster=kg} = 0
+    e-bad        redis_db_keys{job=valkey-bad,db=db9,cluster=kg} = 0
+
+## L key group 與 count-keys 的成本（kg：40 萬個 key；slowlog 門檻 1ms）（23:23:02）
+  > scrape_duration_seconds{instance="e-kg"}
+    e-kg         scrape_duration_seconds{job=valkey,cluster=kg} = 0.012486939
+  > redis_last_key_groups_scrape_duration_milliseconds
+    e-bad        redis_last_key_groups_scrape_duration_milliseconds{job=valkey-bad,cluster=kg} = 0
+    e-kg         redis_last_key_groups_scrape_duration_milliseconds{job=valkey,cluster=kg} = 4
+    e-r72        redis_last_key_groups_scrape_duration_milliseconds{job=valkey,cluster=r72} = 0
+    e-r8         redis_last_key_groups_scrape_duration_milliseconds{job=valkey,cluster=r8} = 0
+    e-s1         redis_last_key_groups_scrape_duration_milliseconds{job=sentinel,cluster=vk} = 0
+    e-short      redis_last_key_groups_scrape_duration_milliseconds{job=valkey-short,cluster=vk} = 0
+    e-vk1        redis_last_key_groups_scrape_duration_milliseconds{job=valkey,cluster=vk} = 0
+    e-vk2        redis_last_key_groups_scrape_duration_milliseconds{job=valkey,cluster=vk} = 0
+    multi-vk1    redis_last_key_groups_scrape_duration_milliseconds{job=valkey-multi,cluster=vk} = 0
+    multi-vk2    redis_last_key_groups_scrape_duration_milliseconds{job=valkey-multi,cluster=vk} = 0
+  > scrape_duration_seconds{instance="e-kg"}
+    e-kg         scrape_duration_seconds{job=valkey,cluster=kg} = 1.095466439
+  > redis_last_key_groups_scrape_duration_milliseconds
+    e-bad        redis_last_key_groups_scrape_duration_milliseconds{job=valkey-bad,cluster=kg} = 0
+    e-kg         redis_last_key_groups_scrape_duration_milliseconds{job=valkey,cluster=kg} = 928
+    e-r72        redis_last_key_groups_scrape_duration_milliseconds{job=valkey,cluster=r72} = 0
+    e-r8         redis_last_key_groups_scrape_duration_milliseconds{job=valkey,cluster=r8} = 0
+    e-s1         redis_last_key_groups_scrape_duration_milliseconds{job=sentinel,cluster=vk} = 0
+    e-short      redis_last_key_groups_scrape_duration_milliseconds{job=valkey-short,cluster=vk} = 0
+    e-vk1        redis_last_key_groups_scrape_duration_milliseconds{job=valkey,cluster=vk} = 0
+    e-vk2        redis_last_key_groups_scrape_duration_milliseconds{job=valkey,cluster=vk} = 0
+    multi-vk1    redis_last_key_groups_scrape_duration_milliseconds{job=valkey-multi,cluster=vk} = 0
+    multi-vk2    redis_last_key_groups_scrape_duration_milliseconds{job=valkey-multi,cluster=vk} = 0
+  > redis_key_group_count
+    e-kg         redis_key_group_count{job=valkey,db=db0,key_group=sess,cluster=kg} = 200000
+    e-kg         redis_key_group_count{job=valkey,db=db0,key_group=user,cluster=kg} = 200000
+  > redis_keys_count
+    e-kg         redis_keys_count{job=valkey,db=db0,key=user:*,cluster=kg} = 200000
+  > redis_slowlog_length{instance="e-kg"}
+    e-kg         redis_slowlog_length{job=valkey,cluster=kg} = 128
+  > scrape_duration_seconds{instance="e-bad"}
+    e-bad        scrape_duration_seconds{job=valkey-bad,cluster=kg} = 0.033878496
+  kg 的 slowlog（exporter 的 EVAL 與 SCAN）：
+    1597 1794237802 1703 EVALSHA 0 35327 1000 1596 1794237802 1865 EVALSHA 0 59263 1000 1595 1794237802 1963 EVALSHA 0 41599 1000 1594 1794237802 1954 EVALSHA 0 9663 1000 1593 1794237802 1999 EVALSHA 0 32
+    575 1000 1592 1794237802 2035 EVALSHA 0 43583 1000
+  kg commandstats：
+    cmdstat_evalsha:calls=2648,usec=3261209,usec_per_call=1231.57,rejected_calls=0,failed_calls=1
+    cmdstat_memory|usage:calls=1600000,usec=265432,usec_per_call=0.17,rejected_calls=0,failed_calls=0
+    cmdstat_eval:calls=67,usec=2796,usec_per_call=41.73,rejected_calls=0,failed_calls=66
+    cmdstat_scan:calls=4306,usec=487910,usec_per_call=113.31,rejected_calls=0,failed_calls=0
+
+## 清理（23:23:26）
+  完成（23:23:29）

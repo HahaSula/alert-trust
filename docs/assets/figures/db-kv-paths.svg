@@ -1,0 +1,50 @@
+<svg viewBox="0 0 900 330" role="img" aria-label="Valkey main thread: clients, redis_exporter INFO, Sentinel PING and replicas all queue on one thread; fork child writes RDB; replication backlog ring">
+  <defs>
+    <marker id="kv-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+    <marker id="kv-ahb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah-bad"/></marker>
+  </defs>
+  <!-- 左側：請求來源 -->
+  <rect x="20" y="20" width="170" height="50" rx="6" class="b-node"/>
+  <text x="105" y="42" text-anchor="middle" class="lbl-b">應用客戶端</text>
+  <text x="105" y="60" text-anchor="middle" class="lbl-s">GET／SET／BLPOP</text>
+  <rect x="20" y="90" width="170" height="50" rx="6" class="b-node-acc"/>
+  <text x="105" y="112" text-anchor="middle" class="lbl-b">redis_exporter</text>
+  <text x="105" y="130" text-anchor="middle" class="lbl-s">INFO ALL、CONFIG GET、EVAL</text>
+  <rect x="20" y="160" width="170" height="50" rx="6" class="b-node-acc"/>
+  <text x="105" y="182" text-anchor="middle" class="lbl-b">Sentinel ×3</text>
+  <text x="105" y="200" text-anchor="middle" class="lbl-s">每秒 PING、每 10 秒 INFO</text>
+  <rect x="20" y="230" width="170" height="50" rx="6" class="b-node"/>
+  <text x="105" y="252" text-anchor="middle" class="lbl-b">複本</text>
+  <text x="105" y="270" text-anchor="middle" class="lbl-s">REPLCONF ACK（每秒）</text>
+
+  <!-- 主執行緒 -->
+  <rect x="290" y="40" width="250" height="210" rx="8" class="b-node"/>
+  <text x="415" y="64" text-anchor="middle" class="lbl-b">主執行緒（依序執行）</text>
+  <text x="305" y="92" class="lbl-s">1. performEvictions()：超過 maxmemory</text>
+  <text x="305" y="110" class="lbl-s">   → 淘汰，或回 -OOM（noeviction）</text>
+  <text x="305" y="134" class="lbl-s">2. 持久化失敗？寫入與 PING 回 -MISCONF</text>
+  <text x="305" y="158" class="lbl-s">3. 執行指令（慢指令 → slowlog）</text>
+  <text x="305" y="182" class="lbl-s">4. 寫入串流 → 複本 ＋ backlog</text>
+  <text x="305" y="206" class="lbl-s">5. fork()：BGSAVE、AOF rewrite、</text>
+  <text x="305" y="224" class="lbl-s">   full resync（latest_fork_usec）</text>
+  <line x1="190" y1="45" x2="288" y2="90" class="arrow" marker-end="url(#kv-ah)"/>
+  <line x1="190" y1="115" x2="288" y2="120" class="arrow-bad" marker-end="url(#kv-ahb)"/>
+  <line x1="190" y1="185" x2="288" y2="150" class="arrow-bad" marker-end="url(#kv-ahb)"/>
+  <line x1="190" y1="255" x2="288" y2="200" class="arrow" marker-end="url(#kv-ah)"/>
+  <text x="196" y="300" class="t-bad">① 慢指令或 key 掃描卡住時，INFO 與 PING 一起等</text>
+
+  <!-- 右側：fork 子程序、backlog -->
+  <rect x="640" y="30" width="230" height="64" rx="6" class="b-node-bad"/>
+  <text x="755" y="54" text-anchor="middle" class="lbl-b">fork 子程序</text>
+  <text x="755" y="74" text-anchor="middle" class="lbl-s">寫 RDB；失敗 → bgsave_status:err</text>
+  <line x1="540" y1="210" x2="638" y2="70" class="arrow" marker-end="url(#kv-ah)"/>
+  <text x="600" y="120" class="t-bad">② copy-on-write 吃記憶體</text>
+
+  <rect x="640" y="150" width="230" height="64" rx="6" class="b-node"/>
+  <text x="755" y="174" text-anchor="middle" class="lbl-b">repl backlog（環狀）</text>
+  <text x="755" y="194" text-anchor="middle" class="lbl-s">Valkey 10MB／Redis 1MB（預設）</text>
+  <line x1="540" y1="182" x2="638" y2="182" class="arrow" marker-end="url(#kv-ah)"/>
+  <text x="640" y="240" class="t-bad">③ 斷線期間寫入超過 backlog</text>
+  <text x="640" y="258" class="t-bad">   → full resync，再 fork 一次</text>
+  <text x="640" y="290" class="lbl-s">複本斷線時 last_io = -1、主節點那一列消失</text>
+</svg>

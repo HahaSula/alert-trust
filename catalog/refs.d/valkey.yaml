@@ -1,0 +1,1235 @@
+# Valkey／Redis（redis_exporter 卡）的原始碼參考。key 以 vk-（Valkey 9.1.3）、r72-（Redis 7.2.17）、r8-（Redis 8.10.3）、
+# rx-（redis_exporter v1.97.0）、otel-（opentelemetry-collector-contrib v0.165.0 redisreceiver）、vdoc-（valkey-doc 9.1.3）開頭。
+# 每一行都在 tag 的 clone 上用關鍵字找出行號（行內含關鍵字），2026-11-09。實驗參考在檔案最後。
+refs:
+  vk-info-bgsave-status:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6368
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6368"
+  vk-info-aof-write-status:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6383
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6383"
+  vk-info-aof-rewrite-status:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6380
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6380"
+  vk-info-evicted:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6471
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6471"
+  vk-info-eviction-exceeded:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6475
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6475"
+  vk-info-rejected:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6461
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6461"
+  vk-info-sync-full:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6462
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6462"
+  vk-info-sync-partial-err:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6464
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6464"
+  vk-info-fork-usec:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6481
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6481"
+  vk-info-total-forks:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6482
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6482"
+  vk-info-frag:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6323
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6323"
+  vk-info-blocked:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6231
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6231"
+  vk-info-hits:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6476
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6476"
+  vk-info-maxmemory:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6310
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6310"
+  vk-info-role:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6524
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6524"
+  vk-info-link-status:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6542
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6542"
+  vk-info-last-io:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6543
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6543"
+  vk-info-link-down-since:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6575
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6575"
+  vk-info-slave-lag:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6612
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6612"
+  vk-info-slave-line:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6615
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6615"
+  vk-info-min-good:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6591
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6591"
+  vk-info-backlog:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6637
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6637"
+  vk-info-failover-state:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6629
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6629"
+  vk-info-io-threads:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6159
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6159"
+  vk-info-cluster-info:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6734
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6734"
+  vk-info-errorstat:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6706
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6706"
+  vk-info-redis-version:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6130
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6130"
+  vk-oom-perform:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 4498
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L4498"
+  vk-oom-reject:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 4516
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L4516"
+  vk-misconf-deny:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 4535
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L4535"
+  vk-misconf-ping:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 4536
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L4536"
+  vk-misconf-cond:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 4984
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L4984"
+  vk-fork-time:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 7121
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L7121"
+  vk-fork-latency:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 7124
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L7124"
+  vk-evict-noeviction:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/evict.c"
+    line: 422
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/evict.c#L422"
+  vk-evict-nothing:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/evict.c"
+    line: 608
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/evict.c#L608"
+  vk-evict-count:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/evict.c"
+    line: 569
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/evict.c#L569"
+  vk-evict-notcounted:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/evict.c"
+    line: 200
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/evict.c#L200"
+  vk-rdb-fork-fail:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/rdb.c"
+    line: 1696
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/rdb.c#L1696"
+  vk-rdb-bgsave-err:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/rdb.c"
+    line: 3689
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/rdb.c#L3689"
+  vk-repl-full:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/replication.c"
+    line: 1220
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/replication.c#L1220"
+  vk-repl-partial-err:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/replication.c"
+    line: 1198
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/replication.c#L1198"
+  vk-repl-no-backlog:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/replication.c"
+    line: 923
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/replication.c#L923"
+  vk-repl-timeout:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/replication.c"
+    line: 5312
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/replication.c#L5312"
+  vk-maxclients-reject:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/networking.c"
+    line: 1908
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/networking.c#L1908"
+  vk-obuf-close:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/networking.c"
+    line: 1743
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/networking.c#L1743"
+  vk-cfg-backlog:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/config.c"
+    line: 3463
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/config.c#L3463"
+  vk-cfg-latency-threshold:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/config.c"
+    line: 3460
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/config.c#L3460"
+  vk-cfg-commandlog-slower:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/config.c"
+    line: 3457
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/config.c#L3457"
+  vk-cfg-io-threads:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/config.c"
+    line: 3385
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/config.c#L3385"
+  vk-cfg-stop-writes:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/config.c"
+    line: 3276
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/config.c#L3276"
+  vk-cfg-maxmemory-policy:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/config.c"
+    line: 3365
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/config.c#L3365"
+  vk-cfg-dual-channel:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/config.c"
+    line: 3286
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/config.c#L3286"
+  vk-cfg-full-coverage:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/config.c"
+    line: 3289
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/config.c#L3289"
+  vk-cfg-maxclients:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/config.c"
+    line: 3434
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/config.c#L3434"
+  vk-cfg-debug:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/config.c"
+    line: 3370
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/config.c#L3370"
+  vk-cfg-import-mode:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/config.c"
+    line: 3320
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/config.c#L3320"
+  vk-cfg-latency-tracking:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/config.c"
+    line: 3312
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/config.c#L3312"
+  vk-cfg-replica-ignore-maxmemory:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/config.c"
+    line: 3298
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/config.c#L3298"
+  vk-cfg-repl-timeout:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/config.c"
+    line: 3416
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/config.c#L3416"
+  vk-sen-ping-valid:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/sentinel.c"
+    line: 2729
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/sentinel.c#L2729"
+  vk-sen-sdown:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/sentinel.c"
+    line: 4443
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/sentinel.c#L4443"
+  vk-sen-odown:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/sentinel.c"
+    line: 4530
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/sentinel.c#L4530"
+  vk-sen-quorum:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/sentinel.c"
+    line: 3749
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/sentinel.c#L3749"
+  vk-sen-ckquorum:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/sentinel.c"
+    line: 4026
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/sentinel.c#L4026"
+  vk-sen-tilt:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/sentinel.c"
+    line: 5456
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/sentinel.c#L5456"
+  vk-sen-info-tilt:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/sentinel.c"
+    line: 4204
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/sentinel.c#L4204"
+  vk-sen-switch:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/sentinel.c"
+    line: 5327
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/sentinel.c#L5327"
+  vk-cl-full-coverage:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/cluster_legacy.c"
+    line: 6705
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/cluster_legacy.c#L6705"
+  vk-cl-minority:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/cluster_legacy.c"
+    line: 6744
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/cluster_legacy.c#L6744"
+  vk-cl-info-state:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/cluster_legacy.c"
+    line: 7436
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/cluster_legacy.c#L7436"
+  vk-cl-info-slots-fail:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/cluster_legacy.c"
+    line: 7440
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/cluster_legacy.c#L7440"
+  vk-lat-addsample:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/latency.h"
+    line: 93
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/latency.h#L93"
+  vk-lat-ms:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/latency.c"
+    line: 80
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/latency.c#L80"
+  vk-lat-latest:
+    kind: code
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/latency.c"
+    line: 609
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/latency.c#L609"
+  r72-info-bgsave-status:
+    kind: code
+    project: "Redis"
+    version: "7.2.17"
+    file: "src/server.c"
+    line: 5765
+    url: "https://github.com/redis/redis/blob/7.2.17/src/server.c#L5765"
+  r72-cfg-backlog:
+    kind: code
+    project: "Redis"
+    version: "7.2.17"
+    file: "src/config.c"
+    line: 3229
+    url: "https://github.com/redis/redis/blob/7.2.17/src/config.c#L3229"
+  r72-cfg-io-threads:
+    kind: code
+    project: "Redis"
+    version: "7.2.17"
+    file: "src/config.c"
+    line: 3172
+    url: "https://github.com/redis/redis/blob/7.2.17/src/config.c#L3172"
+  r72-cfg-slowlog:
+    kind: code
+    project: "Redis"
+    version: "7.2.17"
+    file: "src/config.c"
+    line: 3225
+    url: "https://github.com/redis/redis/blob/7.2.17/src/config.c#L3225"
+  r72-lat-addsample:
+    kind: code
+    project: "Redis"
+    version: "7.2.17"
+    file: "src/latency.h"
+    line: 83
+    url: "https://github.com/redis/redis/blob/7.2.17/src/latency.h#L83"
+  r72-fork-latency:
+    kind: code
+    project: "Redis"
+    version: "7.2.17"
+    file: "src/server.c"
+    line: 6640
+    url: "https://github.com/redis/redis/blob/7.2.17/src/server.c#L6640"
+  r72-evict-noeviction:
+    kind: code
+    project: "Redis"
+    version: "7.2.17"
+    file: "src/evict.c"
+    line: 556
+    url: "https://github.com/redis/redis/blob/7.2.17/src/evict.c#L556"
+  r72-misconf-ping:
+    kind: code
+    project: "Redis"
+    version: "7.2.17"
+    file: "src/server.c"
+    line: 4035
+    url: "https://github.com/redis/redis/blob/7.2.17/src/server.c#L4035"
+  r72-sen-ping-valid:
+    kind: code
+    project: "Redis"
+    version: "7.2.17"
+    file: "src/sentinel.c"
+    line: 2806
+    url: "https://github.com/redis/redis/blob/7.2.17/src/sentinel.c#L2806"
+  r72-conf-latency:
+    kind: code
+    project: "Redis"
+    version: "7.2.17"
+    file: "redis.conf"
+    line: 1853
+    url: "https://github.com/redis/redis/blob/7.2.17/redis.conf#L1853"
+  r72-conf-stop-writes:
+    kind: code
+    project: "Redis"
+    version: "7.2.17"
+    file: "redis.conf"
+    line: 454
+    url: "https://github.com/redis/redis/blob/7.2.17/redis.conf#L454"
+  r72-cl-info-state:
+    kind: code
+    project: "Redis"
+    version: "7.2.17"
+    file: "src/cluster.c"
+    line: 5964
+    url: "https://github.com/redis/redis/blob/7.2.17/src/cluster.c#L5964"
+  r8-cfg-rdb-channel:
+    kind: code
+    project: "Redis"
+    version: "8.10.3"
+    file: "src/config.c"
+    line: 3417
+    url: "https://github.com/redis/redis/blob/8.10.3/src/config.c#L3417"
+  r8-cfg-backlog:
+    kind: code
+    project: "Redis"
+    version: "8.10.3"
+    file: "src/config.c"
+    line: 3585
+    url: "https://github.com/redis/redis/blob/8.10.3/src/config.c#L3585"
+  r8-cfg-io-threads:
+    kind: code
+    project: "Redis"
+    version: "8.10.3"
+    file: "src/config.c"
+    line: 3507
+    url: "https://github.com/redis/redis/blob/8.10.3/src/config.c#L3507"
+  r8-info-keysizes:
+    kind: code
+    project: "Redis"
+    version: "8.10.3"
+    file: "src/server.c"
+    line: 6364
+    url: "https://github.com/redis/redis/blob/8.10.3/src/server.c#L6364"
+  r8-evict-count:
+    kind: code
+    project: "Redis"
+    version: "8.10.3"
+    file: "src/db.c"
+    line: 2883
+    url: "https://github.com/redis/redis/blob/8.10.3/src/db.c#L2883"
+  r8-fork-latency:
+    kind: code
+    project: "Redis"
+    version: "8.10.3"
+    file: "src/server.c"
+    line: 7541
+    url: "https://github.com/redis/redis/blob/8.10.3/src/server.c#L7541"
+  r8-misconf-ping:
+    kind: code
+    project: "Redis"
+    version: "8.10.3"
+    file: "src/server.c"
+    line: 4690
+    url: "https://github.com/redis/redis/blob/8.10.3/src/server.c#L4690"
+  r8-info-active-clients:
+    kind: code
+    project: "Redis"
+    version: "8.10.3"
+    file: "src/server.c"
+    line: 6494
+    url: "https://github.com/redis/redis/blob/8.10.3/src/server.c#L6494"
+  rx-collect-lock:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 780
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L780"
+  rx-collect-up:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 792
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L792"
+  rx-scrape-err:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 786
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L786"
+  rx-info-all:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 906
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L906"
+  rx-config-get:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 926
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L926"
+  rx-config-get-silent:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 938
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L938"
+  rx-cluster-info:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 947
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L947"
+  rx-sen-section:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 1022
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L1022"
+  rx-lua-err-up:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 1046
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L1046"
+  rx-sysmem:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 556
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L556"
+  rx-config-maxclients:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 823
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L823"
+  rx-map-bgsave:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 273
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L273"
+  rx-map-aof-write:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 294
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L294"
+  rx-map-evicted:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 434
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L434"
+  rx-map-rejected:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 422
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L422"
+  rx-map-fork:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 303
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L303"
+  rx-map-frag:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 237
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L237"
+  rx-map-sync-full:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 324
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L324"
+  rx-map-blocked:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 184
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L184"
+  rx-map-hits:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 438
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L438"
+  rx-map-maxmemory:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 228
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L228"
+  rx-map-master-offset:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 320
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L320"
+  rx-fork-seconds:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/metrics.go"
+    line: 90
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/metrics.go#L90"
+  rx-okerr:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/metrics.go"
+    line: 68
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/metrics.go#L68"
+  rx-cluster-prefix:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/metrics.go"
+    line: 27
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/metrics.go#L27"
+  rx-link-up:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/info.go"
+    line: 385
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/info.go#L385"
+  rx-last-io:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/info.go"
+    line: 394
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/info.go#L394"
+  rx-slave-lag:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/info.go"
+    line: 413
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/info.go#L413"
+  rx-instance-info:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/info.go"
+    line: 228
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/info.go#L228"
+  rx-skip-cluster-section:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/info.go"
+    line: 149
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/info.go#L149"
+  rx-errorstats:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/info.go"
+    line: 667
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/info.go#L667"
+  rx-cmd-rejected:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/info.go"
+    line: 640
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/info.go#L640"
+  rx-slowlog-len:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/slowlog.go"
+    line: 9
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/slowlog.go#L9"
+  rx-slowlog-lastid:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/slowlog.go"
+    line: 34
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/slowlog.go#L34"
+  rx-latency-latest:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/latency.go"
+    line: 26
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/latency.go#L26"
+  rx-latency-ms:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/latency.go"
+    line: 47
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/latency.go#L47"
+  rx-cmdlog:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/commandlog.go"
+    line: 42
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/commandlog.go#L42"
+  rx-sen-ckquorum:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/sentinels.go"
+    line: 72
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/sentinels.go#L72"
+  rx-sen-oksentinels-init:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/sentinels.go"
+    line: 132
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/sentinels.go#L132"
+  rx-sen-status:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/sentinels.go"
+    line: 33
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/sentinels.go#L33"
+  rx-sen-epoch:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/sentinels.go"
+    line: 93
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/sentinels.go#L93"
+  rx-lua-result0:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/lua.go"
+    line: 21
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/lua.go#L21"
+  rx-lua-ro:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/lua.go"
+    line: 14
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/lua.go#L14"
+  rx-kg-scan:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/key_groups.go"
+    line: 160
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/key_groups.go#L160"
+  rx-kg-memusage:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/key_groups.go"
+    line: 176
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/key_groups.go#L176"
+  rx-kg-loop:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/key_groups.go"
+    line: 205
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/key_groups.go#L205"
+  rx-checkkeys-scan:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/keys.go"
+    line: 518
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/keys.go#L518"
+  rx-slot-stats:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/cluster_slot_stats.go"
+    line: 20
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/cluster_slot_stats.go#L20"
+  rx-dial-timeouts:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/redis.go"
+    line: 22
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/redis.go#L22"
+  rx-scrape-handler-new:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/http.go"
+    line: 105
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/http.go#L105"
+  rx-flag-timeout:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "main.go"
+    line: 176
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/main.go#L176"
+  rx-flag-skip-master:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "main.go"
+    line: 215
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/main.go#L215"
+  rx-flag-keysizes:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "main.go"
+    line: 203
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/main.go#L203"
+  rx-flag-batch:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "main.go"
+    line: 170
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/main.go#L170"
+  rx-mixin-down:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "contrib/redis-mixin/alerts/redis.libsonnet"
+    line: 8
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/contrib/redis-mixin/alerts/redis.libsonnet#L8"
+  rx-mixin-oom:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "contrib/redis-mixin/alerts/redis.libsonnet"
+    line: 20
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/contrib/redis-mixin/alerts/redis.libsonnet#L20"
+  rx-mixin-cluster:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "contrib/redis-mixin/alerts/redis.libsonnet"
+    line: 68
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/contrib/redis-mixin/alerts/redis.libsonnet#L68"
+  rx-readme-script:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "README.md"
+    line: 378
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/README.md#L378"
+  rx-readme-kg-cost:
+    kind: code
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "README.md"
+    line: 432
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/README.md#L432"
+  otel-info-all:
+    kind: code
+    project: "opentelemetry-collector-contrib"
+    version: "v0.165.0"
+    file: "receiver/redisreceiver/client.go"
+    line: 46
+    url: "https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.165.0/receiver/redisreceiver/client.go#L46"
+  otel-role:
+    kind: code
+    project: "opentelemetry-collector-contrib"
+    version: "v0.165.0"
+    file: "receiver/redisreceiver/metadata.yaml"
+    line: 575
+    url: "https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.165.0/receiver/redisreceiver/metadata.yaml#L575"
+  otel-cluster-state:
+    kind: code
+    project: "opentelemetry-collector-contrib"
+    version: "v0.165.0"
+    file: "receiver/redisreceiver/metadata.yaml"
+    line: 217
+    url: "https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.165.0/receiver/redisreceiver/metadata.yaml#L217"
+  otel-latest-fork:
+    kind: code
+    project: "opentelemetry-collector-contrib"
+    version: "v0.165.0"
+    file: "receiver/redisreceiver/metadata.yaml"
+    line: 403
+    url: "https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.165.0/receiver/redisreceiver/metadata.yaml#L403"
+  otel-slaves:
+    kind: code
+    project: "opentelemetry-collector-contrib"
+    version: "v0.165.0"
+    file: "receiver/redisreceiver/metadata.yaml"
+    line: 636
+    url: "https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.165.0/receiver/redisreceiver/metadata.yaml#L636"
+  awe-missing-master:
+    kind: code
+    project: "awesome-prometheus-alerts"
+    version: "dd70d7b"
+    file: "_data/rules.yml"
+    line: 1706
+    url: "https://github.com/samber/awesome-prometheus-alerts/blob/dd70d7b66a4e9dbf14429aec244d543a2833390e/_data/rules.yml#L1706"
+  awe-multi-master:
+    kind: code
+    project: "awesome-prometheus-alerts"
+    version: "dd70d7b"
+    file: "_data/rules.yml"
+    line: 1710
+    url: "https://github.com/samber/awesome-prometheus-alerts/blob/dd70d7b66a4e9dbf14429aec244d543a2833390e/_data/rules.yml#L1710"
+  awe-link-down:
+    kind: code
+    project: "awesome-prometheus-alerts"
+    version: "dd70d7b"
+    file: "_data/rules.yml"
+    line: 1730
+    url: "https://github.com/samber/awesome-prometheus-alerts/blob/dd70d7b66a4e9dbf14429aec244d543a2833390e/_data/rules.yml#L1730"
+  awe-oom-sys:
+    kind: code
+    project: "awesome-prometheus-alerts"
+    version: "dd70d7b"
+    file: "_data/rules.yml"
+    line: 1743
+    url: "https://github.com/samber/awesome-prometheus-alerts/blob/dd70d7b66a4e9dbf14429aec244d543a2833390e/_data/rules.yml#L1743"
+  awe-rejected:
+    kind: code
+    project: "awesome-prometheus-alerts"
+    version: "dd70d7b"
+    file: "_data/rules.yml"
+    line: 1775
+    url: "https://github.com/samber/awesome-prometheus-alerts/blob/dd70d7b66a4e9dbf14429aec244d543a2833390e/_data/rules.yml#L1775"
+  awe-backup:
+    kind: code
+    project: "awesome-prometheus-alerts"
+    version: "dd70d7b"
+    file: "_data/rules.yml"
+    line: 1789
+    url: "https://github.com/samber/awesome-prometheus-alerts/blob/dd70d7b66a4e9dbf14429aec244d543a2833390e/_data/rules.yml#L1789"
+  vdoc-admin-maxmemory:
+    kind: code
+    project: "valkey-doc"
+    version: "9.1.3"
+    file: "topics/admin.md"
+    line: 22
+    url: "https://github.com/valkey-io/valkey-doc/blob/9.1.3/topics/admin.md#L22"
+  vdoc-admin-overcommit:
+    kind: code
+    project: "valkey-doc"
+    version: "9.1.3"
+    file: "topics/admin.md"
+    line: 14
+    url: "https://github.com/valkey-io/valkey-doc/blob/9.1.3/topics/admin.md#L14"
+  vdoc-admin-persistence:
+    kind: code
+    project: "valkey-doc"
+    version: "9.1.3"
+    file: "topics/admin.md"
+    line: 38
+    url: "https://github.com/valkey-io/valkey-doc/blob/9.1.3/topics/admin.md#L38"
+  vdoc-repl-monitor:
+    kind: code
+    project: "valkey-doc"
+    version: "9.1.3"
+    file: "topics/replication.md"
+    line: 345
+    url: "https://github.com/valkey-io/valkey-doc/blob/9.1.3/topics/replication.md#L345"
+  vdoc-sentinel-ckquorum:
+    kind: code
+    project: "valkey-doc"
+    version: "9.1.3"
+    file: "topics/sentinel.md"
+    line: 597
+    url: "https://github.com/valkey-io/valkey-doc/blob/9.1.3/topics/sentinel.md#L597"
+  vdoc-sentinel-tilt:
+    kind: code
+    project: "valkey-doc"
+    version: "9.1.3"
+    file: "topics/sentinel.md"
+    line: 1193
+    url: "https://github.com/valkey-io/valkey-doc/blob/9.1.3/topics/sentinel.md#L1193"
+  vdoc-latmon-enable:
+    kind: code
+    project: "valkey-doc"
+    version: "9.1.3"
+    file: "topics/latency-monitor.md"
+    line: 85
+    url: "https://github.com/valkey-io/valkey-doc/blob/9.1.3/topics/latency-monitor.md#L85"
+  vdoc-latency-fork:
+    kind: code
+    project: "valkey-doc"
+    version: "9.1.3"
+    file: "topics/latency.md"
+    line: 235
+    url: "https://github.com/valkey-io/valkey-doc/blob/9.1.3/topics/latency.md#L235"
+  vdoc-lru-volatile:
+    kind: code
+    project: "valkey-doc"
+    version: "9.1.3"
+    file: "topics/lru-cache.md"
+    line: 60
+    url: "https://github.com/valkey-io/valkey-doc/blob/9.1.3/topics/lru-cache.md#L60"
+  # ---------- 實驗 ----------
+  vk-exp:
+    kind: experiment
+    title: Valkey 9.1.3 主從＋3 Sentinel、Redis 7.2.17／8.10.3、redis_exporter v1.97.0：slowlog、blocked、maxmemory、exporter 逾時、連線額滿、full resync、BGSAVE 失敗、failover、quorum、script 失敗、key group 成本
+    url: https://github.com/HahaSula/alert-trust/blob/main/lab/targets/valkey/results/run-20261109.txt
+  vk-exp2:
+    kind: experiment
+    title: Valkey 第二輪：Sentinel TILT、heartbeat key 的複寫延遲、ACL 拒絕 CONFIG、BGSAVE 失敗時的 Sentinel、pause 主節點、複本重啟
+    url: https://github.com/HahaSula/alert-trust/blob/main/lab/targets/valkey/results/run2-20261109.txt
+  vk-exp-summary:
+    kind: experiment
+    title: Valkey／Redis 監控實驗摘要
+    url: https://github.com/HahaSula/alert-trust/blob/main/lab/targets/valkey/results/summary.md

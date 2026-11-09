@@ -356,3 +356,53 @@ terms:
     where: "Thanos Compactor 的 `/metrics`"
     default: "0；遇到重疊 block 等嚴重錯誤時設 1，行程不結束"
     refs: [th-compact-halt, exp-thanos-compact-halt]
+
+  # ---------- Valkey／Redis（redis_exporter 卡） ----------
+  repl-backlog-size:
+    title: Valkey／Redis 的複寫 backlog 大小
+    kind: config
+    systems: [valkey, redis]
+    tokens: [repl-backlog-size]
+    where: "valkey.conf／redis.conf 或 `CONFIG SET repl-backlog-size`"
+    default: "Valkey 9.1.3 是 10MB；Redis 7.2.17、8.10.3 是 1MB"
+    observe:
+      - "`redis_replication_backlog_bytes`（INFO repl_backlog_size）；`redis_config_repl_backlog_size`（CONFIG GET，沒有權限時不存在）"
+      - "撐得住多久的斷線：`redis_replication_backlog_bytes / rate(redis_master_repl_offset[15m])`"
+    note: "斷線期間的寫入量超過它，重連就是 full resync（`redis_replica_resyncs_full` 增加）。"
+    refs: [vk-cfg-backlog, r72-cfg-backlog, vk-exp]
+
+  latency-monitor-threshold:
+    title: Valkey／Redis latency monitor 的門檻
+    kind: config
+    systems: [valkey, redis]
+    tokens: [latency-monitor-threshold]
+    where: "valkey.conf／redis.conf 或 `CONFIG SET latency-monitor-threshold <毫秒>`"
+    default: "0（關閉）"
+    observe:
+      - "`redis_latency_spike_duration_seconds{event_name}`、`redis_latency_spike_last`：門檻是 0 時完全沒有這兩組 series"
+    note: "Valkey 用微秒和門檻 ×1000 比較、存成毫秒；Redis 7.2 直接用毫秒。"
+    refs: [vk-cfg-latency-threshold, vk-lat-addsample, r72-lat-addsample, vdoc-latmon-enable]
+
+  stop-writes-on-bgsave-error:
+    title: BGSAVE 失敗時拒絕寫入
+    kind: config
+    systems: [valkey, redis]
+    tokens: [stop-writes-on-bgsave-error]
+    where: "valkey.conf／redis.conf 或 `CONFIG SET`"
+    default: "yes；而且要有 save 設定才生效"
+    observe:
+      - "`redis_rdb_last_bgsave_status == 0` 時，寫入與 PING 回 MISCONF：`redis_errors_total{err=\"MISCONF\"}`"
+    note: "exporter 不送 PING，所以這段期間 `redis_up` 仍是 1。"
+    refs: [vk-cfg-stop-writes, vk-misconf-cond, vk-misconf-ping, vk-exp]
+
+  redis-exporter-connection-timeout:
+    title: redis_exporter 的連線與讀寫逾時
+    kind: config
+    systems: [redis_exporter]
+    tokens: [--connection-timeout]
+    where: "redis_exporter 的 `--connection-timeout` 或 `REDIS_EXPORTER_CONNECTION_TIMEOUT`"
+    default: "15s（連線、讀、寫三個逾時都用它）"
+    observe:
+      - "`redis_exporter_last_scrape_duration_seconds`；比 scrape_timeout 長時，伺服器忙會讓 `up` 變 0、`redis_up` 消失"
+    note: "設得比 scrape_timeout 短，exporter 會自己回 `redis_up=0` 與錯誤訊息。"
+    refs: [rx-flag-timeout, rx-dial-timeouts, vk-exp]

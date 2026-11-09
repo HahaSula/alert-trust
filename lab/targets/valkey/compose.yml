@@ -1,0 +1,96 @@
+# Valkey／Redis 監控實驗（輕量）：
+#   vk1 主節點 + vk2 複本（Valkey 9.1.3）、s1～s3 三個 Sentinel（quorum 2）
+#   r72（Redis 7.2.17）、r8（Redis 8.10.3）各一台單機，只比對 metric 名稱與預設值
+#   kg：Valkey 單機，給 key group 成本測試用
+# 每台一個 redis_exporter v1.97.0，另加：connection-timeout 2s 的 e-short、壞 script 的 e-bad、multi-target 的 e-multi。
+# vk2 同時接 default 與 mon 兩個網路：把它從 default 拔掉時，複寫與 Sentinel 斷線，exporter（只在 mon）仍抓得到它。
+# run2.sh 另外用 profile run2 起 e-hb、e-noconf，Prometheus 改讀 prometheus-run2.yml。
+# 對外只開 127.0.0.1:27090（Prometheus）與 127.0.0.1:27001（vk1，給連線風暴用）。執行 ./run.sh，結束會 docker compose down -v。
+name: at-vk-lab
+x-vk: &vk
+  image: valkey/valkey:9.1.3-alpine
+x-exp: &exp
+  image: oliver006/redis_exporter:v1.97.0
+x-sentinel: &sentinel
+  <<: *vk
+  depends_on: [vk1, vk2]
+  entrypoint: ["/bin/sh", "-c"]
+  command:
+    - >-
+      printf 'port 26379\nsentinel resolve-hostnames yes\nsentinel announce-hostnames yes\n
+      sentinel monitor mymaster vk1 6379 2\nsentinel down-after-milliseconds mymaster 10000\n
+      sentinel failover-timeout mymaster 30000\n' | sed 's/^ //' > /tmp/s.conf && exec valkey-server /tmp/s.conf --sentinel
+services:
+  vk1:
+    <<: *vk
+    command: >-
+      valkey-server --enable-debug-command yes --maxclients 40 --repl-backlog-size 1mb --repl-timeout 5
+      --latency-monitor-threshold 100
+    ports: ["127.0.0.1:27001:6379"]
+  vk2:
+    <<: *vk
+    command: valkey-server --enable-debug-command yes --replicaof vk1 6379 --repl-timeout 5 --latency-monitor-threshold 100
+    depends_on: [vk1]
+    networks: [default, mon]
+  s1: *sentinel
+  s2: *sentinel
+  s3: *sentinel
+  r72:
+    image: redis:7.2.17-alpine
+    command: redis-server --enable-debug-command yes --latency-monitor-threshold 100
+  r8:
+    image: redis:8.10.3-alpine
+    command: redis-server --enable-debug-command yes --latency-monitor-threshold 100
+  kg:
+    <<: *vk
+    command: valkey-server --enable-debug-command yes --save "" --slowlog-log-slower-than 1000
+  e-vk1:
+    <<: *exp
+    command: ["--redis.addr=redis://vk1:6379", "--script=/q/valkey-extra.lua", "--lua-script-read-only"]
+    volumes: ["../../../queries/redis_exporter:/q:ro"]
+  e-vk2:
+    <<: *exp
+    command: ["--redis.addr=redis://vk2:6379", "--script=/q/valkey-extra.lua", "--lua-script-read-only"]
+    volumes: ["../../../queries/redis_exporter:/q:ro"]
+    networks: [mon]
+  e-short:
+    <<: *exp
+    command: ["--redis.addr=redis://vk1:6379", "--connection-timeout=2s"]
+  e-bad:
+    <<: *exp
+    command: ["--redis.addr=redis://kg:6379", "--script=/s/bad.lua"]
+    volumes: ["./scripts:/s:ro"]
+  e-multi:
+    <<: *exp
+    command: ["--redis.addr="]
+    networks: [default, mon]
+  e-s1:
+    <<: *exp
+    command: ["--redis.addr=redis://s1:26379"]
+  e-r72:
+    <<: *exp
+    command: ["--redis.addr=redis://r72:6379"]
+  e-r8:
+    <<: *exp
+    command: ["--redis.addr=redis://r8:6379"]
+  e-kg:
+    <<: *exp
+    command: ["--redis.addr=redis://kg:6379", "--check-key-groups=^(%a+):", "--count-keys=db0=user:*"]
+  # run2.sh 才用：heartbeat key（複本端）與沒有 CONFIG 權限的 ACL 帳號
+  e-hb:
+    <<: *exp
+    profiles: [run2]
+    command: ["--redis.addr=redis://vk2:6379", "--check-single-keys=db0=at:heartbeat"]
+    networks: [mon]
+  e-noconf:
+    <<: *exp
+    profiles: [run2]
+    command: ["--redis.addr=redis://vk1:6379", "--redis.user=mon", "--redis.password=monpw"]
+  prometheus:
+    image: prom/prometheus:v3.13.5
+    volumes: ["./${PROM_CONFIG:-prometheus.yml}:/etc/prometheus/prometheus.yml:ro"]
+    ports: ["127.0.0.1:27090:9090"]
+    networks: [default, mon]
+networks:
+  default: {}
+  mon: {}
