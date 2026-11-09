@@ -28,7 +28,10 @@
 
 ## 進行中
 
-（無）
+- Valkey／Redis target（redis_exporter）與「記憶體 KV」架構頁
+- 「關聯式」資料庫架構頁
+
+之後的資料庫順序（使用者已同意）：etcd → TiDB → YugabyteDB → ClickHouse → MongoDB；CockroachDB（專有授權）不做。資料庫架構頁依類型分頁：關聯式、記憶體 KV、共識（Raft）、分散式 SQL、分析型、文件型。
 
 ## 待辦（依建議順序）
 
