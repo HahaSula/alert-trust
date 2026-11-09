@@ -1,18 +1,19 @@
-# MariaDB 的 ASH 缺口與取樣器建議
+# 查詢與 session 分析（ASH）
 
-ASH（Active Session History）是「每秒記下每個在做事的 session 正在跑哪個語句、在等什麼」，事後可以回答「昨天 14:03 那 40 秒卡在哪裡」。這頁回答三個問題：MariaDB 11.4 有哪些相近的工具、跟 MySQL 8.4 比少了什麼、怎麼用一個輕量取樣器補上，並接到 alert-trust 的訊號。
+這頁屬於 MySQL／MariaDB 的**工作量與效能**面向，處理最細的一層：單一 session 與單一查詢。
+
 
 依據是 MariaDB 11.4.13、MySQL 8.4.7、mysqld_exporter v0.21.0 的原始碼，加上一組小實驗（[`lab/targets/mysql/ash/`](https://github.com/HahaSula/alert-trust/tree/main/lab/targets/mysql/ash)）。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp][^my-asp-exp-ash]
 
-## 先講結論
+## 要監控什麼 {#goal}
 
-1. **MariaDB 和 MySQL 都沒有內建的 ASH。**兩邊都有 performance_schema 的 `events_*_current`／`_history`／`_history_long` 與 sys schema，但那是「每個 thread 最近 N 筆事件」和「累計值」，不是依時間取樣的 active session 紀錄；Oracle ASH、PostgreSQL 的 pg_wait_sampling、pgsentinel 這類每秒取樣的歷史表，兩邊都沒有。<span class="at-chip at-ev-code">讀碼</span>
-2. **MariaDB 比 MySQL 少的是「事後分析」的料。**digest 摘要表沒有 `QUANTILE_95/99/999`、`SUM_CPU_TIME`、`QUERY_SAMPLE_*`，沒有 `events_statements_histogram_by_digest`、`events_errors_summary_*`、`data_locks`／`data_lock_waits`。實驗中查 `information_schema` 確認這幾張表與欄位在 MariaDB 11.4 不存在、在 MySQL 8.4 存在。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp][^my-asp-my-esms-quantile][^my-asp-my-esms-cpu][^my-asp-my-esmh]exporter 對 MariaDB 輸出的 quantile、`lock_time`、`cpu_time` 一直是 0，原因在[主頁](mysql.md#perf-slow-sql)。[^my-perf-ex-stmt-8028]
-3. **MariaDB 的 performance_schema 預設全關，開了以後 `events_*_current` 的 consumer 也全關。**實驗中 `performance_schema=ON` 的 MariaDB，`setup_consumers` 只有 `global_instrumentation`、`thread_instrumentation`、`statements_digest` 是 YES，`events_statements_current`、`events_waits_current` 都是 NO。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp][^my-perf-mdb-pfs-default]
-4. **MariaDB 執行中的語句沒有 digest。**MariaDB 只在語句結束時把 digest 複製進 `events_statements_current`；MySQL 在 parse 完就複製。實驗：開 consumer 後 MariaDB 取樣 216 列、有 digest 的 0 列；MySQL 執行中的 `SELECT SLEEP(8)` 已有 `SELECT SLEEP (?)`。所以 MariaDB 的取樣器不能直接用 digest 把執行中的語句分組。<span class="at-chip at-ev-tested">實測</span>[^my-asp-mdb-pfs-digest-at-end][^my-asp-my-pfs-digest-at-parse][^my-asp-exp-ash]
-5. **一個 SQL 寫的取樣器就夠用。**每秒一次的 EVENT 把 `PROCESSLIST`、`performance_schema.threads`、`events_statements_current`、`events_waits_current`、`INNODB_TRX` join 起來存一列。實驗中 row lock、metadata lock、重查詢、`SLEEP` 同時發生的 30 秒內，它正確分出「等 row lock 57 秒、等 MDL 50＋26 秒、重查詢 27 秒」；同一時間 exporter 的 processlist collector 只看得到 `updating` 3、`waiting_for_table_metadata_lock` 3。一次取樣約 3–4 ms（含 client 啟動，是上限）。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp-ash]
+調校與事後分析要回答的是：**某個時間點，哪些 session 在做事？各自跑哪條 SQL、在等什麼（row lock、metadata lock、I/O、CPU）、等了多久？**例如「昨天 14:03 那 40 秒 TPS 掉到 0，卡在哪裡」。
 
-## MariaDB 11.4 有什麼
+這需要「每秒記下每個在做事的 session 正在跑哪個語句、在等什麼」的歷史紀錄，Oracle 稱為 ASH（Active Session History），PostgreSQL 社群有 pg_wait_sampling、pgsentinel。
+
+alert-trust 裡相關的訊號：[慢 SQL](mysql.md#workload)、[活動 session](mysql.md#workload)、[鎖等待](mysql.md#saturation)。這些訊號告訴你「出事了」，ASH 回答「是誰、卡在哪」。
+
+## 現有工具：MariaDB 11.4 有什麼
 
 | 工具 | 看得到 | 有歷史嗎 | 預設 | 證據 |
 |---|---|---|---|---|
@@ -27,7 +28,7 @@ ASH（Active Session History）是「每秒記下每個在做事的 session 正�
 | `optimizer_trace` | 單一 session 的最佳化過程 | 只有最後一筆 | 關 | 讀碼[^my-asp-mdb-optimizer-trace] |
 | userstat（`USER_STATISTICS` 等） | 每個帳號、client、表、索引的累計 `BUSY_TIME`、`CPU_TIME`、rows | 累計值 | `userstat=OFF` | 讀碼[^my-asp-mdb-userstat-var][^my-asp-mdb-userstat-cpu]；exporter 有 `info_schema.userstats`（預設關）[^my-asp-ex-userstats-cpu][^my-asp-ex-def-userstats] |
 
-## 和 MySQL 8.4 比少了什麼
+## 現有工具：和 MySQL 8.4 比少了什麼
 
 | MySQL 8.4 有、MariaDB 11.4 沒有 | 影響 | 證據 |
 |---|---|---|
@@ -39,6 +40,14 @@ ASH（Active Session History）是「每秒記下每個在做事的 session 正�
 | 執行中語句的 digest | 取樣器不能直接依 digest 分組（見下一節的補法） | 實測、讀碼[^my-asp-mdb-pfs-digest-at-end][^my-asp-my-pfs-digest-at-parse] |
 
 MariaDB 有、MySQL 沒有的：`SHOW ANALYZE FOR`（MySQL 有 `EXPLAIN FOR CONNECTION`，沒有對執行中查詢的 ANALYZE；未實測）、`PROCESSLIST` 的 `PROGRESS`、`MEMORY_USED`、`EXAMINED_ROWS`、userstat 的每帳號 `CPU_TIME`。
+
+## 缺口：沒有 ASH {#gap}
+
+1. **MariaDB 和 MySQL 都沒有內建的 ASH。**兩邊都有 performance_schema 的 `events_*_current`／`_history`／`_history_long` 與 sys schema，但那是「每個 thread 最近 N 筆事件」和「累計值」，不是依時間取樣的 active session 紀錄；Oracle ASH、PostgreSQL 的 pg_wait_sampling、pgsentinel 這類每秒取樣的歷史表，兩邊都沒有。<span class="at-chip at-ev-code">讀碼</span>
+2. **MariaDB 比 MySQL 少的是「事後分析」的料。**digest 摘要表沒有 `QUANTILE_95/99/999`、`SUM_CPU_TIME`、`QUERY_SAMPLE_*`，沒有 `events_statements_histogram_by_digest`、`events_errors_summary_*`、`data_locks`／`data_lock_waits`。實驗中查 `information_schema` 確認這幾張表與欄位在 MariaDB 11.4 不存在、在 MySQL 8.4 存在。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp][^my-asp-my-esms-quantile][^my-asp-my-esms-cpu][^my-asp-my-esmh]exporter 對 MariaDB 輸出的 quantile、`lock_time`、`cpu_time` 一直是 0，原因在[主頁](mysql.md#perf-slow-sql)。[^my-perf-ex-stmt-8028]
+3. **MariaDB 的 performance_schema 預設全關，開了以後 `events_*_current` 的 consumer 也全關。**實驗中 `performance_schema=ON` 的 MariaDB，`setup_consumers` 只有 `global_instrumentation`、`thread_instrumentation`、`statements_digest` 是 YES，`events_statements_current`、`events_waits_current` 都是 NO。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp][^my-perf-mdb-pfs-default]
+4. **MariaDB 執行中的語句沒有 digest。**MariaDB 只在語句結束時把 digest 複製進 `events_statements_current`；MySQL 在 parse 完就複製。實驗：開 consumer 後 MariaDB 取樣 216 列、有 digest 的 0 列；MySQL 執行中的 `SELECT SLEEP(8)` 已有 `SELECT SLEEP (?)`。所以 MariaDB 的取樣器不能直接用 digest 把執行中的語句分組。<span class="at-chip at-ev-tested">實測</span>[^my-asp-mdb-pfs-digest-at-end][^my-asp-my-pfs-digest-at-parse][^my-asp-exp-ash]
+5. **一個 SQL 寫的取樣器就夠用。**每秒一次的 EVENT 把 `PROCESSLIST`、`performance_schema.threads`、`events_statements_current`、`events_waits_current`、`INNODB_TRX` join 起來存一列。實驗中 row lock、metadata lock、重查詢、`SLEEP` 同時發生的 30 秒內，它正確分出「等 row lock 57 秒、等 MDL 50＋26 秒、重查詢 27 秒」；同一時間 exporter 的 processlist collector 只看得到 `updating` 3、`waiting_for_table_metadata_lock` 3。一次取樣約 3–4 ms（含 client 啟動，是上限）。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp-ash]
 
 ## 實驗
 
