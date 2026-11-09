@@ -1,0 +1,58 @@
+<svg viewBox="0 0 960 470" role="img" aria-label="rule-review 的四個步驟：確認監控體系、監控基礎設施的覆蓋、每條 rule 的時間契約、規則寫法；第二步和第三步之間有一道關卡：基礎設施的第一級缺口沒有處理時，時間契約的結論要加註">
+<defs><marker id="rr-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker></defs>
+<rect x="20" y="20" width="920" height="54" rx="8" class="b-node"/>
+<text x="40" y="43" class="lbl-b">輸入</text>
+<text x="40" y="62" class="lbl-s">使用者的 rule 檔（rule.yml、VMRule、PrometheusRule）；能連線時加上 ruler 的 URL；有外部觀察者時加上它的 rule 檔</text>
+<path d="M120 74 V100" class="arrow" marker-end="url(#rr-ah)"/>
+<rect x="20" y="104" width="210" height="250" rx="8" class="b-node-acc"/>
+<text x="36" y="130" class="lbl-b">1 · 確認監控體系</text>
+<text x="36" y="156" class="lbl-s">評估 rule 的是 Prometheus</text>
+<text x="36" y="174" class="lbl-s">還是 vmalert？版本？</text>
+<text x="36" y="198" class="lbl-s">資料來源：Prometheus scrape，</text>
+<text x="36" y="216" class="lbl-s">或 vmagent → VM／VL</text>
+<text x="36" y="240" class="lbl-s">有沒有外部觀察者？</text>
+<text x="36" y="258" class="lbl-s">告警走哪台 Alertmanager？</text>
+<text x="36" y="290" class="tk">先從檔案判斷，不行才問</text>
+<text x="36" y="330" class="t-ok">→ env/&lt;name&gt;.yaml</text>
+<path d="M230 229 H254" class="arrow" marker-end="url(#rr-ah)"/>
+<rect x="258" y="104" width="230" height="250" rx="8" class="b-node-acc"/>
+<text x="274" y="130" class="lbl-b">2 · 基礎設施的覆蓋</text>
+<text x="274" y="156" class="tk">rules_to_snapshot.py（離線）</text>
+<text x="274" y="174" class="tk">或 collect.py（連線，加 --live）</text>
+<text x="274" y="192" class="tk">→ check_coverage.py</text>
+<text x="274" y="220" class="lbl-s">先報第 1 級缺口，例如：</text>
+<text x="274" y="240" class="lbl-s">· scrape 耗時接近 scrape_interval</text>
+<text x="274" y="258" class="lbl-s">· rule group 跑不完／停止評估</text>
+<text x="274" y="276" class="lbl-s">· WAL 寫入失敗、送不到 AM</text>
+<text x="274" y="294" class="lbl-s">· Watchdog 與外部 DMS</text>
+<text x="274" y="312" class="lbl-s">· VM：查詢錯誤、partial、唯讀</text>
+<text x="274" y="340" class="t-ok">→ coverage.md／.json</text>
+<rect x="500" y="104" width="22" height="250" rx="4" class="b-node-bad"/>
+<text x="511" y="222" text-anchor="middle" class="t-bad">關</text>
+<text x="511" y="242" text-anchor="middle" class="t-bad">卡</text>
+<path d="M488 229 H498" class="arrow"/>
+<path d="M522 229 H542" class="arrow" marker-end="url(#rr-ah)"/>
+<rect x="546" y="104" width="200" height="250" rx="8" class="b-node"/>
+<text x="562" y="130" class="lbl-b">3 · 每條 rule 的時間契約</text>
+<text x="562" y="156" class="lbl-s">依第 1 步選公式：</text>
+<text x="562" y="180" class="tk">Prometheus</text>
+<text x="562" y="198" class="tk">R ≥ (2+k)·I + d</text>
+<text x="562" y="222" class="tk">vmalert</text>
+<text x="562" y="240" class="tk">R ≥ I + L − D</text>
+<text x="562" y="264" class="tk">Alertmanager 告警視窗</text>
+<text x="562" y="282" class="tk">≥ 2 × group_interval</text>
+<text x="562" y="312" class="lbl-s">數字拿不到就問或標未知</text>
+<path d="M746 229 H770" class="arrow" marker-end="url(#rr-ah)"/>
+<rect x="774" y="104" width="166" height="250" rx="8" class="b-node"/>
+<text x="790" y="130" class="lbl-b">4 · 規則寫法</text>
+<text x="790" y="156" class="lbl-s">x == 0 資料消失時</text>
+<text x="790" y="174" class="lbl-s">回傳空（presence）</text>
+<text x="790" y="198" class="lbl-s">job=~ 對不對得上</text>
+<text x="790" y="216" class="lbl-s">實際 job 名稱</text>
+<text x="790" y="240" class="lbl-s">關鍵 alert 與昂貴</text>
+<text x="790" y="258" class="lbl-s">recording rule 分開</text>
+<rect x="20" y="376" width="920" height="74" rx="8" class="b-pend"/>
+<text x="40" y="400" class="lbl-b">關卡規則</text>
+<text x="40" y="420" class="lbl-s">第 2 步找到的第 1 級缺口沒有處理前，第 3、4 步的結論都要加註：「評估這些 rule 的 ruler 本身沒有被監控，它變慢或掛掉時以下結論不成立。」</text>
+<text x="40" y="438" class="lbl-s">報告順序固定：監控體系 → 基礎設施缺口（第 1 級優先）→ 時間契約不成立的 rule → 寫法問題 → 沒有確認的部分</text>
+</svg>

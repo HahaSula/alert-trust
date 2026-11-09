@@ -85,6 +85,7 @@ nav:
       - 資料庫 exporter: architecture/exporters.md
   - 寫 rule:
       - 信任契約: contracts.md
+      - 檢查 rule 檔的流程: tools/rule-review.md
       - 契約計算器: tools/calculator.md
       - 名詞：設定與 metric: reference/terms.md
   - 實驗報告:
