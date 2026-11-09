@@ -208,12 +208,16 @@ def check_target_pattern(components: list[dict], root: str) -> list[str]:
     if not os.path.exists(path):
         return []
     pattern = C._load(path)
-    required = pattern["required_signals"]
     aspects_required = pattern.get("required_aspects", [])
     errors = []
     for card in components:
         if card.get("kind") != "target":
             continue
+        model = card.get("model", "exporter")
+        if model not in C.TARGET_MODELS:
+            errors.append(f"{card['_path']}: model 要是 {'、'.join(C.TARGET_MODELS)}")
+            continue
+        required = C.required_target_signals(pattern, card)
         by_id = {s["id"]: s for s in card.get("signals", [])}
         na = card.get("not_applicable") or {}
         blind = card.get("blind_spots") or []

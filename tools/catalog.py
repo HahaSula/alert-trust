@@ -148,3 +148,11 @@ def load_rules(root: str = ROOT) -> dict[str, dict]:
 
 def runbook_url(component_id: str, signal_id: str) -> str:
     return f"{SITE_URL}/components/{component_id}/#{signal_id}"
+
+
+TARGET_MODELS = {"exporter": "required_signals", "native": "required_signals_native"}
+
+
+def required_target_signals(pattern: dict, card: dict) -> list[dict]:
+    """The standard questions for a target card, by its model (exporter is the default)."""
+    return pattern.get(TARGET_MODELS.get(card.get("model", "exporter"), ""), []) or []

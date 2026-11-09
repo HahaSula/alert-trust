@@ -94,6 +94,16 @@ class LintTest(unittest.TestCase):
         errors = validate.check_target_pattern([card], ROOT)
         self.assertFalse(any("role-detection" in e or "exporter-query-timeout" in e for e in errors), errors)
 
+    def test_target_pattern_native_model(self):
+        card = {"_path": "t.yaml", "kind": "target", "model": "native",
+                "signals": [{"id": "endpoint-up", "tier": 1}, {"id": "health-second-path", "tier": 1}]}
+        errors = validate.check_target_pattern([card], ROOT)
+        missing = {e.split("缺少 target 標準訊號 ")[1].split("（")[0] for e in errors if "缺少" in e}
+        self.assertEqual(missing, {"metric-families-present", "scrape-budget", "component-count",
+                                   "endpoint-blocking", "replication-lag", "role-detection"})
+        bad = dict(card, model="sidecar")
+        self.assertTrue(any("model" in e for e in validate.check_target_pattern([bad], ROOT)))
+
     def test_duplicate_keys_rejected(self):
         with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:
             f.write("a: 1\na: 2\n")

@@ -176,12 +176,18 @@ def index_page(cards: list[dict]) -> str:
         out.append("")
     pattern_path = os.path.join(C.ROOT, "catalog", "target-pattern.yaml")
     if os.path.exists(pattern_path):
+        pattern = C._load(pattern_path)
         out.append("## 每張 target 卡都要回答的問題\n")
-        out.append("任何 exporter 都適用。`tools/validate.py` 會檢查每張 target 卡都有這些訊號，或寫明不適用的理由。\n")
-        out.append("| 訊號 | 問題 | 至少 | 為什麼 |\n|---|---|---|---|")
-        for r in C._load(pattern_path)["required_signals"]:
-            out.append(f"| `{r['id']}` | {esc(r['question'])} | {chip(str(r['min_tier']), 't' + str(r['min_tier']))} | {esc(r['why'])} |")
-        out.append("")
+        out.append("`tools/validate.py` 會檢查每張 target 卡都有這些訊號，或寫明不適用的理由。卡片的 `model` 決定用哪一組。\n")
+        for key, title in (("required_signals", "透過 exporter（`model: exporter`）"),
+                           ("required_signals_native", "資料庫自己提供 /metrics（`model: native`）")):
+            if not pattern.get(key):
+                continue
+            out.append(f"### {title}\n")
+            out.append("| 訊號 | 問題 | 至少 | 為什麼 |\n|---|---|---|---|")
+            for r in pattern[key]:
+                out.append(f"| `{r['id']}` | {esc(r['question'])} | {chip(str(r['min_tier']), 't' + str(r['min_tier']))} | {esc(r['why'])} |")
+            out.append("")
     return "\n".join(out)
 
 
