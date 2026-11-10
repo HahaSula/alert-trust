@@ -47,7 +47,7 @@ etcd 屬於「資料庫內建端點」模型（見[資料庫監控模型](models
 | mixin 規則 | 我們 | 差在哪 |
 |---|---|---|
 | etcdMembersDown（up == 0 或 peer 送出失敗，for 20m）[^etcd-mixin-membersdown] | EtcdEndpointDown＋EtcdEndpointMissing＋三方交叉 | mixin 沒有 absent，也分不出 scrape 與 process |
-| etcdInsufficientMembers（up 過半）[^dbm-etcd-mixin-insufficient] | EtcdQuorumAtRisk（`/readyz` 成功數對 known_peers 過半） | `up` 在失去 quorum 時是 1（實測） |
+| etcdInsufficientMembers（up 過半）[^dbm-etcd-mixin-insufficient] | EtcdQuorumAtRisk（`/readyz` 成功數對 known_peers 過半） | `up` 在失去 quorum 時是 1（實測：3 台停 2 台）；網路分割時 mixin 這條不響是由式子推得（推論，沒有做分割實驗） |
 | etcdNoLeader[^dbm-etcd-mixin-noleader] | EtcdNoLeader（相同）＋absence 補位 | — |
 | etcdHighNumberOfLeaderChanges[^etcd-mixin-leaderchanges] | EtcdFrequentLeaderChanges（相同門檻） | — |
 | etcdHighNumberOfFailedGRPCRequests[^etcd-mixin-grpcfail] | EtcdGrpcErrorRate（5%） | — |

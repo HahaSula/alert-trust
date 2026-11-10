@@ -17,10 +17,15 @@ role: >-
 silent_failures:
   - text: >-
       失去 quorum（3 台停 2 台）時，存活的 member 照常回應 /metrics（200、約 185KB），up=1；etcd_server_has_leader=0、/livez 200。
-      只看 up 的規則（mixin etcdInsufficientMembers 是用 up 算過半）在「process 都在、彼此連不到」的網路分割下不會響。
     evidence: tested
     source: etcd-lab
     refs: [etcd-exp, etcd-exp-raw, etcd-h-metrics-handler, etcd-raft-hasleader, etcd-raft-checkquorum-stepdown]
+  - text: >-
+      只看 up 的規則（mixin etcdInsufficientMembers 是用 up 算過半）在「process 都在、彼此連不到」的網路分割下不會響。
+      這是從規則的式子與上一項推得的；lab 沒有載入 mixin，也沒有做網路分割情境。
+    evidence: inferred
+    source: etcd-lab
+    refs: [dbm-etcd-mixin-insufficient, etcd-exp-raw]
   - text: >-
       /readyz 在沒有 leader 時不是立刻回 503：linearizable read 要等到 ReqTimeout（5s + 2 × election timeout，預設 7 秒）才失敗。
       實測（主機時鐘）：第一次執行 7.02 秒回 503，第二次 10.00 秒回 503，兩次都另有一次超過 curl 的 10 秒逾時（容器時鐘比牆鐘慢約 30%，可能是 7 秒變 10 秒的原因）；
@@ -209,7 +214,8 @@ signals:
     metrics: [probe_success, etcd_network_known_peers, etcd_server_has_leader]
     evaluate_on: self
     silent_failure: >-
-      mixin etcdInsufficientMembers 用 up 算：process 都在、彼此分割時（up=1）不響，只有 scrape 失敗時也會響。
+      mixin etcdInsufficientMembers 用 up 算：process 都在、彼此分割時（up=1）不響，只有 scrape 失敗時也會響
+      （推論：由式子與「失去 quorum 時 up=1」的實測推得，lab 沒有載入 mixin、也沒做網路分割）。
       Prometheus 與 blackbox 一起和 etcd 斷開時這條也會響，要和 EtcdEndpointDown 一起看
     evidence: tested
     source: etcd-lab
