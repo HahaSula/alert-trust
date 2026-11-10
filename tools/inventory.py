@@ -29,8 +29,9 @@ the rest. Sections:
   questions             ranked by how many findings / rules the answer changes; at most 3 ask_now
 
 Answers file (env/<name>.sources.yaml) keys read here: job_names, producers, metrics, labels (as in
-check_metric_sources.py), plus version, ruler, external_observer, measured.<job>.{d_p99,d_max,up0_count},
-keep_range.<rule>. The inventory is facts and questions; advice comes from the later tools.
+check_metric_sources.py), plus version (the ruler's), target_versions.<job> (the database / server version behind a
+scrape job, e.g. mysql: "8.4.13"; check_coverage.py uses it for the cards' `versions`), ruler, external_observer,
+measured.<job>.{d_p99,d_max,up0_count}, keep_range.<rule>. The inventory is facts and questions; advice comes from the later tools.
 """
 from __future__ import annotations
 
@@ -797,6 +798,10 @@ def build(a) -> dict:
         for k in ("evaluation_interval", "rule_files_loaded", "alertmanagers"):
             stack[k] = V(None, "unknown")
         stack["rules_given_are_loaded"] = V("unknown", "unknown")
+    tv = answers.get("target_versions")
+    if isinstance(tv, dict) and tv:
+        stack["target_versions"] = V({str(k): str(v) for k, v in tv.items() if v is not None}, "user",
+                                     note="answers.target_versions：scrape job → 資料庫版本")
     eo = answers.get("external_observer")
     stack["external_observer"] = V(eo, "user") if eo is not None else V("unknown", "unknown")
     inv["stack"] = stack
@@ -1462,7 +1467,8 @@ def markdown(inv) -> str:
     names = {"ruler": "ruler", "version": "版本", "evaluation_interval": "`evaluation_interval`", "rule_files_loaded": "`rule_files`",
              "rules_given_are_loaded": "給的 rule 檔有被載入", "alertmanagers": "Alertmanager", "external_observer": "外部觀察者",
              "external_labels": "`external_labels`", "rule_query_offset": "`rule_query_offset`",
-             "scrape_interval": "global `scrape_interval`", "scrape_timeout": "global `scrape_timeout`"}
+             "scrape_interval": "global `scrape_interval`", "scrape_timeout": "global `scrape_timeout`",
+             "target_versions": "資料庫版本（依 job）"}
     for k, v in st.items():
         L.append(f"| {names.get(k, k)} | {_v(v)} |")
     L += ["", "## Scrape job", "", "| job | `scrape_interval` | `scrape_timeout` | target | target label | 丟掉的 metric | exporter | exporter 期限 | 實測 d_p99／d_max／up0 |",

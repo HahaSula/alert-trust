@@ -272,6 +272,7 @@ groups:
         for: 1m
         labels: { severity: critical, component: etcd, tier: "1", aspect: availability }
         annotations:
+          alert_trust_min_version: "3.6"
           summary: "{{ $labels.alarm_type }} alarm 啟動中（由 member {{ $labels.server_id }} 提出）；NOSPACE 時寫入全部被拒，要 compact、defrag 後再 etcdctl alarm disarm"
           description: "etcd_debugging_server_alarms 是「套用過幾次 activate」的計數，不是 0／1 狀態：重複提出會變 2，disarm 後可能停在 1，重啟的 member 沒有這條、disarm 後變 -1（lab 情境 F）。所以要和 /health 探測一起成立才告警；alarm_type 只拿來標示種類。這個 metric 3.6 以上才有，3.4、3.5 只剩 EtcdHealthProbeFailing"
           absence_covered_by: "EtcdHealthProbeFailing, EtcdHealthProbeMissing"

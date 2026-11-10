@@ -7,7 +7,8 @@
 
 Checks: required fields and enums, unique ids, every source/contract/rule reference resolves,
 every alerting rule has a runbook_url that points at an existing signal, every contract has an
-anchor in docs/contracts.md.
+anchor in docs/contracts.md, the optional `versions` field on signals ({min, max, note, refs}; min inclusive,
+max exclusive; refs must exist) and the rule annotation `alert_trust_min_version` (a version string).
 """
 from __future__ import annotations
 
@@ -27,6 +28,7 @@ def validate(root: str = C.ROOT) -> tuple[list[str], list[str]]:
     contracts = C.load_contracts(root)
     rules = C.load_rules(root)
     components = C.load_components(root)
+    all_refs = C.load_refs(root)
 
     for cid, c in contracts.items():
         if not C.ID_RE.match(cid):
@@ -88,6 +90,7 @@ def validate(root: str = C.ROOT) -> tuple[list[str], list[str]]:
                 if field not in s:
                     errors.append(f"{at}: 缺少 {field}")
             errors += [f"{at}: {e}" for e in C.check_metric_fields(s)]
+            errors += [f"{at}: {e}" for e in C.check_versions_field(s, all_refs)]
             if s.get("aspect") is not None and s.get("aspect") not in C.ASPECTS:
                 errors.append(f"{at}: aspect {s.get('aspect')!r} 要是 {', '.join(C.ASPECTS)} 之一")
             if s.get("tier") not in C.TIERS:
@@ -123,6 +126,9 @@ def validate(root: str = C.ROOT) -> tuple[list[str], list[str]]:
             errors.append(f"{ref}: runbook_url 指向不存在的訊號 {m.group(1)}#{m.group(2)}")
         if ref not in referenced_rules:
             warnings.append(f"{ref}: 沒有任何訊號引用這條規則")
+        mv = (rule.get("annotations") or {}).get(C.RULE_MIN_VERSION)
+        if mv is not None and (not isinstance(mv, str) or C.parse_version(mv) is None):
+            errors.append(f"{ref}: annotations.{C.RULE_MIN_VERSION} 要是加引號的版本字串（例如 \"2024.2\"），不是 {mv!r}")
         tier = (rule.get("labels") or {}).get("tier")
         if tier not in ("1", "2", "3"):
             errors.append(f"{ref}: labels.tier 要是字串 \"1\"、\"2\" 或 \"3\"")

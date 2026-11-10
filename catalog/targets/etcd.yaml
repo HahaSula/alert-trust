@@ -223,6 +223,7 @@ signals:
     evidence: tested
     source: etcd-lab
     refs: [etcd-exp-raw, etcd-exp-raw-v1, etcd-member-knownpeers, etcd-h-readyz-linear, dbm-etcd-mixin-insufficient, ver-et35-active-peers, ver-et36-known-peers]
+    versions: { min: "3.6", note: "3.4、3.5 沒有 etcd_network_known_peers，規則回傳空（不會響）；舊版成員數改用 etcd_network_active_peers + 1 或 up 計數", refs: [ver-et35-active-peers, ver-et36-known-peers] }
     upstream: { status: partial, note: "mixin etcdInsufficientMembers 用 up == bool 1 對 count(up) 過半" }
     rules: [rules/targets/etcd.yml#EtcdQuorumAtRisk]
 
@@ -269,6 +270,7 @@ signals:
     evidence: tested
     source: etcd-lab
     refs: [etcd-exp-raw, etcd-member-knownpeers, ver-et35-active-peers, ver-et36-known-peers]
+    versions: { min: "3.6", note: "3.4、3.5 沒有 etcd_network_known_peers，規則回傳空", refs: [ver-et35-active-peers, ver-et36-known-peers] }
     upstream: { status: partial, note: "mixin etcdMembersDown 看 up 與 peer 送出失敗" }
     rules: [rules/targets/etcd.yml#EtcdMembersNotScraped]
 
@@ -494,6 +496,7 @@ signals:
     evidence: tested
     source: etcd-lab
     refs: [etcd-exp-raw, etcd-feat-compacthash, etcd-feat-initialcorrupt, etcd-feat-metric, ver-et36-feature]
+    versions: { min: "3.6", note: "3.4、3.5 沒有 etcd_server_feature_enabled，只能看啟動參數", refs: [ver-et36-feature] }
     upstream: { status: no }
     rules: [rules/targets/etcd.yml#EtcdCorruptionCheckDisabled]
 

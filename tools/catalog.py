@@ -183,3 +183,81 @@ TARGET_MODELS = {"exporter": "required_signals", "native": "required_signals_nat
 def required_target_signals(pattern: dict, card: dict) -> list[dict]:
     """The standard questions for a target card, by its model (exporter is the default)."""
     return pattern.get(TARGET_MODELS.get(card.get("model", "exporter"), ""), []) or []
+
+
+# ---------- versions ----------
+# Optional signal field (catalog/targets/*.yaml):
+#   versions: {min: "3.6", max: "4.0", note: "...", refs: [ver-...]}
+# The signal's metrics exist only for versions v with  min <= v < max  (min inclusive, max exclusive: `max` is the
+# first version that no longer has them). At least one of min / max; note and refs optional (refs must exist).
+# Only for a signal that is version-bound as a whole; when one rule inside a signal is, the rule carries the
+# annotation `alert_trust_min_version: "x.y"` (same comparison, inclusive) instead.
+# The versions are the database / server version (MySQL, PostgreSQL, etcd...), not the exporter's.
+VERSION_KEYS = {"min", "max", "note", "refs"}
+RULE_MIN_VERSION = "alert_trust_min_version"
+_VERSION_RE = re.compile(r"(\d+(?:\.\d+)*)")
+
+
+def parse_version(v) -> tuple[int, ...] | None:
+    """"8.4.13", "v3.6.16", "2024.2.3.0", "26.8.3.1", "11.4.13-MariaDB", "PostgreSQL 16.4" -> int tuple;
+    None when there is no number (unknown, empty, None)."""
+    if v is None or isinstance(v, bool):
+        return None
+    m = _VERSION_RE.search(str(v).strip())
+    return tuple(int(x) for x in m.group(1).split(".")) if m else None
+
+
+def compare_versions(a, b) -> int:
+    """-1 / 0 / 1; missing trailing parts count as 0 ("3.6" == "3.6.0", "3.6" < "3.6.16")."""
+    pa, pb = parse_version(a), parse_version(b)
+    if pa is None or pb is None:
+        raise ValueError(f"版本無法比較：{a!r}、{b!r}")
+    n = max(len(pa), len(pb))
+    pa, pb = pa + (0,) * (n - len(pa)), pb + (0,) * (n - len(pb))
+    return (pa > pb) - (pa < pb)
+
+
+def version_in_range(v, versions: dict) -> bool | None:
+    """True / False for a known version, None when the version cannot be parsed."""
+    if parse_version(v) is None:
+        return None
+    if versions.get("min") is not None and compare_versions(v, versions["min"]) < 0:
+        return False
+    if versions.get("max") is not None and compare_versions(v, versions["max"]) >= 0:
+        return False
+    return True
+
+
+def version_range_text(versions: dict) -> str:
+    """'≥ 3.6', '< 4.0', '≥ 3.6、< 4.0'."""
+    parts = []
+    if versions.get("min") is not None:
+        parts.append(f"≥ {versions['min']}")
+    if versions.get("max") is not None:
+        parts.append(f"< {versions['max']}")
+    return "、".join(parts)
+
+
+def check_versions_field(signal: dict, refs: dict | None = None) -> list[str]:
+    """Shape of `versions` on a signal; refs must exist when `refs` (the loaded refs) is given."""
+    if "versions" not in signal:
+        return []
+    v = signal["versions"]
+    if not isinstance(v, dict):
+        return ["versions 要是 {min, max, note, refs}"]
+    errs = [f"versions 不認得 {k!r}（只有 min、max、note、refs）" for k in v if k not in VERSION_KEYS]
+    if v.get("min") is None and v.get("max") is None:
+        errs.append("versions 至少要有 min 或 max")
+    for k in ("min", "max"):
+        if v.get(k) is not None and (not isinstance(v[k], str) or parse_version(v[k]) is None):
+            errs.append(f"versions.{k} 要是加引號的版本字串（例如 \"3.6\"），不是 {v[k]!r}")
+    if not errs and v.get("min") is not None and v.get("max") is not None and compare_versions(v["min"], v["max"]) >= 0:
+        errs.append("versions.min 要小於 max（max 不含）")
+    if "note" in v and not (isinstance(v["note"], str) and v["note"].strip()):
+        errs.append("versions.note 要是非空字串")
+    if "refs" in v:
+        if not isinstance(v["refs"], list) or not all(isinstance(r, str) for r in v["refs"]):
+            errs.append("versions.refs 要是 ref key 清單")
+        elif refs is not None:
+            errs += [f"versions.refs 裡的 {r} 不存在" for r in v["refs"] if r not in refs]
+    return errs

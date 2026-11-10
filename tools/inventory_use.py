@@ -61,7 +61,8 @@ def job_names(inv: dict) -> set[str]:
 
 def answers(inv: dict, given: dict | None = None) -> dict:
     """The answers the inventory was built with (sources.answers, when it still exists), plus the user's own
-    edits in the inventory (exporter from user → producers, label answers, job names). `given` (--answers) wins."""
+    edits in the inventory (exporter from user → producers, label answers, job names, version, target_versions).
+    `given` (--answers) wins."""
     out: dict = {}
     src = (inv.get("sources") or {}).get("answers")
     if src and os.path.exists(src):
@@ -86,9 +87,23 @@ def answers(inv: dict, given: dict | None = None) -> dict:
         names = [j["name"] for j in inv.get("jobs") or [] if j.get("from") == "user" and not j.get("pattern")]
         if names:
             out["job_names"] = sorted(set(out.get("job_names") or []) | set(names))
+    st = inv.get("stack") or {}
+    if is_user(st.get("version")) and val(st.get("version")) is not None:
+        out.setdefault("version", val(st["version"]))
+    if is_user(st.get("target_versions")) and isinstance(val(st.get("target_versions")), dict):
+        tv = dict(val(st["target_versions"]))
+        tv.update(out.get("target_versions") or {})
+        out["target_versions"] = tv
     for k, v in (given or {}).items():
         out[k] = v
     return out
+
+
+def target_versions(inv: dict) -> dict[str, str]:
+    """job -> database / server version the user gave (answers.target_versions, kept in stack.target_versions)."""
+    node = (inv.get("stack") or {}).get("target_versions")
+    v = val(node)
+    return {str(k): str(x) for k, x in v.items()} if isinstance(v, dict) else {}
 
 
 def ms_jobs(inv: dict) -> list[dict]:

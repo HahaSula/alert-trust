@@ -33,6 +33,11 @@ Statuses
                   or env.yaml lists `features:` for it and the needed feature is not there (vocabulary: FEATURES,
                   documented in env/env.example.yaml). Without a features list the signal stays and the note
                   says 「需要回答：有沒有 X」.
+                  Also when the card's `versions` ({min, max}: min inclusive, max exclusive) excludes the
+                  component's env.yaml `version` (targets[].version / components[].version, the database or server
+                  version): 「版本 X 沒有這個 metric（需要 ≥ Y）」. Version unknown: the signal stays and the note
+                  says 「需要回答：版本」. A matched rule with annotations.alert_trust_min_version above a known
+                  version does not count (it returns nothing there); unknown version: the same question.
   needs_input     only an interview or inventory can answer it (e.g. the observer's failure domain); env values
                   `unknown` / `不知道` / empty are not answers
 
@@ -291,7 +296,7 @@ APPLIES_FEATURES = [  # (regex on applies_when, [any-of groups]); first match wi
 ]
 # conditions that are not features (flavour / version / flag notes): stay "需要回答" when they matter
 APPLIES_UNMAPPED = {"performance_schema=ON（MariaDB 預設 OFF，要重啟）", "要 --collect.info_schema.innodb_metrics",
-                    "thread_handling=one-thread-per-connection（預設）", "MariaDB 11.4 以上（slave_connections_needed_for_purge）",
+                    "thread_handling=one-thread-per-connection（預設）",
                     "PostgreSQL 17 以上要打開 --collector.stat_checkpointer",
                     "依賴時鐘的資料庫（YugabyteDB 的 hybrid clock、TiDB 的 TSO、MongoDB 的 wall time lag）"}
 # replication signals that only make sense on one side, although the card says just "replication"
@@ -301,6 +306,38 @@ SIGNAL_SIDE = {
         ("replica-status-present", "replication-replica"), ("replication-lag", "replication-replica"),
         ("replica-read-only", "replication-replica"), ("primary-writable", "replication-primary"))
 }
+
+
+# an applies_when that only states a version ("MariaDB 11.4 以上（...）"): answered by the signal's `versions`
+VERSION_ONLY_COND = re.compile(r"^[A-Za-z]+ \d+(\.\d+)* 以上(（[^）]*）)?$")
+
+
+def version_only_cond(signal: dict) -> bool:
+    cond = str(signal.get("applies_when") or "").strip()
+    return bool(signal.get("versions")) and bool(VERSION_ONLY_COND.match(cond))
+
+
+def env_version(comp: dict) -> str | None:
+    """The component's env.yaml `version` when it is an answer that parses as a version."""
+    v = comp.get("version")
+    return str(v) if answered(v) and C.parse_version(v) is not None else None
+
+
+VERSION_QUESTION = "需要回答：版本（env.yaml 的 version）"
+
+
+def version_gate(signal: dict, comp: dict) -> tuple[bool, str]:
+    """(applies, note) from the signal's `versions`."""
+    vr = signal.get("versions")
+    if not vr:
+        return True, ""
+    need = C.version_range_text(vr)
+    ver = env_version(comp)
+    if ver is None:
+        return True, f"{VERSION_QUESTION}；這個訊號的 metric 需要 {need}"
+    if C.version_in_range(ver, vr):
+        return True, ""
+    return False, f"版本 {ver} 沒有這個 metric（需要 {need}）" + (f"；{vr['note']}" if vr.get("note") else "")
 
 
 def feature_requirement(cond: str, card_id: str | None = None, signal_id: str | None = None) -> list[set] | None:
@@ -326,7 +363,7 @@ def applies(signal: dict, comp: dict, env: dict, card_id: str | None = None) -> 
     """(applies, note). not applicable only when env.yaml lists features for this component and the needed
     one is not there; without a features list the signal is kept and the note asks the question."""
     cond = str(signal.get("applies_when") or "").strip()
-    if not cond:
+    if not cond or version_only_cond(signal):
         return True, ""
     if cond == "cluster":
         if "mode" in comp and not answered(comp.get("mode")):
@@ -529,6 +566,9 @@ def evaluate(env: dict, snapshot: str | None, tiers: set[int], live: bool, scrap
                     "question": s["question"], "evaluate_on": s["evaluate_on"], "rules": [], "note": "",
                     "suggested_rules": s.get("rules", []), "runbook": C.runbook_url(card_id, s["id"])}
             ok, why = applies(s, comp, env, card_id)
+            if ok:
+                ok, vwhy = version_gate(s, comp)
+                why = vwhy if not ok else "；".join(x for x in (why, vwhy) if x)
             if not ok:
                 item.update(status="not_applicable", note=why)
                 items.append(item)
@@ -554,12 +594,28 @@ def evaluate(env: dict, snapshot: str | None, tiers: set[int], live: bool, scrap
                         continue
                     entry = {"ruler": rid, "alert": r.get("name"), "placement": placement(rid, rl[rid], comp),
                              "query": r.get("query", "")}
+                    mv = (r.get("annotations") or {}).get(C.RULE_MIN_VERSION)
+                    if mv is not None and C.parse_version(mv) is not None:
+                        entry["min_version"] = str(mv)
                     if s["id"] == "watchdog" and rid != comp["id"] and \
                             (rl[rid].get("_observer") or not (s["evaluate_on"] == "dedicated" and rl[rid].get("role") == "watchdog")):
                         foreign_wd.append(entry)  # another ruler's Watchdog proves that ruler is alive, not this one
                         continue
                     (item["rules"] if m == "ok" else mismatched).append(entry)
             item["mismatched_rules"] = mismatched
+            ver = env_version(comp)
+            gated = [r for r in item["rules"] if r.get("min_version")]
+            if gated and ver is None:
+                if VERSION_QUESTION not in "；".join(extra):
+                    extra.append(VERSION_QUESTION)
+                extra.append("、".join(f"`{r['alert']}` 需要 ≥ {r['min_version']}" for r in gated))
+            elif gated:
+                low = [r for r in gated if C.compare_versions(ver, r["min_version"]) < 0]
+                if low:
+                    item["version_excluded"] = low
+                    item["rules"] = [r for r in item["rules"] if r not in low]
+                    extra.append("、".join(f"`{r['alert']}` 在版本 {ver} 回傳空（需要 ≥ {r['min_version']}）" for r in low)
+                                 + "，不算涵蓋")
             if foreign_wd:
                 item["other_rulers_watchdog"] = foreign_wd
                 extra.append(f"{'、'.join(sorted({r['ruler'] for r in foreign_wd}))} 自己的 Watchdog 只證明它自己活著，"
@@ -680,6 +736,14 @@ def render_md(env: dict, items: list[dict], tiers: set[int]) -> str:
     return "\n".join(out)
 
 
+def fill_versions(env: dict, by_job: dict[str, str]) -> None:
+    """targets[] without an answered `version` take the one the answers gave for their job
+    (inventory stack.target_versions); env.yaml wins when it has one."""
+    for t in env.get("targets") or []:
+        if not answered(t.get("version")) and t.get("job") in by_job:
+            t["version"] = by_job[t["job"]]
+
+
 def inventory_rules(env: dict, inv: dict) -> dict[str, list[dict]]:
     """No snapshot: the inventory's rule files, evaluated by the env.yaml ruler of the inventory's ruler kind
     (the only ruler, or the first of that type)."""
@@ -716,6 +780,7 @@ def main(argv=None) -> int:
         if scrape_jobs is None and IU.has_config(inv):
             scrape_jobs = IU.job_names(inv)
         unscraped = IU.unscraped(inv)
+        fill_versions(env, IU.target_versions(inv))
         if not a.snapshot:
             override = inventory_rules(env, inv)
     if not a.snapshot and override is None:

@@ -573,7 +573,19 @@ def advice(rows: list[dict]) -> list[str]:
     return out
 
 
-def report(rows: list[dict], jobs: list[dict]) -> str:
+def answer_versions(answers: dict) -> dict:
+    """Versions the answers give, passed through to the output (answers.version = the ruler's,
+    answers.target_versions.<job> = the database behind that job). The metric checks do not use them."""
+    out = {}
+    if answers.get("version") is not None:
+        out["ruler"] = str(answers["version"])
+    tv = answers.get("target_versions")
+    if isinstance(tv, dict) and tv:
+        out["targets"] = {str(k): str(v) for k, v in tv.items() if v is not None}
+    return out
+
+
+def report(rows: list[dict], jobs: list[dict], versions: dict | None = None) -> str:
     out = ["# Metric 來源檢查\n", "每條 rule 讀到的 metric，都要找得到來源：scrape job、recording rule，或使用者確認。"
            "目錄裡的卡片只提示「通常由哪個 exporter 產生」，不算來源。\n"]
     adv = advice(rows)
@@ -584,6 +596,10 @@ def report(rows: list[dict], jobs: list[dict]) -> str:
     out.append("| 狀態 | 數量 |\n|---|---|")
     out += [f"| {LABEL[s]}（`{s}`） | {cnt[s]} |" for s in ORDER if cnt[s]]
     out.append("\n## Config 裡的 scrape job\n")
+    tv = (versions or {}).get("targets") or {}
+    if versions:
+        out.append("版本（answers）：" + "、".join(([f"ruler {versions['ruler']}"] if versions.get("ruler") else [])
+                                             + [f"job `{k}` {v}" for k, v in sorted(tv.items())]) + "\n")
     out.append("| job | metrics_path | 服務發現 | target label | 備註 |\n|---|---|---|---|---|")
     for j in jobs:
         extra = j["notes"] + ([f"module {j['module']}"] if j["module"] else []) + \
@@ -660,9 +676,10 @@ def main(argv=None) -> int:
     rows = check(rules, jobs, answers, live, C.ROOT)
     os.makedirs(a.out, exist_ok=True)
     with open(os.path.join(a.out, "metric-sources.md"), "w", encoding="utf-8") as f:
-        f.write(report(rows, jobs))
+        f.write(report(rows, jobs, answer_versions(answers)))
     with open(os.path.join(a.out, "metric-sources.json"), "w", encoding="utf-8") as f:
-        json.dump({"jobs": [{k: v for k, v in j.items() if k != "metric_relabel"} for j in jobs], "rows": rows},
+        json.dump({"jobs": [{k: v for k, v in j.items() if k != "metric_relabel"} for j in jobs], "rows": rows,
+                   "versions": answer_versions(answers)},
                   f, ensure_ascii=False, indent=2)
     cnt = {s: sum(1 for r in rows if r["status"] == s) for s in ORDER}
     print("  ".join(f"{LABEL[s]} {cnt[s]}" for s in ORDER if cnt[s]) or "沒有 rule")

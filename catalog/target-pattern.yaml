@@ -2,6 +2,16 @@
 # 或寫在卡片的 not_applicable（id: 理由）裡。
 # 卡片的 model 決定用哪一組：exporter（預設，required_signals）或 native（資料庫自己提供 /metrics，required_signals_native）。
 # 依據：mysqld_exporter 與 postgres_exporter 的實驗都踩到同樣的盲點。
+#
+# 版本條件（選填，validate 檢查格式與 refs）：
+#   整個訊號只在某些版本有 metric 時，訊號寫
+#     versions: { min: "3.6", max: "4.0", note: "舊版怎麼辦", refs: [ver-...] }
+#   版本指資料庫本身（不是 exporter）。範圍是 min ≤ 版本 < max：min 含、max 不含（max 是第一個「沒有」的版本）；
+#   min、max 至少一個，都要加引號。比較時只看數字部分（v3.6.16、11.4.13-MariaDB、2024.2.3.0 都可以），缺的位數當 0。
+#   signal 裡的「版本：…」說明照留。check_coverage.py 用 env.yaml 的 version 判斷 not_applicable 或「需要回答：版本」。
+#   只有訊號裡的某一條規則受版本限制時，不寫 versions，改在規則檔那條規則加
+#     annotations: { alert_trust_min_version: "2024.2" }   # 含；低於它時這條規則回傳空
+#   check_coverage.py 在版本已知且較低時不把這條規則算進涵蓋。
 required_signals:
   - id: exporter-up
     min_tier: 1

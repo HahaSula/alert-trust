@@ -149,6 +149,7 @@ signals:
     evidence: tested
     source: pg-q-lab
     refs: [pg-q-exp, pg-q-pg16-view-statwal, pg-q-pg17-view-statwal, pg-q-pg16-view-statio, pg-q-pg17-view-statio, ver-pg16-io, ver-pg18-io-wal, ver-pg18-io-bytes, ver-pg14-wal]
+    versions: { min: "16", note: "pg_stat_io 16 以上才有（pgq_io_*）；pg_stat_wal（pgq_wal_*）14 以上", refs: [ver-pg16-io, ver-pg14-wal] }
     upstream: { status: no }
     rules: [rules/targets/postgres.yml#PostgresWalBuffersFull, rules/targets/postgres.yml#PostgresBackendsWritingBuffers]
 
@@ -326,6 +327,7 @@ signals:
     evidence: tested
     source: pg-target-lab
     refs: [pg-exp-target, pg-c-slots-query, pg-src-wal-avail, ver-pg13-slot-walstatus, ver-pgx-slots-13, ver-pg17-slot-invalidation, ver-pg18-slot-idle-timeout, ver-pg18-guc-idle-slot]
+    versions: { min: "13", note: "wal_status、safe_wal_size 13 以上才有（exporter 13 以上才查）；12 以下 PostgresReplicationSlotLost 回傳空", refs: [ver-pg13-slot-walstatus, ver-pgx-slots-13] }
     upstream: { status: partial, note: "mixin 與 awesome 都有 slots_active == 0；都沒有 wal_status 或保留量" }
     rules:
       - rules/targets/postgres.yml#PostgresReplicationSlotInactive

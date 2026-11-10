@@ -315,6 +315,7 @@ groups:
         expr: increase(mongodb_ss_wt_checkpoint_total_failed_number_of_checkpoints{job="mongodb"}[15m]) > 0
         labels: { severity: critical, component: mongodb_exporter, tier: "2", aspect: protection }
         annotations:
+          alert_trust_min_version: "8.0"
           summary: "WiredTiger checkpoint 失敗；崩潰後要從更舊的 checkpoint 重播 journal"
           description: "失敗次數只在 MongoDB 8.0 以上有，6.0、7.0 上這條回傳空"
           runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#checkpoint

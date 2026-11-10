@@ -43,9 +43,21 @@ def marks(item: dict) -> str:
     return "".join(f"[^{k}]" for k in item.get("refs", []) or [])
 
 
+_RULES = None
+
+
+def ver_chip(versions: dict | None) -> str:
+    """「版本：≥ 3.6」 next to a version-bound signal (catalog `versions`)."""
+    return f" {chip('版本：' + C.version_range_text(versions), 'ver')}" if versions else ""
+
+
 def rule_link(ref: str) -> str:
+    global _RULES
+    if _RULES is None:
+        _RULES = C.load_rules()
     path, alert = ref.split("#", 1)
-    return f"[`{alert}`]({C.REPO_URL}/blob/main/{path})"
+    mv = ((_RULES.get(ref) or {}).get("annotations") or {}).get(C.RULE_MIN_VERSION)
+    return f"[`{alert}`]({C.REPO_URL}/blob/main/{path})" + (f" {chip('版本：≥ ' + str(mv), 'ver')}" if mv else "")
 
 
 _NAME = None
@@ -98,7 +110,7 @@ def component_page(card: dict, sources: dict, contracts: dict) -> str:
     for s in signals:
         n = len(s.get("rules", []))
         asp = f" {C.ASPECTS.get(s.get('aspect'), '—')} |" if use_aspect else ""
-        out.append(f"| {chip(str(s['tier']), 't' + str(s['tier']))} |{asp} [{esc(s['question'])}](#{s['id']}) | "
+        out.append(f"| {chip(str(s['tier']), 't' + str(s['tier']))} |{asp} [{esc(s['question'])}](#{s['id']}){ver_chip(s.get('versions'))} | "
                    f"{C.EVALUATE_ON[s['evaluate_on']]} | {up(s['upstream']['status'])} | {n if n else '—'} |")
     out.append("")
 
@@ -145,6 +157,10 @@ def component_page(card: dict, sources: dict, contracts: dict) -> str:
             rows.append(("在哪裡評估", where))
             if s.get("applies_when"):
                 rows.append(("適用條件", esc(s["applies_when"])))
+            if s.get("versions"):
+                v = s["versions"]
+                rows.append(("版本", ver_chip(v).strip() + (f" {esc(codeify(v['note']))}" if v.get("note") else "")
+                             + "".join(f"[^{k}]" for k in v.get("refs") or [])))
             if s.get("silent_failure"):
                 rows.append(("為什麼需要", esc(codeify(s["silent_failure"]))))
             rows.append(("證據", f"{ev(s['evidence'])} {src(s['source'], sources)}{marks(s)}"))

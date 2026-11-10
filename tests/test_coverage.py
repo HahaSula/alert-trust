@@ -123,7 +123,7 @@ class CoverageDbTest(unittest.TestCase):
             for s in card["signals"]:
                 cond = str(s.get("applies_when") or "").strip()
                 if not cond or cond in CC.APPLIES_UNMAPPED or cond in ("cluster", "kubernetes", "prometheus in env") \
-                        or cond.startswith("replicas"):
+                        or cond.startswith("replicas") or CC.version_only_cond(s):
                     continue
                 req = CC.feature_requirement(cond, card["id"], s["id"])
                 self.assertIsNotNone(req, f"{card['id']}#{s['id']}: applies_when {cond!r} 沒有對應的 feature")

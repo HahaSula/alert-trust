@@ -28,7 +28,8 @@ def convert(files: list[str]) -> dict:
             for r in g.get("rules", []) or []:
                 if "alert" in r:
                     rules.append({"type": "alerting", "name": r["alert"], "query": str(r.get("expr", "")),
-                                  "duration": r.get("for", "0s"), "labels": r.get("labels", {})})
+                                  "duration": r.get("for", "0s"), "labels": r.get("labels", {}),
+                                  "annotations": r.get("annotations") or {}})
                 elif "record" in r:
                     rules.append({"type": "recording", "name": r["record"], "query": str(r.get("expr", ""))})
             groups.append({"name": g.get("name"), "file": path, "interval": g.get("interval"),

@@ -107,3 +107,4 @@
 .at-fig .ah-ok { fill: var(--at-ok); }
 .at-fig .ok-mark { fill: var(--at-ok); }
 .at-fig .bad-mark { fill: var(--at-crit); }
+.at-chip.at-ver { background: var(--at-warn-bg); color: var(--at-warn); }

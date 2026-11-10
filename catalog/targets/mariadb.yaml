@@ -1111,6 +1111,7 @@ signals:
     evidence: tested
     source: art-mysql-asp
     refs: [my-asp-exp, my-asp-mdb-purge-needs-slave, my-asp-ex-binlog-query, spl-mdb114-purge-check, spl-mdb114-slaves-connected, ver-mdb114-purge-needed, ver-mdb114-max-binlog-total, ver-mdb114-binlog-disk-use]
+    versions: { min: "11.4", note: "slave_connections_needed_for_purge 11.4 起才有；10.6、10.11 沒有這個變數，MariaDBBinlogNotPurged 回傳空", refs: [ver-mdb114-purge-needed] }
     upstream: { status: no }
     rules: [rules/targets/mariadb.yml#MariaDBBinlogNotPurged, rules/targets/mariadb.yml#MariaDBDataDiskFillingSoon]
 
