@@ -3,6 +3,9 @@
 
   python3 tools/check_metric_sources.py --rules my-rules/*.yml --config prometheus.yml \
       [--answers env/<name>.sources.yaml] [--live snapshot/<id>/metric_jobs.json] --out report
+  python3 tools/check_metric_sources.py --inventory env/<name>.inventory.yaml --out report
+      (jobs, target labels, dropped metrics and the answers come from the inventory; --rules / --config /
+       --answers given on the command line still win)
 
 Never guesses. For each (rule, metric selector) it reports one status:
 
@@ -606,17 +609,30 @@ def report(rows: list[dict], jobs: list[dict]) -> str:
     return "\n".join(out) + "\n"
 
 
-def main() -> int:
+def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--rules", nargs="+", required=True, help="rule 檔（Prometheus 或 vmalert 格式）")
-    ap.add_argument("--config", action="append", default=[], help="prometheus.yml（可重複）")
-    ap.add_argument("--answers", help="使用者確認的來源（env/<name>.sources.yaml）")
+    ap.add_argument("--rules", nargs="+", help="rule 檔（Prometheus 或 vmalert 格式）；有 --inventory 時可省略")
+    ap.add_argument("--config", action="append", default=[], help="prometheus.yml（可重複）；給了就不用 inventory 的 job")
+    ap.add_argument("--inventory", help="tools/inventory.py 的 env/<name>.inventory.yaml：job、label、answers 從這裡讀")
+    ap.add_argument("--answers", help="使用者確認的來源（env/<name>.sources.yaml）；優先於 inventory 記的 answers")
     ap.add_argument("--live", help="collect.py 產生的 metric_jobs.json")
     ap.add_argument("--out", required=True)
-    a = ap.parse_args()
+    a = ap.parse_args(argv)
+    inv = None
+    if a.inventory:
+        import inventory_use as IU
+        inv = IU.load(a.inventory)
+    if not a.rules:
+        a.rules = list(((inv or {}).get("sources") or {}).get("rules") or [])
+        if not a.rules:
+            ap.error("要給 --rules（或 --inventory，裡面記了 rule 檔）")
     rules = load_rules(a.rules)
     jobs = [j for c in a.config for j in load_config(c)]
     answers = C._load(a.answers) or {} if a.answers else {}
+    if inv is not None:
+        if not a.config:
+            jobs = IU.ms_jobs(inv)
+        answers = IU.answers(inv, answers)
     live = None
     if a.live:
         with open(a.live, encoding="utf-8") as f:

@@ -19,7 +19,13 @@ the rest. Sections:
                         labels_out, Alertmanager route
   alertmanager          timings per route (with inheritance), receivers (empty ones), inhibit rules,
                         rules routed to an empty receiver, rules an inhibit rule always suppresses
-  findings_from_files   facts only, no advice
+  findings_from_files   facts only, no advice. Routing ones: route_label_missing (a route matcher needs a label the
+                        alert cannot carry: not in rule labels / external_labels / static or relabel target labels,
+                        and the expression drops it (certain) or only the exporter could add it (asked; the route
+                        then keeps depends_on_runtime_labels)), route_label_value_mismatch (close names, e.g.
+                        job="etcd" vs kube-etcd), critical_not_paging (critical rules whose only receivers are
+                        email / empty), routed_to_empty_receiver (grouped), inhibit_no_equal, dms_route_without_rule
+                        (an alertname="Watchdog" route but no such rule), no_watchdog_rule
   questions             ranked by how many findings / rules the answer changes; at most 3 ask_now
 
 Answers file (env/<name>.sources.yaml) keys read here: job_names, producers, metrics, labels (as in
@@ -282,7 +288,7 @@ def load_scrape(path: str, kind: str) -> dict:
             am_targets += [str(t) for t in (st or {}).get("targets") or []]
         if any(k.endswith("_sd_configs") for k in amc):
             am_targets.append("(service discovery)")
-    return {"global": g, "gS": gS, "gT": gT, "jobs": jobs, "rule_files": doc.get("rule_files"),
+    return {"global": g, "gS": gS, "gT": gT, "gS_raw": gS_raw, "gT_raw": gT_raw, "jobs": jobs, "rule_files": doc.get("rule_files"),
             "has_rule_files": "rule_files" in doc, "alerting": alerting, "am_targets": am_targets,
             "external_labels": {str(k): str(v) for k, v in (g.get("external_labels") or {}).items()},
             "alert_relabel": bool((alerting or {}).get("alert_relabel_configs")), "findings": findings}
@@ -481,6 +487,252 @@ def receiver_empty(r: dict) -> bool:
     return not any(k.endswith("_configs") and v for k, v in r.items())
 
 
+# ---------- labels on the alert's result (for routing) ----------
+
+_AGG_NAMES = {"sum", "min", "max", "avg", "count", "group", "stddev", "stdvar", "quantile", "count_values"}
+_KEEP_ALL_AGG = {"topk", "bottomk", "limitk", "limit_ratio"}  # keep the input series' labels
+
+
+def _close_paren(s: str, i: int) -> int:
+    """Index of the ')' matching the '(' at s[i] (skips strings)."""
+    depth, q = 0, None
+    for j in range(i, len(s)):
+        c = s[j]
+        if q:
+            if c == "\\":
+                continue
+            if c == q:
+                q = None
+            continue
+        if c in "\"'`":
+            q = c
+        elif c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                return j
+    return len(s) - 1
+
+
+def _split_args(s: str) -> list[str]:
+    out, depth, cur, q = [], 0, "", None
+    for c in s:
+        if q:
+            cur += c
+            if c == q:
+                q = None
+            continue
+        if c in "\"'`":
+            q = c
+        elif c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+        if c == "," and depth == 0:
+            out.append(cur)
+            cur = ""
+        else:
+            cur += c
+    if cur.strip():
+        out.append(cur)
+    return [x.strip() for x in out]
+
+
+def _depth0_split(expr: str, word: str) -> list[str]:
+    """Split at a top-level binary keyword (or / and / unless)."""
+    parts, depth, last, q = [], 0, 0, None
+    i = 0
+    while i < len(expr):
+        c = expr[i]
+        if q:
+            if c == q:
+                q = None
+        elif c in "\"'`":
+            q = c
+        elif c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+        elif depth == 0 and re.match(rf"\b{word}\b", expr[i:]) and (i == 0 or not (expr[i - 1].isalnum() or expr[i - 1] == "_")):
+            parts.append(expr[last:i])
+            i += len(word)
+            last = i
+            continue
+        i += 1
+    parts.append(expr[last:])
+    return [p.strip() for p in parts if p.strip()]
+
+
+def result_label(expr: str, label: str, _depth: int = 0) -> tuple[str, str | None]:
+    """Does the alert's result series carry `label`?  ("absent", None): the expression drops it (aggregation
+    without it in `by`, absent() without an equality matcher on it, vector()); ("value", v): it is set to v
+    (absent() with label="v"); ("made", None): label_replace / count_values / group_left write it; ("series", None):
+    it is kept from the input series (only the series' own labels can say). The left operand decides, as in
+    PromQL one-to-one matching; `or` keeps either side."""
+    e = expr.strip()
+    if _depth > 20 or not e:
+        return "series", None
+    gl = re.search(r"\bgroup_(left|right)\s*\(([^)]*)\)", e)
+    if gl and label in [x.strip() for x in gl.group(2).split(",")]:
+        return "made", None
+    ors = _depth0_split(e, "or")
+    if len(ors) > 1:
+        res = [result_label(p, label, _depth + 1) for p in ors]
+        kinds = {r[0] for r in res}
+        if "made" in kinds:
+            return "made", None
+        if kinds == {"absent"}:
+            return "absent", None
+        if kinds == {"value"} and len({r[1] for r in res}) == 1:
+            return res[0]
+        return "series", None  # either side may carry it
+    while e.startswith("(") and _close_paren(e, 0) == len(e) - 1:
+        e = e[1:-1].strip()
+    if e.startswith("("):
+        return result_label(e[1:_close_paren(e, 0)], label, _depth + 1)
+    m = re.match(r"([A-Za-z_][A-Za-z0-9_:]*)\s*", e)
+    if not m:
+        sc = re.match(r"[-+]?[0-9.]+(?:e[-+]?\d+)?\s*(?:==|!=|>=|<=|[-+*/%^<>])\s*(?:bool\s+)?(.+)$", e, re.S)
+        if sc:
+            return result_label(sc.group(1), label, _depth + 1)  # 1 - x: labels of x
+        if re.match(r"[-+]?[0-9.]", e):
+            return "absent", None  # scalar literal
+        return "series", None
+    word, rest_i = m.group(1), m.end()
+    low = word.lower()
+    if low in _AGG_NAMES | _KEEP_ALL_AGG:
+        grouping, glist = None, []
+        g = re.match(r"(by|without)\s*\(([^)]*)\)\s*", e[rest_i:], re.I)
+        if g:
+            grouping, glist = g.group(1).lower(), [x.strip() for x in g.group(2).split(",") if x.strip()]
+            rest_i += g.end()
+        if rest_i >= len(e) or e[rest_i] != "(":
+            return "series", None
+        close = _close_paren(e, rest_i)
+        args = _split_args(e[rest_i + 1:close])
+        if grouping is None:
+            g = re.match(r"\s*(by|without)\s*\(([^)]*)\)", e[close + 1:], re.I)
+            if g:
+                grouping, glist = g.group(1).lower(), [x.strip() for x in g.group(2).split(",") if x.strip()]
+        inner = args[-1] if args else ""
+        if low == "count_values" and args and args[0].strip("\"'`") == label:
+            return "made", None
+        if low in _KEEP_ALL_AGG and grouping is None:
+            return result_label(inner, label, _depth + 1)
+        if grouping == "by":
+            return result_label(inner, label, _depth + 1) if label in glist else ("absent", None)
+        if grouping == "without":
+            return ("absent", None) if label in glist else result_label(inner, label, _depth + 1)
+        if low in _KEEP_ALL_AGG:
+            return result_label(inner, label, _depth + 1)
+        return "absent", None
+    if rest_i < len(e) and e[rest_i] == "(":
+        close = _close_paren(e, rest_i)
+        args = _split_args(e[rest_i + 1:close])
+        if low in ("absent", "absent_over_time"):
+            for s in MS.selectors(args[0] if args else ""):
+                for (l, op, v) in s["matchers"]:
+                    if l == label and op == "=":
+                        return "value", v
+            return "absent", None
+        if low in ("vector", "time", "scalar", "pi"):
+            return "absent", None
+        if low in ("label_replace", "label_join"):
+            if len(args) > 1 and args[1].strip("\"'`") == label:
+                return "made", None
+            return result_label(args[0] if args else "", label, _depth + 1)
+        if low == "histogram_quantile" and len(args) > 1:
+            return result_label(args[1], label, _depth + 1)
+        for arg in args:
+            if not re.fullmatch(r"[-+]?[0-9.e]+|\"[^\"]*\"|'[^']*'", arg):
+                return result_label(arg, label, _depth + 1)
+        return "absent", None
+    return "series", None  # a vector selector: the series' own labels
+
+
+def route_label_gaps(e: dict, expr: str, tree: dict, by_job: dict, cfg_jobs: list, matched: set, gaps: dict,
+                     ans_labels: dict | None = None) -> list[str]:
+    """Labels a route matcher needs that the alert does not carry (rule labels, external_labels and target labels
+    checked first). A label the expression drops (aggregation, absent(), up/scrape_* without it) is set to absent
+    in e['_lab'] and recorded in gaps[(label, 'absent')]; returns the labels only the exporter could still add
+    (not aggregated, the matched jobs add no such label), which stay runtime-dependent."""
+    lab = e["_lab"]
+    ans_labels = ans_labels or {}
+    cands: dict[str, list] = {}
+    for n in tree["nodes"]:
+        ms = n["matchers"]
+        for (l, op, v) in ms:
+            if l == "alertname" or (l in lab and l != "__other__") or fullmatch(op, v, ""):
+                continue
+            if eval_matchers([m for m in ms if m[0] != l], lab)[0] == "no":
+                continue  # this route is not for the alert anyway
+            cands.setdefault(l, []).append((op, v))
+    cond = []
+    for L in sorted(cands):
+        if L in ALERT_LEVEL_LABELS:
+            lab[L] = ""  # set by the rule's labels or not at all: a rule without it simply does not take this route
+            continue
+        ans = ans_labels.get(L)
+        if ans is not None:
+            if ans.strip().lower() in MS.NO_LABEL:
+                lab[L] = ""
+                gaps.setdefault((L, "absent"), {})[e["name"]] = None
+            else:
+                lab[L] = None
+            continue
+        kind, val = result_label(expr, L)
+        if kind == "value":
+            lab[L] = val
+            continue
+        if kind == "made":
+            lab[L] = None
+            continue
+        if "__other__" in lab:
+            gaps.setdefault((L, "absent"), {})[e["name"]] = None  # up / scrape_*: only target labels
+            continue
+        if kind == "series" and L == "job":  # every scraped series has it: the matched job names
+            lab[L] = set(matched) if matched else None
+            continue
+        if kind == "series" and L == "instance":
+            lab[L] = None
+            continue
+        sels = [s.get("metric") or "" for s in MS.selectors(expr)]
+        if kind == "series" and sels and all(m == "up" or m.startswith("scrape_") for m in sels):
+            kind = "absent"  # up / scrape_* carry only target labels (checked below would say the same)
+            js = [by_job[j] for j in matched if j in by_job] if matched else list(cfg_jobs)
+            if not js or any(L in j["target_labels"]["from_static"] or L in j["target_labels"]["from_relabel"]
+                             or j["target_labels"]["open"] or j["sd"] != ["static_configs"] for j in js):
+                lab[L] = None
+                continue
+        if kind == "absent":
+            lab[L] = ""
+            js = [by_job[j] for j in matched if j in by_job]
+            static = {x for j in js for x in j["target_labels"]["from_static"].get(L, [])}
+            if static and not any(fullmatch(op, v, x) for op, v in cands[L] for x in static):
+                continue  # the series carry another value (cluster=main vs a route for cluster=other): not meant for it
+            gaps.setdefault((L, "absent"), {})[e["name"]] = None
+            continue
+        js = [by_job[j] for j in matched if j in by_job] if matched else list(cfg_jobs)
+        if not js:
+            continue  # no config for these jobs: only the series can tell
+        if any(L in j["target_labels"]["from_static"] or L in j["target_labels"]["from_relabel"] or j["target_labels"]["open"]
+               or j["sd"] != ["static_configs"] for j in js):
+            continue
+        cond.append(L)
+    return cond
+
+
+def _sev_critical(v) -> bool:
+    return isinstance(v, str) and v.lower() in ("critical", "page", "p1", "sev1")
+
+
+EMAIL_LIKE = {"email_configs"}
+# labels only an alerting rule's `labels` set (never the series): a rule without one just does not take that route
+ALERT_LEVEL_LABELS = {"severity", "priority"}
+WATCHDOG_NAME = re.compile(r"watchdog|dead.?man|dms\b", re.I)
+
+
 # ---------- main model ----------
 
 def build(a) -> dict:
@@ -502,6 +754,8 @@ def build(a) -> dict:
     stack = {"ruler": ruler,
              "version": V(answers.get("version"), "user") if answers.get("version") else V(None, "unknown")}
     if cfg:
+        stack["scrape_interval"] = V(fmt(cfg["gS"]), "file" if cfg["gS_raw"] else "default")
+        stack["scrape_timeout"] = V(fmt(cfg["gT"]), "file" if cfg["gT_raw"] else "default")
         if kind["value"] == "vmagent":
             stack["evaluation_interval"] = V(None, "unknown", note="vmalert -evaluationInterval（預設 1m），不在 scrape 設定裡")
             stack["rule_files_loaded"] = V(None, "unknown", note="vmalert 用 -rule 參數載入")
@@ -725,6 +979,8 @@ def build(a) -> dict:
     keep_ans = answers.get("keep_range") or {}
     ext = cfg["external_labels"] if cfg else {}
     fires_by: dict[tuple, list] = {}
+    route_gaps: dict[tuple, dict] = {}
+    route_values: dict[tuple, dict] = {}
     for e in rules_out:
         if "_sels" not in e:
             continue
@@ -829,7 +1085,34 @@ def build(a) -> dict:
             lo = {str(k): str(v) for k, v in (r.get("labels") or {}).items()}
             e["labels_out"] = lo
             if tree:
+                cond = route_label_gaps(e, r_expr, tree, by_job, cfg_jobs, rule_jobs_used.get(name, set()), route_gaps,
+                                        ans_labels)
                 e["route"] = route_for(tree, e["_lab"])
+                if cond:
+                    alt = route_for(tree, dict(e["_lab"], **{l: "" for l in cond}))
+                    for l in cond:
+                        route_gaps.setdefault((l, "exporter"), {}).setdefault(name, alt["receivers"])
+                for (l, kind), rs in route_gaps.items():
+                    if kind == "absent" and name in rs:
+                        rs[name] = e["route"]["receivers"]
+                for n in tree["nodes"][1:]:
+                    res = [(m, eval_matchers([m], e["_lab"])[0]) for m in n["matchers"]]
+                    no = [m for m, x in res if x == "no"]
+                    if len(no) != 1 or len(res) < 2 or any(x != "yes" for m, x in res if m is not no[0]) \
+                            or no[0][0] == "alertname" or no[0][0] in ALERT_LEVEL_LABELS:
+                        continue
+                    l = no[0][0]
+                    v = e["_lab"].get(l, e["_lab"].get("__other__"))
+                    if v in (None, "") or n["path"] in {m["path"] for m in e["route"]["matches"]} \
+                            or n["eff"]["receiver"]["value"] in e["route"]["receivers"]:
+                        continue
+                    want = next(x for (ll, op, x) in n["matchers"] if ll == l)
+                    vs = [v] if isinstance(v, str) else sorted(v)
+                    if not any(want.lower() in x.lower() or x.lower() in want.lower()
+                               or difflib.SequenceMatcher(None, want, x).ratio() >= 0.6 for x in vs):
+                        continue  # a different value on purpose (another cluster / team): normal routing
+                    shown = "／".join(vs)
+                    route_values.setdefault((n["path"], l), {})[name] = (shown, e["route"]["receivers"])
             else:
                 e["route"] = V(None, "unknown", note="沒有 alertmanager.yml")
     inv["rules"] = rules_out
@@ -881,7 +1164,7 @@ def build(a) -> dict:
             if am.get(k):
                 amo[k] = [t.get("name") for t in am[k]]
         alerts = [e for e in rules_out if e["kind"] == "alert" and isinstance(e.get("route"), dict) and "receivers" in e["route"]]
-        unr = []
+        unr, to_empty = [], {}
         for e in alerts:
             rt = e["route"]
             hit = [o for o in rt["matches"] if o["receiver"] in empty]
@@ -890,13 +1173,66 @@ def build(a) -> dict:
                 unr.append({"rule": e["name"], "receiver": hit[0]["receiver"], "certain": certain,
                             "severity": e["labels_out"].get("severity")})
                 if certain or len(rt["receivers"]) == 1:
-                    findings.append({"kind": "routed_to_empty_receiver", "rule": e["name"],
-                                     "fact": f"{e['name']}（severity {e['labels_out'].get('severity', '—')}）會送到空的 receiver {hit[0]['receiver']}"
-                                             + ("" if certain else "（依 runtime label 而定）")})
+                    to_empty.setdefault((hit[0]["receiver"], certain), []).append(e)
             if rt["receivers"] and any(x not in receivers for x in rt["receivers"]):
                 findings.append({"kind": "receiver_undefined", "rule": e["name"],
                                  "fact": f"{e['name']} 路由到的 receiver {rt['receivers']} 不在 receivers 清單"})
         amo["unrouted_or_blackholed_rules"] = unr
+        for (rcv, certain), es in to_empty.items():
+            names = [x["name"] for x in es]
+            crit = [x["name"] for x in es if _sev_critical(x["labels_out"].get("severity"))]
+            findings.append({"kind": "routed_to_empty_receiver", "rules": names, "receiver": rcv, "certain": certain,
+                             "fact": f"{len(names)} 條 rule 會送到空的 receiver {rcv}" + ("" if certain else "（依 runtime label 而定）")
+                                     + (f"，其中 critical {len(crit)} 條" if crit else "")
+                                     + f"：{', '.join(names[:8])}{' 等' if len(names) > 8 else ''}"})
+        # route labels no rule carries
+        for (l, kind), rs in sorted(route_gaps.items()):
+            names = sorted(rs)
+            recv = sorted({x for v in rs.values() for x in (v or [])})
+            need = "；".join(f"{n['path']}：{mtext(n['matchers'])} → {n['eff']['receiver']['value']}"
+                            for n in nodes if any(m[0] == l for m in n["matchers"]))
+            cert = kind == "absent"
+            fact = (f"route 要求 `{l}`，這些 rule 都沒有" + ("" if cert else f"（除非 exporter 自己輸出 `{l}`）")
+                    + f"，實際會送到 {'、'.join(recv) or '—'}：{', '.join(names[:8])}{' 等' if len(names) > 8 else ''}"
+                    f"（{need}；" + ("聚合、absent() 或 up 拿掉了這個 label，" if cert else "rule 沒有聚合，")
+                    + "rule labels、external_labels、static／relabel target label 都沒有）")
+            findings.append({"kind": "route_label_missing", "label": l, "certain": cert, "rules": names,
+                             "fallback": recv, "fact": fact})
+        for (path, l), rs in sorted(route_values.items()):
+            n = next(x for x in nodes if x["path"] == path)
+            names = sorted(rs)
+            vals = sorted({v for v, _ in rs.values()})
+            recv = sorted({x for _, rv in rs.values() for x in rv})
+            findings.append({"kind": "route_label_value_mismatch", "label": l, "route": path, "values": vals, "rules": names,
+                             "fallback": recv, "receiver": n["eff"]["receiver"]["value"],
+                             "fact": f"route（{mtext(n['matchers'])} → {n['eff']['receiver']['value']}）要 {l}{next(op + chr(34) + v + chr(34) for (x, op, v) in n['matchers'] if x == l)}，"
+                                     f"這些 rule 的 {l} 是 {'、'.join(vals)}（名稱相近，像是寫錯），實際會送到 {'、'.join(recv)}：{', '.join(names[:8])}{' 等' if len(names) > 8 else ''}"})
+        # critical alerts that only reach email / empty receivers
+        by_kind = {x["name"]: x for x in recv_out}
+        nopage: dict[tuple, list] = {}
+        for e in alerts:
+            if not _sev_critical(e["labels_out"].get("severity")):
+                continue
+            rv = e["route"]["receivers"]
+            if rv and all(x in by_kind and (by_kind[x]["empty"] or set(by_kind[x]["kinds"]) <= EMAIL_LIKE) for x in rv):
+                nopage.setdefault(tuple(rv), []).append(e["name"])
+        for rv, names in nopage.items():
+            what = "、".join(f"{x}（{'空' if by_kind[x]['empty'] else 'email'}）" for x in rv)
+            findings.append({"kind": "critical_not_paging", "rules": names, "receivers": list(rv),
+                             "fact": f"{len(names)} 條 severity critical 的 rule 只會送到 {what}，不會 page："
+                                     f"{', '.join(names[:8])}{' 等' if len(names) > 8 else ''}"})
+        # Watchdog / dead man's switch route without a Watchdog rule
+        alert_names = [e["name"] for e in rules_out if e["kind"] == "alert"]
+        for n in nodes:
+            wm = [(op, v) for (l, op, v) in n["matchers"] if l == "alertname" and op in ("=", "=~")]
+            recv = n["eff"]["receiver"]["value"] or ""
+            if not wm or not any(fullmatch(op, v, "Watchdog") or WATCHDOG_NAME.search(v) for op, v in wm) and \
+                    not WATCHDOG_NAME.search(recv):
+                continue
+            if not any(all(fullmatch(op, v, a) for op, v in wm) for a in alert_names):
+                findings.append({"kind": "dms_route_without_rule", "route": n["path"], "receiver": recv,
+                                 "fact": f"alertmanager 有給 {mtext(n['matchers'])} 的 route（→ {recv}），但給的 rule 檔沒有這條 rule："
+                                         "dead man's switch 收不到心跳（Watchdog 可能在別的檔案）"})
         inh_out = []
         for ih in am.get("inhibit_rules") or []:
             src, tgt = am_matchers(ih, "source_"), am_matchers(ih, "target_")
@@ -926,6 +1262,15 @@ def build(a) -> dict:
                     if cond_always:
                         findings.append({"kind": "always_inhibited", "rule": e["name"],
                                          "fact": f"{', '.join(cond_always)} 在響時 {e['name']} 一定被抑制（equal: {equal or '無'}）"})
+            if not equal:
+                tnames = [e["name"] for e in alerts if eval_matchers(tgt, single(e["_lab"]))[0] != "no"
+                          and e["name"] not in srules]
+                findings.append({"kind": "inhibit_no_equal", "source": mtext(src), "target": mtext(tgt),
+                                 "source_rules": srules, "target_rules": tnames,
+                                 "fact": f"inhibit（{mtext(src)} 抑制 {mtext(tgt)}）沒有 `equal`：任何一台的 source alert 在響時，"
+                                         f"所有 instance／叢集符合 target 的 alert 都被抑制"
+                                         + (f"（source rule：{', '.join(srules[:5])}；可能被抑制：{len(tnames)} 條"
+                                            + (f"，例如 {', '.join(tnames[:5])}" if tnames else "") + "）" if srules or tnames else "")})
             inh_out.append({"source": mtext(src), "target": mtext(tgt), "equal": equal, "source_rules": srules,
                             "suppressed": pairs})
         amo["inhibit"] = inh_out
@@ -939,6 +1284,14 @@ def build(a) -> dict:
 
     for e in rules_out:
         e.pop("_lab", None)
+
+    alerts_all = [e["name"] for e in rules_out if e["kind"] == "alert"]
+    if alerts_all and not any(WATCHDOG_NAME.search(n or "") for n in alerts_all):
+        dms = am is not None and any(f["kind"] == "dms_route_without_rule" for f in findings)
+        findings.append({"kind": "no_watchdog_rule",
+                         "fact": "給的 rule 檔沒有 Watchdog（一直在響、送到外部 dead man's switch 的 rule）"
+                                 + ("" if dms else "；alertmanager.yml 也沒有給 Watchdog 的 route" if am is not None else "")
+                                 + "：ruler 或 Alertmanager 停掉時，沒有任何 alert 會說出來"})
 
     # dedupe findings, drop internal keys
     seen, fl = set(), []
@@ -1016,6 +1369,19 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
         qs.append({"q": "確認 exporter：" + "、".join(f"{j['name']} = {j['exporter']['value']}？" for j in hinted) + "（版本與參數）",
                    "changes": ["exporter 期限", "metric 來源", "目錄卡片"], "affects": n,
                    "findings": cnt("exporter_deadline_ge_timeout"), "answer_key": "producers"})
+    for f in [f for f in findings if f["kind"] == "route_label_missing"]:
+        sib = [x for x in findings if x["kind"] == "route_label_missing" and x["label"] == f["label"]]
+        if f is not sib[0]:
+            continue
+        sib = [x for x in sib if not x["certain"]]
+        if not sib:
+            continue  # the expression drops the label: nothing to ask, the fix is in the rule or the route
+        names = sorted({n for x in sib for n in x["rules"]})
+        recv = sorted({n for x in sib for n in x["fallback"]})
+        qs.append({"q": f"route 要 `{f['label']}` label：exporter 會輸出 `{f['label']}` 嗎（沒有聚合的 rule 才用得到）？"
+                        f"還是要在 rule 的 labels 或 relabel 加？沒有的話 {len(names)} 條 rule 會送到 {'、'.join(recv)}",
+                   "changes": ["每條 rule 送到哪個 receiver", "critical 會不會 page"], "affects": len(names),
+                   "findings": len(sib) + cnt("critical_not_paging"), "answer_key": f"labels.{f['label']}"})
     lbl = {}
     for r in rules:
         for l in r.get("labels_required", []):
@@ -1093,7 +1459,8 @@ def markdown(inv) -> str:
     L += ["", "## 監控體系", "", "| 項目 | 值 |", "|---|---|"]
     names = {"ruler": "ruler", "version": "版本", "evaluation_interval": "`evaluation_interval`", "rule_files_loaded": "`rule_files`",
              "rules_given_are_loaded": "給的 rule 檔有被載入", "alertmanagers": "Alertmanager", "external_observer": "外部觀察者",
-             "external_labels": "`external_labels`", "rule_query_offset": "`rule_query_offset`"}
+             "external_labels": "`external_labels`", "rule_query_offset": "`rule_query_offset`",
+             "scrape_interval": "global `scrape_interval`", "scrape_timeout": "global `scrape_timeout`"}
     for k, v in st.items():
         L.append(f"| {names.get(k, k)} | {_v(v)} |")
     L += ["", "## Scrape job", "", "| job | `scrape_interval` | `scrape_timeout` | target | target label | 丟掉的 metric | exporter | exporter 期限 | 實測 d_p99／d_max／up0 |",

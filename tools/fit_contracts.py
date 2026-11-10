@@ -60,6 +60,12 @@ Other rules the report follows:
   - --prom-version below 2.53: `query_offset` is shown as unavailable.
   - vmalert with --latency unknown: L = S of the job (conservative), stated as an assumption.
   - Section 5 skips rules that detect absence (absent(), unless, up == 0, absence_covered_by, *Missing names).
+  - --inventory env/<name>.inventory.yaml (tools/inventory.py): stack (ruler → --stack, version, evaluation_interval,
+    rule_query_offset, global scrape_interval / scrape_timeout), per job interval, effective timeout, exporter,
+    exporter deadline (from: user), measured d_max / d_p99, rules' keep_range, and rules that never / always fire
+    (no data). Precedence: flags > inventory from: user / confirmed > --config > other inventory values.
+  - Neither flags, --config nor --inventory give S / E: Prometheus defaults scrape_interval 1m, scrape_timeout 10s,
+    evaluation_interval 1m are used and listed as assumptions (no error).
 """
 from __future__ import annotations
 
@@ -219,7 +225,8 @@ def exporter_deadline(a, job, tau: float | None) -> tuple[float | None, str]:
     if exp not in EXPORTER_DEADLINE or tau is None:
         return None, ""
     kind, v, _, text = EXPORTER_DEADLINE[exp]
-    how = "--job-exporter" if job in a.job_exporter_flag else "由 rule 的 metric 前綴推斷"
+    how = (getattr(a, "job_exporter_src", None) or {}).get(job) or \
+        ("--job-exporter" if job in a.job_exporter_flag else "由 rule 的 metric 前綴推斷")
     return (v if kind == "fixed" else tau - v), f"{text}；exporter 是{how}"
 
 
@@ -433,6 +440,10 @@ def analyze(a, docs):
         if st and not nodata:
             nodata = True
             notes = notes + [f"check_metric_sources：{st}"]
+        inv_nd = (getattr(a, "nodata_rules", None) or {}).get(rule_name)
+        if inv_nd and not nodata:
+            nodata = True
+            notes = notes + [inv_nd]
         I = eff_interval(P["S"], P["d"])
         if a.stack == "vmalert" and a.dedup:
             I = max(I, a.dedup)  # VictoriaMetrics keeps one sample per -dedup.minScrapeInterval
@@ -581,7 +592,7 @@ def for_checks(a, docs, skipped: list | None = None) -> list[dict]:
                     if MS.ABSENT_FUNCS & set(MS.enclosing_funcs(expr, sel["pos"])):
                         continue
                     job, _, _, nodata = resolve_job(a, sel["matchers"])
-                    if nodata or source_status(a, r["alert"], m or ""):
+                    if nodata or source_status(a, r["alert"], m or "") or r["alert"] in (getattr(a, "nodata_rules", None) or {}):
                         continue  # no data at all: reported in the no-data section instead
                     by_job.setdefault(job, []).append(expr[sel["pos"]:sel["end"]])
                 if not by_job:
@@ -1052,6 +1063,89 @@ def apply_config(a, paths: list[str]) -> None:
                          f"job：{', '.join(f'{j} S {fmt(a.job_interval[j])}／有效 τ {fmt(a.job_timeout[j])}' for j in sorted(a.cfg_jobs))}{clamp}）")
 
 
+def apply_inventory(a, inv: dict, user_only: bool) -> None:
+    """Fill S / τ / E / O, per-job interval / effective timeout / exporter / measured d and p99, keep_range and
+    the never/always-firing rules from env/<name>.inventory.yaml (tools/inventory.py). Flags already set win.
+    user_only=True takes only values marked from: user / confirmed (they also beat --config); the second pass
+    takes the rest (from: file / default / hint)."""
+    import inventory_use as IU
+    take = IU.is_user if user_only else IU.known
+    st = inv.get("stack") or {}
+    if a.E is None and take(st.get("evaluation_interval")):
+        a.E = dur(IU.val(st["evaluation_interval"]))
+    if a.O is None and take(st.get("rule_query_offset")):
+        a.O = dur(IU.val(st["rule_query_offset"]))
+    if a.S is None and take(st.get("scrape_interval")):
+        a.S = dur(IU.val(st["scrape_interval"]))
+    if a.timeout is None and take(st.get("scrape_timeout")):
+        a.timeout = dur(IU.val(st["scrape_timeout"]))
+    used = []
+    for j in IU.config_jobs(inv) if IU.has_config(inv) else []:
+        name = j["name"]
+        iv, to = j.get("interval") or {}, j.get("timeout") or {}
+        if take(iv) and name not in a.job_interval:
+            a.job_interval[name] = dur(IU.val(iv))
+        S = a.job_interval.get(name, a.S)
+        if take(to) and name not in a.job_timeout:
+            raw = dur(IU.val(to))
+            eff = dur(to.get("effective")) if to.get("effective") and not IU.is_user(to) else raw
+            if a.config_kind == "vmagent" and S is not None and raw is not None and raw > S:
+                a.tau_clamped[name] = raw
+                eff = S
+            a.job_timeout[name] = eff
+        ex = j.get("exporter") or {}
+        if take(ex) and IU.val(ex) in EXPORTER_DEADLINE and name not in a.job_exporter:
+            a.job_exporter[name] = IU.val(ex)
+            a.job_exporter_src[name] = "inventory 使用者確認" if IU.is_user(ex) else \
+                f"inventory 推測（{ex.get('basis') or '目錄卡片'}，要確認）"
+        xd = j.get("exporter_deadline") or {}
+        if IU.is_user(xd) and IU.val(xd) and name not in a.exporter_deadline:
+            a.exporter_deadline[name] = dur(IU.val(xd))
+        m = j.get("measured") or {}
+        if m.get("from") == "user":
+            if m.get("d_max") and name not in a.job_duration:
+                a.job_duration[name] = dur(m["d_max"])
+            if m.get("d_p99") and name not in a.job_p99:
+                a.job_p99[name] = dur(m["d_p99"])
+        if name in a.job_interval:
+            used.append(name)
+    if user_only:
+        return
+    if IU.has_config(inv):
+        names = IU.job_names(inv)
+        a.cfg_jobs = names if a.cfg_jobs is None else set(a.cfg_jobs) | names
+    a.keep_range = list(dict.fromkeys(list(a.keep_range) + IU.keep_range(inv)))
+    a.nodata_rules = dict(IU.nodata_rules(inv), **(getattr(a, "nodata_rules", None) or {}))
+    ev = st.get("evaluation_interval") or {}
+    if IU.has_config(inv) or IU.known(ev):
+        a.assumptions.append(f"S、τ、E、job 由 inventory `{inv.get('_path')}` 讀入（E {fmt(a.E) if a.E else '—'}"
+                         f"（{ev.get('from', 'unknown')}）；job：" + (", ".join(
+                             f"{j} S {fmt(a.job_interval[j])}／有效 τ {fmt(a.job_timeout[j]) if j in a.job_timeout else '—'}"
+                             for j in sorted(used)) or "—") + "）；inventory 標 from: user／confirmed 的值優先於 --config，"
+                             "命令列參數優先於 inventory")
+    if a.nodata_rules:
+        a.assumptions.append(f"inventory 判定永遠不會響或一直在響的 {len(a.nodata_rules)} 條 rule 當成「沒有資料」，契約不適用")
+
+
+def apply_defaults(a) -> None:
+    """No S / E from flags, config or inventory: Prometheus / vmagent defaults (scrape_interval 1m,
+    scrape_timeout 10s, evaluation_interval 1m), stated as assumptions instead of an error."""
+    who = "vmagent／vmalert" if a.stack == "vmalert" else "Prometheus"
+    if a.S is None:
+        a.S = 60.0
+        if a.timeout is None:
+            a.timeout = 10.0
+            a.assumptions.append(f"沒有 `scrape_interval`／`scrape_timeout`（沒給 --config、--inventory 或參數）：用 {who} 預設 "
+                                 "`scrape_interval` 1m、`scrape_timeout` 10s；給 config 後結論可能改變")
+        else:
+            a.assumptions.append(f"沒有 `scrape_interval`：用 {who} 預設 1m；給 config 後結論可能改變")
+    if a.E is None:
+        a.E = 60.0
+        a.assumptions.append(f"沒有 `evaluation_interval`：用 {who} 預設 1m"
+                             + ("（vmalert `-evaluationInterval`）" if a.stack == "vmalert" else "")
+                             + "；group 有寫 interval 的照 group")
+
+
 def clamp_timeouts(a) -> None:
     """vmagent: any remaining τ > S (from --scrape-timeout / --job-timeout) becomes S, recorded as a finding."""
     if a.config_kind != "vmagent":
@@ -1075,10 +1169,13 @@ def load_sources(path: str) -> dict:
             if r.get("status") in MS.EMPTY_STATUSES}
 
 
-def main() -> int:
+def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--rules", nargs="+", default=[], help="rule 檔；只要 --baseline 時可省略")
-    ap.add_argument("--stack", choices=["prometheus", "vmalert"], required=True)
+    ap.add_argument("--stack", choices=["prometheus", "vmalert"],
+                    help="誰評估 rule；沒給時用 --inventory 的 stack.ruler，再沒有就當成 prometheus（寫進假設）")
+    ap.add_argument("--inventory", help="tools/inventory.py 的 env/<name>.inventory.yaml：S、τ、E、O、job、exporter、"
+                                        "實測值、keep_range、永遠不會響的 rule 從這裡讀；命令列參數優先")
     ap.add_argument("--config", action="append", default=[],
                     help="prometheus.yml（或 vmagent 的 -promscrape.config）：讀 global 與每個 job 的 scrape_interval／scrape_timeout、"
                          "evaluation_interval、rule_query_offset")
@@ -1111,8 +1208,27 @@ def main() -> int:
     ap.add_argument("--keep-range", action="append", default=[], help="這條 rule 的視窗是刻意選的，不要建議拉長（也可在 rule 加 annotation keep_range: \"true\"）")
     ap.add_argument("--out", required=True)
     ap.add_argument("--write-fitted", help="把方案 A 改好的 rule 寫到這個檔（不動原檔；註解不會保留；第 5 節的改法不寫）")
-    a = ap.parse_args()
+    a = ap.parse_args(argv)
     a.assumptions = []
+    inv = None
+    if a.inventory:
+        import inventory_use as IU
+        inv = IU.load(a.inventory)
+        if not a.rules and not a.baseline:
+            a.rules = list((inv.get("sources") or {}).get("rules") or [])
+        st = inv.get("stack") or {}
+        if a.stack is None and IU.val(st.get("ruler")) in ("prometheus", "vmalert"):
+            a.stack = IU.val(st["ruler"])
+            if not IU.is_user(st["ruler"]) and st["ruler"].get("from") != "file":
+                a.assumptions.append(f"ruler 是 {a.stack}：inventory 的推測（{'；'.join(st['ruler'].get('evidence') or [])}），未確認")
+        ck = (inv.get("sources") or {}).get("config_kind") or {}
+        if a.config_kind is None and IU.val(ck) in ("prometheus", "vmagent") and ck.get("from") != "default":
+            a.config_kind = IU.val(ck)
+        if a.prom_version is None and IU.val(st.get("version")) and (a.stack or "prometheus") == "prometheus":
+            a.prom_version = str(IU.val(st["version"]))
+    if a.stack is None:
+        a.stack = "prometheus"
+        a.assumptions.append("沒有 --stack，inventory 也不確定 ruler：當成 Prometheus；是 vmalert 時用 `--stack vmalert` 重跑")
     a.config_kind = a.config_kind or ("vmagent" if a.stack == "vmalert" else "prometheus")
     a.prom_version_text = a.prom_version or ""
     a.prom_version = parse_version(a.prom_version)
@@ -1126,16 +1242,21 @@ def main() -> int:
     a.job_failrun = {k: int(v) for k, _, v in (x.partition("=") for x in a.job_failrun)}
     a.job_exporter = {k: v for k, _, v in (x.partition("=") for x in a.job_exporter)}
     a.job_exporter_flag = set(a.job_exporter)
+    a.job_exporter_src = {}
+    a.nodata_rules = {}
     for j, e in a.job_exporter.items():
         if e not in EXPORTER_DEADLINE:
             ap.error(f"--job-exporter {j}={e}：不認得的 exporter（可用：{', '.join(EXPORTER_DEADLINE)}）")
     a.cfg_jobs = None
     a.sources_empty = load_sources(a.sources) if a.sources else {}
+    if inv is not None:
+        apply_inventory(a, inv, user_only=True)
     if a.config:
         apply_config(a, a.config)
+    if inv is not None:
+        apply_inventory(a, inv, user_only=False)
+    apply_defaults(a)
     clamp_timeouts(a)
-    if a.S is None or a.E is None:
-        ap.error("要給 --scrape-interval 與 --eval-interval，或用 --config prometheus.yml")
     if a.O is None:
         a.O = 0.0
     if not query_offset_available(a) and a.O:
@@ -1161,6 +1282,14 @@ def main() -> int:
         f.write(report(a, rows, checks, assumptions_for(a, rows, fors), fors, skipped) if a.rules else "# 基準值\n")
         if a.baseline:
             f.write("\n" + baseline(a))
+    with open(os.path.join(a.out, "contracts-fit.json"), "w", encoding="utf-8") as f:
+        import json
+        json.dump({"stack": a.stack, "S": a.S, "E": a.E, "assumptions": assumptions_for(a, rows, fors),
+                   "env_checks": [{"text": c[0], "ok": c[1], "contract": c[3]} for c in checks],
+                   "rows": [{k: r.get(k) for k in ("file", "group", "rule", "metric", "func", "R", "need", "ok", "nodata",
+                                                    "job", "contract", "fit_R", "keep")} for r in rows],
+                   "for_checks": [{"rule": x["rule"], "job": x["job"], "R": x["R"]} for x in fors]},
+                  f, ensure_ascii=False, indent=1)
     if a.write_fitted:
         groups = [g for _, doc in fitted for g in doc.get("groups", []) or []]
         with open(a.write_fitted, "w", encoding="utf-8") as f:

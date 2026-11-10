@@ -32,6 +32,7 @@
 | YugabyteDB v2026.1.3.0 target（`model: native`），YSQL 與 PostgreSQL 監控對照（postgres_exporter 實測） | `catalog/targets/yugabytedb.yaml`、`docs/targets/yugabytedb*.md`、`lab/targets/yugabytedb/` |
 | ClickHouse v26.10.2 target（內建 endpoint＋query-exporter 查 system 表）與「分析型」架構頁，2 副本＋3 Keeper lab | `catalog/targets/clickhouse.yaml`、`docs/targets/clickhouse*.md`、`queries/clickhouse/`、`lab/targets/clickhouse/` |
 | MongoDB 8.0.34 target（Percona mongodb_exporter v0.54.0）與「文件型」架構頁，3 成員 replica set lab | `catalog/targets/mongodb_exporter.yaml`、`docs/targets/mongodb*.md`、`lab/targets/mongodb/` |
+| 一鍵入口 `tools/review.py`，各工具 `--inventory` 共用盤點；路由問題（缺 label、送進空 receiver、critical 不會叫人、inhibit 沒有 `equal`、DMS 路由沒有 Watchdog）；卡片 `key_metrics`／`metrics_any` | `tools/` |
 | 盤點工具 `tools/inventory.py`：從 Prometheus／vmagent config、rule 檔、Alertmanager config 建環境模型（每個值標來源），含 Alertmanager 路由與 inhibit；計算錯誤修正（vmagent timeout 截斷、`--baseline` 下限、d = τ、dedup、正規式 job、subquery、沒資料的 rule、exporter 預設期限、`--prom-version`、覆蓋檢查的 Watchdog 歸屬與 `partial`） | `tools/` |
 | 資料庫資源對照（連線、執行緒、記憶體池、IO／fsync、複寫 worker、背景工作、CPU）與共用的主機／容器卡（node_exporter、cAdvisor、kube-state-metrics），只讀碼 | `docs/architecture/db-resources.md`、`catalog/components/host.yaml`、`rules/host/` |
 | rule-review 改為建議優先：第 0 輪只看檔案就給建議、缺資料用保守假設、每輪最多 3 題但可提前問；工具修正（覆蓋檢查比對 job、`features` 判斷不適用、`fit_contracts --config`、方案 B 可行性、`for` 被 stale 重置的提示、`always_fires`、缺 label 的提問、`validate.py --lint-rules`）；新頁「從哪裡開始」（五階） | `skills/rule-review/`、`tools/`、`docs/tools/start.md` |
@@ -45,9 +46,8 @@
 
 ## 進行中
 
-- 工具接上盤點檔（`--inventory`）、路由 label 判斷、`metrics_any`／`key_metrics`、一鍵入口 `tools/review.py`
 - 版本差異調查（從原始碼）：MySQL、MariaDB；PostgreSQL、MongoDB、Valkey／Redis、etcd、TiDB、YugabyteDB、ClickHouse
-- 之後：MySQL 與 MariaDB 拆成兩張卡（各自盤查原始碼）；資料庫卡的 blind_spots 指向主機卡；新增 10 個飽和訊號；更新 rule-review skill；盲測重跑；打 v0.3.0
+- 之後：MySQL 與 MariaDB 拆成兩張卡（各自盤查原始碼）；資料庫卡的 blind_spots 指向主機卡；新增 10 個飽和訊號；盲測重跑；打 v0.3.0
 - 排定 2026-11-11 01:00：主機卡小實驗（OOM、記憶體接近 limit、唯讀掛載；不用特權容器）
 
 使用者同意的資料庫順序已全部完成；CockroachDB（專有授權）不做。資料庫架構頁依類型分頁：關聯式、記憶體 KV、共識（Raft）、分散式 SQL、分析型、文件型。

@@ -25,23 +25,27 @@ argument-hint: "<rule files...>"
 
 ## 第 0 輪：只看檔案，第一次回覆就給
 
-拿到檔案後，先不問問題，跑能跑的工具：
+拿到檔案後，先不問問題，**先盤點、再檢查**。一個指令跑完全部：
 
 ```bash
-python3 "$AT/tools/check_metric_sources.py" --rules <rule 檔...> [--config prometheus.yml] --out report
-python3 "$AT/tools/validate.py" --lint-rules <rule 檔...>          # 資料消失時回傳空的寫法
-python3 "$AT/tools/fit_contracts.py" --rules <rule 檔...> --stack prometheus|vmalert [--config prometheus.yml] \
-    --scrape-interval <S> --eval-interval <E> --out report          # 沒有數字時工具用保守假設並標明
+python3 "$AT/tools/review.py" --rules <rule 檔...> [--config prometheus.yml|vmagent 設定 --config-kind prometheus|vmagent] \
+    [--alertmanager alertmanager.yml] [--answers env/<name>.sources.yaml] --out report
 ```
+
+它會依序跑：盤點（`tools/inventory.py`，產生 `report/inventory.yaml` 與 `inventory.md`）→ metric 來源 → presence lint → 時間契約（沒有數字時用 Prometheus 預設值並寫明）→ 覆蓋（給 `--env` 時），並寫出 `report/summary.md`：建議先處理的 3 件事、盤點確認、假設、下一輪的問題。之後要單獨重跑某個工具時，加 `--inventory report/inventory.yaml`，所有工具都從同一份盤點取資料。
+
+**盤點是共同的事實基礎。**`inventory.md` 列出從檔案理解的環境：每個 job 的 interval 與實際生效的 timeout、target label 從哪來、被丟掉的 metric、每條 rule 對到哪個 job、需要哪些 label、會被送到哪個 receiver、哪些元件沒被抓。每個值標來源（檔案、預設、提示、使用者、未知）。第一次回覆要附上盤點摘要，請使用者確認「這是我從檔案理解的環境，哪裡不對？」。使用者的更正寫進盤點檔（標 `confirmed: true`），之後用 `--merge` 重跑會保留。
 
 第一次回覆的格式：
 
 1. **建議先處理的 3 件事**：依影響排序。常見的有：
    - 永遠不會響的 rule（job 對不上、被 `metric_relabel_configs` 丟掉、要求 config 沒加的 label）。
    - 一直在響的 rule（`absent()` 包住對不上的 job）。
-   - 評估這些 rule 的 Prometheus／vmalert 沒有任何自我監控（沒有 Watchdog、沒有外部 dead man's switch、Alertmanager 沒被 scrape）。
+   - 評估這些 rule 的 Prometheus／vmalert 沒有任何自我監控（沒有 Watchdog、沒有外部 dead man's switch、Alertmanager 沒被 scrape）；config 沒有 `rule_files` 或 `alerting`。
+   - 告警送不到該送的人：路由需要的 label rule 沒有（例如 critical 只會寄信，或被送進空的 receiver）、inhibit 沒有 `equal`、有 dead man's switch 路由卻沒有 Watchdog rule。
    - config 裡 `scrape_timeout` 與 `scrape_interval` 的關係、明顯太短的視窗。
-2. **從檔案判斷出的監控體系**，以及判斷不了的部分。
+   使用者問了具體問題（例如「失去 quorum 會不會告警」）時，**第一句就直接回答**，再列這 3 件事。
+2. **盤點摘要**（`inventory.md` 的重點）：從檔案判斷出的監控體系與環境，判斷不了的部分標「未知」，請使用者更正。
 3. **我做了哪些假設**，以及補上哪一項會改變哪個結論。
 4. **第一組問題**（最多 3 題）。通常是：
    - 版本與有沒有外部觀察者（決定公式與 monitor of monitor 的結論）。
@@ -85,9 +89,11 @@ python3 "$AT/tools/fit_contracts.py" --rules <rule 檔...> --stack prometheus|vm
 
 ```bash
 python3 "$AT/tools/rules_to_snapshot.py" --out snapshot --ruler <受測 ruler id> <rule 檔...> [--ruler <觀察者 id> <觀察者的 rule 檔...>]
-python3 "$AT/tools/check_coverage.py" --env env/<name>.yaml --snapshot snapshot --config prometheus.yml --out report [--tiers 1,2]
+python3 "$AT/tools/check_coverage.py" --env env/<name>.yaml --inventory report/inventory.yaml --out report [--tiers 1,2]
+# 連得到 ruler 時改用 collect.py 的快照：--snapshot snapshot --live
 ```
 
+- 只比對 metric 名稱不算涵蓋：卡片訊號的 `key_metrics`（例如 native 型的 `probe_success`）沒有任何 rule 用到時是 `partial`。
 - 覆蓋檢查會核對規則的 job 是否對得上 env 的 target：名稱相同但 job 對不上的是 `rule_job_mismatch`，不算涵蓋。給 `--config` 時，還會列出沒有任何 scrape job 在抓的元件（例如 Alertmanager）。env 的 `features` 沒有的功能，相關訊號是「不適用」；沒填 `features` 時會變成「需要回答」。
 - **依影響排序回報**：Watchdog 與外部 dead man's switch、rule group 停止評估或跑不完、WAL 寫入失敗、送不到 Alertmanager 優先；資料庫的附加訊號（例如 query-exporter）在後。scrape 耗時接近 timeout（Prometheus 卡 `scrape-ratio`、資料庫卡 `scrape-budget`）是第 2 級，要加 `--tiers 1,2` 才會列出；第 0 輪如果已經從數字看到，就直接寫進建議。
 - 基礎設施的缺口沒有處理前，第 4 步的結論加一句：「評估這些 rule 的 ruler 本身沒有被監控，以下結論在它變慢或掛掉時不成立。」
@@ -99,10 +105,10 @@ python3 "$AT/tools/check_coverage.py" --env env/<name>.yaml --snapshot snapshot 
 **先問視窗是不是刻意的，再跑工具**：像 `[1m]` 常常就是要「最近 1 分鐘」，拉長會改變語意。是的話加 `--keep-range <rule>`（或 rule 的 annotation `keep_range: "true"`）。
 
 ```bash
-python3 "$AT/tools/fit_contracts.py" --rules <rule 檔...> --stack prometheus|vmalert --config prometheus.yml \
-    --eval-interval <E> [--job-duration <job>=<d_max>] [--job-p99 <job>=<p99>] [--job-failrun <job>=<N>] \
-    [--exporter-deadline <job>=<X>] [--group-duration <T>] [--keep-range <rule>] \
-    [--latency <L> --eval-delay <D>] --out report [--write-fitted report/fitted-rules.yml]
+python3 "$AT/tools/fit_contracts.py" --inventory report/inventory.yaml [--job-duration <job>=<d_max>] \
+    [--job-p99 <job>=<p99>] [--job-failrun <job>=<N>] [--exporter-deadline <job>=<X>] [--group-duration <T>] \
+    [--keep-range <rule>] [--prom-version <版本>] [--dedup-interval <dedup>] [--latency <L> --eval-delay <D>] \
+    --out report [--write-fitted report/fitted-rules.yml]
 ```
 
 - 使用者還沒有基準值（不知道 S、τ 該設多少）時，加 `--baseline`，依 `$AT/docs/tools/baseline.md` 由量到的耗時推出建議值。官方沒有 timeout 餘裕的建議；0.8、0.9 是 alert-trust 依契約訂的預警線，回報時說明。

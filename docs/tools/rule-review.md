@@ -20,7 +20,13 @@
 /alert-trust:rule-review my-rules/*.yml
 ```
 
-不用 skill、自己跑工具：
+不用 skill、自己跑工具時，先用一鍵入口（盤點 → metric 來源 → lint → 時間契約）：
+
+```bash
+python3 tools/review.py --rules my-rules/*.yml --config prometheus.yml --alertmanager alertmanager.yml --out report
+```
+
+單獨跑某一步時，加 `--inventory report/inventory.yaml` 共用同一份盤點：
 
 ```bash
 # 第 2 步：每個 metric 的來源（有 prometheus.yml 就一定要給）

@@ -93,6 +93,7 @@ signals:
       TiKV：up、探 /status（只代表 HTTP）、PD 看到的 store 狀態（抓得到的 TiKV 數多於 PD 的 Up store 數）；TiDB：up、探 /status、time() − tidb_domain_lease_expire_time > 0。
       lab：PD 失去 quorum 時存活那台 up 1、/readyz 0、has_leader 0；TiDB up 1、/status 1、lease 過期 48 秒；PD leader 抓不到時 up 0、/readyz 1
     metrics: [up, probe_success, etcd_server_has_leader, service_member_role, pd_cluster_status, tidb_domain_lease_expire_time]
+    key_metrics: [probe_success]   # 完整涵蓋一定要有 blackbox 探測（check_coverage.py 的 partial 只看 key_metrics）
     evaluate_on: self
     silent_failure: >-
       /pd/api/v1/health 永遠 200（成員清單用非 linearizable 讀，每台只打空的 /ping），不能當 PD 的健康探測；TiKV /status 永遠空的 200；

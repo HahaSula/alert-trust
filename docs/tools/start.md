@@ -32,10 +32,10 @@ python3 tools/fit_contracts.py --baseline --stack prometheus --scrape-interval 3
 ## 第 2、3 階：有設定檔與 rule 檔
 
 ```bash
-python3 tools/check_metric_sources.py --rules my-rules/*.yml --config prometheus.yml --out report
-python3 tools/validate.py --lint-rules my-rules/*.yml
-python3 tools/fit_contracts.py --rules my-rules/*.yml --stack prometheus --config prometheus.yml --eval-interval 30s --out report
+python3 tools/review.py --rules my-rules/*.yml --config prometheus.yml --alertmanager alertmanager.yml --out report
 ```
+
+先看 `report/summary.md`（建議先處理的 3 件事），再看 `report/inventory.md`：這是工具從你的檔案理解的環境，哪裡不對就直接改 `report/inventory.yaml`（改過的標 `confirmed: true`），再加 `--merge report/inventory.yaml` 跑一次，改過的值會保留。
 
 完整流程見[檢查 rule 檔](rule-review.md)。用 Claude Code 的話，直接 `/alert-trust:rule-review my-rules/*.yml`，它會先給只看檔案就說得出的建議，再逐輪問你。
 

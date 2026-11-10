@@ -2,6 +2,9 @@
 """Coverage checker: does this environment's monitor of monitor cover each component's signals?
 
   python3 tools/check_coverage.py --env env/prod.yaml --snapshot ./snapshot --out ./report [--live] [--tiers 1,2]
+  python3 tools/check_coverage.py --env env/prod.yaml --inventory env/prod.inventory.yaml --out ./report
+      (scrape jobs and unscraped components from the inventory; without --snapshot its rule files are evaluated
+       by the env.yaml ruler of the inventory's ruler kind; --config / --snapshot given still win)
 
 Inputs
   env.yaml                     components, observers, targets (see env/env.example.yaml)
@@ -20,9 +23,11 @@ Statuses
                   the same selector parser as check_metric_sources.py
   rule_no_data    a rule exists but its selector matches no series (--live), or (--config) no scrape job has
                   the component's job
-  partial         rules watch the signal but do not read all of the card's `metrics` for it (e.g. etcd
-                  health-second-path without probe_success). Cards cannot mark alternative metrics yet, so every
-                  listed metric is required; slave/replica and master/source spellings count as the same metric
+  partial         rules watch the signal but miss what the card requires: every `key_metrics` entry and one metric
+                  of each `metrics_any` group (e.g. etcd health-second-path without probe_success). A card with
+                  neither field requires every listed `metrics` entry; slave/replica and master/source spellings
+                  count as the same metric. Probe rules (probe_success, own blackbox job) count when a label value
+                  names the component (job="etcd-readyz")
   missing         no rule references the signal
   not_applicable  the signal's applies_when does not hold for this component: cluster / replicas / kubernetes,
                   or env.yaml lists `features:` for it and the needed feature is not there (vocabulary: FEATURES,
@@ -408,28 +413,59 @@ def rule_metrics(expr: str) -> tuple[set[str], list[str]]:
     return names, pats
 
 
+def required_sets(signal: dict) -> list[list[str]] | None:
+    """What full coverage needs, from the card: every `key_metrics` entry, and one metric of each
+    `metrics_any` group. None when the card has neither (then every listed metric is required)."""
+    if "key_metrics" not in signal and "metrics_any" not in signal:
+        return None
+    return [[m] for m in signal.get("key_metrics") or []] + [list(g) for g in signal.get("metrics_any") or []]
+
+
 def missing_metrics(signal: dict, rules: list[dict]) -> list[str]:
-    """Card metrics of the signal that none of the rules read (normalized for slave/replica)."""
-    want = list(dict.fromkeys(_norm_metric(m) for m in signal.get("metrics") or []))
+    """Card metrics of the signal that none of the rules read (normalized for slave/replica). With key_metrics /
+    metrics_any only those count: a missing key metric is listed by name, an unmet group as 「a 或 b」."""
     names, pats = set(), []
     for r in rules:
         n, p = rule_metrics(str(r.get("query", "")))
         names |= {_norm_metric(x) for x in n}
         pats += p
-    out = []
-    for m in want:
+
+    def used(m: str) -> bool:
+        m = _norm_metric(m)
         if m in names:
-            continue
-        hit = False
+            return True
         for p in pats:
             try:
                 if re.fullmatch(_norm_metric(p), m) or re.fullmatch(p, m):
-                    hit = True
-                    break
+                    return True
             except re.error:
                 continue
-        if not hit:
-            out.append(m)
+        return False
+    sets = required_sets(signal)
+    if sets is None:
+        want = list(dict.fromkeys(_norm_metric(m) for m in signal.get("metrics") or []))
+        return [m for m in want if not used(m)]
+    return [" 或 ".join(g) for g in sets if g and not any(used(m) for m in g)]
+
+
+PROBE_METRICS = {"probe_success", "probe_http_status_code", "probe_duration_seconds"}
+
+
+def related_probe_rules(signal: dict, comp: dict, card_id: str, rules_by_ruler: dict) -> list[dict]:
+    """Rules reading a probe metric the card lists (blackbox runs in its own job, so rule_match skips them) whose
+    selector names this component in a label value (job="etcd-readyz", instance=~".*etcd.*")."""
+    want = set(signal.get("metrics") or []) & PROBE_METRICS
+    if not want:
+        return []
+    words = {str(w).lower() for w in (comp.get("job"), comp.get("id"), comp.get("type"), card_id.replace("_exporter", ""))
+             if w and len(str(w)) >= 3}
+    out = []
+    for rid, rules in rules_by_ruler.items():
+        for r in rules:
+            for x in MS.selectors(str(r.get("query", ""))):
+                if x["metric"] in want and any(w in str(v).lower() for (_, _, v) in x["matchers"] for w in words):
+                    out.append({"ruler": rid, "alert": r.get("name"), "query": r.get("query", ""), "probe": True})
+                    break
     return out
 
 
@@ -442,11 +478,17 @@ def dms_named(env: dict, comp: dict) -> bool:
 
 # ---------- main evaluation ----------
 
-def scrape_note(comp: dict, card_id: str, scrape_jobs: set[str] | None) -> str:
-    """With --config: is this component scraped at all? (rules copied from templates have no data otherwise)"""
+def scrape_note(comp: dict, card_id: str, scrape_jobs: set[str] | None, unscraped: list[dict] | None = None) -> str:
+    """With --config: is this component scraped at all? (rules copied from templates have no data otherwise)
+    With --inventory, its unscraped_components (Alertmanager targets, the ruler itself) decide for components
+    env.yaml gives no job."""
     if scrape_jobs is None or card_id == "observer":
         return ""
     job = comp.get("job")
+    if job is None:
+        hit = [u for u in unscraped or [] if u.get("component") in (card_id, comp.get("type"))]
+        if hit:
+            return "inventory：" + "；".join(u.get("fact", "") for u in hit) + "（先加 scrape job 再加規則）"
     if job is not None:
         return "" if job in scrape_jobs else f"config 沒有 job `{job}`：這個元件沒有被 scrape，先加 scrape job 再加規則"
     words = {str(comp.get("type") or "").lower(), str(card_id).lower().replace("_exporter", ""), str(comp["id"]).lower()}
@@ -456,10 +498,12 @@ def scrape_note(comp: dict, card_id: str, scrape_jobs: set[str] | None) -> str:
             f"可能沒有被 scrape；有的話在 env.yaml 填 job")
 
 
-def evaluate(env: dict, snapshot: str, tiers: set[int], live: bool, scrape_jobs: set[str] | None = None) -> list[dict]:
+def evaluate(env: dict, snapshot: str | None, tiers: set[int], live: bool, scrape_jobs: set[str] | None = None,
+             rules_override: dict | None = None, unscraped: list[dict] | None = None) -> list[dict]:
     cards = {c["id"]: c for c in C.load_components()}
     rl = rulers(env)
-    rules_by_ruler = {rid: load_rules(snapshot, rid) for rid in rl}
+    rules_by_ruler = {rid: (rules_override or {}).get(rid) if rid in (rules_override or {})
+                      else (load_rules(snapshot, rid) if snapshot else []) for rid in rl}
     items = []
     ids = set(cards)
     instances = [(c, card_for(c.get("type"), ids)) for c in env["components"]]
@@ -471,7 +515,7 @@ def evaluate(env: dict, snapshot: str, tiers: set[int], live: bool, scrape_jobs:
                           "note": f"元件類型 {comp.get('type')!r} 沒有對應的元件卡"})
             continue
         card = cards[card_id]
-        unscraped = scrape_note(comp, card_id, scrape_jobs)
+        unscraped_txt = scrape_note(comp, card_id, scrape_jobs, unscraped)
         for s in card["signals"]:
             if s["tier"] not in tiers:
                 continue
@@ -483,7 +527,7 @@ def evaluate(env: dict, snapshot: str, tiers: set[int], live: bool, scrape_jobs:
                 item.update(status="not_applicable", note=why)
                 items.append(item)
                 continue
-            extra = [x for x in (why, unscraped if s.get("metrics") else "") if x]
+            extra = [x for x in (why, unscraped_txt if s.get("metrics") else "") if x]
 
             def push(status: str, note: str = "") -> None:
                 item.update(status=status, note="；".join([n for n in (note, *extra) if n]))
@@ -515,7 +559,7 @@ def evaluate(env: dict, snapshot: str, tiers: set[int], live: bool, scrape_jobs:
                 extra.append(f"{'、'.join(sorted({r['ruler'] for r in foreign_wd}))} 自己的 Watchdog 只證明它自己活著，"
                              f"不算 {comp['id']} 的 Watchdog")
             own_data = bool(s.get("metrics")) and s["id"] not in OTHER_JOB_SIGNALS
-            if unscraped and own_data and scrape_jobs is not None and item["rules"]:
+            if unscraped_txt and own_data and scrape_jobs is not None and item["rules"]:
                 push("rule_no_data", f"沒有資料：{comp['id']} 沒有被 scrape，讀它自己 metric 的規則回傳空"
                                      "（只在自己身上或放在觀察者都一樣）")
                 continue
@@ -533,13 +577,18 @@ def evaluate(env: dict, snapshot: str, tiers: set[int], live: bool, scrape_jobs:
             if not good:
                 push("self_only", "只有被監控的元件（或同一故障域的 ruler）在評估，它掛掉時這條規則也停")
                 continue
-            gaps = missing_metrics(s, good)
+            probes = related_probe_rules(s, comp, card_id, rules_by_ruler)
+            gaps = missing_metrics(s, good + probes)
             if gaps:
                 first = _norm_metric((s.get("metrics") or [""])[0])
+                legacy = required_sets(s) is None
                 push("partial", f"規則沒有用到 {'、'.join('`' + m + '`' for m in gaps[:4])}{' 等' if len(gaps) > 4 else ''}"
-                                + ("（卡片列的第一個 metric）" if first in gaps else "")
-                                + "；卡片沒有標哪些 metric 可以互相替代，先當成都要")
+                                + ("（卡片列的第一個 metric）" if first in gaps and legacy else "")
+                                + ("；卡片沒有標哪些 metric 可以互相替代（`metrics_any`／`key_metrics`），先當成都要" if legacy
+                                   else "（卡片的 `key_metrics`／`metrics_any`：完整涵蓋一定要有）"))
                 continue
+            if probes:
+                item["probe_rules"] = probes
             if s["id"] == "watchdog" and not dms_named(env, comp):
                 push("needs_input", "Watchdog 規則在，但 env.yaml 沒寫它送到哪個外部 dead man's switch（deadman.receiver）；"
                                     "沒有外部接收端時 Watchdog 停了也沒有人知道")
@@ -625,20 +674,47 @@ def render_md(env: dict, items: list[dict], tiers: set[int]) -> str:
     return "\n".join(out)
 
 
-def main() -> int:
+def inventory_rules(env: dict, inv: dict) -> dict[str, list[dict]]:
+    """No snapshot: the inventory's rule files, evaluated by the env.yaml ruler of the inventory's ruler kind
+    (the only ruler, or the first of that type)."""
+    import inventory_use as IU
+    import rules_to_snapshot as R2S
+    files = list((inv.get("sources") or {}).get("rules") or [])
+    kind = IU.val((inv.get("stack") or {}).get("ruler"))
+    cands = [c for c in env["components"] if c.get("type") in RULER_TYPES]
+    pick = next((c for c in cands if c.get("type") == kind), cands[0] if cands else None)
+    if not pick or not files:
+        return {}
+    snap = R2S.convert([f for f in files if os.path.exists(f)])
+    return {pick["id"]: [r for g in snap["data"]["groups"] for r in g["rules"] if r.get("type") == "alerting"]}
+
+
+def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--env", required=True)
-    ap.add_argument("--snapshot", required=True)
+    ap.add_argument("--snapshot", help="collect.py／rules_to_snapshot.py 的目錄；有 --inventory 時可省略（用 inventory 記的 rule 檔）")
+    ap.add_argument("--inventory", help="tools/inventory.py 的 env/<name>.inventory.yaml：scrape job、沒被抓的元件、rule 檔從這裡讀")
     ap.add_argument("--out", required=True)
     ap.add_argument("--live", action="store_true", help="query each ruler to check rule selectors match series")
     ap.add_argument("--tiers", default="1", help="comma-separated tiers, default 1")
     ap.add_argument("--config", action="append", default=[],
                     help="prometheus.yml of the scraping Prometheus (repeatable): flags components no job scrapes")
-    a = ap.parse_args()
+    a = ap.parse_args(argv)
     env = load_env(a.env)
     tiers = {int(t) for t in a.tiers.split(",")}
     scrape_jobs = {j["job"] for c in a.config for j in MS.load_config(c)} if a.config else None
-    items = evaluate(env, a.snapshot, tiers, a.live, scrape_jobs)
+    inv, override, unscraped = None, None, None
+    if a.inventory:
+        import inventory_use as IU
+        inv = IU.load(a.inventory)
+        if scrape_jobs is None and IU.has_config(inv):
+            scrape_jobs = IU.job_names(inv)
+        unscraped = IU.unscraped(inv)
+        if not a.snapshot:
+            override = inventory_rules(env, inv)
+    if not a.snapshot and override is None:
+        ap.error("要給 --snapshot（或 --inventory）")
+    items = evaluate(env, a.snapshot, tiers, a.live, scrape_jobs, override, unscraped)
     os.makedirs(a.out, exist_ok=True)
     with open(os.path.join(a.out, "coverage.json"), "w", encoding="utf-8") as f:
         json.dump({"env": env.get("name"), "generated": time.strftime("%Y-%m-%dT%H:%M:%S"), "tiers": sorted(tiers),

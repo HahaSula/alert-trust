@@ -24,7 +24,7 @@ alert-trust 回答兩個問題：
 | `catalog/refs-code.yaml` | 釘在版本與行號的原始碼參考 | **產生**：`tools/gen_code_refs.py` 讀 `refs-code.src.json` |
 | `catalog/refs.yaml`、`refs.d/*.yaml` | 實驗參考，也可放手動核對過的原始碼參考 | 手寫 |
 | `rules/<component>/*.yml`、`rules/targets/*.yml` | 規則範本；每條都有 `labels.tier` 與 `annotations.runbook_url` | 手寫 |
-| `tools/` | `validate.py`、`build_pages.py`、`check_coverage.py`、`check_metric_sources.py`、`fit_contracts.py`、`rules_to_snapshot.py`、`collect.py`、`check_metrics.py`、`gen_code_refs.py`、`catalog.py`（loader） | 手寫 |
+| `tools/` | `validate.py`、`build_pages.py`、`check_coverage.py`、`review.py`（一鍵入口）、`inventory.py`、`check_metric_sources.py`、`fit_contracts.py`、`rules_to_snapshot.py`、`collect.py`、`check_metrics.py`、`gen_code_refs.py`、`catalog.py`（loader） | 手寫 |
 | `hooks/refs.py` | MkDocs hook：`[^key]` 變註腳、反引號名稱連到名詞表、`<!-- figure: name -->` 內嵌 SVG | 手寫 |
 | `docs/` | 網站；`docs/components/*.md`、`docs/reference/*.md` 由 `build_pages.py` 產生，不 commit | 混合 |
 | `docs/assets/figures/*.svg` | 圖；顏色用 class，由 `docs/assets/extra.css` 對應主題 | 手寫 |
@@ -48,13 +48,16 @@ docker run --rm -u $(id -u):$(id -g) -v "$PWD":/docs squidfunk/mkdocs-material:9
 
 **輸出是建議，不是判決；第一次回覆就要有建議。**拿到 rule 檔（和 `prometheus.yml`，如果有）後，先跑只需要檔案的工具，把「只看檔案就說得出的結論」連同第一組問題一起回覆，之後每輪回答都更新同一份報告。缺資料時用保守假設先跑完，寫明假設了什麼、補上哪一項會改變結論；不要一開始就要求使用者提供全部資料。每輪最多問 3 題，可以問任何一步的問題，先問會改變最多結論的。
 
+先跑一鍵入口，它會先盤點再檢查：`python3 tools/review.py --rules <rule 檔...> [--config prometheus.yml] [--alertmanager alertmanager.yml] --out report`。盤點（`report/inventory.yaml`／`inventory.md`）是所有工具共同的事實基礎，第一次回覆要附上盤點摘要請使用者確認；單獨重跑工具時加 `--inventory report/inventory.yaml`。
+
 分析順序固定：
 
-1. **監控體系**：Prometheus 還是 vmalert（版本）、資料從哪裡來、有沒有外部觀察者、告警走哪台 Alertmanager。能從檔案判斷就判斷。寫成 `env/<name>.yaml`（`targets[].job` 填 config 裡的實際 job，`features` 填有哪些功能）。
-2. **每個 metric 的來源**：**不要假定。**`python3 tools/check_metric_sources.py --rules <rule 檔...> --config prometheus.yml --out report`。來源只能是 config 的 scrape job、live 快照（`--live`）或使用者的回答（`--answers`）；目錄卡片只是提示。永遠不會響（job 對不上、被丟掉、缺 label）與一直在響（`absent()` 對不上）的 rule 最先回報。
-3. **監控基礎設施的覆蓋**：`tools/rules_to_snapshot.py` → `tools/check_coverage.py`。依影響排序回報，Watchdog／dead man's switch、rule group 停止評估、WAL、送不到 Alertmanager 優先。
-4. **每條 rule 的時間契約**：`python3 tools/fit_contracts.py --rules <rule 檔...> --stack prometheus|vmalert --config prometheus.yml --eval-interval <E> --out report`。跑之前先問短視窗是不是刻意的（`--keep-range`）。沒有基準值時用 `--baseline`（`docs/tools/baseline.md`）。不成立時給：目前成立的 rule、方案 A 改 rule、方案 B 改環境、保留視窗的做法，附代價，讓使用者選。
-5. **寫法**：`python3 tools/validate.py --lint-rules <rule 檔...>`、group 擺放。
+1. **監控體系**：Prometheus 還是 vmalert（版本）、資料從哪裡來、有沒有外部觀察者、告警走哪台 Alertmanager。能從檔案判斷就判斷。
+2. **每個 metric 的來源**：**不要假定。**來源只能是 config 的 scrape job、live 快照或使用者的回答；目錄卡片只是提示。永遠不會響與一直在響的 rule 最先回報。
+3. **告警送不送得到**：Alertmanager 路由需要的 label、空的 receiver、沒有 `equal` 的 inhibit、dead man's switch 路由與 Watchdog rule。
+4. **監控基礎設施的覆蓋**：`tools/check_coverage.py --env env/<name>.yaml --inventory …`。依影響排序回報。
+5. **每條 rule 的時間契約**：`tools/fit_contracts.py --inventory …`。跑之前先問短視窗是不是刻意的（`--keep-range`）。沒有基準值時用 `--baseline`。不成立時給：目前成立的 rule、方案 A 改 rule、方案 B 改環境、保留視窗的做法，附代價。
+6. **寫法**：`tools/validate.py --lint-rules`、group 擺放。
 
 完整步驟在 `skills/rule-review/SKILL.md`。
 

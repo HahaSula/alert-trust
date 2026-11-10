@@ -135,6 +135,10 @@ def component_page(card: dict, sources: dict, contracts: dict) -> str:
                     ("訊號", esc(codeify(s["signal"])))]
             if s.get("metrics"):
                 rows.append(("Metric", "、".join(f"`{m}`" for m in s["metrics"])))
+            if s.get("key_metrics") or s.get("metrics_any"):
+                need = [f"`{m}`" for m in s.get("key_metrics") or []] + \
+                    ["（" + " 或 ".join(f"`{m}`" for m in g) + "）" for g in s.get("metrics_any") or []]
+                rows.append(("完整涵蓋要有", "、".join(need)))
             where = C.EVALUATE_ON[s["evaluate_on"]]
             if s.get("judged_by") == "external":
                 where += "；由外部判斷「沒收到」"

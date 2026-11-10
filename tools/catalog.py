@@ -150,6 +150,33 @@ def runbook_url(component_id: str, signal_id: str) -> str:
     return f"{SITE_URL}/components/{component_id}/#{signal_id}"
 
 
+def check_metric_fields(signal: dict) -> list[str]:
+    """Optional signal fields that say what full coverage needs (tools/check_coverage.py `partial`):
+      key_metrics: [m, ...]          every one must be read by a rule
+      metrics_any: [[a, b], [c, d]]  each group is alternatives: one of them is enough
+    Every name must also be in `metrics`. Without either field every `metrics` entry is required."""
+    errs = []
+    metrics = set(signal.get("metrics") or [])
+    if "key_metrics" in signal:
+        km = signal["key_metrics"]
+        if not isinstance(km, list) or not km or not all(isinstance(m, str) and m for m in km):
+            errs.append("key_metrics 要是非空的 metric 名稱清單")
+        else:
+            errs += [f"key_metrics 的 {m} 不在 metrics 裡" for m in km if m not in metrics]
+            if len(set(km)) != len(km):
+                errs.append("key_metrics 有重複")
+    if "metrics_any" in signal:
+        ma = signal["metrics_any"]
+        if not isinstance(ma, list) or not ma or not all(isinstance(g, list) and len(g) >= 2 and
+                                                         all(isinstance(m, str) and m for m in g) for g in ma):
+            errs.append("metrics_any 要是清單的清單，每組至少 2 個可以互相替代的 metric")
+        else:
+            errs += [f"metrics_any 的 {m} 不在 metrics 裡" for g in ma for m in g if m not in metrics]
+            km = set(signal.get("key_metrics") or [])
+            errs += [f"{m} 同時在 key_metrics 與 metrics_any（key 一定要有，不會是替代）" for g in ma for m in g if m in km]
+    return errs
+
+
 TARGET_MODELS = {"exporter": "required_signals", "native": "required_signals_native"}
 
 

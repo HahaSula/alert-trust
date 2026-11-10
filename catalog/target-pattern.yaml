@@ -55,6 +55,7 @@ required_signals_native:
   - id: health-second-path
     min_tier: 1
     question: 抓得到 /metrics，就代表服務健康嗎
+    key_metrics: [probe_success]   # 卡片的這個訊號要列 key_metrics: [probe_success]（validate 強制；check_coverage 的 partial 依它）
     why: 同一個 process 在失去 leader、quorum 或唯讀時仍可能照常回應 /metrics，up 維持 1。要看資料庫自己的健康 metric（例如 etcd_server_has_leader），並從不同路徑用 blackbox 探測健康端點（例如 /readyz、/ping）。三者交叉：up 0、探測 1 是 scrape 本身的問題；兩者都 0 是 process 或主機；up 1、健康 metric 異常是服務不健康。
   - id: metric-families-present
     min_tier: 1

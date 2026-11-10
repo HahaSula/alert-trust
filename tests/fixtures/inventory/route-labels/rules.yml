@@ -1,0 +1,23 @@
+groups:
+- name: app
+  rules:
+  - alert: AppDown
+    expr: up{job="app"} == 0
+    for: 1m
+    labels: { severity: critical }
+  - alert: AppErrorsHigh
+    expr: sum by (instance) (rate(app_errors_total{job="app"}[5m])) > 1
+    labels: { severity: critical }
+  - alert: AppQueueDeep
+    expr: app_queue_depth{job="app"} > 100
+    for: 5m
+    labels: { severity: critical }
+  - alert: AppWithService
+    expr: app_queue_depth{job="app"} > 1000
+    labels: { severity: critical, service: app }
+  - alert: AppSlow
+    expr: histogram_quantile(0.99, sum by (le) (rate(app_latency_seconds_bucket{job="app"}[5m]))) > 2
+    labels: { severity: warning }
+  - alert: AppLabelReplaced
+    expr: label_replace(up{job="app"} == 0, "service", "app", "", "")
+    labels: { severity: critical }

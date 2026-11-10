@@ -1,0 +1,19 @@
+route:
+  receiver: mail
+  routes:
+    - matchers: ['alertname="Watchdog"']
+      receiver: dms
+    - matchers: ['severity="critical"', 'service="app"']
+      receiver: pager
+    - matchers: ['severity="critical"', 'cluster="other"']
+      receiver: pager
+receivers:
+  - name: mail
+    email_configs: [{ to: "ops@example.invalid" }]
+  - name: pager
+    webhook_configs: [{ url: "http://example.invalid/pager" }]
+  - name: dms
+    webhook_configs: [{ url: "http://example.invalid/dms" }]
+inhibit_rules:
+  - source_matchers: ['alertname="AppDown"']
+    target_matchers: ['severity="warning"']

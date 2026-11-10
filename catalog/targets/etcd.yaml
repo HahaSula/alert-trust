@@ -109,6 +109,7 @@ signals:
       up 0、probe 1 是 scrape 本身（實測：sample_limit 讓 up=0，/readyz 照樣 1）；兩者都 0 是 process 或主機；
       up 1、probe 0（has_leader 0）是 etcd 不能服務（實測：失去 quorum）。probe 的 instance 要 relabel 成和 job="etcd" 相同的 host:port
     metrics: [up, probe_success, etcd_server_has_leader]
+    key_metrics: [probe_success]   # 完整涵蓋一定要有 blackbox 探測（check_coverage.py 的 partial 只看 key_metrics）
     evaluate_on: self
     silent_failure: >-
       /readyz 沒有 leader 時要等 ReqTimeout（預設 7 秒；實測 7–10 秒以上）才回 503，blackbox timeout 較短時以逾時失敗；/readyz 不看 NOSPACE（要另探 /health）；learner 的 /readyz 一定失敗

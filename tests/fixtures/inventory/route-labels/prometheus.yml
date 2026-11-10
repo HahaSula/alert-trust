@@ -1,0 +1,12 @@
+# 虛構的設定：route 要 service／team，rule 與 target 都沒有（tests/test_inventory.py RouteLabelScenario）
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+rule_files: [rules.yml]
+alerting:
+  alertmanagers: [{ static_configs: [{ targets: ["am:9093"] }] }]
+scrape_configs:
+  - job_name: app
+    static_configs: [{ targets: ["app-1:8080", "app-2:8080"], labels: { cluster: main } }]
+  - job_name: am
+    static_configs: [{ targets: ["am:9093"] }]

@@ -94,6 +94,7 @@ signals:
       （503 或 body 有 is readonly 就失敗）、HTTP SQL 探測（SELECT count() FROM system.replicas WHERE is_readonly，不是 0 就失敗）、ReadonlyReplica；
       Keeper：up、/ready（沒有 leader 時 503）、KeeperIsLeader。4lw ruok 一律 imok，不能當健康檢查
     metrics: [up, probe_success, ClickHouseMetrics_ReadonlyReplica, ClickHouseAsyncMetrics_KeeperIsLeader]
+    key_metrics: [probe_success]   # 完整涵蓋一定要有 blackbox 探測（check_coverage.py 的 partial 只看 key_metrics）
     evaluate_on: self
     silent_failure: /ping 與 /replicas_status 的狀態碼在 Keeper 失去 quorum 時都是 200
     evidence: tested

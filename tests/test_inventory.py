@@ -184,7 +184,7 @@ class EtcdScenario(unittest.TestCase):
         self.assertEqual(rule(inv, "etcdNoLeader")["jobs_matched"]["from"], "unknown")
         self.assertEqual(inv["unscraped_components"]["from"], "unknown")
         self.assertEqual(inv["alertmanager"]["from"], "unknown")
-        self.assertEqual(inv["findings_from_files"], [])
+        self.assertEqual(kinds(inv), ["no_watchdog_rule"])  # files alone: no Watchdog rule
         self.assertIn("--config", [q["answer_key"] for q in inv["questions"] if q["ask_now"]])
 
 
@@ -248,6 +248,110 @@ class RoutingScenario(unittest.TestCase):
     def test_matchers_parsing(self):
         self.assertEqual(I.am_matchers({"matchers": ['{a="b", c=~"d|e"}', "f!=g"]}),
                          [("a", "=", "b"), ("c", "=~", "d|e"), ("f", "!=", "g")])
+
+
+class RouteLabelScenario(unittest.TestCase):
+    """route-labels: routes need service / cluster that the rules and targets do not have; a Watchdog route
+    without a Watchdog rule; an inhibit rule without equal."""
+
+    @classmethod
+    def setUpClass(cls):
+        d = "route-labels/"
+        cls.inv, cls.md = run([d + "rules.yml"], d + "prometheus.yml", am=d + "alertmanager.yml", md=True)
+        cls.f = cls.inv["findings_from_files"]
+
+    def gap(self, label, certain):
+        return next(f for f in self.f if f["kind"] == "route_label_missing" and f["label"] == label and f["certain"] is certain)
+
+    def test_dropped_label_is_certain(self):
+        g = self.gap("service", True)
+        self.assertEqual(g["rules"], ["AppDown", "AppErrorsHigh"])  # up only carries target labels; sum by (instance)
+        self.assertEqual(g["fallback"], ["mail"])
+        self.assertTrue(g["fact"].startswith("route 要求 `service`，這些 rule 都沒有，實際會送到 mail"))
+        rt = rule(self.inv, "AppErrorsHigh")["route"]
+        self.assertEqual(rt["receiver"], "mail")
+        self.assertNotIn("depends_on_runtime_labels", rt)
+
+    def test_series_label_stays_runtime_and_asks(self):
+        g = self.gap("service", False)
+        self.assertEqual(g["rules"], ["AppQueueDeep"])
+        self.assertIn("service", rule(self.inv, "AppQueueDeep")["route"]["depends_on_runtime_labels"])
+        q = next(q for q in self.inv["questions"] if q["answer_key"] == "labels.service")
+        self.assertIn("exporter 會輸出 `service` 嗎", q["q"])
+        self.assertEqual(q["affects"], 1)
+
+    def test_labels_set_elsewhere_are_not_gaps(self):
+        self.assertEqual(rule(self.inv, "AppWithService")["route"]["receiver"], "pager")
+        self.assertNotIn("AppLabelReplaced", self.gap("service", True)["rules"])  # label_replace writes it
+        # cluster="other": the series carry cluster=main, so that route is not for these rules
+        self.assertFalse([f for f in self.f if f["kind"] == "route_label_missing" and f["label"] == "cluster"])
+        self.assertFalse([f for f in self.f if f["kind"] == "route_label_value_mismatch"])
+
+    def test_critical_not_paging(self):
+        f = next(f for f in self.f if f["kind"] == "critical_not_paging")
+        self.assertEqual((f["rules"], f["receivers"]), (["AppDown", "AppErrorsHigh"], ["mail"]))
+
+    def test_watchdog_route_without_rule(self):
+        f = next(f for f in self.f if f["kind"] == "dms_route_without_rule")
+        self.assertEqual(f["receiver"], "dms")
+        self.assertIn("no_watchdog_rule", kinds(self.inv))
+
+    def test_inhibit_without_equal(self):
+        f = next(f for f in self.f if f["kind"] == "inhibit_no_equal")
+        self.assertEqual((f["source_rules"], f["target_rules"]), (["AppDown"], ["AppSlow"]))
+
+    def test_answer_exporter_label(self):
+        tmp = tempfile.mkdtemp()
+        ans = os.path.join(tmp, "a.yaml")
+        with open(ans, "w") as fh:
+            yaml.safe_dump({"labels": {"service": "exporter"}}, fh)
+        d = "route-labels/"
+        inv, _ = run([d + "rules.yml"], d + "prometheus.yml", am=d + "alertmanager.yml", answers=ans)
+        shutil.rmtree(tmp)
+        gaps = [f for f in inv["findings_from_files"] if f["kind"] == "route_label_missing"]
+        self.assertTrue(all(f["certain"] for f in gaps))  # the exporter answer removes the conditional one only
+        self.assertIn("service", rule(inv, "AppQueueDeep")["route"]["depends_on_runtime_labels"])
+
+    def test_value_mismatch_close_names(self):
+        # route job="etcd", the series' job is kube-etcd (names close: looks like a typo) -> finding
+        tmp = tempfile.mkdtemp()
+        files = {"p.yml": {"scrape_configs": [{"job_name": "kube-etcd", "static_configs": [{"targets": ["e1:2379"]}]}]},
+                 "r.yml": {"groups": [{"name": "g", "rules": [
+                     {"alert": "EtcdNoLeader", "expr": 'etcd_server_has_leader{job=~".*etcd.*"} == 0',
+                      "labels": {"severity": "critical"}}]}]},
+                 "am.yml": {"route": {"receiver": "mail", "routes": [
+                     {"matchers": ['severity="critical"', 'job="etcd"'], "receiver": "pager"}]},
+                     "receivers": [{"name": "mail", "email_configs": [{"to": "x"}]}, {"name": "pager", "webhook_configs": [{"url": "y"}]}]}}
+        for n, d in files.items():
+            with open(os.path.join(tmp, n), "w") as fh:
+                yaml.safe_dump(d, fh)
+        out = os.path.join(tmp, "inv.yaml")
+        _main(["--rules", os.path.join(tmp, "r.yml"), "--config", os.path.join(tmp, "p.yml"),
+               "--alertmanager", os.path.join(tmp, "am.yml"), "--out", out])
+        inv = yaml.safe_load(_read(out))
+        shutil.rmtree(tmp)
+        f = next(f for f in inv["findings_from_files"] if f["kind"] == "route_label_value_mismatch")
+        self.assertEqual((f["label"], f["values"], f["fallback"]), ("job", ["kube-etcd"], ["mail"]))
+        self.assertIn("critical_not_paging", kinds(inv))
+
+
+class ResultLabelTest(unittest.TestCase):
+    def test_result_label(self):
+        R = I.result_label
+        self.assertEqual(R('sum by (instance) (rate(x{job="a"}[5m])) > 1', "service")[0], "absent")
+        self.assertEqual(R('sum by (instance, service) (rate(x[5m])) > 1', "service")[0], "series")
+        self.assertEqual(R('sum(up{job=~".*etcd.*"} == bool 1) without (instance) < 2', "job")[0], "series")
+        self.assertEqual(R('sum(x) without (service)', "service")[0], "absent")
+        self.assertEqual(R('count(x)', "service")[0], "absent")
+        self.assertEqual(R('topk(3, x)', "service")[0], "series")
+        self.assertEqual(R('absent(up{job="a", service="db"})', "service"), ("value", "db"))
+        self.assertEqual(R('absent(up{job="a"})', "service")[0], "absent")
+        self.assertEqual(R('label_replace(up == 0, "service", "x", "", "")', "service")[0], "made")
+        self.assertEqual(R('histogram_quantile(0.99, sum by (le) (rate(h_bucket[5m])))', "service")[0], "absent")
+        self.assertEqual(R('1 - avg by (service) (x)', "service")[0], "series")
+        self.assertEqual(R('vector(1)', "service")[0], "absent")
+        self.assertEqual(R('x > 1 or sum(y) > 2', "service")[0], "series")
+        self.assertEqual(R('a * on (instance) group_left (service) b', "service")[0], "made")
 
 
 class MergeTest(unittest.TestCase):

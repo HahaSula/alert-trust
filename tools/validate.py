@@ -87,6 +87,7 @@ def validate(root: str = C.ROOT) -> tuple[list[str], list[str]]:
             for field in ("tier", "question", "signal", "metrics", "evaluate_on", "evidence", "source", "upstream", "rules"):
                 if field not in s:
                     errors.append(f"{at}: 缺少 {field}")
+            errors += [f"{at}: {e}" for e in C.check_metric_fields(s)]
             if s.get("aspect") is not None and s.get("aspect") not in C.ASPECTS:
                 errors.append(f"{at}: aspect {s.get('aspect')!r} 要是 {', '.join(C.ASPECTS)} 之一")
             if s.get("tier") not in C.TIERS:
@@ -270,6 +271,10 @@ def check_target_pattern(components: list[dict], root: str) -> list[str]:
                 errors.append(f"{card['_path']}#{rid}: 標準訊號至少要第 {req['min_tier']} 級")
             elif req.get("contract") and by_id[rid].get("contract") != req["contract"]:
                 errors.append(f"{card['_path']}#{rid}: 要引用契約 {req['contract']}")
+            else:
+                miss = [m for m in req.get("key_metrics") or [] if m not in (by_id[rid].get("key_metrics") or [])]
+                if miss:
+                    errors.append(f"{card['_path']}#{rid}: 標準訊號要把 {', '.join(miss)} 列在 key_metrics（完整涵蓋一定要有）")
     return errors
 
 

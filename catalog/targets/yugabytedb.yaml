@@ -108,6 +108,7 @@ signals:
       （拿得到 leader 的回應）、is_raft_leader{table_name="sys.catalog"}；tserver：up、探 /api/v1/health-check（failed_tablets 為空）、master leader 的 num_tablet_servers_live；
       YSQL：up（13000）、tcp 探 5433、yb_ysqlserver_connection_over_limit_total。/status 一律 {}，不能用
     metrics: [up, probe_success, is_raft_leader, num_tablet_servers_live, yb_ysqlserver_connection_over_limit_total]
+    key_metrics: [probe_success]   # 完整涵蓋一定要有 blackbox 探測（check_coverage.py 的 partial 只看 key_metrics）
     evaluate_on: self
     silent_failure: >-
       /status 永遠 {}；master 的 JSON API 轉送失敗時仍回 200，只看狀態碼不夠；tserver 的 /api/v1/health-check 只看 FAILED tablet，不看 master；
