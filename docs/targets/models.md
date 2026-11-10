@@ -38,7 +38,7 @@ OTel receiver 的成熟度見 metadata.yaml。[^dbm-otel-mysql][^dbm-otel-postgr
 | (a) exporter | 可自訂查詢（SQL、命令），能把資料庫沒有輸出成 metric 的狀態變成數字 | 佔連線：連線打滿時 exporter 也連不進去，連線數 metric 整組消失；單執行緒的 Valkey／Redis 上，SCAN 類收集會拖慢正式流量 | 多一個行程；但有 `*_up` 可以分開「exporter 活著、資料庫掛了」 |
 | (b) 原生端點 | 不用多部署；內部 histogram（Raft、fsync、TSO）只有原生端點有 | 回應大小隨表、tablet、region 數成長；YugabyteDB 提供 `max_metric_entries` 與 allowlist 控制 | `up` 分不開資料庫掛了與抓不到；沒有 exporter 層可以監控 |
 | (c) agent／collector | 一個 agent 收多種來源，可推送 | metric 名稱與 exporter 不同，規則不能共用；receiver 多為 beta | agent 本身變成新的單點，要有自己的心跳 |
-| (d) 資料庫內歷史 | 告警之後回頭查「是哪一條 SQL」「當時在等什麼」 | 多數預設關或有保留上限（例如 Valkey 的 latency monitor 預設關、MongoDB FTDC 預設 500 MB 循環覆寫） | 不是告警來源；匯出時要先彙總，避免高基數 |
+| (d) 資料庫內歷史 | 告警之後回頭查「是哪一條 SQL」「當時在等什麼」 | 多數預設關或有保留上限（例如 Valkey 的 latency monitor 預設關、MongoDB FTDC 預設 250 MB 循環覆寫，shard server 加倍為 500 MB[^mg-ftdc-dir-size][^mg-ftdc-shard-double]） | 不是告警來源；匯出時要先彙總，避免高基數 |
 | (e) 廠商整套 | 開箱即用的儀表板與規則，跟版本一起更新 | 綁定版本與部署方式；授權不同（例如 YugabyteDB Anywhere 是 Polyform Free Trial、PMM 是 AGPL-3.0） | 只在同一套裡面自我監控，或完全不監控自己 |
 
 連線與單執行緒的風險：mysqld_exporter 連線打滿的實測與保留連線見[MySQL 頁](mysql.md)[^mysql-conn-reserved]；redis_exporter README 寫明大量 `--check-keys` 會讓 scrape 跑不完，並提醒「Redis 是單執行緒，SCAN COUNT 太大會影響正式環境」。[^dbm-redis-exp-checkkeys][^dbm-redis-exp-batch]

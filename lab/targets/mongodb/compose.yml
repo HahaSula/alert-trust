@@ -1,0 +1,59 @@
+# MongoDB 監控實驗（輕量）：3 member 的 replica set（MongoDB 8.0.34，wiredTigerCacheSizeGB 0.25、oplogSize 2MB）＋ Percona mongodb_exporter v0.54.0。
+#   e1～e3：每個 member 一個 exporter，--collector.diagnosticdata --collector.replicasetstatus --compatible-mode（PMM 的設定）
+#   e-default：m1，不加任何 collector 旗標（看預設輸出什麼）
+#   e-norole：m1，帳號只有 app 庫的 read（沒有 clusterMonitor）
+#   e-all：m1，--collect-all（看 collStats／indexStats 等的成本）
+#   e-multi：一個 exporter 帶三個 URI，給 /scrape?target= 與 /scrapeall
+# keyFile 每次啟動寫到新的檔名（上次留下的 400 權限檔在 restart 時寫不進去，mongod 起不來）。
+# 開了 enableTestCommands 才能用 sleep 指令模擬「伺服器忙」。對外只開 127.0.0.1:32090（Prometheus）。
+# 執行 ./run.sh，結束會 docker compose down -v。
+name: at-mongo-lab
+x-m: &m
+  image: mongo:8.0.34
+  mem_limit: 640m
+  entrypoint: ["/bin/sh", "-c"]
+  command:
+    - >-
+      K=/tmp/kf.$$(date +%s%N) && echo "$${KEY}" > $$K && chmod 400 $$K && chown 999:999 $$K &&
+      exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile $$K
+      --wiredTigerCacheSizeGB 0.25 --oplogSize 2 --setParameter enableTestCommands=1
+  environment: { KEY: "atmongolabkeyfileatmongolabkeyfileatmongolab" }
+x-e: &e
+  image: percona/mongodb_exporter:0.54.0
+  mem_limit: 96m
+  depends_on: [m1, m2, m3]
+services:
+  m1: *m
+  m2: *m
+  m3: *m
+  e1:
+    <<: *e
+    command: ["--mongodb.uri=mongodb://exporter:exppw@m1:27017/admin", "--collector.diagnosticdata", "--collector.replicasetstatus", "--compatible-mode"]
+  e2:
+    <<: *e
+    command: ["--mongodb.uri=mongodb://exporter:exppw@m2:27017/admin", "--collector.diagnosticdata", "--collector.replicasetstatus", "--compatible-mode"]
+  e3:
+    <<: *e
+    command: ["--mongodb.uri=mongodb://exporter:exppw@m3:27017/admin", "--collector.diagnosticdata", "--collector.replicasetstatus", "--compatible-mode"]
+  e-default:
+    <<: *e
+    command: ["--mongodb.uri=mongodb://exporter:exppw@m1:27017/admin"]
+  e-norole:
+    <<: *e
+    command: ["--mongodb.uri=mongodb://appreader:apppw@m1:27017/admin", "--collector.diagnosticdata", "--collector.replicasetstatus", "--compatible-mode"]
+  e-all:
+    <<: *e
+    command: ["--mongodb.uri=mongodb://exporter:exppw@m1:27017/admin", "--collect-all", "--compatible-mode"]
+  e-multi:
+    <<: *e
+    command:
+      - "--mongodb.uri=mongodb://exporter:exppw@m1:27017/admin,mongodb://exporter:exppw@m2:27017/admin,mongodb://exporter:exppw@m3:27017/admin"
+      - "--collector.diagnosticdata"
+      - "--collector.replicasetstatus"
+      - "--compatible-mode"
+  prometheus:
+    image: prom/prometheus:v3.13.5
+    mem_limit: 256m
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--web.enable-lifecycle", "--storage.tsdb.retention.time=2h"]
+    volumes: ["./prom:/etc/prometheus:ro"]
+    ports: ["127.0.0.1:32090:9090"]

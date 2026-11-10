@@ -1,0 +1,1292 @@
+# MongoDB（mongodb_exporter 卡）的原始碼參考。key 以 mg-（MongoDB 8.0.34）、wt-（8.0.34 內附的 WiredTiger）、mx-（Percona mongodb_exporter v0.54.0）、
+# pmm-（percona/pmm v3.10.0 alerting-templates）、awe-mg-（awesome-prometheus-alerts dd70d7b）、mg90-（MongoDB 9.0.4）開頭。
+# 每一行都在 tag 的 clone 上用關鍵字找出行號（行內含關鍵字），2026-11-10。實驗參考在檔案最後。
+refs:
+  mg-hb-interval:
+    kind: code
+    title: "heartbeat 預設每 2 秒"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/repl_set_config.cpp"
+    line: 84
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/repl_set_config.cpp#L84"
+  mg-election-timeout:
+    kind: code
+    title: "electionTimeoutMillis 預設 10 秒"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/repl_set_config.cpp"
+    line: 86
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/repl_set_config.cpp#L86"
+  mg-catchup-timeout:
+    kind: code
+    title: "catchUpTimeoutMillis 預設無限"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/repl_set_config.cpp"
+    line: 87
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/repl_set_config.cpp#L87"
+  mg-member-timeout:
+    kind: code
+    title: "超過 electionTimeout 沒有消息的 member 標成 down"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/topology_coordinator.cpp"
+    line: 1366
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/topology_coordinator.cpp#L1366"
+  mg-stepdown-majority:
+    kind: code
+    title: "primary 看不到多數時自己降級"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/topology_coordinator.cpp"
+    line: 1374
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/topology_coordinator.cpp#L1374"
+  mg-set-down-optime:
+    kind: code
+    title: "member 標成 DOWN 時清掉它的 applied optime"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/member_data.cpp"
+    line: 51
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/member_data.cpp#L51"
+  mg-rs-health:
+    kind: code
+    title: "replSetGetStatus members[].health"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/topology_coordinator.cpp"
+    line: 2120
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/topology_coordinator.cpp#L2120"
+  mg-rs-notreachable:
+    kind: code
+    title: "health 0 時 stateStr 是 (not reachable/healthy)"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/topology_coordinator.cpp"
+    line: 2126
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/topology_coordinator.cpp#L2126"
+  mg-rs-optimedate:
+    kind: code
+    title: "其他 member 的 optimeDate 取自 heartbeat，秒為單位"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/topology_coordinator.cpp"
+    line: 2141
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/topology_coordinator.cpp#L2141"
+  mg-rs-electiondate:
+    kind: code
+    title: "primary 的 electionDate"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/topology_coordinator.cpp"
+    line: 2105
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/topology_coordinator.cpp#L2105"
+  mg-rs-lastcommitted:
+    kind: code
+    title: "optimes.lastCommittedWallTime（majority commit point）"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/topology_coordinator.cpp"
+    line: 2232
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/topology_coordinator.cpp#L2232"
+  mg-rs-writemajority:
+    kind: code
+    title: "writeMajorityCount"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/topology_coordinator.cpp"
+    line: 2224
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/topology_coordinator.cpp#L2224"
+  mg-rs-candidate:
+    kind: code
+    title: "electionCandidateMetrics"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/topology_coordinator.cpp"
+    line: 2261
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/topology_coordinator.cpp#L2261"
+  mg-term-increment:
+    kind: code
+    title: "每次選舉 term 加 1"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/replication_coordinator_impl_elect_v1.cpp"
+    line: 225
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/replication_coordinator_impl_elect_v1.cpp#L225"
+  mg-state-primary:
+    kind: code
+    title: "member state 1 PRIMARY"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/member_state.h"
+    line: 58
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/member_state.h#L58"
+  mg-state-down:
+    kind: code
+    title: "member state 8 DOWN"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/member_state.h"
+    line: 91
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/member_state.h#L91"
+  mg-noop-interval:
+    kind: code
+    title: "noop writer 預設每 10 秒寫一筆"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/replication_coordinator_impl.idl"
+    line: 62
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/replication_coordinator_impl.idl#L62"
+  mg-writable-primary:
+    kind: code
+    title: "serverStatus repl.isWritablePrimary"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/replication_info.cpp"
+    line: 222
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/replication_info.cpp#L222"
+  mg-wc-implicit:
+    kind: code
+    title: "沒有 arbiter 時預設 write concern 是 majority"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/repl_set_config.cpp"
+    line: 786
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/repl_set_config.cpp#L786"
+  mg-wc-notimeout:
+    kind: code
+    title: "wtimeout 0 代表無限等待"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/write_concern_options.h"
+    line: 62
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/write_concern_options.h#L62"
+  mg-fc-enabled:
+    kind: code
+    title: "enableFlowControl 預設 true"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/storage/flow_control_parameters.idl"
+    line: 32
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/storage/flow_control_parameters.idl#L32"
+  mg-fc-target-lag:
+    kind: code
+    title: "flowControlTargetLagSeconds 預設 10"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/storage/flow_control_parameters.idl"
+    line: 40
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/storage/flow_control_parameters.idl#L40"
+  mg-fc-threshold:
+    kind: code
+    title: "flowControlThresholdLagPercentage 預設 0.5"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/storage/flow_control_parameters.idl"
+    line: 49
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/storage/flow_control_parameters.idl#L49"
+  mg-fc-primary-only:
+    kind: code
+    title: "flow control 只在可寫入的節點上作用"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/storage/flow_control.cpp"
+    line: 366
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/storage/flow_control.cpp#L366"
+  mg-fc-healthy:
+    kind: code
+    title: "commit point 落後小於門檻就是 healthy"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/storage/flow_control.cpp"
+    line: 402
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/storage/flow_control.cpp#L402"
+  mg-fc-sustainer:
+    kind: code
+    title: "commit point 有前進才會設 isLagged"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/storage/flow_control.cpp"
+    line: 420
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/storage/flow_control.cpp#L420"
+  mg-fc-unexpected:
+    kind: code
+    title: "commit point 不動時維持上次的 ticket 數，不改 isLagged"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/storage/flow_control.cpp"
+    line: 436
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/storage/flow_control.cpp#L436"
+  mg-fc-ss-islagged:
+    kind: code
+    title: "serverStatus flowControl.isLagged"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/storage/flow_control.cpp"
+    line: 250
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/storage/flow_control.cpp#L250"
+  mg-fc-ss-target:
+    kind: code
+    title: "serverStatus flowControl.targetRateLimit"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/storage/flow_control.cpp"
+    line: 243
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/storage/flow_control.cpp#L243"
+  mg-oplog-user-size:
+    kind: code
+    title: "有設 --oplogSize 就用它"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/oplog.cpp"
+    line: 645
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/oplog.cpp#L645"
+  mg-oplog-min:
+    kind: code
+    title: "預設 oplog 至少 990MB"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/oplog.cpp"
+    line: 676
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/oplog.cpp#L676"
+  mg-oplog-5pct:
+    kind: code
+    title: "預設 oplog 是可用空間的 5%"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/oplog.cpp"
+    line: 684
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/oplog.cpp#L684"
+  mg-oplog-max:
+    kind: code
+    title: "預設 oplog 最多 50GB"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/oplog.cpp"
+    line: 703
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/oplog.cpp#L703"
+  mg-oplog-capacity:
+    kind: code
+    title: "oplog 超過上限才截斷"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/storage/wiredtiger/wiredtiger_record_store.cpp"
+    line: 457
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/storage/wiredtiger/wiredtiger_record_store.cpp#L457"
+  mg-oplog-pinned:
+    kind: code
+    title: "被釘住的 oplog 不能截斷"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/storage/wiredtiger/wiredtiger_record_store.cpp"
+    line: 463
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/storage/wiredtiger/wiredtiger_record_store.cpp#L463"
+  mg-oplog-min-retention:
+    kind: code
+    title: "oplogMinRetentionHours"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/storage/wiredtiger/wiredtiger_record_store.cpp"
+    line: 469
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/storage/wiredtiger/wiredtiger_record_store.cpp#L469"
+  mg-pinned-rollback:
+    kind: code
+    title: "pinned oplog 取 rollback 需要的位置"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp"
+    line: 2657
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L2657"
+  mg-pinned-stable:
+    kind: code
+    title: "rollback 需要的位置依 stable timestamp"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp"
+    line: 2601
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L2601"
+  mg-oplog-markers-min:
+    kind: code
+    title: "至少 10 個截斷點"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/storage/wiredtiger/oplog_truncate_marker_parameters.idl"
+    line: 50
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/storage/wiredtiger/oplog_truncate_marker_parameters.idl#L50"
+  mg-oplog-check-period:
+    kind: code
+    title: "截斷執行緒的檢查間隔"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/storage/wiredtiger/oplog_truncate_marker_parameters.idl"
+    line: 68
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/storage/wiredtiger/oplog_truncate_marker_parameters.idl#L68"
+  mg-wt-cache-default:
+    kind: code
+    title: "WiredTiger cache 預設 (RAM − 1GB) × 50%，至少 256MB"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/storage/wiredtiger/wiredtiger_util.cpp"
+    line: 681
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/storage/wiredtiger/wiredtiger_util.cpp#L681"
+  mg-wt-eviction-threads:
+    kind: code
+    title: "MongoDB 固定 4 個 eviction thread"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp"
+    line: 383
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L383"
+  wt-eviction-defaults:
+    kind: code
+    title: "wiredtiger_open 預設 dirty target 5%、trigger 20%、target 80%、trigger 95%"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/third_party/wiredtiger/src/config/config_def.c"
+    line: 4164
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/third_party/wiredtiger/src/config/config_def.c#L4164"
+  wt-stat-app-evict:
+    kind: code
+    title: "WT 統計：應用執行緒花在 eviction 的時間"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/third_party/wiredtiger/src/support/stat.c"
+    line: 1553
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/third_party/wiredtiger/src/support/stat.c#L1553"
+  wt-stat-dirty:
+    kind: code
+    title: "WT 統計：tracked dirty bytes"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/third_party/wiredtiger/src/support/stat.c"
+    line: 1769
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/third_party/wiredtiger/src/support/stat.c#L1769"
+  wt-stat-max:
+    kind: code
+    title: "WT 統計：maximum bytes configured"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/third_party/wiredtiger/src/support/stat.c"
+    line: 1702
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/third_party/wiredtiger/src/support/stat.c#L1702"
+  mg-ticket-algo:
+    kind: code
+    title: "8.0 預設 throughputProbing 動態調整 ticket"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/admission/execution_control_parameters.idl"
+    line: 107
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/admission/execution_control_parameters.idl#L107"
+  mg-tp-initial:
+    kind: code
+    title: "初始 ticket 數是 CPU 核心數"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/admission/throughput_probing.idl"
+    line: 48
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/admission/throughput_probing.idl#L48"
+  mg-tp-min:
+    kind: code
+    title: "最少 4"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/admission/throughput_probing.idl"
+    line: 57
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/admission/throughput_probing.idl#L57"
+  mg-tp-max:
+    kind: code
+    title: "最多 128"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/admission/throughput_probing.idl"
+    line: 69
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/admission/throughput_probing.idl#L69"
+  mg-queues-section:
+    kind: code
+    title: "serverStatus queues.execution"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/admission/queues_server_status_section.cpp"
+    line: 58
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/admission/queues_server_status_section.cpp#L58"
+  mg-globallock-queue:
+    kind: code
+    title: "serverStatus globalLock.currentQueue"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/stats/lock_server_status_section.cpp"
+    line: 84
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/stats/lock_server_status_section.cpp#L84"
+  mg-conn-refused:
+    kind: code
+    title: "連線額滿時拒絕"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/transport/session_manager_common.cpp"
+    line: 330
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/transport/session_manager_common.cpp#L330"
+  mg-ftdc-dir-size:
+    kind: code
+    title: "FTDC 目錄預設 250MB"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/ftdc/config.h"
+    line: 101
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/ftdc/config.h#L101"
+  mg-ftdc-period:
+    kind: code
+    title: "FTDC 每秒取樣"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/ftdc/util.cpp"
+    line: 80
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/ftdc/util.cpp#L80"
+  mg-ftdc-shard-double:
+    kind: code
+    title: "shard server 上 FTDC 目錄上限加倍"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/ftdc/ftdc_server.cpp"
+    line: 345
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/ftdc/ftdc_server.cpp#L345"
+  mg-diag-auth:
+    kind: code
+    title: "getDiagnosticData 要 serverStatus 與 replSetGetStatus"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/ftdc/ftdc_commands.cpp"
+    line: 85
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/ftdc/ftdc_commands.cpp#L85"
+  mg-diag-auth-oplog:
+    kind: code
+    title: "getDiagnosticData 也要 local.oplog.rs 的 collStats"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/ftdc/ftdc_commands.cpp"
+    line: 90
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/ftdc/ftdc_commands.cpp#L90"
+  mg-sleep-testonly:
+    kind: code
+    title: "sleep 是測試用指令"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/commands/sleep_command.cpp"
+    line: 252
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/commands/sleep_command.cpp#L252"
+  mg-sleep-global:
+    kind: code
+    title: "sleep lock:w 拿 global 鎖"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/commands/sleep_command.cpp"
+    line: 105
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/commands/sleep_command.cpp#L105"
+  mg-fsync-lock:
+    kind: code
+    title: "fsyncLock 持有 GlobalRead"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/commands/fsync.cpp"
+    line: 455
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/commands/fsync.cpp#L455"
+  mg-ttl-sleep:
+    kind: code
+    title: "TTL monitor 預設 60 秒一輪"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/ttl.idl"
+    line: 41
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/ttl.idl#L41"
+  mg-syncdelay:
+    kind: code
+    title: "checkpoint 預設 60 秒一次"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/storage/storage_options.h"
+    line: 114
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/storage/storage_options.h#L114"
+  mg-cursor-timeout:
+    kind: code
+    title: "cursor 閒置 10 分鐘逾時"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/cursor_server_params.idl"
+    line: 41
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/cursor_server_params.idl#L41"
+  mg-cursor-timedout:
+    kind: code
+    title: "metrics.cursor.timedOut"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/clientcursor.cpp"
+    line: 95
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/clientcursor.cpp#L95"
+  mg-election-reason:
+    kind: code
+    title: "electionMetrics 依原因計數"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/replication_metrics.cpp"
+    line: 90
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/replication_metrics.cpp#L90"
+  mg-election-sss:
+    kind: code
+    title: "serverStatus electionMetrics"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/replication_metrics.cpp"
+    line: 423
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/replication_metrics.cpp#L423"
+  mg-balancer-round:
+    kind: code
+    title: "balancer 預設 10 秒一輪"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/s/balancer/balancer.cpp"
+    line: 133
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/s/balancer/balancer.cpp#L133"
+  mg-dryrun:
+    kind: code
+    title: "選舉前先做 dry run（不加 term）"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/replication_coordinator_impl_elect_v1.cpp"
+    line: 204
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/replication_coordinator_impl_elect_v1.cpp#L204"
+  mg-priority-takeover:
+    kind: code
+    title: "priority takeover 選舉"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/topology_coordinator.cpp"
+    line: 2646
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/topology_coordinator.cpp#L2646"
+  mg-catchup:
+    kind: code
+    title: "新 primary 先進入 catch-up"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/replication_coordinator_impl.cpp"
+    line: 5141
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/replication_coordinator_impl.cpp#L5141"
+  mg-majority-count:
+    kind: code
+    title: "投票多數＝voters / 2 + 1"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/repl_set_config.cpp"
+    line: 633
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/repl_set_config.cpp#L633"
+  mg-write-majority:
+    kind: code
+    title: "寫入多數取可寫入的投票成員"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/repl/repl_set_config.cpp"
+    line: 635
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/repl_set_config.cpp#L635"
+  mg-fc-min-tickets:
+    kind: code
+    title: "flow control 每秒最少給 100 個 ticket"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/storage/flow_control_parameters.idl"
+    line: 76
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/storage/flow_control_parameters.idl#L76"
+  mg-fc-median:
+    kind: code
+    title: "sustainer 是各 member applied 時間的中位數"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/storage/flow_control.cpp"
+    line: 149
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/storage/flow_control.cpp#L149"
+  mx-flag-diag:
+    kind: code
+    title: "--collector.diagnosticdata（預設關）"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "main.go"
+    line: 58
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/main.go#L58"
+  mx-flag-rs:
+    kind: code
+    title: "--collector.replicasetstatus（預設關）"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "main.go"
+    line: 60
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/main.go#L60"
+  mx-flag-dbstats:
+    kind: code
+    title: "--collector.dbstats（預設關）"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "main.go"
+    line: 62
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/main.go#L62"
+  mx-flag-collstats-limit:
+    kind: code
+    title: "--collector.collstats-limit"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "main.go"
+    line: 77
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/main.go#L77"
+  mx-flag-collectall:
+    kind: code
+    title: "--collect-all"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "main.go"
+    line: 75
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/main.go#L75"
+  mx-flag-discovering:
+    kind: code
+    title: "--discovering-mode"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "main.go"
+    line: 84
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/main.go#L84"
+  mx-flag-compat:
+    kind: code
+    title: "--compatible-mode"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "main.go"
+    line: 85
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/main.go#L85"
+  mx-flag-timeout-offset:
+    kind: code
+    title: "--web.timeout-offset 預設 1 秒"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "main.go"
+    line: 53
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/main.go#L53"
+  mx-flag-connect-timeout:
+    kind: code
+    title: "--mongodb.connect-timeout-ms 預設 5000"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "main.go"
+    line: 55
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/main.go#L55"
+  mx-flag-loglevel:
+    kind: code
+    title: "--log.level 預設 error"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "main.go"
+    line: 54
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/main.go#L54"
+  mx-flag-globalpool:
+    kind: code
+    title: "--mongodb.global-conn-pool"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "main.go"
+    line: 48
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/main.go#L48"
+  mx-general-always:
+    kind: code
+    title: "general collector（mongodb_up）一定開"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/general_collector.go"
+    line: 27
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/general_collector.go#L27"
+  mx-up-ping:
+    kind: code
+    title: "mongodb_up 是一次 ping"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/general_collector.go"
+    line: 61
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/general_collector.go#L61"
+  mx-up-desc:
+    kind: code
+    title: "mongodb_up 只有 cluster_role label"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/general_collector.go"
+    line: 75
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/general_collector.go#L75"
+  mx-describe-ctx:
+    kind: code
+    title: "期限過了之後的 collector 不輸出"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/base_collector.go"
+    line: 45
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/base_collector.go#L45"
+  mx-describe-collect:
+    kind: code
+    title: "查詢在註冊（Describe）時依序執行"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/base_collector.go"
+    line: 63
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/base_collector.go#L63"
+  mx-handler-header:
+    kind: code
+    title: "期限取自 Prometheus 的 scrape timeout header"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/exporter.go"
+    line: 309
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/exporter.go#L309"
+  mx-handler-default10:
+    kind: code
+    title: "沒有 header 時用 10 秒"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/exporter.go"
+    line: 310
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/exporter.go#L310"
+  mx-handler-offset:
+    kind: code
+    title: "減掉 timeout offset"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/exporter.go"
+    line: 319
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/exporter.go#L319"
+  mx-new-client:
+    kind: code
+    title: "預設每次 scrape 建新連線"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/exporter.go"
+    line: 296
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/exporter.go#L296"
+  mx-register-general:
+    kind: code
+    title: "先註冊 general collector"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/exporter.go"
+    line: 149
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/exporter.go#L149"
+  mx-register-diag:
+    kind: code
+    title: "diagnosticdata collector 要旗標才註冊"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/exporter.go"
+    line: 210
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/exporter.go#L210"
+  mx-collectall:
+    kind: code
+    title: "--collect-all 打開所有 collector"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/exporter.go"
+    line: 160
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/exporter.go#L160"
+  mx-arbiter:
+    kind: code
+    title: "arbiter 上關掉多數 collector"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/exporter.go"
+    line: 179
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/exporter.go#L179"
+  mx-continue-on-error:
+    kind: code
+    title: "錯誤時照樣回 HTTP 200"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/exporter.go"
+    line: 375
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/exporter.go#L375"
+  mx-multi-lookup:
+    kind: code
+    title: "/scrape?target= 只能選啟動時給的 URI"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/server.go"
+    line: 98
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/server.go#L98"
+  mx-multi-notfound:
+    kind: code
+    title: "其他 target 回 404"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/server.go"
+    line: 104
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/server.go#L104"
+  mx-metrics-first:
+    kind: code
+    title: "/metrics 只回第一個 URI"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/server.go"
+    line: 59
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/server.go#L59"
+  mx-scrapeall-loop:
+    kind: code
+    title: "/scrapeall 依序抓每個 URI"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/server.go"
+    line: 124
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/server.go#L124"
+  mx-scrapeall-timeout:
+    kind: code
+    title: "每個 URI 各自一個完整期限"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/server.go"
+    line: 125
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/server.go#L125"
+  mx-scrapeall-instance:
+    kind: code
+    title: "/scrapeall 加 instance label"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/server.go"
+    line: 160
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/server.go#L160"
+  mx-diag-warn:
+    kind: code
+    title: "getDiagnosticData 失敗只記 warn"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/diagnostic_data_collector.go"
+    line: 96
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/diagnostic_data_collector.go#L96"
+  mx-diag-merge8:
+    kind: code
+    title: "8.0 的 getDiagnosticData 分段"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/diagnostic_data_collector.go"
+    line: 118
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/diagnostic_data_collector.go#L118"
+  mx-diag-special:
+    kind: code
+    title: "compatible mode 才算 replset 與 oplog 的舊 metric"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/diagnostic_data_collector.go"
+    line: 144
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/diagnostic_data_collector.go#L144"
+  mx-rs-error:
+    kind: code
+    title: "replSetGetStatus 失敗記 error"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/replset_status_collector.go"
+    line: 76
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/replset_status_collector.go#L76"
+  mx-prefix-ss:
+    kind: code
+    title: "serverStatus → mongodb_ss_"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/metrics.go"
+    line: 60
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/metrics.go#L60"
+  mx-prefix-rs:
+    kind: code
+    title: "replSetGetStatus → mongodb_rs_"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/metrics.go"
+    line: 61
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/metrics.go#L61"
+  mx-prefix-queues:
+    kind: code
+    title: "8.0 的 queues.execution 對到舊名 concurrentTransactions"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/metrics.go"
+    line: 59
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/metrics.go#L59"
+  mx-txn-rw:
+    kind: code
+    title: "ticket 的 label 是 txn_rw"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/metrics.go"
+    line: 597
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/metrics.go#L597"
+  mx-member-state-label:
+    kind: code
+    title: "members 陣列加 member_idx、member_state label"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/metrics.go"
+    line: 373
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/metrics.go#L373"
+  mx-asfloat-date:
+    kind: code
+    title: "日期輸出成毫秒"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/metrics.go"
+    line: 274
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/metrics.go#L274"
+  mx-topo-rsstate:
+    kind: code
+    title: "每個 metric 帶 rs_state"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/topology_info.go"
+    line: 38
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/topology_info.go#L38"
+  mx-topo-rsnm:
+    kind: code
+    title: "rs_nm label"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/topology_info.go"
+    line: 37
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/topology_info.go#L37"
+  mx-topo-state:
+    kind: code
+    title: "rs_state 是 member 自己的 myState"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/topology_info.go"
+    line: 134
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/topology_info.go#L134"
+  mx-compat-gotprimary:
+    kind: code
+    title: "找得到 PRIMARY 才算延遲"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/v1_compatibility.go"
+    line: 1005
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/v1_compatibility.go#L1005"
+  mx-compat-lag:
+    kind: code
+    title: "沒有 primary 或 optime 為 0 時不輸出延遲"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/v1_compatibility.go"
+    line: 1040
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/v1_compatibility.go#L1040"
+  mx-compat-abs:
+    kind: code
+    title: "延遲取絕對值、秒為單位"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/v1_compatibility.go"
+    line: 1041
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/v1_compatibility.go#L1041"
+  mx-compat-self:
+    kind: code
+    title: "self label"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/v1_compatibility.go"
+    line: 1031
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/v1_compatibility.go#L1031"
+  mx-compat-mystate:
+    kind: code
+    title: "mongodb_mongod_replset_my_state"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/v1_compatibility.go"
+    line: 906
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/v1_compatibility.go#L906"
+  mx-oplog-find:
+    kind: code
+    title: "oplog head／tail 直接讀 local.oplog.rs"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/v1_compatibility.go"
+    line: 948
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/v1_compatibility.go#L948"
+  mx-oplog-head:
+    kind: code
+    title: "mongodb_mongod_replset_oplog_head_timestamp"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/v1_compatibility.go"
+    line: 974
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/v1_compatibility.go#L974"
+  mx-oplog-warn:
+    kind: code
+    title: "oplog 讀不到只記 warn"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/v1_compatibility.go"
+    line: 831
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/v1_compatibility.go#L831"
+  mx-compat-tickets:
+    kind: code
+    title: "舊名 available_tickets"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/v1_compatibility.go"
+    line: 447
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/v1_compatibility.go#L447"
+  mx-changelog:
+    kind: code
+    title: "mongos 上近 10 分鐘的 changelog 事件數"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/v1_compatibility.go"
+    line: 1279
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/v1_compatibility.go#L1279"
+  mx-balancer-enabled:
+    kind: code
+    title: "mongodb_mongos_sharding_balancer_enabled"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/v1_compatibility.go"
+    line: 1208
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/v1_compatibility.go#L1208"
+  mx-mongos-compat:
+    kind: code
+    title: "mongos 的 sharding metric 只在 compatible mode"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/diagnostic_data_collector.go"
+    line: 162
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/diagnostic_data_collector.go#L162"
+  mx-measure:
+    kind: code
+    title: "collector_scrape_time_ms"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/exporter_metrics.go"
+    line: 28
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/exporter_metrics.go#L28"
+  pmm-read-tickets:
+    kind: code
+    title: "PMM：read tickets < 50"
+    project: "PMM"
+    version: "v3.10.0"
+    file: "managed/data/alerting-templates/mongodb_read_tickets.yml"
+    line: 7
+    url: "https://github.com/percona/pmm/blob/v3.10.0/managed/data/alerting-templates/mongodb_read_tickets.yml#L7"
+  pmm-write-tickets:
+    kind: code
+    title: "PMM：write tickets < 50"
+    project: "PMM"
+    version: "v3.10.0"
+    file: "managed/data/alerting-templates/mongodb_write_tickets.yml"
+    line: 7
+    url: "https://github.com/percona/pmm/blob/v3.10.0/managed/data/alerting-templates/mongodb_write_tickets.yml#L7"
+  pmm-tickets-default:
+    kind: code
+    title: "PMM：tickets 門檻預設 50"
+    project: "PMM"
+    version: "v3.10.0"
+    file: "managed/data/alerting-templates/mongodb_read_tickets.yml"
+    line: 14
+    url: "https://github.com/percona/pmm/blob/v3.10.0/managed/data/alerting-templates/mongodb_read_tickets.yml#L14"
+  pmm-lag:
+    kind: code
+    title: "PMM：replication lag > 600s（range vector 進 max()）"
+    project: "PMM"
+    version: "v3.10.0"
+    file: "managed/data/alerting-templates/mongodb_replication_lag.yml"
+    line: 7
+    url: "https://github.com/percona/pmm/blob/v3.10.0/managed/data/alerting-templates/mongodb_replication_lag.yml#L7"
+  pmm-no-primary:
+    kind: code
+    title: "PMM：no primary"
+    project: "PMM"
+    version: "v3.10.0"
+    file: "managed/data/alerting-templates/mongodb_replset_no_primary.yml"
+    line: 7
+    url: "https://github.com/percona/pmm/blob/v3.10.0/managed/data/alerting-templates/mongodb_replset_no_primary.yml#L7"
+  pmm-primary-changed:
+    kind: code
+    title: "PMM：primary changed"
+    project: "PMM"
+    version: "v3.10.0"
+    file: "managed/data/alerting-templates/mongodb_replset_primary_changed.yml"
+    line: 6
+    url: "https://github.com/percona/pmm/blob/v3.10.0/managed/data/alerting-templates/mongodb_replset_primary_changed.yml#L6"
+  pmm-restarted:
+    kind: code
+    title: "PMM：restarted"
+    project: "PMM"
+    version: "v3.10.0"
+    file: "managed/data/alerting-templates/mongodb_restarted.yml"
+    line: 7
+    url: "https://github.com/percona/pmm/blob/v3.10.0/managed/data/alerting-templates/mongodb_restarted.yml#L7"
+  pmm-oplog:
+    kind: code
+    title: "PMM：oplog window < 24h"
+    project: "PMM"
+    version: "v3.10.0"
+    file: "managed/data/alerting-templates/mongodb_oplog_window.yml"
+    line: 7
+    url: "https://github.com/percona/pmm/blob/v3.10.0/managed/data/alerting-templates/mongodb_oplog_window.yml#L7"
+  pmm-unusual:
+    kind: code
+    title: "PMM：unusual state"
+    project: "PMM"
+    version: "v3.10.0"
+    file: "managed/data/alerting-templates/mongodb_unusual_state.yml"
+    line: 7
+    url: "https://github.com/percona/pmm/blob/v3.10.0/managed/data/alerting-templates/mongodb_unusual_state.yml#L7"
+  pmm-disk:
+    kind: code
+    title: "PMM：dbPath 磁碟 > 85%"
+    project: "PMM"
+    version: "v3.10.0"
+    file: "managed/data/alerting-templates/mongodb_dbpath_disk_space.yml"
+    line: 9
+    url: "https://github.com/percona/pmm/blob/v3.10.0/managed/data/alerting-templates/mongodb_dbpath_disk_space.yml#L9"
+  pmm-chunks:
+    kind: code
+    title: "PMM：chunk migrations > 40"
+    project: "PMM"
+    version: "v3.10.0"
+    file: "managed/data/alerting-templates/mongodb_too_many_chunk_migrations.yml"
+    line: 7
+    url: "https://github.com/percona/pmm/blob/v3.10.0/managed/data/alerting-templates/mongodb_too_many_chunk_migrations.yml#L7"
+  pmm-down:
+    kind: code
+    title: "PMM：down 用 inventory 補消失的 exporter"
+    project: "PMM"
+    version: "v3.10.0"
+    file: "managed/data/alerting-templates/mongodb_down.yml"
+    line: 13
+    url: "https://github.com/percona/pmm/blob/v3.10.0/managed/data/alerting-templates/mongodb_down.yml#L13"
+  pmm-vm:
+    kind: code
+    title: "PMM 的 TSDB 是 VictoriaMetrics"
+    project: "PMM"
+    version: "v3.10.0"
+    file: "managed/services/victoriametrics/victoriametrics.go"
+    line: 16
+    url: "https://github.com/percona/pmm/blob/v3.10.0/managed/services/victoriametrics/victoriametrics.go#L16"
+  awe-mg-down:
+    kind: code
+    title: "awesome：MongoDB Down"
+    project: "awesome-prometheus-alerts"
+    version: "dd70d7b"
+    file: "_data/rules.yml"
+    line: 1882
+    url: "https://github.com/samber/awesome-prometheus-alerts/blob/dd70d7b66a4e9dbf14429aec244d543a2833390e/_data/rules.yml#L1882"
+  awe-mg-unhealthy:
+    kind: code
+    title: "awesome：replica member unhealthy"
+    project: "awesome-prometheus-alerts"
+    version: "dd70d7b"
+    file: "_data/rules.yml"
+    line: 1889
+    url: "https://github.com/samber/awesome-prometheus-alerts/blob/dd70d7b66a4e9dbf14429aec244d543a2833390e/_data/rules.yml#L1889"
+  awe-mg-noprimary:
+    kind: code
+    title: "awesome：no primary"
+    project: "awesome-prometheus-alerts"
+    version: "dd70d7b"
+    file: "_data/rules.yml"
+    line: 1896
+    url: "https://github.com/samber/awesome-prometheus-alerts/blob/dd70d7b66a4e9dbf14429aec244d543a2833390e/_data/rules.yml#L1896"
+  awe-mg-primarychanged:
+    kind: code
+    title: "awesome：primary changed"
+    project: "awesome-prometheus-alerts"
+    version: "dd70d7b"
+    file: "_data/rules.yml"
+    line: 1901
+    url: "https://github.com/samber/awesome-prometheus-alerts/blob/dd70d7b66a4e9dbf14429aec244d543a2833390e/_data/rules.yml#L1901"
+  awe-mg-conns:
+    kind: code
+    title: "awesome：too many connections"
+    project: "awesome-prometheus-alerts"
+    version: "dd70d7b"
+    file: "_data/rules.yml"
+    line: 1913
+    url: "https://github.com/samber/awesome-prometheus-alerts/blob/dd70d7b66a4e9dbf14429aec244d543a2833390e/_data/rules.yml#L1913"
+  awe-mg-headroom:
+    kind: code
+    title: "awesome：replication headroom（on (set)）"
+    project: "awesome-prometheus-alerts"
+    version: "dd70d7b"
+    file: "_data/rules.yml"
+    line: 1921
+    url: "https://github.com/samber/awesome-prometheus-alerts/blob/dd70d7b66a4e9dbf14429aec244d543a2833390e/_data/rules.yml#L1921"
+  awe-mg-lag:
+    kind: code
+    title: "awesome：replication lag（on (set)）"
+    project: "awesome-prometheus-alerts"
+    version: "dd70d7b"
+    file: "_data/rules.yml"
+    line: 1927
+    url: "https://github.com/samber/awesome-prometheus-alerts/blob/dd70d7b66a4e9dbf14429aec244d543a2833390e/_data/rules.yml#L1927"
+  awe-mg-cursors:
+    kind: code
+    title: "awesome：open cursors"
+    project: "awesome-prometheus-alerts"
+    version: "dd70d7b"
+    file: "_data/rules.yml"
+    line: 1934
+    url: "https://github.com/samber/awesome-prometheus-alerts/blob/dd70d7b66a4e9dbf14429aec244d543a2833390e/_data/rules.yml#L1934"
+  awe-mg-cursor-timeout:
+    kind: code
+    title: "awesome：cursor timeouts"
+    project: "awesome-prometheus-alerts"
+    version: "dd70d7b"
+    file: "_data/rules.yml"
+    line: 1941
+    url: "https://github.com/samber/awesome-prometheus-alerts/blob/dd70d7b66a4e9dbf14429aec244d543a2833390e/_data/rules.yml#L1941"
+  awe-mg-read-tickets:
+    kind: code
+    title: "awesome：read tickets（txn_rw_type）"
+    project: "awesome-prometheus-alerts"
+    version: "dd70d7b"
+    file: "_data/rules.yml"
+    line: 1948
+    url: "https://github.com/samber/awesome-prometheus-alerts/blob/dd70d7b66a4e9dbf14429aec244d543a2833390e/_data/rules.yml#L1948"
+  awe-mg-write-tickets:
+    kind: code
+    title: "awesome：write tickets（txn_rw_type）"
+    project: "awesome-prometheus-alerts"
+    version: "dd70d7b"
+    file: "_data/rules.yml"
+    line: 1955
+    url: "https://github.com/samber/awesome-prometheus-alerts/blob/dd70d7b66a4e9dbf14429aec244d543a2833390e/_data/rules.yml#L1955"
+  awe-mg-restart:
+    kind: code
+    title: "awesome：recently restarted"
+    project: "awesome-prometheus-alerts"
+    version: "dd70d7b"
+    file: "_data/rules.yml"
+    line: 1962
+    url: "https://github.com/samber/awesome-prometheus-alerts/blob/dd70d7b66a4e9dbf14429aec244d543a2833390e/_data/rules.yml#L1962"
+  mg90-otel-prom-dir:
+    kind: code
+    title: "9.0.4：Prometheus 格式檔案輸出"
+    project: "MongoDB"
+    version: "9.0.4"
+    file: "src/mongo/otel/metrics/metrics_settings.idl"
+    line: 60
+    url: "https://github.com/mongodb/mongo/blob/r9.0.4/src/mongo/otel/metrics/metrics_settings.idl#L60"
+  mg90-otel-maxfail:
+    kind: code
+    title: "9.0.4：連續失敗上限後 process 結束"
+    project: "MongoDB"
+    version: "9.0.4"
+    file: "src/mongo/otel/metrics/metrics_settings.idl"
+    line: 72
+    url: "https://github.com/mongodb/mongo/blob/r9.0.4/src/mongo/otel/metrics/metrics_settings.idl#L72"
+  mg90-otel-names:
+    kind: code
+    title: "9.0.4：OTel metric 名稱表"
+    project: "MongoDB"
+    version: "9.0.4"
+    file: "src/mongo/otel/metrics/metric_names.h"
+    line: 484
+    url: "https://github.com/mongodb/mongo/blob/r9.0.4/src/mongo/otel/metrics/metric_names.h#L484"
+  mg-exp:
+    kind: experiment
+    title: MongoDB 8.0.34 三 member replica set＋mongodb_exporter v0.54.0：預設輸出、沒有 clusterMonitor、上游規則的 metric、oplog window、fsyncLock 延遲、majority 停住、伺服器忙、停 primary、pause secondary、停兩個 secondary
+    url: https://github.com/HahaSula/alert-trust/blob/main/lab/targets/mongodb/results/run-20261110.txt
+  mg-exp-a:
+    kind: experiment
+    title: MongoDB lab 的前一次執行（被 kill 的 member 沒有重新啟動）；只引用兩個 member 同時連不上時 /scrapeall 整個逾時
+    url: https://github.com/HahaSula/alert-trust/blob/main/lab/targets/mongodb/results/run-20261110-a.txt

@@ -1,0 +1,27 @@
+global: { scrape_interval: 5s, scrape_timeout: 4s, evaluation_interval: 5s }
+rule_files: ["/etc/prometheus/rules/*.yml"]
+scrape_configs:
+  # 每個 member 一個 exporter；instance 改成 member 的 host:port，cluster 是 replica set
+  - job_name: mongodb
+    static_configs:
+      - { targets: ["e1:9216"], labels: { instance: "m1:27017", cluster: rs0 } }
+      - { targets: ["e2:9216"], labels: { instance: "m2:27017", cluster: rs0 } }
+      - { targets: ["e3:9216"], labels: { instance: "m3:27017", cluster: rs0 } }
+  - job_name: mongodb-default
+    static_configs: [{ targets: ["e-default:9216"], labels: { instance: "m1:27017", cluster: rs0 } }]
+  - job_name: mongodb-norole
+    static_configs: [{ targets: ["e-norole:9216"], labels: { instance: "m1:27017", cluster: rs0 } }]
+  - job_name: mongodb-all
+    static_configs: [{ targets: ["e-all:9216"], labels: { instance: "m1:27017", cluster: rs0 } }]
+  # multi-target：/scrape?target=<host:port>，只能選啟動時 --mongodb.uri 給過的 host
+  - job_name: mongodb-multi
+    metrics_path: /scrape
+    static_configs: [{ targets: ["m1:27017", "m2:27017", "m3:27017"], labels: { cluster: rs0 } }]
+    relabel_configs:
+      - { source_labels: [__address__], target_label: __param_target }
+      - { source_labels: [__param_target], target_label: instance }
+      - { target_label: __address__, replacement: "e-multi:9216" }
+  # /scrapeall：一次請求依序抓三個 member
+  - job_name: mongodb-scrapeall
+    metrics_path: /scrapeall
+    static_configs: [{ targets: ["e-multi:9216"], labels: { cluster: rs0 } }]

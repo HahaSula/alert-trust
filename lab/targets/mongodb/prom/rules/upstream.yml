@@ -1,0 +1,69 @@
+# 上游規則照抄（只換掉範本參數），用來確認在 mongodb_exporter v0.54.0 ＋ MongoDB 8.0.34 上會不會響。
+#   PMM：percona/pmm v3.10.0 managed/data/alerting-templates/mongodb_*.yml，[[ .threshold ]] 換成範本的預設值
+#   awesome：samber/awesome-prometheus-alerts dd70d7b _data/rules.yml 的 percona/mongodb_exporter 段
+# 原規則沒有 job 選擇器；這裡加上 {job="mongodb"} 以外的 job 會重複，所以只對 job="mongodb" 評估（用 label 篩，不改運算）。
+# PMM 用 `< bool N` 的範本（0／1）在 Grafana 裡以「結果非 0」當條件；Prometheus 的 bool 永遠有結果，所以這裡外面包一層 == 1。
+# for 縮短成 30s，讓 lab 在幾分鐘內看得到結果。
+groups:
+  - name: upstream-pmm
+    rules:
+      - alert: PMM_ReadTickets
+        expr: (avg by(cluster,node_name,service_name,txn_rw) (mongodb_mongod_wiredtiger_concurrent_transactions_available_tickets{job="mongodb",txn_rw="read"}) < bool 50) == 1
+        labels: { component: upstream }
+      - alert: PMM_WriteTickets
+        expr: (avg by(cluster,node_name,service_name,txn_rw) (mongodb_mongod_wiredtiger_concurrent_transactions_available_tickets{job="mongodb",txn_rw="write"}) < bool 50) == 1
+        labels: { component: upstream }
+      - alert: PMM_ReplicationLag
+        # 原文 max(<metric>[1m]) by(...) 在 Prometheus 是語法錯誤（aggregation 不收 range vector）；PMM 後端是 VictoriaMetrics，
+        # MetricsQL 會自動補成 default_rollup。這裡用 last_over_time 模擬。
+        expr: max(last_over_time(mongodb_mongod_replset_member_replication_lag{job="mongodb",state="SECONDARY", self=~"|1"}[1m])) by(cluster,name,set) > 600
+        labels: { component: upstream }
+      - alert: PMM_ReplsetNoPrimary
+        expr: avg(mongodb_ss_repl_isWritablePrimary{job="mongodb"}) by(cluster,rs_nm) == 0
+        for: 30s
+        labels: { component: upstream }
+      - alert: PMM_PrimaryChanged
+        expr: min by (set)(changes(mongodb_mongod_replset_my_state{job="mongodb"}[10m]) > 0)
+        labels: { component: upstream }
+      - alert: PMM_Restarted
+        expr: (mongodb_instance_uptime_seconds{job="mongodb"} < bool 300) == 1
+        labels: { component: upstream }
+      - alert: PMM_OplogWindow
+        expr: (((mongodb_mongod_replset_oplog_head_timestamp{job="mongodb"} - mongodb_mongod_replset_oplog_tail_timestamp{job="mongodb"}) / 3600) < bool 24) == 1
+        labels: { component: upstream }
+      - alert: PMM_UnusualState
+        expr: group(mongodb_rs_members_state{job="mongodb"} != 1 and mongodb_rs_members_state != 2 and mongodb_rs_members_state != 7 and mongodb_rs_members_state != 8) by (cluster,member_idx,member_state,rs_nm)
+        for: 30s
+        labels: { component: upstream }
+      - alert: PMM_DbpathDiskSpace
+        expr: ((max(mongodb_dbstats_fsUsedSize{job="mongodb"}) by(cluster,node_name,service_name,rs_nm)) / (max(mongodb_dbstats_fsTotalSize{job="mongodb"}) by(cluster,node_name,service_name,rs_nm))) * 100 > 85
+        labels: { component: upstream }
+  - name: upstream-awesome
+    rules:
+      - alert: AWE_MongodbDown
+        expr: mongodb_up{job="mongodb"} == 0
+        labels: { component: upstream }
+      - alert: AWE_MemberUnhealthy
+        expr: mongodb_rs_members_health{job="mongodb"} == 0
+        labels: { component: upstream }
+      - alert: AWE_NoPrimary
+        expr: sum(mongodb_ss_repl_isWritablePrimary{job="mongodb"}) by (job) == 0
+        labels: { component: upstream }
+      - alert: AWE_PrimaryChanged
+        expr: changes(mongodb_rs_myState{job="mongodb"}[10m]) > 0 and mongodb_rs_myState{job="mongodb"} == 1
+        labels: { component: upstream }
+      - alert: AWE_ReplicationLag
+        expr: (mongodb_rs_members_optimeDate{job="mongodb",member_state="PRIMARY"} - on (set) group_right mongodb_rs_members_optimeDate{job="mongodb",member_state="SECONDARY"}) / 1000 > 30
+        labels: { component: upstream }
+      - alert: AWE_ReplicationHeadroom
+        expr: sum(avg(mongodb_mongod_replset_oplog_head_timestamp{job="mongodb"} - mongodb_mongod_replset_oplog_tail_timestamp{job="mongodb"})) - sum(avg(mongodb_rs_members_optimeDate{job="mongodb",member_state="PRIMARY"} - on (set) group_right mongodb_rs_members_optimeDate{job="mongodb",member_state="SECONDARY"})) <= 0
+        labels: { component: upstream }
+      - alert: AWE_ReadTicketsExhausted
+        expr: mongodb_ss_wt_concurrentTransactions_available{job="mongodb",txn_rw_type="read"} < 50
+        labels: { component: upstream }
+      - alert: AWE_WriteTicketsExhausted
+        expr: mongodb_ss_wt_concurrentTransactions_available{job="mongodb",txn_rw_type="write"} < 50
+        labels: { component: upstream }
+      - alert: AWE_Restarted
+        expr: mongodb_ss_uptime{job="mongodb"} < 300
+        labels: { component: upstream }

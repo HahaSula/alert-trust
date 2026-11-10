@@ -694,3 +694,125 @@ terms:
       - "原生 /metrics 不受影響：每個 ProfileEvent 都輸出，含 0"
     note: "用 SQL 讀 system.events 的 exporter（Altinity metrics-exporter）在事件第一次發生前沒有這條 series；increase() 抓不到第一次的增加。"
     refs: [ch-set-events-zero, ch-events-zero, ch-prom-events-all, alt-fetch-events]
+
+  # ---------- MongoDB ----------
+  mongodb-election-timeout:
+    title: MongoDB replica set 的選舉逾時
+    kind: config
+    systems: [mongodb]
+    tokens: [electionTimeoutMillis, heartbeatIntervalMillis]
+    where: "replica set 設定 `settings.electionTimeoutMillis`（`rs.reconfig()`）；heartbeat 間隔在 8.0 是固定的 2 秒"
+    default: "electionTimeoutMillis 10000（10 秒）；heartbeat 每 2 秒"
+    observe:
+      - "`mongodb_rs_electionCandidateMetrics_electionTimeoutMillis`；選舉次數看 `mongodb_rs_term` 的增加、`mongodb_ss_electionMetrics_electionTimeout_called`"
+    note: "超過這段時間沒有收到某個 member 的消息就把它標成 DOWN；primary 看不到多數時自己降級。這台機器的容器單調時鐘比牆鐘慢，實際等待會比 10 秒長。"
+    refs: [mg-election-timeout, mg-hb-interval, mg-member-timeout, mg-stepdown-majority, mg-exp]
+
+  mongodb-oplog-size:
+    title: MongoDB 的 oplog 大小與最短保留
+    kind: config
+    systems: [mongodb]
+    tokens: [--oplogSize, oplogSizeMB, oplogMinRetentionHours]
+    where: "`mongod --oplogSize`（MB）或設定檔 `replication.oplogSizeMB`；執行中用 `replSetResizeOplog`；`storage.oplogMinRetentionHours`"
+    default: "可用磁碟的 5%，至少 990MB、最多 50GB；oplogMinRetentionHours 0（只看大小）"
+    observe:
+      - "`mongodb_mongod_replset_oplog_head_timestamp` − `mongodb_mongod_replset_oplog_tail_timestamp`（秒，要 `--compatible-mode`）"
+      - "`mongodb_oplog_stats_storageStats_size` 與 `mongodb_oplog_stats_storageStats_maxSize`"
+    note: "oplog 只在超過大小、而且最舊的那段沒有被 majority commit point 或 backup 釘住時才截斷；commit point 停住時 oplog 會超過設定值。"
+    refs: [mg-oplog-user-size, mg-oplog-min, mg-oplog-5pct, mg-oplog-max, mg-oplog-capacity, mg-oplog-pinned, mg-oplog-min-retention, mg-exp]
+
+  mongodb-wt-cache:
+    title: WiredTiger cache 大小與 eviction 門檻
+    kind: config
+    systems: [mongodb]
+    tokens: [wiredTigerCacheSizeGB, eviction_dirty_trigger, eviction_trigger]
+    where: "`mongod --wiredTigerCacheSizeGB` 或 `storage.wiredTiger.engineConfig.cacheSizeGB`；eviction 門檻是 WiredTiger 的 `wiredtiger_open` 設定（MongoDB 不改）"
+    default: "cache (RAM − 1GB) × 50%，至少 256MB；eviction_target 80%、eviction_trigger 95%、eviction_dirty_target 5%、eviction_dirty_trigger 20%"
+    observe:
+      - "`mongodb_ss_wt_cache_bytes_currently_in_the_cache`、`mongodb_ss_wt_cache_tracked_dirty_bytes_in_the_cache` 對 `mongodb_ss_wt_cache_maximum_bytes_configured`"
+      - "`mongodb_ss_wt_cache_application_thread_time_evicting_usecs`（應用執行緒被迫做 eviction）"
+    refs: [mg-wt-cache-default, wt-eviction-defaults, wt-stat-dirty, wt-stat-app-evict, mg-exp]
+
+  mongodb-flow-control:
+    title: MongoDB flow control
+    kind: config
+    systems: [mongodb]
+    tokens: [enableFlowControl, flowControlTargetLagSeconds]
+    where: "`setParameter`（啟動或執行中）"
+    default: "enableFlowControl true；flowControlTargetLagSeconds 10；flowControlThresholdLagPercentage 0.5（落後 5 秒開始限制）"
+    observe:
+      - "`mongodb_ss_flowControl_isLagged`、`mongodb_ss_flowControl_targetRateLimit`、`mongodb_ss_flowControl_isLaggedCount`"
+    note: "只在 primary 上作用。lab 兩個 secondary 都 fsyncLock 時 isLagged 1、targetRateLimit 降到下限 100（flowControlMinTicketsPerSecond）；每秒寫入少於 100 的應用不會被擋。"
+    refs: [mg-fc-enabled, mg-fc-target-lag, mg-fc-threshold, mg-fc-primary-only, mg-fc-sustainer, mg-fc-min-tickets, mg-exp]
+
+  mongodb-ticket-algorithm:
+    title: MongoDB 8.0 的 storage engine ticket（並行交易數）
+    kind: config
+    systems: [mongodb]
+    tokens: [storageEngineConcurrencyAdjustmentAlgorithm, throughputProbing]
+    where: "`setParameter storageEngineConcurrencyAdjustmentAlgorithm`（啟動時）"
+    default: "throughputProbing：初始值是 CPU 核心數，在 4～128 之間動態調整；fixedConcurrentTransactions 才是固定 128"
+    observe:
+      - "`mongodb_ss_wt_concurrentTransactions_available{txn_rw}`、`mongodb_ss_wt_concurrentTransactions_totalTickets`"
+      - "排隊：`mongodb_ss_wt_concurrentTransactions_read_normalPriority_queueLength`、`..._write_normalPriority_queueLength`"
+    note: "PMM 與 awesome 的「available < 50」規則是照固定 128 寫的；動態調整下 available 本來就可能小於 50。"
+    refs: [mg-ticket-algo, mg-tp-initial, mg-tp-min, mg-tp-max, mg-queues-section, mg-exp]
+
+  mongodb-ftdc:
+    title: MongoDB FTDC（diagnostic.data）
+    kind: config
+    systems: [mongodb]
+    tokens: [diagnosticDataCollectionDirectorySizeMB, diagnostic.data]
+    where: "`setParameter diagnosticDataCollectionDirectorySizeMB`、`diagnosticDataCollectionPeriodMillis`；目錄在 dbPath 下的 diagnostic.data"
+    default: "每 1000ms 取樣；目錄上限 250MB（shard server 在新的 log／FTDC 格式下自動加倍）"
+    observe:
+      - "exporter 的 `--collector.diagnosticdata` 讀的是同一份資料（`getDiagnosticData` 指令），不是 FTDC 檔案"
+    note: "FTDC 檔案格式不公開，用途是事後交給 MongoDB 分析；不是告警來源。"
+    refs: [mg-ftdc-period, mg-ftdc-dir-size, mg-ftdc-shard-double, mg-diag-auth]
+
+  mongodb-exporter-collectors:
+    title: mongodb_exporter 的 collector 旗標
+    kind: config
+    systems: [mongodb_exporter]
+    tokens: [--collector.diagnosticdata, --collector.replicasetstatus, --compatible-mode, --collect-all, --discovering-mode]
+    where: "mongodb_exporter 的命令列"
+    default: "全部關閉：只輸出 `mongodb_up` 與 go_*／process_*"
+    observe:
+      - "`collector_scrape_time_ms{collector}`：有註冊的 collector 才有這條（失敗時也有，值接近 0）"
+      - "`scrape_samples_scraped`：lab 預設 46、加三個旗標約 6100、`--collect-all` 約 6700"
+    note: "`--compatible-mode` 才有 `mongodb_mongod_replset_member_replication_lag`、oplog head／tail、`mongodb_mongod_replset_my_state` 等舊名 metric；PMM 的規則用的是這些。"
+    refs: [mx-flag-diag, mx-flag-rs, mx-flag-compat, mx-flag-collectall, mx-register-diag, mx-general-always, mg-exp]
+
+  mongodb-exporter-timeout:
+    title: mongodb_exporter 的查詢期限
+    kind: config
+    systems: [mongodb_exporter]
+    tokens: [--web.timeout-offset, --mongodb.connect-timeout-ms]
+    where: "mongodb_exporter 的命令列"
+    default: "期限＝Prometheus 送來的 X-Prometheus-Scrape-Timeout-Seconds（沒有時 10 秒）減 `--web.timeout-offset`（1 秒）；連線逾時 5000ms"
+    observe:
+      - "`scrape_duration_seconds` 接近 scrape_timeout 減 1 秒；期限到了以後的 collector 整組不輸出，`up` 仍是 1"
+    refs: [mx-handler-header, mx-handler-default10, mx-handler-offset, mx-flag-timeout-offset, mx-flag-connect-timeout, mx-describe-ctx, mg-exp]
+
+  mongodb-up:
+    title: mongodb_up
+    kind: metric
+    systems: [mongodb_exporter]
+    tokens: [mongodb_up]
+    where: "mongodb_exporter 的 general collector（一定開）"
+    default: "一次 ping（read preference primaryPreferred、direct connection）成功就是 1"
+    observe:
+      - "label 只有 `cluster_role`，沒有 rs_nm；secondary 在沒有 primary 時 ping 照樣成功，值仍是 1"
+    refs: [mx-up-ping, mx-up-desc, mx-general-always, mg-exp]
+
+  mongodb-replication-lag-metric:
+    title: mongodb_exporter 的複寫延遲
+    kind: metric
+    systems: [mongodb_exporter]
+    tokens: [mongodb_mongod_replset_member_replication_lag]
+    where: "`--compatible-mode`＋`--collector.diagnosticdata`；從每個 member 自己的 replSetGetStatus 算"
+    default: "|member 的 optimeDate − PRIMARY 的 optimeDate|，秒；label name、state、self、set"
+    observe:
+      - "每個 secondary 會被每個 exporter 各報一次，用 `self=\"1\"` 取自己報的那條"
+    note: "replSetGetStatus 裡沒有 PRIMARY（選舉中、失去多數）時整組不輸出；DOWN 的 member optime 被清成 0，也不輸出。"
+    refs: [mx-compat-gotprimary, mx-compat-lag, mx-compat-abs, mx-compat-self, mg-set-down-optime, mg-exp]

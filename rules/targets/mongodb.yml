@@ -1,0 +1,330 @@
+# Percona mongodb_exporter v0.54.0 ＋ MongoDB 8.0.34（replica set）的建議規則。MongoDB Community 是 SSPL；exporter 是 Apache-2.0。
+#
+# 前提：exporter 要加 --collector.diagnosticdata --collector.replicasetstatus --compatible-mode（PMM 用的組合）。
+# 不加任何 collector 旗標時 exporter 只輸出 mongodb_up 與 go_*／process_*（lab 實測 46 個 sample），
+# 這裡除了 liveness 以外的規則全部回傳空；MongoDBDiagnosticDataMissing 會抓到這種設定。
+# 帳號要有 admin 的 clusterMonitor 與 local 的 read（getDiagnosticData 要 serverStatus、replSetGetStatus 與 local.oplog.rs 的 collStats）。
+#
+# job 選擇器是佔位用的，請換成實際的名稱：
+#   job="mongodb"           Prometheus 抓「每個 member 一個 exporter」（建議）；target 要加 cluster label（同一個 replica set 共用一個值）
+#   job="mongodb-exporter"  只在用 multi-target（/scrape?target=）時才有：抓 exporter 自己的 /metrics（注意它回的是第一個 URI 的資料）
+# 多個 replica set 共用 job 時，規則已經依 cluster 分組；exporter 輸出的 rs_nm label 在連不上時不存在，所以分組用 target 的 cluster label。
+# exporter 在每個 metric 加 rs_state（member 狀態）label：角色改變時所有 series 換一組 label，changes() 與 rate() 要先依 cluster 彙總。
+#
+# 門檻以 scrape_interval 15s、scrape_timeout 10s 為基準；標「例子」的數字沒有官方依據，請依環境調整。
+# Atlas 的建議門檻（oplog window < 1h、複寫延遲）見 docs/targets/mongodb.md#models。
+# runbook_url 指向 alert-trust 網站上對應訊號的段落。
+groups:
+  - name: mongodb-liveness
+    rules:
+      - alert: MongoDBExporterDown
+        expr: up{job="mongodb"} == 0
+        for: 1m
+        labels: { severity: critical, component: mongodb_exporter, tier: "1", aspect: exporter }
+        annotations:
+          summary: "抓不到 mongodb_exporter 或 scrape 超時，這時 mongodb_up 也不存在"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#exporter-up
+      - alert: MongoDBExporterMissing
+        expr: absent(up{job="mongodb"})
+        for: 5m
+        labels: { severity: critical, component: mongodb_exporter, tier: "1", aspect: exporter }
+        annotations:
+          summary: "完全沒有 mongodb 的 target，服務發現或 job 名稱可能錯了"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#exporter-up
+      - alert: MongoDBDown
+        expr: mongodb_up{job="mongodb"} == 0
+        for: 1m
+        labels: { severity: critical, component: mongodb_exporter, tier: "1", aspect: availability }
+        annotations:
+          summary: "exporter 連不上 {{ $labels.instance }}（ping 失敗）；member 是 SECONDARY、整個 replica set 沒有 primary 時 mongodb_up 仍是 1，要看 MongoDBNoPrimary"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#db-up
+          absence_covered_by: "MongoDBExporterDown, MongoDBExporterMissing"
+      - alert: MongoDBDiagnosticDataMissing
+        expr: |
+          mongodb_up{job="mongodb"} == 1
+            unless on (job, instance) mongodb_ss_uptime{job="mongodb"}
+        for: 5m
+        labels: { severity: warning, component: mongodb_exporter, tier: "1", aspect: exporter }
+        annotations:
+          summary: "exporter 連得上，但沒有 serverStatus 的 metric：沒開 --collector.diagnosticdata，或帳號沒有 clusterMonitor（getDiagnosticData 被拒，錯誤在預設 log.level=error 下看不到）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#collectors-present
+      - alert: MongoDBReplSetStatusMissing
+        expr: |
+          mongodb_ss_uptime{job="mongodb"}
+            unless on (job, instance) mongodb_rs_ok{job="mongodb"}
+        for: 5m
+        labels: { severity: warning, component: mongodb_exporter, tier: "1", aspect: exporter }
+        annotations:
+          summary: "有 serverStatus 但沒有 replSetGetStatus 的 metric：沒開 --collector.replicasetstatus、帳號缺 replSetGetStatus，或這台不是 replica set member（standalone、mongos、arbiter）；member 健康與 term 的規則回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#collector-success
+      - alert: MongoDBOplogMetricsMissing
+        expr: |
+          mongodb_ss_uptime{job="mongodb"}
+            unless on (job, instance) mongodb_mongod_replset_oplog_head_timestamp{job="mongodb"}
+        for: 5m
+        labels: { severity: warning, component: mongodb_exporter, tier: "1", aspect: exporter }
+        annotations:
+          summary: "沒有 oplog head／tail：沒開 --compatible-mode，或帳號沒有 local 的 read；oplog window 與複寫延遲的規則回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#collector-success
+      - alert: MongoDBScrapeNearTimeout
+        expr: scrape_duration_seconds{job="mongodb"} > 8
+        for: 10m
+        labels: { severity: warning, component: mongodb_exporter, tier: "2", aspect: exporter }
+        annotations:
+          summary: "scrape 接近 scrape_timeout（10s 的 80%）；exporter 只給查詢 scrape_timeout 減 1 秒（--web.timeout-offset），超過時後面的 collector 整組不輸出"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#scrape-budget
+      - alert: MongoDBScrapeSamplesDropped
+        expr: |
+          scrape_samples_scraped{job="mongodb"}
+            < 0.5 * max_over_time(scrape_samples_scraped{job="mongodb"}[1h] offset 5m)
+        for: 5m
+        labels: { severity: warning, component: mongodb_exporter, tier: "2", aspect: exporter }
+        annotations:
+          summary: "sample 數比一小時內的最大值少一半：collector 逾時或被拒時只剩一部分 metric（up 仍是 1）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#exporter-query-timeout
+      - alert: MongoDBMultiTargetExporterDown
+        expr: up{job="mongodb-exporter"} == 0 or absent(up{job="mongodb-exporter"})
+        for: 2m
+        labels: { severity: critical, component: mongodb_exporter, tier: "2", aspect: exporter }
+        annotations:
+          summary: "multi-target exporter 本身抓不到，它代理的所有 member 一起失去監控；沒用 multi-target 的環境把這條刪掉"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#probe-blast-radius
+
+  - name: mongodb-availability
+    rules:
+      - alert: MongoDBRestarted
+        expr: mongodb_ss_uptime{job="mongodb"} < 300
+        labels: { severity: info, component: mongodb_exporter, tier: "2", aspect: availability }
+        annotations:
+          summary: "{{ $labels.instance }} 在 5 分鐘內重啟過"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#restart
+      - alert: MongoDBMajorityWriteTimeouts
+        expr: increase(mongodb_ss_metrics_getLastError_wtimeouts{job="mongodb"}[5m]) > 0
+        labels: { severity: warning, component: mongodb_exporter, tier: "2", aspect: availability }
+        annotations:
+          summary: "有寫入等 write concern 逾時（wtimeout）；沒有設 wtimeout 的寫入會一直等，不會出現在這裡，要看 MongoDBMajorityCommitLag"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#majority-writes
+
+  - name: mongodb-replication
+    rules:
+      - alert: MongoDBNoPrimary
+        expr: |
+          count by (cluster) (mongodb_up{job="mongodb"})
+            unless count by (cluster) (mongodb_ss_repl_isWritablePrimary{job="mongodb"} == 1)
+        for: 30s
+        labels: { severity: critical, component: mongodb_exporter, tier: "2", aspect: replication }
+        annotations:
+          summary: "replica set {{ $labels.cluster }} 沒有任何 member 回報 isWritablePrimary；寫入全部失敗。選舉進行中也會短暫出現（electionTimeoutMillis 預設 10 秒）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#role-detection
+      - alert: MongoDBMultiplePrimaries
+        expr: count by (cluster) (mongodb_ss_repl_isWritablePrimary{job="mongodb"} == 1) > 1
+        for: 1m
+        labels: { severity: critical, component: mongodb_exporter, tier: "2", aspect: replication }
+        annotations:
+          summary: "replica set {{ $labels.cluster }} 有 {{ $value }} 台回報 isWritablePrimary；網路分割時舊 primary 要等 electionTimeoutMillis 才會發現自己在少數派並降級"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#role-detection
+      - alert: MongoDBReplicationLag
+        expr: |
+          max by (cluster, name) (mongodb_mongod_replset_member_replication_lag{job="mongodb", self="1", state="SECONDARY"}) > 240
+        for: 5m
+        labels: { severity: warning, component: mongodb_exporter, tier: "2", aspect: replication }
+        annotations:
+          summary: "{{ $labels.name }} 落後 primary {{ $value }} 秒（Atlas 建議 > 240 秒 5 分鐘；optimeDate 相減，秒為單位；閒置時 noop 每 10 秒一筆，會在 0 與 10 之間跳）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#replication-lag
+      - alert: MongoDBReplicationLagUnknown
+        expr: |
+          mongodb_rs_myState{job="mongodb"} == 2
+            unless on (job, instance) mongodb_mongod_replset_member_replication_lag{job="mongodb", self="1"}
+        for: 2m
+        labels: { severity: warning, component: mongodb_exporter, tier: "2", aspect: replication }
+        annotations:
+          summary: "{{ $labels.instance }} 是 SECONDARY 但沒有延遲數字：exporter 只在看得到 PRIMARY 時才算延遲，沒有 primary 或看不到 primary 時整條消失"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#replication-lag
+      - alert: MongoDBMemberUnhealthy
+        expr: count by (cluster, member_idx) (mongodb_rs_members_health{job="mongodb"} == 0) > 0
+        for: 1m
+        labels: { severity: warning, component: mongodb_exporter, tier: "2", aspect: cluster }
+        annotations:
+          summary: "有 member 看不到 {{ $labels.member_idx }}（heartbeat 失敗，state 8 DOWN）；停掉的 member 自己的 exporter 只剩 mongodb_up=0"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#member-health
+          absence_covered_by: "MongoDBReplSetStatusMissing"
+      - alert: MongoDBMemberUnusualState
+        expr: |
+          count by (cluster, member_idx, member_state) (
+            mongodb_rs_members_state{job="mongodb"} > 2 and mongodb_rs_members_state{job="mongodb"} != 7 and mongodb_rs_members_state{job="mongodb"} != 8
+          ) > 0
+        for: 5m
+        labels: { severity: warning, component: mongodb_exporter, tier: "2", aspect: cluster }
+        annotations:
+          summary: "{{ $labels.member_idx }} 停在 {{ $labels.member_state }}（RECOVERING、STARTUP2、ROLLBACK 等）超過 5 分鐘"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#member-health
+      - alert: MongoDBOplogWindowShort
+        expr: |
+          (mongodb_mongod_replset_oplog_head_timestamp{job="mongodb"} - mongodb_mongod_replset_oplog_tail_timestamp{job="mongodb"}) < 3600
+            and on (job, instance) mongodb_ss_uptime{job="mongodb"} > 3600
+        for: 10m
+        labels: { severity: warning, component: mongodb_exporter, tier: "2", aspect: replication }
+        annotations:
+          summary: "{{ $labels.instance }} 的 oplog 只涵蓋 {{ $value | humanizeDuration }}（Atlas 建議 < 1h 告警）；secondary 停機超過這段時間就要 initial sync"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#oplog-window
+      - alert: MongoDBMajorityCommitLag
+        expr: |
+          (mongodb_rs_optimes_lastAppliedWallTime{job="mongodb"} - mongodb_rs_optimes_lastCommittedWallTime{job="mongodb"}) / 1000 > 30
+            and on (job, instance) mongodb_ss_repl_isWritablePrimary{job="mongodb"} == 1
+        for: 2m
+        labels: { severity: critical, component: mongodb_exporter, tier: "2", aspect: replication }
+        annotations:
+          summary: "primary {{ $labels.instance }} 的 majority commit point 落後 {{ $value }} 秒：w:majority 寫入在等（沒有 wtimeout 就一直等），oplog 不能截斷而變大"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#majority-commit-lag
+      - alert: MongoDBFlowControlEngaged
+        expr: mongodb_ss_flowControl_isLagged{job="mongodb"} == 1
+        for: 2m
+        labels: { severity: warning, component: mongodb_exporter, tier: "2", aspect: replication }
+        annotations:
+          summary: "{{ $labels.instance }} 的 flow control 在限制寫入（commit point 落後超過 flowControlTargetLagSeconds 10 秒的 50%）；限流下限是 flowControlMinTicketsPerSecond（每秒 100 個 ticket），寫入量更小的應用感覺不到"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#majority-commit-lag
+          absence_covered_by: "MongoDBDiagnosticDataMissing"
+
+  - name: mongodb-cluster
+    rules:
+      - alert: MongoDBElectionHappened
+        expr: |
+          max by (cluster) (mongodb_rs_term{job="mongodb"})
+            - min by (cluster) (min_over_time(mongodb_rs_term{job="mongodb"}[15m])) > 0
+        labels: { severity: warning, component: mongodb_exporter, tier: "2", aspect: cluster }
+        annotations:
+          summary: "replica set {{ $labels.cluster }} 在 15 分鐘內 term 增加了 {{ $value }}（每次選舉加 1）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#elections
+      - alert: MongoDBFrequentElections
+        expr: |
+          max by (cluster) (mongodb_rs_term{job="mongodb"})
+            - min by (cluster) (min_over_time(mongodb_rs_term{job="mongodb"}[1h])) > 3
+        labels: { severity: critical, component: mongodb_exporter, tier: "2", aspect: cluster }
+        annotations:
+          summary: "replica set {{ $labels.cluster }} 一小時內選舉超過 3 次（Atlas 的低優先門檻）：網路不穩、member 過載或 priority 設定互搶"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#elections
+      - alert: MongoDBChunkMigrationsHigh
+        expr: max by (cluster) (mongodb_mongos_sharding_changelog_10min_total{job="mongodb-mongos", event="moveChunk.start"}) > 40
+        for: 10m
+        labels: { severity: warning, component: mongodb_exporter, tier: "3", aspect: cluster }
+        annotations:
+          summary: "10 分鐘內 moveChunk.start 超過 40 次（PMM 的預設值）；只在 mongos 上、--compatible-mode 加 --collector.diagnosticdata 才有（讀碼，lab 沒有 sharded cluster）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#sharding-balancer
+
+  - name: mongodb-saturation
+    rules:
+      - alert: MongoDBWTCacheDirtyHigh
+        expr: |
+          mongodb_ss_wt_cache_tracked_dirty_bytes_in_the_cache{job="mongodb"}
+            / mongodb_ss_wt_cache_maximum_bytes_configured{job="mongodb"} > 0.15
+        for: 5m
+        labels: { severity: warning, component: mongodb_exporter, tier: "2", aspect: saturation }
+        annotations:
+          summary: "WiredTiger cache 的 dirty 比例 {{ $value | humanizePercentage }}；到 eviction_dirty_trigger（20%）時應用執行緒要自己做 eviction，延遲上升"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#wt-cache
+      - alert: MongoDBWTCacheFull
+        expr: |
+          mongodb_ss_wt_cache_bytes_currently_in_the_cache{job="mongodb"}
+            / mongodb_ss_wt_cache_maximum_bytes_configured{job="mongodb"} > 0.9
+        for: 10m
+        labels: { severity: warning, component: mongodb_exporter, tier: "3", aspect: saturation }
+        annotations:
+          summary: "WiredTiger cache 用了 {{ $value | humanizePercentage }}；eviction_target 80% 是常態，接近 eviction_trigger 95% 才有問題"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#wt-cache
+      - alert: MongoDBAppThreadsEvicting
+        expr: rate(mongodb_ss_wt_cache_application_thread_time_evicting_usecs{job="mongodb"}[5m]) > 100000
+        for: 5m
+        labels: { severity: warning, component: mongodb_exporter, tier: "2", aspect: saturation }
+        annotations:
+          summary: "應用執行緒每秒花超過 0.1 秒做 eviction（例子）：背景 eviction 跟不上，請求直接變慢"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#wt-cache
+      - alert: MongoDBTicketQueue
+        expr: |
+          max by (cluster, instance) ({__name__=~"mongodb_ss_wt_concurrentTransactions_(read|write)_normalPriority_queueLength", job="mongodb"}) > 10
+        for: 5m
+        labels: { severity: warning, component: mongodb_exporter, tier: "2", aspect: saturation }
+        annotations:
+          summary: "有超過 10 個操作在排隊等 storage engine ticket（Atlas 的 Queued Reads／Writes 高優先門檻是 10+）；8.0 預設 throughputProbing 會動態調整 ticket 數，看 available 的固定門檻沒有意義"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#tickets
+      - alert: MongoDBConnectionsNearLimit
+        expr: |
+          mongodb_ss_connections{job="mongodb", conn_type="current"}
+            / ignoring (conn_type) (mongodb_ss_connections{job="mongodb", conn_type="current"} + ignoring (conn_type) mongodb_ss_connections{job="mongodb", conn_type="available"}) > 0.8
+        for: 5m
+        labels: { severity: warning, component: mongodb_exporter, tier: "2", aspect: saturation }
+        annotations:
+          summary: "連線數用了 {{ $value | humanizePercentage }}（上限是 maxIncomingConnections 與 ulimit 的較小者）；額滿時 exporter 自己也連不進去"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#connections
+      - alert: MongoDBGlobalLockQueue
+        expr: mongodb_ss_globalLock_currentQueue{job="mongodb", count_type="total"} > 10
+        for: 5m
+        labels: { severity: warning, component: mongodb_exporter, tier: "3", aspect: saturation }
+        annotations:
+          summary: "{{ $value }} 個操作在等鎖（例子）；常見原因是 fsyncLock、collMod、index build 或長交易"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#tickets
+
+  - name: mongodb-workload
+    rules:
+      - alert: MongoDBSlowOperations
+        expr: |
+          rate(mongodb_ss_opLatencies_latency{job="mongodb"}[5m])
+            / rate(mongodb_ss_opLatencies_ops{job="mongodb"}[5m]) > 100000
+        for: 10m
+        labels: { severity: warning, component: mongodb_exporter, tier: "3", aspect: workload }
+        annotations:
+          summary: "{{ $labels.instance }} 的 {{ $labels.op_type }} 平均延遲超過 100ms（例子；opLatencies 的單位是微秒）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#op-latency
+      - alert: MongoDBCursorsTimingOut
+        expr: increase(mongodb_ss_metrics_cursor_timedOut{job="mongodb"}[10m]) > 100
+        labels: { severity: warning, component: mongodb_exporter, tier: "3", aspect: workload }
+        annotations:
+          summary: "10 分鐘內超過 100 個 cursor 閒置逾時（cursorTimeoutMillis 預設 10 分鐘；awesome 的門檻）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#cursors
+      - alert: MongoDBRegularAsserts
+        expr: increase(mongodb_ss_asserts{job="mongodb", assert_type=~"regular|warning|msg"}[10m]) > 0
+        labels: { severity: warning, component: mongodb_exporter, tier: "3", aspect: workload }
+        annotations:
+          summary: "{{ $labels.instance }} 出現 {{ $labels.assert_type }} assert；user assert 包含驗證失敗與重複鍵，這裡不算"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#asserts
+
+  - name: mongodb-maintenance-protection-capacity
+    rules:
+      - alert: MongoDBTTLMonitorStalled
+        expr: |
+          increase(mongodb_ss_metrics_ttl_passes{job="mongodb"}[10m]) == 0
+            and on (job, instance) mongodb_ss_uptime{job="mongodb"} > 900
+        for: 10m
+        labels: { severity: warning, component: mongodb_exporter, tier: "3", aspect: maintenance }
+        annotations:
+          summary: "TTL monitor 10 分鐘沒有跑（ttlMonitorSleepSecs 預設 60 秒一輪）；過期文件不會被刪"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#ttl-monitor
+      - alert: MongoDBCheckpointSlow
+        expr: mongodb_ss_wt_checkpoint_most_recent_time_msecs{job="mongodb"} > 30000
+        for: 5m
+        labels: { severity: warning, component: mongodb_exporter, tier: "3", aspect: protection }
+        annotations:
+          summary: "最近一次 WiredTiger checkpoint 花了 {{ $value }}ms（例子；syncdelay 預設 60 秒一次），磁碟寫入跟不上"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#checkpoint
+      - alert: MongoDBCheckpointFailed
+        expr: increase(mongodb_ss_wt_checkpoint_total_failed_number_of_checkpoints{job="mongodb"}[15m]) > 0
+        labels: { severity: critical, component: mongodb_exporter, tier: "2", aspect: protection }
+        annotations:
+          summary: "WiredTiger checkpoint 失敗；崩潰後要從更舊的 checkpoint 重播 journal"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#checkpoint
+      - alert: MongoDBOplogOverMaxSize
+        expr: |
+          mongodb_oplog_stats_storageStats_size{job="mongodb"}
+            > 1.5 * mongodb_oplog_stats_storageStats_maxSize{job="mongodb"}
+        for: 5m
+        labels: { severity: warning, component: mongodb_exporter, tier: "2", aspect: capacity }
+        annotations:
+          summary: "oplog 已超過設定大小的 1.5 倍：majority commit point 或 backup 釘住了舊的 oplog，不能截斷，磁碟會一直長"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#oplog-growth
+      - alert: MongoDBDiskSpaceLow
+        expr: |
+          max by (cluster, instance) (mongodb_dbstats_fsUsedSize{job="mongodb"} / mongodb_dbstats_fsTotalSize{job="mongodb"}) > 0.9
+        for: 10m
+        labels: { severity: warning, component: mongodb_exporter, tier: "2", aspect: capacity }
+        annotations:
+          summary: "dbPath 所在檔案系統用了 {{ $value | humanizePercentage }}（Atlas 建議 > 90%；PMM 預設 85%）；要 --collector.dbstats，沒開就用 node_exporter"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#disk-usage

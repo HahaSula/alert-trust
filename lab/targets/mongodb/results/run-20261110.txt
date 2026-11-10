@@ -1,0 +1,500 @@
+環境：MongoDB 8.0.34 ×3（replica set rs0，--wiredTigerCacheSizeGB 0.25、--oplogSize 2、enableTestCommands=1、keyFile），
+      percona/mongodb_exporter:0.54.0（e1～e3 每 member 一個，加 --collector.diagnosticdata --collector.replicasetstatus --compatible-mode），
+      Prometheus v3.13.5（scrape_interval 5s、scrape_timeout 4s；規則 rules/targets/mongodb.yml 與 prom/rules/upstream.yml）。主機 nproc=16
+    m1:27017 PRIMARY, m2:27017 SECONDARY, m3:27017 SECONDARY
+
+## A 基線：每種 exporter 設定輸出什麼（13:32:24）
+    mongodb            m2:27017       up    0.080s 
+    mongodb            m3:27017       up    0.079s 
+    mongodb            m1:27017       up    0.075s 
+    mongodb-all        m1:27017       up    0.095s 
+    mongodb-default    m1:27017       up    0.011s 
+    mongodb-multi      m3:27017       up    0.072s 
+    mongodb-multi      m1:27017       up    0.080s 
+    mongodb-multi      m2:27017       up    0.081s 
+    mongodb-norole     m1:27017       up    0.011s 
+    mongodb-scrapeall  e-multi:9216   up    0.211s 
+  mongodb：5592 個 metric 名稱（存到 results/names-mongodb.txt）
+  mongodb-default：47 個 metric 名稱（存到 results/names-mongodb-default.txt）
+  mongodb-norole：48 個 metric 名稱（存到 results/names-mongodb-norole.txt）
+  mongodb-all：5647 個 metric 名稱（存到 results/names-mongodb-all.txt）
+  mongodb-multi：5590 個 metric 名稱（存到 results/names-mongodb-multi.txt）
+  mongodb-scrapeall：5590 個 metric 名稱（存到 results/names-mongodb-scrapeall.txt）
+  > scrape_samples_scraped
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m1:27017", job="mongodb-norole"} 49
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m2:27017", job="mongodb-multi"} 6112
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m1:27017", job="mongodb-default"} 46
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m3:27017", job="mongodb-multi"} 6112
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m2:27017", job="mongodb"} 6112
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m1:27017", job="mongodb-multi"} 6108
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m3:27017", job="mongodb"} 6112
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="e-multi:9216", job="mongodb-scrapeall"} 18244
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m1:27017", job="mongodb-all"} 6729
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m1:27017", job="mongodb"} 6108
+  > scrape_duration_seconds
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m1:27017", job="mongodb-norole"} 0.011115797
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m2:27017", job="mongodb-multi"} 0.0807934
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m1:27017", job="mongodb-default"} 0.011075934
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m3:27017", job="mongodb-multi"} 0.071971717
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m2:27017", job="mongodb"} 0.081524334
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m1:27017", job="mongodb-multi"} 0.08022041
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m3:27017", job="mongodb"} 0.078715614
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="e-multi:9216", job="mongodb-scrapeall"} 0.211250903
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m1:27017", job="mongodb-all"} 0.094786541
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m1:27017", job="mongodb"} 0.074964384
+  > collector_scrape_time_ms{job=~"mongodb|mongodb-norole|mongodb-default", instance="m1:27017"}
+    {__name__="collector_scrape_time_ms", cluster="rs0", collector="diagnostic_data", exporter="mongodb", instance="m1:27017", job="mongodb-norole"} 0
+    {__name__="collector_scrape_time_ms", cluster="rs0", collector="general", exporter="mongodb", instance="m1:27017", job="mongodb-norole"} 0
+    {__name__="collector_scrape_time_ms", cluster="rs0", collector="replset_status", exporter="mongodb", instance="m1:27017", job="mongodb-norole"} 0
+    {__name__="collector_scrape_time_ms", cluster="rs0", collector="general", exporter="mongodb", instance="m1:27017", job="mongodb-default"} 0
+    {__name__="collector_scrape_time_ms", cluster="rs0", collector="diagnostic_data", exporter="mongodb", instance="m1:27017", job="mongodb"} 25
+    {__name__="collector_scrape_time_ms", cluster="rs0", collector="general", exporter="mongodb", instance="m1:27017", job="mongodb"} 0
+    {__name__="collector_scrape_time_ms", cluster="rs0", collector="replset_status", exporter="mongodb", instance="m1:27017", job="mongodb"} 0
+  沒有 clusterMonitor 的 exporter（e-norole）的 log（預設 log.level=error）：
+          8 level=ERROR source=replset_status_collector.go:76 msg="cannot get replSetGetStatus"
+  同一個帳號在 m1 造成的 user assert（Unauthorized 也算）：
+  > increase(mongodb_ss_asserts{job="mongodb", instance="m1:27017", assert_type="user"}[1m])
+    {assert_type="user", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m1:27017", job="mongodb", rs_nm="rs0", rs_state="1"} 374.03699284009554
+  規則 MongoDBDiagnosticDataMissing 的運算式換成 default／norole 兩個 job：
+  > mongodb_up{job=~"mongodb-default|mongodb-norole"} == 1 unless on (job, instance) mongodb_ss_uptime
+    {__name__="mongodb_up", cluster="rs0", cluster_role="mongod", instance="m1:27017", job="mongodb-norole"} 1
+    {__name__="mongodb_up", cluster="rs0", cluster_role="mongod", instance="m1:27017", job="mongodb-default"} 1
+  上游規則用到的 metric 與 label 在不在：
+  > mongodb_mongod_wiredtiger_concurrent_transactions_available_tickets{job="mongodb",instance="m1:27017"}
+    {__name__="mongodb_mongod_wiredtiger_concurrent_transactions_available_tickets", cluster="rs0", instance="m1:27017", job="mongodb", txn_rw="read"} 16
+    {__name__="mongodb_mongod_wiredtiger_concurrent_transactions_available_tickets", cluster="rs0", instance="m1:27017", job="mongodb", txn_rw="write"} 16
+  > mongodb_ss_wt_concurrentTransactions_available{job="mongodb",instance="m1:27017"}
+    {__name__="mongodb_ss_wt_concurrentTransactions_available", cluster="rs0", instance="m1:27017", job="mongodb", txn_rw="read"} 16
+    {__name__="mongodb_ss_wt_concurrentTransactions_available", cluster="rs0", instance="m1:27017", job="mongodb", txn_rw="write"} 16
+  > count(mongodb_ss_wt_concurrentTransactions_available{job="mongodb",txn_rw_type=~".+"})
+    （空）
+  > mongodb_ss_wt_concurrentTransactions_totalTickets{job="mongodb",instance="m1:27017"}
+    {__name__="mongodb_ss_wt_concurrentTransactions_totalTickets", cluster="rs0", instance="m1:27017", job="mongodb", txn_rw="read"} 16
+    {__name__="mongodb_ss_wt_concurrentTransactions_totalTickets", cluster="rs0", instance="m1:27017", job="mongodb", txn_rw="write"} 16
+  > count(mongodb_rs_members_optimeDate{job="mongodb",set=~".+"})
+    （空）
+  > count(mongodb_mongod_replset_member_replication_lag{job="mongodb"})
+    {} 6
+  > count(mongodb_ss_repl_isWritablePrimary{job="mongodb",rs_nm=~".+"})
+    {} 3
+  > count(mongodb_mongod_replset_my_state{job="mongodb"})
+    {} 3
+  > count(mongodb_instance_uptime_seconds{job="mongodb"})
+    {} 3
+  > count(mongodb_dbstats_fsUsedSize{job="mongodb"})
+    （空）
+  > count(mongodb_dbstats_fsUsedSize{job="mongodb-all"})
+    {} 4
+  > count(mongodb_ss_security_SSLServerCertificateExpirationDate)
+    （空）
+  > count(mongodb_mongos_sharding_changelog_10min_total)
+    （空）
+  閒置時 secondary 自己回報的延遲（每 3 秒一次，共 30 秒）：
+    13:32:26 name="m2:27017" 0 name="m3:27017" 10
+    13:32:29 name="m2:27017" 0 name="m3:27017" 0
+    13:32:32 name="m2:27017" 0 name="m3:27017" 0
+    13:32:35 name="m2:27017" 0 name="m3:27017" 0
+    13:32:38 name="m2:27017" 0 name="m3:27017" 0
+    13:32:41 name="m2:27017" 0 name="m3:27017" 0
+    13:32:44 name="m2:27017" 0 name="m3:27017" 0
+    13:32:47 name="m2:27017" 0 name="m3:27017" 0
+    13:32:50 name="m2:27017" 0 name="m3:27017" 0
+    13:32:54 name="m2:27017" 0 name="m3:27017" 10
+  同一個 secondary 被幾個 exporter 回報延遲（每個 member 都從自己的 replSetGetStatus 算一份）：
+  > count by (name) (mongodb_mongod_replset_member_replication_lag{job="mongodb"})
+    {name="m2:27017"} 3
+    {name="m3:27017"} 3
+  rs_state label：每個 metric 都帶 member 自己的狀態
+  > count by (instance, rs_state) (mongodb_ss_uptime{job="mongodb"})
+    {instance="m2:27017", rs_state="2"} 1
+    {instance="m3:27017", rs_state="2"} 1
+    {instance="m1:27017", rs_state="1"} 1
+    pending MongoDBMultiTargetExporterDown 
+    firing  MongoDBRestarted m1:27017
+    firing  MongoDBRestarted m2:27017
+    firing  MongoDBRestarted m3:27017
+  > ALERTS{component="upstream"}
+    {__name__="ALERTS", alertname="AWE_Restarted", alertstate="firing", cl_id="6af2ac3155968704b2270e68", cluster="rs0", component="upstream", instance="m3:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 1
+    {__name__="ALERTS", alertname="AWE_Restarted", alertstate="firing", cl_id="6af2ac3155968704b2270e68", cluster="rs0", component="upstream", instance="m1:27017", job="mongodb", rs_nm="rs0", rs_state="1"} 1
+    {__name__="ALERTS", alertname="AWE_Restarted", alertstate="firing", cl_id="6af2ac3155968704b2270e68", cluster="rs0", component="upstream", instance="m2:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 1
+    {__name__="ALERTS", alertname="PMM_ReadTickets", alertstate="firing", cluster="rs0", component="upstream", txn_rw="read"} 1
+    {__name__="ALERTS", alertname="PMM_WriteTickets", alertstate="firing", cluster="rs0", component="upstream", txn_rw="write"} 1
+    {__name__="ALERTS", alertname="PMM_Restarted", alertstate="firing", cl_id="6af2ac3155968704b2270e68", cluster="rs0", component="upstream", instance="m2:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 1
+    {__name__="ALERTS", alertname="PMM_Restarted", alertstate="firing", cl_id="6af2ac3155968704b2270e68", cluster="rs0", component="upstream", instance="m3:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 1
+    {__name__="ALERTS", alertname="PMM_Restarted", alertstate="firing", cl_id="6af2ac3155968704b2270e68", cluster="rs0", component="upstream", instance="m1:27017", job="mongodb", rs_nm="rs0", rs_state="1"} 1
+    {__name__="ALERTS", alertname="PMM_OplogWindow", alertstate="firing", cluster="rs0", component="upstream", instance="m1:27017", job="mongodb"} 1
+    {__name__="ALERTS", alertname="PMM_OplogWindow", alertstate="firing", cluster="rs0", component="upstream", instance="m2:27017", job="mongodb"} 1
+    {__name__="ALERTS", alertname="PMM_OplogWindow", alertstate="firing", cluster="rs0", component="upstream", instance="m3:27017", job="mongodb"} 1
+
+## C oplog window：--oplogSize 2（2MB），寫入 2000 筆 5KB（13:32:57）
+  > mongodb_oplog_stats_storageStats_maxSize{job="mongodb"}
+    {__name__="mongodb_oplog_stats_storageStats_maxSize", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m2:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 2097152
+    {__name__="mongodb_oplog_stats_storageStats_maxSize", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m3:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 2097152
+    {__name__="mongodb_oplog_stats_storageStats_maxSize", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m1:27017", job="mongodb", rs_nm="rs0", rs_state="1"} 2097152
+    inserted
+    {"logSizeMB":10.148253440856934,"usedMB":10.15,"timeDiff":95,"tFirst":"Tue Nov 10 2026 05:31:29 GMT+0000 (Coordinated Universal Time)","tLast":"Tue Nov 10 2026 05:33:04 GMT+0000 (Coordinated Universal Time)"}
+  > mongodb_mongod_replset_oplog_head_timestamp{job="mongodb"} - mongodb_mongod_replset_oplog_tail_timestamp{job="mongodb"}
+    {cluster="rs0", instance="m2:27017", job="mongodb"} 95
+    {cluster="rs0", instance="m3:27017", job="mongodb"} 95
+    {cluster="rs0", instance="m1:27017", job="mongodb"} 95
+  > mongodb_oplog_stats_storageStats_size{job="mongodb"}
+    {__name__="mongodb_oplog_stats_storageStats_size", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m2:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 10641215
+    {__name__="mongodb_oplog_stats_storageStats_size", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m3:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 10641215
+    {__name__="mongodb_oplog_stats_storageStats_size", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m1:27017", job="mongodb", rs_nm="rs0", rs_state="1"} 10641215
+  oplog 什麼時候截斷（每 15 秒一次，最多 150 秒；截斷要等 stable checkpoint 推進，checkpoint 預設 60 秒一次）：
+    13:33:20 m1 oplog size=10641215
+    13:33:35 m1 oplog size=10641421
+    13:33:50 m1 oplog size=10641524
+    13:34:08 m1 oplog size=10641730
+    13:34:23 m1 oplog size=10641833
+    13:34:39 m1 oplog size=10642039
+    13:34:54 m1 oplog size=10642142
+    13:35:09 m1 oplog size=10642348
+    13:35:24 m1 oplog size=10642451
+    13:35:40 m1 oplog size=10642657
+  規則 MongoDBOplogWindowShort 的前半（不含 uptime > 3600 的條件）：
+  > (mongodb_mongod_replset_oplog_head_timestamp{job="mongodb"} - mongodb_mongod_replset_oplog_tail_timestamp{job="mongodb"}) < 3600
+    {cluster="rs0", instance="m2:27017", job="mongodb"} 257
+    {cluster="rs0", instance="m3:27017", job="mongodb"} 257
+    {cluster="rs0", instance="m1:27017", job="mongodb"} 257
+
+## D secondary 延遲：m3 fsyncLock 40 秒，primary 每 100ms 寫一筆（13:35:55）
+  primary 是 m1
+    Long('1')
+  fsyncLock 後約 15 秒：
+    member | up | mongodb_up | rs_myState | isWritablePrimary | compat lag（被誰報、值） | rs_state label
+    m1:27017 | 1 | 1 | 1 | 1 | （無） | 1
+    m2:27017 | 1 | 1 | 2 | 0 | m2:1 m3:0 m1:1 | 2
+    m3:27017 | 1 | 1 | 2 | 0 | m2:6 m3:6 m1:9 | 2
+  > mongodb_mongod_replset_member_replication_lag{job="mongodb",name="m3:27017"}
+    {__name__="mongodb_mongod_replset_member_replication_lag", cluster="rs0", instance="m2:27017", job="mongodb", name="m3:27017", self="0", set="rs0", state="SECONDARY"} 6
+    {__name__="mongodb_mongod_replset_member_replication_lag", cluster="rs0", instance="m3:27017", job="mongodb", name="m3:27017", self="1", set="rs0", state="SECONDARY"} 6
+    {__name__="mongodb_mongod_replset_member_replication_lag", cluster="rs0", instance="m1:27017", job="mongodb", name="m3:27017", self="0", set="rs0", state="SECONDARY"} 9
+  > (mongodb_rs_members_optimeDate{job="mongodb",member_idx="m1:27017",instance="m1:27017"} - ignoring(member_idx, member_state) group_right mongodb_rs_members_optimeDate{job="mongodb",member_idx="m3:27017",instance="m1:27017"}) / 1000
+    {cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m1:27017", job="mongodb", member_idx="m3:27017", member_state="SECONDARY", rs_nm="rs0", rs_state="1"} 9
+  > mongodb_ss_flowControl_isLagged{job="mongodb"}
+    {__name__="mongodb_ss_flowControl_isLagged", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m2:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 0
+    {__name__="mongodb_ss_flowControl_isLagged", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m3:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 0
+    {__name__="mongodb_ss_flowControl_isLagged", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m1:27017", job="mongodb", rs_nm="rs0", rs_state="1"} 0
+  > scrape_duration_seconds{job="mongodb"}
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m2:27017", job="mongodb"} 0.079294912
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m3:27017", job="mongodb"} 0.077310014
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m1:27017", job="mongodb"} 0.076105949
+  fsyncLock 後約 35 秒：
+    member | up | mongodb_up | rs_myState | isWritablePrimary | compat lag（被誰報、值） | rs_state label
+    m1:27017 | 1 | 1 | 1 | 1 | （無） | 1
+    m2:27017 | 1 | 1 | 2 | 0 | m2:0 m3:0 m1:5 | 2
+    m3:27017 | 1 | 1 | 2 | 0 | m2:35 m3:26 m1:31 | 2
+  > mongodb_mongod_replset_member_replication_lag{job="mongodb",name="m3:27017"}
+    {__name__="mongodb_mongod_replset_member_replication_lag", cluster="rs0", instance="m2:27017", job="mongodb", name="m3:27017", self="0", set="rs0", state="SECONDARY"} 35
+    {__name__="mongodb_mongod_replset_member_replication_lag", cluster="rs0", instance="m3:27017", job="mongodb", name="m3:27017", self="1", set="rs0", state="SECONDARY"} 26
+    {__name__="mongodb_mongod_replset_member_replication_lag", cluster="rs0", instance="m1:27017", job="mongodb", name="m3:27017", self="0", set="rs0", state="SECONDARY"} 31
+  > (mongodb_rs_members_optimeDate{job="mongodb",member_idx="m1:27017",instance="m1:27017"} - ignoring(member_idx, member_state) group_right mongodb_rs_members_optimeDate{job="mongodb",member_idx="m3:27017",instance="m1:27017"}) / 1000
+    {cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m1:27017", job="mongodb", member_idx="m3:27017", member_state="SECONDARY", rs_nm="rs0", rs_state="1"} 31
+  > mongodb_ss_flowControl_isLagged{job="mongodb"}
+    {__name__="mongodb_ss_flowControl_isLagged", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m2:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 0
+    {__name__="mongodb_ss_flowControl_isLagged", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m3:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 0
+    {__name__="mongodb_ss_flowControl_isLagged", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m1:27017", job="mongodb", rs_nm="rs0", rs_state="1"} 0
+  > scrape_duration_seconds{job="mongodb"}
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m2:27017", job="mongodb"} 0.076062223
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m3:27017", job="mongodb"} 0.085177533
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m1:27017", job="mongodb"} 0.075149085
+    true
+    Long('0')
+    [writer] writer done: inserted 413 errors 0
+  fsyncUnlock 10 秒後：
+    member | up | mongodb_up | rs_myState | isWritablePrimary | compat lag（被誰報、值） | rs_state label
+    m1:27017 | 1 | 1 | 1 | 1 | （無） | 1
+    m2:27017 | 1 | 1 | 2 | 0 | m2:0 m3:0 m1:0 | 2
+    m3:27017 | 1 | 1 | 2 | 0 | m2:0 m3:0 m1:0 | 2
+
+## E majority commit point 停住：m2、m3 都 fsyncLock 70 秒，primary 每 50ms 寫一筆 5KB（明確指定 w:1）（13:36:51）
+  primary 是 m1
+    Long('1')
+    Long('1')
+  w:majority＋wtimeout 5000：
+    WriteConcernFailed: waiting for replication timed out
+  預設 write concern：
+    {"w":"majority","wtimeout":0} implicit
+  不指定 write concern 的 insert（主機 timeout 8 秒中斷 mongosh）：
+    
+    rc=124，經過 8.0 秒（主機時鐘）
+  fsyncLock 約 50 秒後：
+  > mongodb_ss_metrics_getLastError_wtimeouts{job="mongodb",instance="m1:27017"}
+    {__name__="mongodb_ss_metrics_getLastError_wtimeouts", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m1:27017", job="mongodb", rs_nm="rs0", rs_state="1"} 1
+  > (mongodb_rs_optimes_lastAppliedWallTime{job="mongodb"} - mongodb_rs_optimes_lastCommittedWallTime{job="mongodb"}) / 1000
+    {cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m2:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 0
+    {cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m3:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 0
+    {cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m1:27017", job="mongodb", rs_nm="rs0", rs_state="1"} 70.232
+  > mongodb_ss_flowControl_isLagged{job="mongodb",instance="m1:27017"}
+    {__name__="mongodb_ss_flowControl_isLagged", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m1:27017", job="mongodb", rs_nm="rs0", rs_state="1"} 1
+  > mongodb_ss_flowControl_targetRateLimit{job="mongodb",instance="m1:27017"}
+    {__name__="mongodb_ss_flowControl_targetRateLimit", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m1:27017", job="mongodb", rs_nm="rs0", rs_state="1"} 100
+  > mongodb_ss_flowControl_isLaggedCount{job="mongodb",instance="m1:27017"}
+    {__name__="mongodb_ss_flowControl_isLaggedCount", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m1:27017", job="mongodb", rs_nm="rs0", rs_state="1"} 1
+  > mongodb_oplog_stats_storageStats_size{job="mongodb",instance="m1:27017"}
+    {__name__="mongodb_oplog_stats_storageStats_size", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m1:27017", job="mongodb", rs_nm="rs0", rs_state="1"} 5422816
+  > mongodb_mongod_replset_oplog_head_timestamp{job="mongodb",instance="m1:27017"} - mongodb_mongod_replset_oplog_tail_timestamp{job="mongodb",instance="m1:27017"}
+    {cluster="rs0", instance="m1:27017", job="mongodb"} 74
+    member | up | mongodb_up | rs_myState | isWritablePrimary | compat lag（被誰報、值） | rs_state label
+    m1:27017 | 1 | 1 | 1 | 1 | （無） | 1
+    m2:27017 | 1 | 1 | 2 | 0 | m2:67 m3:67 m1:70 | 2
+    m3:27017 | 1 | 1 | 2 | 0 | m2:67 m3:67 m1:70 | 2
+    [writer] writer done: inserted 1251 errors 0
+    Long('0')
+    Long('0')
+  解鎖 20 秒後：
+  > (mongodb_rs_optimes_lastAppliedWallTime{job="mongodb"} - mongodb_rs_optimes_lastCommittedWallTime{job="mongodb"}) / 1000
+    {cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m2:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 0
+    {cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m3:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 0
+    {cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m1:27017", job="mongodb", rs_nm="rs0", rs_state="1"} 0
+  > mongodb_oplog_stats_storageStats_size{job="mongodb"}
+    {__name__="mongodb_oplog_stats_storageStats_size", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m2:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 6679147
+    {__name__="mongodb_oplog_stats_storageStats_size", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m3:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 6679147
+    {__name__="mongodb_oplog_stats_storageStats_size", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m1:27017", job="mongodb", rs_nm="rs0", rs_state="1"} 6679147
+  > mongodb_ss_flowControl_isLaggedCount{job="mongodb"}
+    {__name__="mongodb_ss_flowControl_isLaggedCount", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m2:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 0
+    {__name__="mongodb_ss_flowControl_isLaggedCount", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m3:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 0
+    {__name__="mongodb_ss_flowControl_isLaggedCount", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m1:27017", job="mongodb", rs_nm="rs0", rs_state="1"} 1
+    firing  MongoDBMajorityWriteTimeouts m1:27017
+    firing  MongoDBMultiTargetExporterDown 
+    pending MongoDBOplogOverMaxSize m1:27017
+    pending MongoDBOplogOverMaxSize m2:27017
+    pending MongoDBOplogOverMaxSize m3:27017
+
+## F 伺服器忙：primary 上 sleep 12 秒並持有 global W 鎖（13:38:26）
+  primary 是 m1
+  直接抓（X-Prometheus-Scrape-Timeout-Seconds: 4，exporter 給查詢 3 秒）：
+    GET http://e1:9216/metrics -> rc=0，3.18s（主機時鐘，含 docker exec 約 0.1～0.3s），44 行 sample；沒有 mongodb_up 
+    GET http://e-multi:9216/scrape?target=m1:27017 -> rc=0，3.16s（主機時鐘，含 docker exec 約 0.1～0.3s），44 行 sample；沒有 mongodb_up 
+    GET http://e-multi:9216/scrapeall -> rc=0，3.36s（主機時鐘，含 docker exec 約 0.1～0.3s），12188 行 sample；mongodb_up{cluster_role="mongod",instance="m2:27017"} 1 mongodb_up{cluster_role="mongod",instance="m3:27017"} 1 
+    GET http://e-default:9216/metrics -> rc=0，3.16s（主機時鐘，含 docker exec 約 0.1～0.3s），44 行 sample；沒有 mongodb_up 
+  > up{job=~"mongodb|mongodb-multi|mongodb-scrapeall"}
+    {__name__="up", cluster="rs0", instance="m2:27017", job="mongodb-multi"} 1
+    {__name__="up", cluster="rs0", instance="m3:27017", job="mongodb-multi"} 1
+    {__name__="up", cluster="rs0", instance="m2:27017", job="mongodb"} 1
+    {__name__="up", cluster="rs0", instance="m1:27017", job="mongodb-multi"} 1
+    {__name__="up", cluster="rs0", instance="m3:27017", job="mongodb"} 1
+    {__name__="up", cluster="rs0", instance="e-multi:9216", job="mongodb-scrapeall"} 1
+    {__name__="up", cluster="rs0", instance="m1:27017", job="mongodb"} 1
+  > scrape_samples_scraped{job=~"mongodb|mongodb-multi|mongodb-scrapeall"}
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m2:27017", job="mongodb-multi"} 6116
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m3:27017", job="mongodb-multi"} 6116
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m2:27017", job="mongodb"} 6116
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m1:27017", job="mongodb-multi"} 44
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m3:27017", job="mongodb"} 6116
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="e-multi:9216", job="mongodb-scrapeall"} 12188
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m1:27017", job="mongodb"} 44
+  > scrape_duration_seconds{job=~"mongodb|mongodb-multi|mongodb-scrapeall"}
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m2:27017", job="mongodb-multi"} 0.082949753
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m3:27017", job="mongodb-multi"} 0.079794227
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m2:27017", job="mongodb"} 0.086568626
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m1:27017", job="mongodb-multi"} 3.007884015
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m3:27017", job="mongodb"} 0.083388871
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="e-multi:9216", job="mongodb-scrapeall"} 3.164892388
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m1:27017", job="mongodb"} 3.005037136
+  [sleep]     1
+  sleep 結束後：
+  > scrape_samples_scraped{job=~"mongodb|mongodb-multi|mongodb-scrapeall"}
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m2:27017", job="mongodb-multi"} 6144
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m3:27017", job="mongodb-multi"} 6116
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m2:27017", job="mongodb"} 6116
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m1:27017", job="mongodb-multi"} 6112
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m3:27017", job="mongodb"} 6116
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="e-multi:9216", job="mongodb-scrapeall"} 18256
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m1:27017", job="mongodb"} 6117
+
+## G 停掉 primary（docker kill）（13:38:56）
+  primary 是 m2；13:38:56.750 kill
+    [m1 看 hello] 2026-11-10T05:38:57.673Z primary = undefined
+    [m1 看 hello] 2026-11-10T05:39:06.208Z primary = m1:27017
+    [log] "t":{"$date":"2026-11-10T05:38:52.774+00:00"},"s":"I",  "c":"ELECTION", "id":4615652, "ctx":"ReplCoord-4","msg":"Starting an election, since we've seen no PRIMARY in election timeout period"
+    [log] "t":{"$date":"2026-11-10T05:38:52.778+00:00"},"s":"I",  "c":"ELECTION", "id":21450,   "ctx":"ReplCoord-7","msg":"Election succeeded, assuming primary role"
+    [log] "t":{"$date":"2026-11-10T05:38:52.785+00:00"},"s":"I",  "c":"REPL",     "id":21331,   "ctx":"OplogApplier-0","msg":"Transition to primary complete; database writes are now permitted"
+    [log] "t":{"$date":"2026-11-10T05:39:05.798+00:00"},"s":"I",  "c":"ELECTION", "id":4615652, "ctx":"ReplCoord-2","msg":"Starting an election, since we've seen no PRIMARY in election timeout period"
+    [log] "t":{"$date":"2026-11-10T05:39:05.805+00:00"},"s":"I",  "c":"ELECTION", "id":21450,   "ctx":"ReplCoord-9","msg":"Election succeeded, assuming primary role"
+    [log] "t":{"$date":"2026-11-10T05:38:57.202+00:00"},"s":"I",  "c":"REPL",     "id":21331,   "ctx":"OplogApplier-0","msg":"Transition to primary complete; database writes are now permitted"
+  kill 約 32 秒後：
+    member | up | mongodb_up | rs_myState | isWritablePrimary | compat lag（被誰報、值） | rs_state label
+    m1:27017 | 1 | 1 | 1 | 1 | （無） | 1
+    m2:27017 | 1 | 0 | （無） | （無） | （無） | （無）
+    m3:27017 | 1 | 1 | 2 | 0 | m3:0 m1:0 | 2
+  > mongodb_up{job=~"mongodb|mongodb-multi"}
+    {__name__="mongodb_up", cluster="rs0", cluster_role="mongod", instance="m3:27017", job="mongodb-multi"} 1
+    {__name__="mongodb_up", cluster="rs0", cluster_role="mongod", instance="m1:27017", job="mongodb-multi"} 1
+    {__name__="mongodb_up", cluster="rs0", cluster_role="mongod", instance="m3:27017", job="mongodb"} 1
+    {__name__="mongodb_up", cluster="rs0", cluster_role="mongod", instance="m1:27017", job="mongodb"} 1
+    {__name__="mongodb_up", cluster="rs0", instance="m2:27017", job="mongodb"} 0
+    {__name__="mongodb_up", cluster="rs0", instance="m2:27017", job="mongodb-multi"} 0
+  > count by (cluster) (mongodb_ss_repl_isWritablePrimary{job="mongodb"} == 1)
+    {cluster="rs0"} 1
+  > mongodb_rs_members_health{job="mongodb", member_idx="m2:27017"}
+    {__name__="mongodb_rs_members_health", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m3:27017", job="mongodb", member_idx="m2:27017", member_state="(not reachable/healthy)", rs_nm="rs0", rs_state="2"} 0
+    {__name__="mongodb_rs_members_health", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m1:27017", job="mongodb", member_idx="m2:27017", member_state="(not reachable/healthy)", rs_nm="rs0", rs_state="1"} 0
+  > max by (cluster) (mongodb_rs_term{job="mongodb"})
+    {cluster="rs0"} 3
+  > up{job="mongodb-scrapeall"}
+    {__name__="up", cluster="rs0", instance="e-multi:9216", job="mongodb-scrapeall"} 1
+  > scrape_samples_scraped{job=~"mongodb|mongodb-scrapeall"}
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m2:27017", job="mongodb"} 46
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m3:27017", job="mongodb"} 6115
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="e-multi:9216", job="mongodb-scrapeall"} 12213
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m1:27017", job="mongodb"} 6140
+    pending MongoDBDown m2:27017
+    firing  MongoDBElectionHappened rs0
+    firing  MongoDBMajorityWriteTimeouts m1:27017
+    pending MongoDBMemberUnhealthy rs0
+    firing  MongoDBMultiTargetExporterDown 
+    pending MongoDBOplogOverMaxSize m1:27017
+    pending MongoDBOplogOverMaxSize m3:27017
+    pending MongoDBScrapeSamplesDropped m2:27017
+  > ALERTS{component="upstream"}
+    {__name__="ALERTS", alertname="PMM_ReadTickets", alertstate="firing", cluster="rs0", component="upstream", txn_rw="read"} 1
+    {__name__="ALERTS", alertname="PMM_WriteTickets", alertstate="firing", cluster="rs0", component="upstream", txn_rw="write"} 1
+    {__name__="ALERTS", alertname="PMM_OplogWindow", alertstate="firing", cluster="rs0", component="upstream", instance="m1:27017", job="mongodb"} 1
+    {__name__="ALERTS", alertname="PMM_OplogWindow", alertstate="firing", cluster="rs0", component="upstream", instance="m3:27017", job="mongodb"} 1
+    {__name__="ALERTS", alertname="PMM_PrimaryChanged", alertstate="firing", component="upstream", set="rs0"} 1
+    {__name__="ALERTS", alertname="AWE_MongodbDown", alertstate="firing", cluster="rs0", component="upstream", instance="m2:27017", job="mongodb"} 1
+    {__name__="ALERTS", alertname="AWE_MemberUnhealthy", alertstate="firing", cl_id="6af2ac3155968704b2270e68", cluster="rs0", component="upstream", instance="m3:27017", job="mongodb", member_idx="m2:27017", member_state="(not reachable/healthy)", rs_nm="rs0", rs_state="2"} 1
+    {__name__="ALERTS", alertname="AWE_MemberUnhealthy", alertstate="firing", cl_id="6af2ac3155968704b2270e68", cluster="rs0", component="upstream", instance="m1:27017", job="mongodb", member_idx="m2:27017", member_state="(not reachable/healthy)", rs_nm="rs0", rs_state="1"} 1
+  m2 重新啟動 30 秒後：
+    member | up | mongodb_up | rs_myState | isWritablePrimary | compat lag（被誰報、值） | rs_state label
+    m1:27017 | 1 | 1 | 1 | 1 | （無） | 1
+    m2:27017 | 1 | 1 | 2 | 0 | m2:0 m3:0 m1:1 | 2
+    m3:27017 | 1 | 1 | 2 | 0 | m2:0 m3:0 m1:1 | 2
+  > count by (__name__) ({job="mongodb", instance="m2:27017", __name__=~"mongodb_ss_uptime|mongodb_rs_term"})
+    {__name__="mongodb_rs_term"} 1
+    {__name__="mongodb_ss_uptime"} 1
+  > changes(mongodb_mongod_replset_my_state{job="mongodb"}[5m])
+    {cluster="rs0", instance="m2:27017", job="mongodb", set="rs0"} 0
+    {cluster="rs0", instance="m3:27017", job="mongodb", set="rs0"} 0
+    {cluster="rs0", instance="m1:27017", job="mongodb", set="rs0"} 2
+  > max by (cluster) (mongodb_rs_term{job="mongodb"}) - min by (cluster) (min_over_time(mongodb_rs_term{job="mongodb"}[15m]))
+    {cluster="rs0"} 2
+    firing  MongoDBElectionHappened rs0
+    firing  MongoDBMajorityWriteTimeouts m1:27017
+    firing  MongoDBMultiTargetExporterDown 
+    pending MongoDBOplogOverMaxSize m1:27017
+    pending MongoDBOplogOverMaxSize m2:27017
+    pending MongoDBOplogOverMaxSize m3:27017
+    firing  MongoDBRestarted m2:27017
+  > ALERTS{component="upstream"}
+    {__name__="ALERTS", alertname="AWE_Restarted", alertstate="firing", cl_id="6af2ac3155968704b2270e68", cluster="rs0", component="upstream", instance="m2:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 1
+    {__name__="ALERTS", alertname="PMM_ReadTickets", alertstate="firing", cluster="rs0", component="upstream", txn_rw="read"} 1
+    {__name__="ALERTS", alertname="PMM_WriteTickets", alertstate="firing", cluster="rs0", component="upstream", txn_rw="write"} 1
+    {__name__="ALERTS", alertname="PMM_Restarted", alertstate="firing", cl_id="6af2ac3155968704b2270e68", cluster="rs0", component="upstream", instance="m2:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 1
+    {__name__="ALERTS", alertname="PMM_OplogWindow", alertstate="firing", cluster="rs0", component="upstream", instance="m1:27017", job="mongodb"} 1
+    {__name__="ALERTS", alertname="PMM_OplogWindow", alertstate="firing", cluster="rs0", component="upstream", instance="m2:27017", job="mongodb"} 1
+    {__name__="ALERTS", alertname="PMM_OplogWindow", alertstate="firing", cluster="rs0", component="upstream", instance="m3:27017", job="mongodb"} 1
+    {__name__="ALERTS", alertname="PMM_PrimaryChanged", alertstate="firing", component="upstream", set="rs0"} 1
+
+## G2 一個 secondary 卡住（docker pause 25 秒）：exporter 與 multi-target（13:40:23）
+  primary m1，pause m3
+    GET http://e3:9216/metrics -> rc=0，3.15s（主機時鐘，含 docker exec 約 0.1～0.3s），46 行 sample；mongodb_up{cluster_role=""} 0 
+    GET http://e-multi:9216/scrape?target=m3:27017 -> rc=0，3.14s（主機時鐘，含 docker exec 約 0.1～0.3s），46 行 sample；mongodb_up{cluster_role=""} 0 
+    GET http://e-multi:9216/scrapeall -> rc=0，3.31s（主機時鐘，含 docker exec 約 0.1～0.3s），12175 行 sample；mongodb_up{cluster_role="",instance="m3:27017"} 0 mongodb_up{cluster_role="mongod",instance="m1:27017"} 1 mongodb_up{cluster_role="mongod",instance="m2:27017"} 1 
+  > up{job=~"mongodb|mongodb-multi|mongodb-scrapeall"}
+    {__name__="up", cluster="rs0", instance="m2:27017", job="mongodb-multi"} 1
+    {__name__="up", cluster="rs0", instance="m3:27017", job="mongodb-multi"} 1
+    {__name__="up", cluster="rs0", instance="m2:27017", job="mongodb"} 1
+    {__name__="up", cluster="rs0", instance="m1:27017", job="mongodb-multi"} 1
+    {__name__="up", cluster="rs0", instance="m3:27017", job="mongodb"} 1
+    {__name__="up", cluster="rs0", instance="e-multi:9216", job="mongodb-scrapeall"} 1
+    {__name__="up", cluster="rs0", instance="m1:27017", job="mongodb"} 1
+  > mongodb_up{job=~"mongodb|mongodb-multi"}
+    {__name__="mongodb_up", cluster="rs0", cluster_role="mongod", instance="m2:27017", job="mongodb-multi"} 1
+    {__name__="mongodb_up", cluster="rs0", cluster_role="mongod", instance="m2:27017", job="mongodb"} 1
+    {__name__="mongodb_up", cluster="rs0", cluster_role="mongod", instance="m1:27017", job="mongodb-multi"} 1
+    {__name__="mongodb_up", cluster="rs0", cluster_role="mongod", instance="m1:27017", job="mongodb"} 1
+    {__name__="mongodb_up", cluster="rs0", instance="m3:27017", job="mongodb-multi"} 0
+    {__name__="mongodb_up", cluster="rs0", instance="m3:27017", job="mongodb"} 0
+  > scrape_duration_seconds{job=~"mongodb|mongodb-multi|mongodb-scrapeall"}
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m2:27017", job="mongodb-multi"} 0.087494674
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m3:27017", job="mongodb-multi"} 3.003906019
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m2:27017", job="mongodb"} 0.078897557
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m1:27017", job="mongodb-multi"} 0.079096285
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m3:27017", job="mongodb"} 3.002883516
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="e-multi:9216", job="mongodb-scrapeall"} 3.155006486
+    {__name__="scrape_duration_seconds", cluster="rs0", instance="m1:27017", job="mongodb"} 0.082434358
+  > scrape_samples_scraped{job=~"mongodb|mongodb-multi|mongodb-scrapeall"}
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m2:27017", job="mongodb-multi"} 6077
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m3:27017", job="mongodb-multi"} 46
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m2:27017", job="mongodb"} 6077
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m1:27017", job="mongodb-multi"} 6140
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m3:27017", job="mongodb"} 46
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="e-multi:9216", job="mongodb-scrapeall"} 12175
+    {__name__="scrape_samples_scraped", cluster="rs0", instance="m1:27017", job="mongodb"} 6140
+  > mongodb_rs_members_health{job="mongodb", member_idx="m3:27017"}
+    {__name__="mongodb_rs_members_health", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m2:27017", job="mongodb", member_idx="m3:27017", member_state="(not reachable/healthy)", rs_nm="rs0", rs_state="2"} 0
+    {__name__="mongodb_rs_members_health", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m1:27017", job="mongodb", member_idx="m3:27017", member_state="(not reachable/healthy)", rs_nm="rs0", rs_state="1"} 0
+
+## H 停掉兩個 secondary（primary 還活著）（13:41:12）
+  primary m1，13:41:12.600 kill m2 m3
+    [m1 看 hello] 2026-11-10T05:41:13.631Z isWritablePrimary/secondary = true false
+    [m1 看 hello] 2026-11-10T05:41:24.910Z isWritablePrimary/secondary = false true
+    [log] "t":{"$date":"2026-11-10T05:38:52.777+00:00"},"s":"I",  "c":"REPL",     "id":21402,   "ctx":"conn1840","msg":"Stepping down from primary, because a new term has begun"
+    [log] "t":{"$date":"2026-11-10T05:41:24.541+00:00"},"s":"I",  "c":"REPL",     "id":21809,   "ctx":"ReplCoord-11","msg":"Can't see a majority of the set, relinquishing primary"
+    [log] "t":{"$date":"2026-11-10T05:41:24.541+00:00"},"s":"I",  "c":"REPL",     "id":21475,   "ctx":"ReplCoord-11","msg":"Stepping down from primary in response to heartbeat"
+  寫入：
+    NotWritablePrimary
+  kill 約 45 秒後：
+    member | up | mongodb_up | rs_myState | isWritablePrimary | compat lag（被誰報、值） | rs_state label
+    m1:27017 | 1 | 1 | 2 | 0 | （無） | 2
+    m2:27017 | 1 | 0 | 2 | 0 | m2:0 | 2
+    m3:27017 | 1 | 0 | （無） | （無） | m2:0 | （無）
+  > up{job="mongodb"}
+    {__name__="up", cluster="rs0", instance="m2:27017", job="mongodb"} 1
+    {__name__="up", cluster="rs0", instance="m3:27017", job="mongodb"} 1
+    {__name__="up", cluster="rs0", instance="m1:27017", job="mongodb"} 1
+  > mongodb_up{job="mongodb"}
+    {__name__="mongodb_up", cluster="rs0", cluster_role="mongod", instance="m2:27017", job="mongodb"} 1
+    {__name__="mongodb_up", cluster="rs0", cluster_role="mongod", instance="m1:27017", job="mongodb"} 1
+    {__name__="mongodb_up", cluster="rs0", instance="m2:27017", job="mongodb"} 0
+    {__name__="mongodb_up", cluster="rs0", instance="m3:27017", job="mongodb"} 0
+  > count by (cluster) (mongodb_up{job="mongodb"}) unless count by (cluster) (mongodb_ss_repl_isWritablePrimary{job="mongodb"} == 1)
+    {cluster="rs0"} 4
+  > count(mongodb_mongod_replset_member_replication_lag{job="mongodb"})
+    {} 2
+  > mongodb_rs_members_health{job="mongodb"}
+    {__name__="mongodb_rs_members_health", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m2:27017", job="mongodb", member_idx="m1:27017", member_state="PRIMARY", rs_nm="rs0", rs_state="2"} 1
+    {__name__="mongodb_rs_members_health", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m2:27017", job="mongodb", member_idx="m2:27017", member_state="SECONDARY", rs_nm="rs0", rs_state="2"} 1
+    {__name__="mongodb_rs_members_health", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m2:27017", job="mongodb", member_idx="m3:27017", member_state="SECONDARY", rs_nm="rs0", rs_state="2"} 1
+    {__name__="mongodb_rs_members_health", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m1:27017", job="mongodb", member_idx="m1:27017", member_state="SECONDARY", rs_nm="rs0", rs_state="2"} 1
+    {__name__="mongodb_rs_members_health", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m1:27017", job="mongodb", member_idx="m2:27017", member_state="(not reachable/healthy)", rs_nm="rs0", rs_state="2"} 0
+    {__name__="mongodb_rs_members_health", cl_id="6af2ac3155968704b2270e68", cluster="rs0", instance="m1:27017", job="mongodb", member_idx="m3:27017", member_state="(not reachable/healthy)", rs_nm="rs0", rs_state="2"} 0
+    firing  MongoDBDown m2:27017
+    firing  MongoDBDown m3:27017
+    firing  MongoDBElectionHappened rs0
+    firing  MongoDBMajorityWriteTimeouts m1:27017
+    pending MongoDBMemberUnhealthy rs0
+    pending MongoDBMemberUnhealthy rs0
+    firing  MongoDBMultiTargetExporterDown 
+    firing  MongoDBNoPrimary rs0
+    pending MongoDBOplogOverMaxSize m1:27017
+    pending MongoDBOplogOverMaxSize m2:27017
+    pending MongoDBReplicationLagUnknown m1:27017
+    firing  MongoDBRestarted m2:27017
+    pending MongoDBScrapeSamplesDropped m2:27017
+    pending MongoDBScrapeSamplesDropped m3:27017
+  > ALERTS{component="upstream"}
+    {__name__="ALERTS", alertname="AWE_Restarted", alertstate="firing", cl_id="6af2ac3155968704b2270e68", cluster="rs0", component="upstream", instance="m2:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 1
+    {__name__="ALERTS", alertname="PMM_ReadTickets", alertstate="firing", cluster="rs0", component="upstream", txn_rw="read"} 1
+    {__name__="ALERTS", alertname="PMM_WriteTickets", alertstate="firing", cluster="rs0", component="upstream", txn_rw="write"} 1
+    {__name__="ALERTS", alertname="PMM_Restarted", alertstate="firing", cl_id="6af2ac3155968704b2270e68", cluster="rs0", component="upstream", instance="m2:27017", job="mongodb", rs_nm="rs0", rs_state="2"} 1
+    {__name__="ALERTS", alertname="PMM_OplogWindow", alertstate="firing", cluster="rs0", component="upstream", instance="m1:27017", job="mongodb"} 1
+    {__name__="ALERTS", alertname="PMM_OplogWindow", alertstate="firing", cluster="rs0", component="upstream", instance="m2:27017", job="mongodb"} 1
+    {__name__="ALERTS", alertname="AWE_NoPrimary", alertstate="firing", component="upstream", job="mongodb"} 1
+    {__name__="ALERTS", alertname="PMM_PrimaryChanged", alertstate="firing", component="upstream", set="rs0"} 1
+    {__name__="ALERTS", alertname="AWE_MongodbDown", alertstate="firing", cluster="rs0", component="upstream", instance="m2:27017", job="mongodb"} 1
+    {__name__="ALERTS", alertname="AWE_MemberUnhealthy", alertstate="firing", cl_id="6af2ac3155968704b2270e68", cluster="rs0", component="upstream", instance="m1:27017", job="mongodb", member_idx="m2:27017", member_state="(not reachable/healthy)", rs_nm="rs0", rs_state="2"} 1
+    {__name__="ALERTS", alertname="AWE_MongodbDown", alertstate="firing", cluster="rs0", component="upstream", instance="m3:27017", job="mongodb"} 1
+    {__name__="ALERTS", alertname="AWE_MemberUnhealthy", alertstate="firing", cl_id="6af2ac3155968704b2270e68", cluster="rs0", component="upstream", instance="m1:27017", job="mongodb", member_idx="m3:27017", member_state="(not reachable/healthy)", rs_nm="rs0", rs_state="2"} 1
+    {__name__="ALERTS", alertname="PMM_ReplsetNoPrimary", alertstate="firing", cluster="rs0", component="upstream", rs_nm="rs0"} 1
+  兩台重新啟動 30 秒後：
+    member | up | mongodb_up | rs_myState | isWritablePrimary | compat lag（被誰報、值） | rs_state label
+    m1:27017 | 1 | 1 | 1 | 1 | （無） | 1
+    m2:27017 | 1 | 0 | 2 | 0 | m2:0 m3:0 m1:0 | 2
+    m3:27017 | 1 | 1 | 2 | 0 | m2:0 m3:0 m1:0 | 2
+
+## 結束（13:42:48）
+  殘留容器：0；殘留 volume：0

@@ -1,0 +1,562 @@
+id: mongodb_exporter
+name: mongodb_exporter＋MongoDB
+kind: target
+family: database
+model: exporter
+status: draft
+stages: [source]
+versions_checked: ["MongoDB 8.0.34", "percona/mongodb_exporter v0.54.0", "MongoDB 9.0.4（只查 OTel metrics）", "MongoDB 8.2.12（只查 OTel metrics）"]
+architecture: architecture/db-doc.md
+role: >-
+  每次 scrape 新建一條連線，依序送 isMaster、getCmdLineOpts、replSetGetConfig、replSetGetStatus（拓撲 label）、ping（mongodb_up），
+  有開旗標才再送 getDiagnosticData（serverStatus、replSetGetStatus、oplog 統計的 FTDC 樣本）與 replSetGetStatus；
+  --compatible-mode 另外讀 local.oplog.rs 的第一筆與最後一筆。名稱依 BSON 路徑自動產生（mongodb_ss_*、mongodb_rs_*），
+  --compatible-mode 再輸出 v1 的舊名（PMM 的規則用的那一組）。**預設什麼 collector 都不開**：不加旗標時只有 mongodb_up。
+  沒有每個 collector 的成功指標，指令被拒只寫 log（getDiagnosticData 被拒是 warn，預設 log level 看不到）。
+  訊號依九個面向分組；cluster 面向的 sharding 只讀碼（lab 只有 replica set）。欄位到 metric 的對照見
+  [MongoDB 怎麼監控](../targets/mongodb.md)與[原始碼到 metric](../targets/mongodb-appendix.md)。
+
+silent_failures:
+  - text: >-
+      不加任何 collector 旗標的 exporter 只輸出 mongodb_up 與 go_*／process_*（lab 46 個 sample）；PMM 與 awesome 除了 Down 以外的規則全部回傳空。
+      要 --collector.diagnosticdata（serverStatus 一大類）、--collector.replicasetstatus、--compatible-mode（舊名）才有約 6100 個 sample。
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mx-flag-diag, mx-flag-rs, mx-general-always, mx-register-diag]
+  - text: >-
+      exporter 帳號沒有 clusterMonitor 時 getDiagnosticData 被拒，exporter 只記 warn（預設 --log.level=error，看不到），mongodb_up=1、up=1，
+      sample 數 6108 → 49；log 只看到 replSetGetStatus 的 error。被拒的指令還讓 primary 的 user assert 每分鐘多約 400 次。
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mg-diag-auth, mx-diag-warn, mx-flag-loglevel, mx-rs-error]
+  - text: >-
+      PMM 的 read／write tickets 範本是「available < 50」：8.0 預設 throughputProbing，ticket 從 CPU 核心數開始動態調整（lab 16 核：total 16），
+      健康的叢集一開機就響。awesome 的同名規則用 txn_rw_type label，exporter 輸出的是 txn_rw，永遠回傳空。
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, pmm-read-tickets, pmm-tickets-default, awe-mg-read-tickets, mx-txn-rw, mg-ticket-algo, mg-tp-initial]
+  - text: >-
+      awesome 的 replication lag 與 replication headroom 用 on (set) 對 mongodb_rs_members_optimeDate，這個 metric 沒有 set label（只有 rs_nm），
+      兩條規則永遠回傳空；lab 的 m3 落後 30 秒時也沒有結果。
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, awe-mg-lag, awe-mg-headroom, mx-member-state-label]
+  - text: >-
+      PMM 的 replication lag 範本寫成 max(<metric>[1m]) by (...)：在 Prometheus 是語法錯誤（aggregation 不收 range vector，promtool 拒絕）；
+      PMM 自己的 TSDB 是 VictoriaMetrics，MetricsQL 會自動補 rollup，所以只在 PMM 裡能用。
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, pmm-lag, pmm-vm]
+  - text: >-
+      複寫延遲只在 replSetGetStatus 裡看得到 PRIMARY 時才輸出；沒有 primary（選舉中、3 台停 2 台）時整組消失，「lag > N」規則回傳空。
+      DOWN 的 member optime 被清成 0，它的延遲 series 也消失。
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mx-compat-gotprimary, mx-compat-lag, mg-set-down-optime]
+  - text: >-
+      沒有 arbiter 時預設 write concern 是 majority、wtimeout 0。多數 secondary 卡住時，不指定 write concern 的寫入一直等、不回錯誤；
+      getLastError.wtimeouts 只數有設 wtimeout 的寫入。flow control 把 primary 的寫入壓到每秒 100 個 ticket（下限），但不讓寫入失敗。
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mg-wc-implicit, mg-wc-notimeout, mg-fc-min-tickets]
+  - text: >-
+      3 台停 2 台時存活的 member 是 SECONDARY，它的 exporter up=1、mongodb_up=1（ping 不需要 primary）；只看 mongodb_up 的 MongoDBDown 不響。
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mx-up-ping, mg-stepdown-majority]
+  - text: >-
+      /scrapeall 在一個請求裡依序抓每個 URI，每個都給完整的期限；兩個 member 同時連不上時整個請求超過 scrape_timeout，三個 member 的 metric 一起消失。
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp-a, mx-scrapeall-loop, mx-scrapeall-timeout]
+  - text: >-
+      primary 持有 global 鎖時（lab 用 sleep lock:w 12 秒），exporter 在期限內只回 44 個 sample，連 mongodb_up 都沒有：up=1、mongodb_up 不存在，
+      只看 mongodb_up == 0 的規則不響。awesome 的 primary changed 用 changes(mongodb_rs_myState)，角色改變時 rs_state label 一起換，series 各自不變，從來不響。
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mx-describe-ctx, mx-topo-rsstate, awe-mg-primarychanged]
+
+contracts: [exporter-deadline]
+
+signals:
+  # ---------- exporter：監測自檢 ----------
+  - id: exporter-up
+    aspect: exporter
+    tier: 1
+    question: Exporter 抓得到嗎
+    signal: >-
+      up{job="mongodb"} == 0，加上 absent(up{job="mongodb"})。exporter 停機或被 Prometheus 中斷時 mongodb_up 也不存在；
+      PMM 用 inventory（pmm_managed_inventory_agents）補這一段，PMM 以外的環境要自己加
+    metrics: [up, scrape_duration_seconds]
+    evaluate_on: self
+    silent_failure: exporter 停機時 mongodb_up 消失，awesome 的 MongoDB Down（mongodb_up == 0）回傳空
+    evidence: code
+    source: mg-exporter
+    refs: [mx-general-always, awe-mg-down, pmm-down]
+    upstream: { status: partial, note: "PMM 的 down 用 inventory 補消失的 exporter；awesome 只看 mongodb_up" }
+    rules: [rules/targets/mongodb.yml#MongoDBExporterDown, rules/targets/mongodb.yml#MongoDBExporterMissing]
+
+  - id: collectors-present
+    aspect: exporter
+    tier: 1
+    question: Exporter 連得上時，serverStatus 這一大類 metric 還在嗎
+    signal: >-
+      mongodb_up == 1 unless on(job, instance) mongodb_ss_uptime。鏈：getDiagnosticData（要 serverStatus、replSetGetStatus 權限與 local.oplog.rs 的 collStats）
+      → exporter 合併 8.0 的分段回應 → 依路徑命名成 mongodb_ss_*。沒開 --collector.diagnosticdata、或帳號沒有 clusterMonitor 時整組不存在
+    metrics: [mongodb_up, mongodb_ss_uptime, scrape_samples_scraped, collector_scrape_time_ms]
+    evaluate_on: self
+    silent_failure: 實測沒有 clusterMonitor：up=1、mongodb_up=1、sample 6108 → 49，collector_scrape_time_ms{collector="diagnostic_data"} 仍存在（0ms），預設 log 看不到原因
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mg-diag-auth, mg-diag-auth-oplog, mx-diag-warn, mx-diag-merge8, mx-flag-loglevel, mx-measure]
+    upstream: { status: no }
+    rules: [rules/targets/mongodb.yml#MongoDBDiagnosticDataMissing]
+
+  - id: collector-success
+    aspect: exporter
+    tier: 1
+    question: replSetGetStatus 與 oplog 這兩組也成功嗎
+    signal: >-
+      沒有 collector 成功指標，用 presence 代替：mongodb_ss_uptime unless on(job, instance) mongodb_rs_ok（replicasetstatus collector），
+      mongodb_ss_uptime unless on(job, instance) mongodb_mongod_replset_oplog_head_timestamp（--compatible-mode 讀 local.oplog.rs，帳號要 local 的 read）。
+      collector_scrape_time_ms 在 collector 失敗時照樣輸出，不能當成功指標
+    metrics: [mongodb_rs_ok, mongodb_mongod_replset_oplog_head_timestamp, collector_scrape_time_ms]
+    evaluate_on: self
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mx-rs-error, mx-oplog-warn, mx-oplog-find, mx-measure]
+    upstream: { status: no }
+    rules: [rules/targets/mongodb.yml#MongoDBReplSetStatusMissing, rules/targets/mongodb.yml#MongoDBOplogMetricsMissing]
+
+  - id: scrape-budget
+    aspect: exporter
+    tier: 2
+    question: Scrape 來得及在 scrape_timeout 內完成嗎
+    signal: >-
+      scrape_duration_seconds 對照 scrape_timeout。exporter 從 X-Prometheus-Scrape-Timeout-Seconds 減 --web.timeout-offset（1 秒）當查詢期限，
+      沒有 header 時用 10 秒。查詢在註冊 collector 時依序執行，期限到了以後的 collector 直接跳過：up=1、sample 變少。
+      一次 scrape 約 6100 個 sample（lab），--collect-all 依 collection 與 index 數成長；--collector.collstats-limit 可以在 collection 太多時關掉 collstats、indexstats、dbstats、top
+    metrics: [scrape_duration_seconds, scrape_samples_scraped, collector_scrape_time_ms]
+    evaluate_on: self
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mx-handler-header, mx-handler-default10, mx-handler-offset, mx-describe-ctx, mx-describe-collect, mx-flag-collstats-limit]
+    upstream: { status: no }
+    contract: exporter-deadline
+    rules: [rules/targets/mongodb.yml#MongoDBScrapeNearTimeout, rules/targets/mongodb.yml#MongoDBScrapeSamplesDropped]
+
+  - id: exporter-query-timeout
+    aspect: exporter
+    tier: 2
+    question: 伺服器忙、卡住或連線額滿時，exporter 會不會跟著看不到
+    signal: >-
+      exporter 只等 scrape_timeout 減 1 秒；連線與 server selection 逾時是 --mongodb.connect-timeout-ms（5000ms）。primary 持有 global X 鎖（sleep lock:w）12 秒時，
+      每個指向它的 exporter 在 3.0 秒（期限）回應：up=1、只剩 44 個 sample，**mongodb_up 也不在**（期限過後連 general collector 都沒輸出）。
+      卡住（pause）的 member 則回 mongodb_up=0 與 46 個 sample。所以「up 1、sample 驟減、mongodb_up 不存在」是伺服器被鎖住，要用 sample 數規則抓。
+      額滿的連線同理：exporter 每次 scrape 都新建連線，額滿時它也被拒
+    metrics: [up, mongodb_up, scrape_samples_scraped, scrape_duration_seconds]
+    evaluate_on: self
+    silent_failure: 實測 global X 鎖 12 秒：MongoDBDown（mongodb_up == 0）與 awesome 的 MongoDB Down 都不響，因為 mongodb_up 不存在；約 25 秒後 replica set 還換了 primary
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mg-sleep-global, mg-sleep-testonly, mx-describe-ctx, mx-flag-connect-timeout, mx-new-client, mg-conn-refused]
+    upstream: { status: no }
+    rules: [rules/targets/mongodb.yml#MongoDBScrapeSamplesDropped, rules/targets/mongodb.yml#MongoDBExporterDown, rules/targets/mongodb.yml#MongoDBDown]
+
+  - id: probe-blast-radius
+    aspect: exporter
+    tier: 2
+    question: Multi-target 時，壞的是 exporter 還是 member
+    signal: >-
+      /scrape?target=<host:port> 只能選啟動時 --mongodb.uri 給過的 host（其他回 404），每個請求只碰那一台：pause 一個 secondary 時只有它 mongodb_up=0。
+      /scrapeall 在一個請求裡依序抓每個 URI，每個 URI 各自給完整的期限，instance label 被 Prometheus 改成 exported_instance：一台卡住時 3.2 秒仍成功、少那一台；
+      兩台同時連不上時 4 秒逾時、up=0、三台的 metric 全部消失。/metrics 回的是第一個 URI 的資料，不是 exporter 自己的健康，所以 multi-target 的「exporter 活著」只能從 up 看
+    metrics: [up, mongodb_up]
+    evaluate_on: self
+    applies_when: "一個 exporter 帶多個 --mongodb.uri（/scrape?target= 或 /scrapeall）"
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mg-exp-a, mx-multi-lookup, mx-multi-notfound, mx-metrics-first, mx-scrapeall-loop, mx-scrapeall-timeout, mx-scrapeall-instance]
+    upstream: { status: no }
+    rules: [rules/targets/mongodb.yml#MongoDBMultiTargetExporterDown]
+
+  - id: version-semantics
+    aspect: exporter
+    tier: 2
+    question: 規則用的 metric 名稱與 label 在這個版本真的存在嗎
+    signal: >-
+      名稱從 BSON 路徑產生，MongoDB 改欄位就跟著改：8.0 的 ticket 在 serverStatus.queues.execution，exporter 改回舊名 mongodb_ss_wt_concurrentTransactions_*、label txn_rw。
+      --compatible-mode 另外輸出 v1 名稱（mongodb_mongod_*、mongodb_instance_uptime_seconds）。每個 serverStatus／replSetGetStatus metric 都帶 rs_state（member 自己的狀態）
+      與 cl_id、rs_nm：角色改變時整批 series 換 label，changes() 與 rate() 要先依 cluster 彙總；mongodb_up 沒有 rs_nm
+    metrics: [mongodb_ss_wt_concurrentTransactions_available, mongodb_mongod_wiredtiger_concurrent_transactions_available_tickets, mongodb_rs_members_optimeDate]
+    evaluate_on: inventory
+    silent_failure: 實測 awesome 的 tickets（txn_rw_type）與 lag／headroom（on (set)）對不到任何 series；PMM 的 tickets 在 16 核上一直響
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mx-prefix-queues, mx-txn-rw, mx-topo-rsstate, mx-topo-state, mx-topo-rsnm, mx-up-desc, awe-mg-read-tickets, awe-mg-lag, pmm-read-tickets]
+    upstream: { status: no }
+    rules: []
+
+  # ---------- availability ----------
+  - id: db-up
+    aspect: availability
+    tier: 1
+    question: Exporter 連得到 mongod 嗎
+    signal: >-
+      mongodb_up == 0；和 exporter-up 一起看。mongodb_up 是一次 ping（primaryPreferred、direct connection）：secondary 在沒有 primary 時 ping 照樣成功，
+      所以 mongodb_up 只回答「process 回應嗎」，「寫得進去嗎」要看 role-detection
+    metrics: [mongodb_up]
+    evaluate_on: self
+    silent_failure: 實測 3 台停 2 台：存活的 SECONDARY mongodb_up=1；被 kill 的那台 mongodb_up=0、沒有 cluster_role 值；primary 被鎖住時 mongodb_up 不存在
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mx-up-ping, mx-up-desc, awe-mg-down]
+    upstream: { status: partial, note: "awesome 是 mongodb_up == 0；PMM 用 inventory 補消失的 exporter" }
+    rules: [rules/targets/mongodb.yml#MongoDBDown]
+
+  - id: restart
+    aspect: availability
+    tier: 2
+    question: 重啟過嗎
+    signal: >-
+      mongodb_ss_uptime < 300（--compatible-mode 另有 mongodb_instance_uptime_seconds）。Atlas 建議「一小時內重啟超過 2 次」告警
+    metrics: [mongodb_ss_uptime, mongodb_instance_uptime_seconds]
+    evaluate_on: self
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, pmm-restarted, awe-mg-restart]
+    upstream: { status: yes, note: "PMM 與 awesome 都有 uptime < 300；lab 啟動後兩者都響" }
+    rules: [rules/targets/mongodb.yml#MongoDBRestarted]
+
+  - id: majority-writes
+    aspect: availability
+    tier: 2
+    question: w:majority 的寫入會不會一直等
+    signal: >-
+      沒有 arbiter 時預設 write concern 是 majority（getDefaultRWConcern 的 source 是 implicit）、wtimeout 0＝無限等。
+      有設 wtimeout 的寫入逾時時 mongodb_ss_metrics_getLastError_wtimeouts 加 1；沒有設的只能從 commit point 落後看（majority-commit-lag）
+    metrics: [mongodb_ss_metrics_getLastError_wtimeouts, mongodb_ss_metrics_getLastError_wtime_num, mongodb_ss_metrics_getLastError_wtime_totalMillis]
+    evaluate_on: self
+    silent_failure: 實測 m2、m3 都 fsyncLock：wtimeout 5000 的寫入回 WriteConcernFailed、wtimeouts 0 → 1；不指定 write concern 的 insert 8 秒（主機時鐘）沒有回應，wtimeouts 不變
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mg-wc-implicit, mg-wc-notimeout, mg-write-majority]
+    upstream: { status: no }
+    rules: [rules/targets/mongodb.yml#MongoDBMajorityWriteTimeouts, rules/targets/mongodb.yml#MongoDBMajorityCommitLag]
+
+  # ---------- workload ----------
+  - id: op-latency
+    aspect: workload
+    tier: 3
+    question: 讀、寫、指令的平均延遲
+    signal: >-
+      rate(mongodb_ss_opLatencies_latency) / rate(mongodb_ss_opLatencies_ops)，label op_type（reads、writes、commands、transactions），單位微秒。
+      Atlas 建議讀寫延遲 > 20ms（低優先）、> 50ms（高優先）各 5 分鐘。慢查詢本身要 profiler 或 slow query log
+    metrics: [mongodb_ss_opLatencies_latency, mongodb_ss_opLatencies_ops, mongodb_ss_opcounters]
+    evaluate_on: self
+    evidence: inferred
+    source: mg-exporter
+    upstream: { status: no }
+    rules: [rules/targets/mongodb.yml#MongoDBSlowOperations]
+
+  - id: cursors
+    aspect: workload
+    tier: 3
+    question: cursor 有沒有大量逾時或累積
+    signal: >-
+      mongodb_ss_metrics_cursor_open{csr_type="total"} 與 increase(mongodb_ss_metrics_cursor_timedOut)；cursor 閒置 cursorTimeoutMillis（10 分鐘）後被關掉
+    metrics: [mongodb_ss_metrics_cursor_open, mongodb_ss_metrics_cursor_timedOut]
+    evaluate_on: self
+    evidence: code
+    source: mg-src
+    refs: [mg-cursor-timedout, mg-cursor-timeout, awe-mg-cursors, awe-mg-cursor-timeout]
+    upstream: { status: yes, note: "awesome 有 open > 10k 與 timedOut 增量 > 100" }
+    rules: [rules/targets/mongodb.yml#MongoDBCursorsTimingOut]
+
+  - id: asserts
+    aspect: workload
+    tier: 3
+    question: 有沒有 regular／warning assert
+    signal: >-
+      increase(mongodb_ss_asserts{assert_type=~"regular|warning|msg"})。user assert 包含驗證失敗、權限不足、重複鍵：lab 的 exporter 帳號權限不足時，
+      primary 的 user assert 每分鐘增加約 400，不能直接當錯誤率
+    metrics: [mongodb_ss_asserts]
+    evaluate_on: self
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp]
+    upstream: { status: no }
+    rules: [rules/targets/mongodb.yml#MongoDBRegularAsserts]
+
+  # ---------- saturation ----------
+  - id: wt-cache
+    aspect: saturation
+    tier: 2
+    question: WiredTiger cache 是不是逼得應用執行緒自己做 eviction
+    signal: >-
+      dirty：mongodb_ss_wt_cache_tracked_dirty_bytes_in_the_cache / mongodb_ss_wt_cache_maximum_bytes_configured，到 eviction_dirty_trigger 20% 時應用執行緒要寫出；
+      用量：bytes_currently_in_the_cache / maximum，80% 是常態、95% 時應用執行緒要清。直接的症狀是 rate(mongodb_ss_wt_cache_application_thread_time_evicting_usecs)。
+      cache 預設 (RAM − 1GB) × 50%，容器裡要明確設 --wiredTigerCacheSizeGB
+    metrics: [mongodb_ss_wt_cache_tracked_dirty_bytes_in_the_cache, mongodb_ss_wt_cache_bytes_currently_in_the_cache, mongodb_ss_wt_cache_maximum_bytes_configured, mongodb_ss_wt_cache_application_thread_time_evicting_usecs]
+    evaluate_on: self
+    evidence: code
+    source: mg-src
+    refs: [wt-eviction-defaults, wt-stat-dirty, wt-stat-max, wt-stat-app-evict, mg-wt-cache-default, mg-wt-eviction-threads, mg-exp]
+    upstream: { status: no, note: "PMM 與 awesome 都沒有 cache 規則；Atlas 的建議也沒有" }
+    rules: [rules/targets/mongodb.yml#MongoDBWTCacheDirtyHigh, rules/targets/mongodb.yml#MongoDBWTCacheFull, rules/targets/mongodb.yml#MongoDBAppThreadsEvicting]
+
+  - id: tickets
+    aspect: saturation
+    tier: 2
+    question: 操作在排隊等 ticket 或鎖嗎
+    signal: >-
+      排隊數：mongodb_ss_wt_concurrentTransactions_{read,write}_normalPriority_queueLength（Atlas 的 Queued Reads／Writes：0～10 低優先、10+ 高優先），
+      等鎖：mongodb_ss_globalLock_currentQueue{count_type}。8.0 預設 throughputProbing，ticket 數從 CPU 核心數開始在 4～128 間調，
+      available 的固定門檻沒有意義；固定值要設 storageEngineConcurrencyAdjustmentAlgorithm=fixedConcurrentTransactions
+    metrics: [mongodb_ss_wt_concurrentTransactions_read_normalPriority_queueLength, mongodb_ss_wt_concurrentTransactions_write_normalPriority_queueLength, mongodb_ss_wt_concurrentTransactions_available, mongodb_ss_wt_concurrentTransactions_totalTickets, mongodb_ss_globalLock_currentQueue]
+    evaluate_on: self
+    silent_failure: 實測 16 核的 lab totalTickets 16，PMM 的 available < 50 一開機就 firing；awesome 的 txn_rw_type 對不到
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mg-ticket-algo, mg-tp-initial, mg-tp-min, mg-tp-max, mg-queues-section, mg-globallock-queue, mx-prefix-queues, pmm-read-tickets, pmm-write-tickets, awe-mg-read-tickets, awe-mg-write-tickets]
+    upstream: { status: partial, note: "PMM 與 awesome 有 available < 50：前者在動態 ticket 下一直響，後者 label 錯誤" }
+    rules: [rules/targets/mongodb.yml#MongoDBTicketQueue, rules/targets/mongodb.yml#MongoDBGlobalLockQueue]
+
+  - id: connections
+    aspect: saturation
+    tier: 2
+    question: 連線還有餘裕嗎
+    signal: >-
+      mongodb_ss_connections{conn_type="current"} / (current + available)。上限是 maxIncomingConnections 與 ulimit 的較小者（lab 的 available 8168）；
+      額滿時新連線被拒，exporter 每次 scrape 都新建連線，也會被拒（mongodb_up 0）
+    metrics: [mongodb_ss_connections]
+    evaluate_on: self
+    evidence: code
+    source: mg-src
+    refs: [mg-conn-refused, mx-new-client, awe-mg-conns, mg-exp]
+    upstream: { status: yes, note: "awesome 有 current / (current + available) > 80%" }
+    rules: [rules/targets/mongodb.yml#MongoDBConnectionsNearLimit]
+
+  # ---------- replication ----------
+  - id: role-detection
+    aspect: replication
+    tier: 2
+    question: 每個 replica set 剛好有一台可寫入的 primary 嗎
+    signal: >-
+      依 target 的 cluster label 計數 mongodb_ss_repl_isWritablePrimary == 1：0 是沒有 primary（寫入全部失敗），> 1 是網路分割時舊 primary 還沒降級。
+      「0」要寫成 count(mongodb_up) unless count(isWritablePrimary == 1)，exporter 連不上的 member 才不會讓結果變空。
+      分組用 target label，因為 rs_nm 在 exporter 連不上時不存在
+    metrics: [mongodb_ss_repl_isWritablePrimary, mongodb_rs_myState, mongodb_up]
+    evaluate_on: self
+    applies_when: "replica set；target 要有 cluster label"
+    silent_failure: 實測 kill 兩個 secondary：primary 12.3 秒（牆鐘）後自己降級，寫入回 NotWritablePrimary，存活那台 up=1、mongodb_up=1，只有角色計數看得出來；kill primary 時 9.5 秒後選出新 primary，for 30s 的 NoPrimary 沒響
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mg-writable-primary, mg-stepdown-majority, pmm-no-primary, awe-mg-noprimary]
+    upstream: { status: partial, note: "PMM 與 awesome 都有 no primary（avg／sum == 0）；都沒有 > 1" }
+    rules: [rules/targets/mongodb.yml#MongoDBNoPrimary, rules/targets/mongodb.yml#MongoDBMultiplePrimaries]
+
+  - id: replication-lag
+    aspect: replication
+    tier: 2
+    question: Replication 延遲量的是真的嗎
+    signal: >-
+      --compatible-mode 的 mongodb_mongod_replset_member_replication_lag{self="1"}：|自己的 optimeDate − PRIMARY 的 optimeDate|，秒為單位。
+      每個 secondary 被每個 exporter 各報一次（lab 3 份，差 1～4 秒），取 self="1"。沒有 compatible mode 時用 mongodb_rs_members_optimeDate（毫秒）在同一個 instance 內相減。
+      閒置時 primary 每 10 秒寫一筆 noop，延遲不會因為沒有寫入而停在 0。沒有 primary 時整組消失，另一條規則檢查「SECONDARY 但沒有延遲數字」
+    metrics: [mongodb_mongod_replset_member_replication_lag, mongodb_rs_members_optimeDate, mongodb_rs_myState]
+    evaluate_on: self
+    applies_when: replica set
+    silent_failure: 實測 m3 fsyncLock 35 秒：自報 26、primary 看 31、m2 看 35；閒置時在 0 與 10 之間跳。kill 兩個 secondary 後（前一次執行）延遲 series 0 條；awesome 的 on (set) 永遠回傳空
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mx-compat-gotprimary, mx-compat-lag, mx-compat-abs, mx-compat-self, mg-rs-optimedate, mg-set-down-optime, mg-noop-interval, pmm-lag, awe-mg-lag]
+    upstream: { status: partial, note: "PMM 的 lag 在 Prometheus 是語法錯誤（MetricsQL 才能跑）；awesome 的 on (set) 對不到 label" }
+    rules: [rules/targets/mongodb.yml#MongoDBReplicationLag, rules/targets/mongodb.yml#MongoDBReplicationLagUnknown]
+
+  - id: oplog-window
+    aspect: replication
+    tier: 2
+    question: oplog 能讓 secondary 離線多久
+    signal: >-
+      mongodb_mongod_replset_oplog_head_timestamp − mongodb_mongod_replset_oplog_tail_timestamp（秒，--compatible-mode，exporter 自己讀 local.oplog.rs 第一筆與最後一筆）。
+      Atlas 建議 < 24h（5 分鐘）低優先、< 1h（10 分鐘）高優先；PMM 預設 24h。剛建立的 replica set 一定小於 24h，規則要排除 uptime 短的情況。
+      延遲接近 window 時那台 secondary 快要追不上（Atlas 的 replication headroom）
+    metrics: [mongodb_mongod_replset_oplog_head_timestamp, mongodb_mongod_replset_oplog_tail_timestamp, mongodb_oplog_stats_storageStats_maxSize]
+    evaluate_on: self
+    applies_when: replica set
+    silent_failure: 實測 2MB 的 oplog 寫 10MB 後 window 約 2 分鐘；PMM 的 24h 範本在新叢集上一開始就響
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mx-oplog-find, mx-oplog-head, mg-oplog-capacity, mg-oplog-user-size, mg-oplog-5pct, pmm-oplog]
+    upstream: { status: yes, note: "PMM 有 oplog window < 24h；awesome 的 headroom 規則因為 on (set) 回傳空" }
+    rules: [rules/targets/mongodb.yml#MongoDBOplogWindowShort]
+
+  - id: majority-commit-lag
+    aspect: replication
+    tier: 2
+    question: majority commit point 有沒有停住
+    signal: >-
+      primary 上 (mongodb_rs_optimes_lastAppliedWallTime − mongodb_rs_optimes_lastCommittedWallTime) / 1000（秒）。多數 secondary 停機或卡住時 commit point 不動：
+      w:majority 寫入一直等、oplog 不能截斷。flow control 在落後超過 5 秒（10 秒 × 0.5）時把 isLagged 設 1、targetRateLimit 往下調，最低每秒 100 個 ticket；它只限流，不會讓寫入失敗
+    metrics: [mongodb_rs_optimes_lastAppliedWallTime, mongodb_rs_optimes_lastCommittedWallTime, mongodb_ss_flowControl_isLagged, mongodb_ss_flowControl_targetRateLimit, mongodb_ss_flowControl_isLaggedCount]
+    evaluate_on: self
+    applies_when: replica set
+    silent_failure: 實測 m2、m3 都 fsyncLock 約 50 秒：commit point 落後 70 秒、isLagged 1、targetRateLimit 100，w:1 的 writer 70 秒寫了 1251 筆沒有錯誤；只鎖一台時 isLagged 一直是 0
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mg-rs-lastcommitted, mg-fc-enabled, mg-fc-target-lag, mg-fc-threshold, mg-fc-healthy, mg-fc-sustainer, mg-fc-median, mg-fc-min-tickets, mg-fc-primary-only, mg-fc-ss-islagged, mg-fc-ss-target]
+    upstream: { status: no }
+    rules: [rules/targets/mongodb.yml#MongoDBMajorityCommitLag, rules/targets/mongodb.yml#MongoDBFlowControlEngaged]
+
+  # ---------- cluster ----------
+  - id: member-health
+    aspect: cluster
+    tier: 2
+    question: 每個 member 在其他 member 眼中健康嗎
+    signal: >-
+      mongodb_rs_members_health{member_idx} == 0（heartbeat 超過 electionTimeoutMillis 沒回應，state 8 DOWN，stateStr「(not reachable/healthy)」）；
+      mongodb_rs_members_state 停在 RECOVERING、STARTUP2、ROLLBACK 等。每個 exporter 都報整個 set 的看法，依 cluster、member_idx 彙總。
+      停掉的 member 自己的 exporter 只剩 mongodb_up=0
+    metrics: [mongodb_rs_members_health, mongodb_rs_members_state, mongodb_rs_members_pingMs, mongodb_rs_members_lastHeartbeat]
+    evaluate_on: self
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mg-rs-health, mg-rs-notreachable, mg-member-timeout, mg-state-down, pmm-unusual, awe-mg-unhealthy]
+    upstream: { status: yes, note: "PMM 有 unusual state；awesome 有 members_health == 0（不分組，同一台被多個 member 回報）" }
+    rules: [rules/targets/mongodb.yml#MongoDBMemberUnhealthy, rules/targets/mongodb.yml#MongoDBMemberUnusualState]
+
+  - id: elections
+    aspect: cluster
+    tier: 2
+    question: 最近有沒有選舉、選得太頻繁嗎
+    signal: >-
+      max by (cluster) (mongodb_rs_term) − min by (cluster) (min_over_time(mongodb_rs_term[15m]))：每次選舉 term 加 1。不能直接 changes(mongodb_rs_term)，
+      因為角色改變時 rs_state label 換了，舊 series 斷掉。另有 mongodb_ss_electionMetrics_*_called（依原因）與 electionCandidateMetrics。
+      Atlas 建議一小時內選舉 > 3 次低優先、> 30 次高優先
+    metrics: [mongodb_rs_term, mongodb_ss_electionMetrics_electionTimeout_called, mongodb_rs_electionCandidateMetrics_lastElectionDate, mongodb_mongod_replset_my_state]
+    evaluate_on: self
+    applies_when: replica set
+    silent_failure: 實測 kill primary 後 awesome 的 changes(mongodb_rs_myState) 從沒響（每台的 series 換了 rs_state label，各自都沒變）；PMM 的 changes(my_state) 與 term 的差值都看得到。primary 被 global 鎖住 12 秒後也發生了一次選舉
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mg-term-increment, mg-election-reason, mg-election-sss, mg-rs-candidate, mg-dryrun, mg-priority-takeover, pmm-primary-changed, awe-mg-primarychanged]
+    upstream: { status: partial, note: "PMM 與 awesome 用 changes(my_state)；選舉次數沒有" }
+    rules: [rules/targets/mongodb.yml#MongoDBElectionHappened, rules/targets/mongodb.yml#MongoDBFrequentElections]
+
+  - id: sharding-balancer
+    aspect: cluster
+    tier: 3
+    question: sharded cluster 的 chunk 搬移是不是太頻繁、balancer 有沒有開
+    signal: >-
+      連到 mongos 的 exporter、加 --compatible-mode 與 --collector.diagnosticdata 時輸出 mongodb_mongos_sharding_changelog_10min_total{event}（config.changelog 近 10 分鐘）
+      與 mongodb_mongos_sharding_balancer_enabled。PMM 的預設是 moveChunk.start > 40。balancer 預設每 10 秒一輪
+    metrics: [mongodb_mongos_sharding_changelog_10min_total, mongodb_mongos_sharding_balancer_enabled]
+    evaluate_on: self
+    applies_when: sharded cluster（exporter 連 mongos）
+    evidence: code
+    source: mg-exporter
+    refs: [mx-changelog, mx-balancer-enabled, mx-mongos-compat, mg-balancer-round, pmm-chunks]
+    upstream: { status: yes, note: "PMM 有 too many chunk migrations；lab 沒有 sharded cluster，未驗證" }
+    rules: [rules/targets/mongodb.yml#MongoDBChunkMigrationsHigh]
+
+  # ---------- maintenance ----------
+  - id: ttl-monitor
+    aspect: maintenance
+    tier: 3
+    question: TTL monitor 有在跑嗎
+    signal: >-
+      increase(mongodb_ss_metrics_ttl_passes[10m]) == 0（ttlMonitorSleepSecs 預設 60 秒一輪）；刪掉的文件數看 mongodb_ss_metrics_ttl_deletedDocuments。
+      secondary 不跑 TTL（刪除透過 oplog 複寫），規則只在 primary 上有意義
+    metrics: [mongodb_ss_metrics_ttl_passes, mongodb_ss_metrics_ttl_deletedDocuments]
+    evaluate_on: self
+    evidence: inferred
+    source: mg-src
+    refs: [mg-ttl-sleep]
+    upstream: { status: no }
+    rules: [rules/targets/mongodb.yml#MongoDBTTLMonitorStalled]
+
+  # ---------- protection ----------
+  - id: checkpoint
+    aspect: protection
+    tier: 2
+    question: WiredTiger checkpoint 成功、來得及嗎
+    signal: >-
+      mongodb_ss_wt_checkpoint_most_recent_time_msecs 與 increase(mongodb_ss_wt_checkpoint_total_failed_number_of_checkpoints)。checkpoint 預設 60 秒一次（syncdelay），
+      兩次之間靠 journal；checkpoint 一直很慢代表磁碟寫入跟不上
+    metrics: [mongodb_ss_wt_checkpoint_most_recent_time_msecs, mongodb_ss_wt_checkpoint_total_failed_number_of_checkpoints, mongodb_ss_wt_checkpoint_total_succeed_number_of_checkpoints]
+    evaluate_on: self
+    evidence: code
+    source: mg-src
+    refs: [mg-syncdelay, mg-exp]
+    upstream: { status: no }
+    rules: [rules/targets/mongodb.yml#MongoDBCheckpointSlow, rules/targets/mongodb.yml#MongoDBCheckpointFailed]
+
+  # ---------- capacity ----------
+  - id: oplog-growth
+    aspect: capacity
+    tier: 2
+    question: oplog 有沒有長到超過設定大小
+    signal: >-
+      mongodb_oplog_stats_storageStats_size 對 mongodb_oplog_stats_storageStats_maxSize。oplog 只在超過上限、而且最舊那段沒被 stable timestamp（跟著 majority commit point）
+      或 backup 釘住時才截斷；截斷是背景執行緒整段刪，不是即時
+    metrics: [mongodb_oplog_stats_storageStats_size, mongodb_oplog_stats_storageStats_maxSize]
+    evaluate_on: self
+    silent_failure: 實測 2MB 的 oplog：寫 10MB 後 150 秒內沒有截斷；m2、m3 都卡住時長到 5.4MB，解鎖 20 秒後 6.7MB。截斷是背景、延後的，「size > maxSize」短時間成立是正常的，規則要 1.5 倍加 for
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mg-oplog-capacity, mg-oplog-pinned, mg-pinned-rollback, mg-pinned-stable, mg-oplog-markers-min, mg-oplog-check-period]
+    upstream: { status: no }
+    rules: [rules/targets/mongodb.yml#MongoDBOplogOverMaxSize]
+
+  - id: disk-usage
+    aspect: capacity
+    tier: 2
+    question: dbPath 所在的檔案系統快滿了嗎
+    signal: >-
+      --collector.dbstats 的 mongodb_dbstats_fsUsedSize / mongodb_dbstats_fsTotalSize（每個 database 一份，取 max）；預設不開，lab 只有 --collect-all 的 exporter 有。
+      Atlas 建議 > 90% 低優先、> 95%（5 分鐘）高優先，PMM 預設 85%。沒開 dbstats 就用 node_exporter 的 node_filesystem_avail_bytes
+    metrics: [mongodb_dbstats_fsUsedSize, mongodb_dbstats_fsTotalSize, mongodb_dbstats_dataSize, mongodb_dbstats_indexSize]
+    evaluate_on: self
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mx-flag-dbstats, pmm-disk]
+    upstream: { status: partial, note: "PMM 有 fsUsedSize / fsTotalSize > 85%，前提是開了 dbstats" }
+    rules: [rules/targets/mongodb.yml#MongoDBDiskSpaceLow]
+
+blind_spots:
+  - what: 每個查詢的慢查詢、執行計畫、collection scan
+    category: database
+    why: serverStatus 只有總數（opLatencies、queryExecutor.scanned）；逐查詢資料在 profiler（system.profile）與 slow query log，profiler 預設關
+    workaround: "`--collector.profile`（只算 system.profile 的筆數）、slow query log 進 log 管線，或 PMM Query Analytics"
+    section: targets/mongodb.md#blind-spots
+  - what: collection 與 index 層級的大小、延遲與使用率
+    category: exporter
+    why: 要 --collector.collstats／indexstats 加 --discovering-mode 或列出 namespace，每次 scrape 對每個 collection 跑 $collStats／$indexStats，成本依 collection 數成長
+    workaround: "只列重要的 namespace（`--mongodb.collstats-colls`），並用 `--collector.collstats-limit` 設上限；或另開一個長 scrape_interval 的 job"
+    section: targets/mongodb.md#blind-spots
+  - what: sharded cluster（mongos、config server、balancer、chunk 分布）
+    category: other
+    why: lab 只有 replica set；exporter 的 sharding metric 只在 mongos 上、compatible mode 才有，沒有驗證
+    workaround: 每個 shard 的每個 member 各一個 exporter、每個 mongos 一個；balancer 的狀態另用 `sh.status()` 定期檢查
+    section: targets/mongodb.md#cluster
+  - what: FTDC（diagnostic.data）保留了多久、在不在持久磁碟
+    category: database
+    why: 目錄上限 250MB 循環覆寫，能涵蓋多久依負載；exporter 讀的是 getDiagnosticData 的最新樣本，不是檔案
+    workaround: 盤點時確認 dbPath 在持久磁碟、`diagnosticDataCollectionDirectorySizeMB` 夠大；事件後先複製目錄
+    section: targets/mongodb.md#protection
+  - what: 備份有沒有成功
+    category: other
+    why: MongoDB 沒有內建排程備份；Percona Backup for MongoDB 要 `--collector.pbm`，mongodump／檔案快照要自己的 metric
+    workaround: "`--collector.pbm`（PMM 的 PBM 範本）或備份工具的 textfile"
+    section: targets/mongodb.md#protection
+  - what: 主機記憶體、swap、磁碟 IOPS 與延遲
+    category: other
+    why: 不在 serverStatus 裡（`systemMetrics` 只在 Linux 的 FTDC 有一部分）；Atlas 的 IOPS、swap、steal 建議都是主機層
+    workaround: node_exporter 與 cAdvisor
+    section: targets/mongodb.md#saturation
+  - what: 憑證到期、版本漏洞
+    category: other
+    why: TLS 沒開時 `security.SSLServerCertificateExpirationDate` 不存在；PMM 的 CVE 範本用 `mongodb_version_info`（compatible mode）
+    workaround: blackbox 的 TLS 探測；版本另外盤點
+    section: targets/mongodb.md#protection

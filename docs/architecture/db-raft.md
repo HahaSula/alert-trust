@@ -169,3 +169,19 @@ compaction 之後檔案不會縮小，空出來的頁面要 defrag 才還給檔�
 **健康端點不一樣。**4lw 的 `ruok` 一律回 `imok`；`mntr` 在沒有服務時只回 `This instance is not currently serving requests`；只有 `/ready` 依 leader 狀態回 503。[^ch-k-ruok][^ch-k-mntr-inactive][^ch-k-ready][^ch-k-ready-503]
 
 **lab 看到的。**3 台停 2 台（leader 與一台 follower）：存活那台 `up` 1、`KeeperIsLeader` 0、`/ready` 503（`hasLeader:false`）、`ruok` `imok`。兩台 server +10 秒（主機時鐘）表已唯讀，insert 卡住超過 30 秒；`/ping` 與 `/replicas_status` 的狀態碼仍是 200。Keeper 啟動後 3 秒表恢復可寫。Altinity 的 ClickHouseKeeperLostQuorum 以 `KeeperIsLeader == 1` 為前提，這時回傳空。<span class="at-chip at-ev-tested">實測</span>[^ch-exp-raw][^alt-k-lostquorum]細節見 [ClickHouse 頁](../targets/clickhouse.md#cluster)。
+
+## MongoDB：replica set 的選舉協定（PV1） {#mongodb}
+
+**機制。**MongoDB replica set 的 protocol version 1 和 Raft 同一個骨架：每個 member 有 term、一個 term 最多一個 primary、拿到投票成員的多數（voters / 2 + 1）才當選，選舉時 term 加 1。[^mg-term-increment][^mg-majority-count] 不同的地方在於複寫走 oplog（一個 collection），而且 secondary 是向別人「拉」oplog，不是由 leader 推。細節與 write concern 見[文件型架構](db-doc.md#election)。
+
+| Raft（etcd）的機制 | MongoDB 8.0.34 的對應 | 差異 | 看得到的訊號 |
+|---|---|---|---|
+| heartbeat、election timeout | 每 2 秒 heartbeat；`electionTimeoutMillis` 10 秒[^mg-hb-interval][^mg-election-timeout] | 超過 timeout 的 member 被標成 DOWN、optime 清成 0[^mg-member-timeout][^mg-set-down-optime] | [member-health](../components/mongodb_exporter.md#member-health) |
+| PreVote | 先做 dry run，拿到多數才加 term[^mg-dryrun] | 相同的目的：不讓被隔離的節點把 term 推高 | [elections](../components/mongodb_exporter.md#elections) |
+| CheckQuorum（leader 退位） | primary 看不到多數就自己降級[^mg-stepdown-majority] | 降級後存活的節點都是 SECONDARY，`mongodb_up` 仍是 1 | [role-detection](../components/mongodb_exporter.md#role-detection) |
+| leader 由 log 最新的當選 | 另外有 priority takeover、catch-up takeover；當選後先 catch-up（預設無限等）[^mg-priority-takeover][^mg-catchup][^mg-catchup-timeout] | priority 不同的設定會多一次「換回去」的選舉 | [elections](../components/mongodb_exporter.md#elections) |
+| commit index | majority commit point（`lastCommittedOpTime`）[^mg-rs-lastcommitted] | 寫入預設 w:majority 且沒有逾時；commit point 停住時 oplog 不能截斷[^mg-wc-implicit][^mg-wc-notimeout][^mg-oplog-pinned] | [majority-commit-lag](../components/mongodb_exporter.md#majority-commit-lag)、[oplog-growth](../components/mongodb_exporter.md#oplog-growth) |
+| follower 落後 | secondary 的 optime 落後 primary；flow control 在 primary 限流[^mg-fc-healthy] | 延遲是 optimeDate 相減（秒），沒有 primary 時 exporter 不輸出[^mx-compat-gotprimary][^mx-compat-lag] | [replication-lag](../components/mongodb_exporter.md#replication-lag) |
+| learner | 沒有 learner；`votes: 0`、priority 0 的 member 只複寫不投票，arbiter 只投票不存資料 | 有 arbiter 時預設 write concern 退回 w:1[^mg-wc-implicit] | — |
+
+**lab 看到的。**見[MongoDB 頁](../targets/mongodb.md#cluster)的選舉與失去多數兩個情境。

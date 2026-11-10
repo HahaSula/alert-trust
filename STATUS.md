@@ -5,7 +5,7 @@
 ## 現況
 
 - GitHub repo `HahaSula/alert-trust`，Pages 由 GitHub Actions 發布。
-- 16 張卡（9 個監控元件、7 個資料庫 target）、344 個訊號、489 條規則；`validate.py` 0 錯誤、1 個警告；`--strict` 建置通過。
+- 17 張卡（9 個監控元件、8 個資料庫 target）、371 個訊號、526 條規則；`validate.py` 0 錯誤、1 個警告；`--strict` 建置通過。
 - 原始碼參考 105+ 筆（釘版本與行號），實驗參考多數已換成 `lab/` 的公開結果。
 
 ## 已完成
@@ -31,6 +31,7 @@
 | TiDB v8.5.8 target（`model: native`，TiDB／TiKV／PD）與「分散式 SQL」架構頁；官方規則 5 類失效實測 | `catalog/targets/tidb.yaml`、`docs/targets/tidb*.md`、`lab/targets/tidb/` |
 | YugabyteDB v2026.1.3.0 target（`model: native`），YSQL 與 PostgreSQL 監控對照（postgres_exporter 實測） | `catalog/targets/yugabytedb.yaml`、`docs/targets/yugabytedb*.md`、`lab/targets/yugabytedb/` |
 | ClickHouse v26.10.2 target（內建 endpoint＋query-exporter 查 system 表）與「分析型」架構頁，2 副本＋3 Keeper lab | `catalog/targets/clickhouse.yaml`、`docs/targets/clickhouse*.md`、`queries/clickhouse/`、`lab/targets/clickhouse/` |
+| MongoDB 8.0.34 target（Percona mongodb_exporter v0.54.0）與「文件型」架構頁，3 成員 replica set lab | `catalog/targets/mongodb_exporter.yaml`、`docs/targets/mongodb*.md`、`lab/targets/mongodb/` |
 | artifact 對照後的修正：VM 報告只留公開 lab 數字、VictoriaLogs storage-reachable 改規則（重跑 lab）、Prometheus retention／notifier／磁碟訊號、VM 系列第 2、3 級訊號 | `docs/reports/`、`catalog/components/`、`rules/`、`lab/vm/vl/` |
 | 時間契約不合時給兩個方向：目前合格的 rule、方案 A 改 rule（最短合格視窗，可另存）、方案 B 改環境（`scrape_interval`、`query_offset`） | `tools/fit_contracts.py` |
 | metric 來源檢查：每個 metric 要對到 config 的 scrape job、live 快照或使用者回答，不假定（使用者在 v0.1.0 用 opencode 時回報 AI 直接假定來源） | `tools/check_metric_sources.py`、`env/sources.example.yaml` |
@@ -38,9 +39,9 @@
 
 ## 進行中
 
-- MongoDB target（mongodb_exporter）與「文件型」架構頁
+（無）
 
-之後的資料庫順序（使用者已同意）：MongoDB；CockroachDB（專有授權）不做。資料庫架構頁依類型分頁：關聯式、記憶體 KV、共識（Raft）、分散式 SQL、分析型、文件型。
+使用者同意的資料庫順序已全部完成；CockroachDB（專有授權）不做。資料庫架構頁依類型分頁：關聯式、記憶體 KV、共識（Raft）、分散式 SQL、分析型、文件型。
 
 ## 待辦（依建議順序）
 
@@ -63,6 +64,7 @@
 17. **ClickHouse 待補**：修正後的 Keeper session 規則（5 分鐘內有變化）只看到 firing，沒等到解除；慢或滿的磁碟、慢 Keeper、卡住的 ON CLUSTER DDL、全伺服器記憶體上限只讀碼。
 18. **query-exporter 排程跳過**：間隔對齊時較長間隔的查詢會被跳過（ClickHouse lab 錯開間隔後解決；MySQL lab 也看過 `misfire_grace_time` 1 秒的跳過）。PostgreSQL 的 5 分鐘查詢可能受影響，要檢查 `queries/query-exporter/postgres.yaml` 的間隔。
 19. **artifact 對照的後續輕量 lab**：429 與 `iteration_missed`、帶 `for` 的 log rule、損毀 block（`reloads_failures_total`）、長查詢卡住 Compact（目前讀碼）。新增的 Prometheus／VM 規則只過 promtool／dryRun，沒有在 lab 觸發過。
+20. **MongoDB 待補**：sharded cluster、WiredTiger cache／eviction 壓力、ticket 排隊、連線打滿、collStats 成本只讀碼；oplog 被釘住只讀碼。`docs/targets/models.md` 說「8.0、8.2 的 tag 沒有 OTel 程式碼」，MongoDB agent 回報 8.2.12 有 OTLP 檔案／HTTP 推送（沒有 Prometheus 檔案輸出），要附原始碼行號後修正。
 
 ## 已做的決定
 

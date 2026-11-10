@@ -1,0 +1,43 @@
+# mongodb_exporter（MongoDB）卡引用的來源。key 一律以 mg- 開頭，避免和其他 target 衝突。
+sources:
+  mg-lab:
+    title: MongoDB 監控實驗（lab/targets/mongodb）
+    kind: experiment
+    visibility: public
+    url: https://github.com/HahaSula/alert-trust/tree/main/lab/targets/mongodb
+    checked: "2026-11-10, MongoDB 8.0.34, percona/mongodb_exporter 0.54.0, Prometheus v3.13.5"
+    note: results/run-20261110.txt 是引用的原始輸出；run-20261110-a.txt 與 aborted-run-20261110.txt 是沒有引用的前兩次執行（見 README）
+  mg-src:
+    title: MongoDB 8.0.34 原始碼（src/mongo/db/repl、storage、admission、ftdc，與內附的 WiredTiger）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/mongodb/mongo/tree/r8.0.34/src/mongo/db
+    checked: "2026-11-10, r8.0.34"
+    note: "授權 SSPL v1；9.0.4（2026-10）與 8.2.12 只查了 src/mongo/otel/metrics"
+  mg-exporter:
+    title: Percona mongodb_exporter v0.54.0（main.go 的旗標、exporter/ 的 collector、v1_compatibility.go 的舊名 metric）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/percona/mongodb_exporter/tree/v0.54.0/exporter
+    checked: "2026-11-10, v0.54.0"
+    note: "serverStatus 等文件依 BSON 路徑自動轉成 metric 名稱（metrics.go 的 prefixes 與 nodeToPDMetrics）；--compatible-mode 另外輸出 v1 的名稱"
+  mg-pmm-templates:
+    title: PMM v3.10.0 的 MongoDB alerting templates（managed/data/alerting-templates/mongodb_*.yml）
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/percona/pmm/tree/v3.10.0/managed/data/alerting-templates
+    checked: "2026-11-10, v3.10.0"
+    note: "範本參數（[[ .threshold ]]）用預設值；PMM 的 TSDB 是 VictoriaMetrics，部分寫法在 Prometheus 上是語法錯誤"
+  mg-awesome:
+    title: awesome-prometheus-alerts MongoDB（percona/mongodb_exporter）
+    kind: community-rules
+    visibility: public
+    url: https://github.com/samber/awesome-prometheus-alerts/blob/dd70d7b66a4e9dbf14429aec244d543a2833390e/_data/rules.yml#L1870
+    checked: "2026-11-10, commit dd70d7b"
+  mg-doc-atlas:
+    title: "Guidance for Atlas Monitoring and Alerts（建議的告警與門檻）"
+    kind: upstream-doc
+    visibility: public
+    url: https://www.mongodb.com/docs/atlas/architecture/current/monitoring-alerts/
+    checked: "2026-11-10"
+    note: "oplog window < 1h、replication lag 等建議門檻；和 docs/targets/models.md 的 dbm-doc-atlas-alerts 是同一頁"
