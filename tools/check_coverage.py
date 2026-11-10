@@ -64,9 +64,14 @@ import check_metric_sources as MS  # noqa: E402 - same selector parser and match
 # env.yaml `type` is normally the card id itself (ls catalog/components catalog/targets); these are accepted aliases.
 TYPE_ALIASES = {
     "vmcluster": "victoriametrics", "vmsingle": "victoriametrics", "thanos-ruler": "thanos", "thanos_ruler": "thanos",
-    "grafana": "grafana_alerting", "valkey": "redis_exporter", "redis": "redis_exporter", "mysql": "mysqld_exporter",
-    "mariadb": "mysqld_exporter", "postgres": "postgres_exporter", "postgresql": "postgres_exporter",
+    "grafana": "grafana_alerting", "valkey": "redis_exporter", "redis": "redis_exporter", "mysqld_exporter": "mysql",
+    "mysqld": "mysql", "postgres": "postgres_exporter", "postgresql": "postgres_exporter",
     "mongodb": "mongodb_exporter", "mongo": "mongodb_exporter",
+}
+# aliases that name the exporter, not the database: the card is a guess, so the report asks which one it is
+AMBIGUOUS_TYPES = {
+    "mysqld_exporter": "需要回答：MySQL 還是 MariaDB？env.yaml 的 type 寫 `mysql` 或 `mariadb`（兩張卡的版本差異與專屬訊號不同）；先用 mysql 卡",
+    "mysqld": "需要回答：MySQL 還是 MariaDB？env.yaml 的 type 寫 `mysql` 或 `mariadb`；先用 mysql 卡",
 }
 
 
@@ -234,7 +239,8 @@ FEATURES = {
     "replication": "有複寫，不分主從（知道是哪一邊就改寫 replication-primary 或 replication-replica）",
     "replication-primary": "有複本的主庫（MySQL source、PostgreSQL primary、Redis master）",
     "replication-replica": "複本（MySQL replica、PostgreSQL standby、Redis replica）",
-    "gtid": "MySQL GTID replication", "semi-sync": "MySQL semi-sync replication", "galera": "MariaDB Galera",
+    "gtid": "MySQL／MariaDB GTID replication", "semi-sync": "semi-sync replication（MySQL plugin、MariaDB 內建）",
+    "galera": "MariaDB Galera",
     "group-replication": "MySQL Group Replication／InnoDB Cluster", "heartbeat": "pt-heartbeat 之類的 heartbeat 表",
     "multi-target-probe": "一個 exporter 帶多個 target（/probe、/scrape、多個 --mongodb.uri）",
     "query-exporter": "有部署 query-exporter 補自訂查詢", "patroni": "PostgreSQL Patroni",
@@ -284,19 +290,16 @@ APPLIES_FEATURES = [  # (regex on applies_when, [any-of groups]); first match wi
     (r"replication|主從複寫|複寫", [_REPL]),
 ]
 # conditions that are not features (flavour / version / flag notes): stay "需要回答" when they matter
-APPLIES_UNMAPPED = {"MySQL；MariaDB 要先開 performance_schema", "MySQL；MariaDB 要先開 performance_schema（預設 OFF，要重啟）",
-                    "MySQL（performance_schema 預設開）；MariaDB 要先開 performance_schema",
-                    "MariaDB 預設可用；MySQL 要 --collect.info_schema.innodb_metrics",
+APPLIES_UNMAPPED = {"performance_schema=ON（MariaDB 預設 OFF，要重啟）", "要 --collect.info_schema.innodb_metrics",
+                    "thread_handling=one-thread-per-connection（預設）", "MariaDB 11.4 以上（slave_connections_needed_for_purge）",
                     "PostgreSQL 17 以上要打開 --collector.stat_checkpointer",
                     "依賴時鐘的資料庫（YugabyteDB 的 hybrid clock、TiDB 的 TSO、MongoDB 的 wall time lag）"}
 # replication signals that only make sense on one side, although the card says just "replication"
 SIGNAL_SIDE = {
-    ("mysqld_exporter", "replication-running"): "replication-replica",
-    ("mysqld_exporter", "replication-error"): "replication-replica",
-    ("mysqld_exporter", "replica-status-present"): "replication-replica",
-    ("mysqld_exporter", "replication-lag"): "replication-replica",
-    ("mysqld_exporter", "replica-read-only"): "replication-replica",
-    ("mysqld_exporter", "primary-writable"): "replication-primary",
+    (card, sig): side for card in ("mysql", "mariadb") for sig, side in (
+        ("replication-running", "replication-replica"), ("replication-error", "replication-replica"),
+        ("replica-status-present", "replication-replica"), ("replication-lag", "replication-replica"),
+        ("replica-read-only", "replication-replica"), ("primary-writable", "replication-primary"))
 }
 
 
@@ -515,6 +518,9 @@ def evaluate(env: dict, snapshot: str | None, tiers: set[int], live: bool, scrap
                           "note": f"元件類型 {comp.get('type')!r} 沒有對應的元件卡"})
             continue
         card = cards[card_id]
+        if comp.get("type") in AMBIGUOUS_TYPES and comp.get("type") not in cards:
+            items.append({"component": comp["id"], "card": card_id, "signal": None, "tier": None, "status": "needs_input",
+                          "note": AMBIGUOUS_TYPES[comp["type"]]})
         unscraped_txt = scrape_note(comp, card_id, scrape_jobs, unscraped)
         for s in card["signals"]:
             if s["tier"] not in tiers:

@@ -22,7 +22,7 @@ argument-hint: "[name] [url...]"
 
 1. `$AT/env/env.example.yaml`：欄位與格式。只用它出現過的鍵，再加一個頂層 `unknowns:`（字串清單）記錄沒答案的題目。
 2. `$AT/docs/model.md` 的「依 infra 組合選卡片」與「檢查流程」：決定要用哪些卡。
-3. `type` 的合法值就是卡片 id：`ls $AT/catalog/components $AT/catalog/targets`（監控鏈：`prometheus`、`thanos`、`vmagent`、`victoriametrics`、`victorialogs`、`vmalert`、`grafana_alerting`、`alertmanager`；資料庫：`mysqld_exporter`、`postgres_exporter`、`redis_exporter`、`mongodb_exporter`、`etcd`、`tidb`、`yugabytedb`、`clickhouse`……，以 `ls` 的結果為準；`valkey`、`grafana`、`mongodb` 等常見別名也接受，見 `tools/check_coverage.py` 的 `TYPE_ALIASES`）。目錄沒有的類型照實寫，告訴使用者這部分沒有卡，只能靠通用原則。
+3. `type` 的合法值就是卡片 id：`ls $AT/catalog/components $AT/catalog/targets`（監控鏈：`prometheus`、`thanos`、`vmagent`、`victoriametrics`、`victorialogs`、`vmalert`、`grafana_alerting`、`alertmanager`；資料庫：`mysql`、`mariadb`、`postgres_exporter`、`redis_exporter`、`mongodb_exporter`、`etcd`、`tidb`、`yugabytedb`、`clickhouse`……，以 `ls` 的結果為準；`valkey`、`grafana`、`mongodb` 等常見別名也接受，見 `tools/check_coverage.py` 的 `TYPE_ALIASES`）。目錄沒有的類型照實寫，告訴使用者這部分沒有卡，只能靠通用原則。
 
 ## 第 0 步：自動偵測
 

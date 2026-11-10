@@ -21,11 +21,11 @@ argument-hint: "[snapshot-dir] [target-id]"
 ## 先讀
 
 1. `$AT/catalog/target-pattern.yaml`：每張 target 卡都要回答的 `required_signals`（每個有 `id`、`min_tier`、`question`、`why`、可能有 `contract`）。這是共同骨架。卡片的 `model` 決定用哪一組：`exporter`（預設）用 `required_signals`；`native`（資料庫自己提供 /metrics，例如 etcd、TiDB）用 `required_signals_native`，重點是 `up` 為 1 時服務仍可能不健康，要用健康 metric 與 blackbox 探測交叉判斷。
-2. 對 env 檔每個 target，讀 `$AT/catalog/targets/<type>.yaml`（`type` 就是卡片 id）。用 `ls $AT/catalog/targets` 確認有哪些卡；**沒有對應卡**時，只用 target-pattern 的骨架逐題檢查，並在報告標明「沒有專屬卡」。
+2. 對 env 檔每個 target，讀 `$AT/catalog/targets/<type>.yaml`（`type` 就是卡片 id）。用 `ls $AT/catalog/targets` 確認有哪些卡；**沒有對應卡**時，只用 target-pattern 的骨架逐題檢查，並在報告標明「沒有專屬卡」。MySQL 與 MariaDB 是兩張卡（`mysql`、`mariadb`，共用 mysqld_exporter、metric 前綴都是 `mysql_`，但版本差異與專屬訊號不同）；env 檔寫 `mysqld_exporter` 時先問是哪一種，沒答案前用 `mysql` 卡並標明假設。
 3. 卡片裡要用的欄位：`role`、`silent_failures`、`contracts`、`signals`（`tier`、`signal`、`metrics`、`applies_when`、`rules`、`upstream.note`）、`not_applicable`（若有）。`applies_when` 依環境判斷：例如 `replication`、`replica`、`mariadb galera`、`multi-target probe`、`pg_stat_statements`。
 4. `$AT/catalog/contracts.yaml` 的 `exporter-deadline`，與 `$AT/docs/contracts.md#exporter-deadline` 的表（各 exporter 自己的期限從哪裡來）。
 5. `$AT/docs/architecture/exporters.md`：連線池、collector 排隊、錯誤指標的差異。
-6. 規則範本：卡片訊號 `rules:` 指到的 `$AT/rules/targets/*.yml`。範本裡的 `job="mysql"`、`job="postgres"` 是佔位符。
+6. 規則範本：卡片訊號 `rules:` 指到的 `$AT/rules/targets/*.yml`。範本裡的 `job="mysql"`、`job="mariadb"`、`job="postgres"` 是佔位符。
 
 ## 快照裡要讀的檔案
 

@@ -86,6 +86,9 @@ class MetricSourcesV2Test(unittest.TestCase):
         self.assertEqual(r["ReplicationNameRegex"]["hint"], ["mysqld_exporter"])
         r = self._rows({"producers": {"mysqld_exporter": ["mysqld"]}})
         self.assertEqual(r["ReplicationNameRegex"]["status"], "confirmed")
+        # mysql and mariadb cards share mysqld_exporter: one producer, the question names both cards
+        self.assertEqual(M.producer_cards(ROOT)["mysqld_exporter"], ["mariadb", "mysql"])
+        self.assertIn("mysql", M.cards_note("mysqld_exporter", ROOT))
 
     def test_required_labels(self):
         r = self._rows()

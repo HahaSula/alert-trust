@@ -1,6 +1,6 @@
 # 關聯式資料庫架構
 
-這頁只寫**監控訊號或盲點依賴的機制**：MySQL／MariaDB（InnoDB）與 PostgreSQL 並排。每一節依序是機制、什麼會壞、哪個訊號看得到。訊號連到元件卡（[mysqld_exporter](../components/mysqld_exporter.md)、[postgres_exporter](../components/postgres_exporter.md)）；資料庫該監控什麼的完整清單在 [MySQL／MariaDB 本體怎麼監控](../targets/mysql.md) 與 [PostgreSQL 本體怎麼監控](../targets/postgres.md)。
+這頁只寫**監控訊號或盲點依賴的機制**：MySQL／MariaDB（InnoDB）與 PostgreSQL 並排。每一節依序是機制、什麼會壞、哪個訊號看得到。訊號連到元件卡（[mysql](../components/mysql.md)（MariaDB 的同名訊號在 [mariadb](../components/mariadb.md)）、[postgres_exporter](../components/postgres_exporter.md)）；資料庫該監控什麼的完整清單在 [MySQL／MariaDB 本體怎麼監控](../targets/mysql.md) 與 [PostgreSQL 本體怎麼監控](../targets/postgres.md)。
 
 以 MySQL 8.4.7、MariaDB 11.4.13、PostgreSQL 17.11（部分 16.15）原始碼與 `lab/targets/` 的實驗為準。<span class="at-chip at-ev-code">讀碼</span> <span class="at-chip at-ev-tested">實測</span>
 
@@ -47,8 +47,8 @@
 
 | | MySQL／MariaDB | PostgreSQL |
 |---|---|---|
-| 打滿之前 | [connections](../components/mysqld_exporter.md#connections)、[connection-headroom](../components/mysqld_exporter.md#connection-headroom) | [connection-headroom](../components/postgres_exporter.md#connection-headroom)、[connection-trend](../components/postgres_exporter.md#connection-trend) |
-| 打滿當下 | [db-up](../components/mysqld_exporter.md#db-up)、[exporter-query-timeout](../components/mysqld_exporter.md#exporter-query-timeout)、[custom-queries](../components/mysqld_exporter.md#custom-queries) | [collectors-present](../components/postgres_exporter.md#collectors-present)（`pg_up` 不會變） |
+| 打滿之前 | [connections](../components/mysql.md#connections)、[connection-headroom](../components/mysql.md#connection-headroom) | [connection-headroom](../components/postgres_exporter.md#connection-headroom)、[connection-trend](../components/postgres_exporter.md#connection-trend) |
+| 打滿當下 | [db-up](../components/mysql.md#db-up)、[exporter-query-timeout](../components/mysql.md#exporter-query-timeout)、[custom-queries](../components/mysql.md#custom-queries) | [collectors-present](../components/postgres_exporter.md#collectors-present)（`pg_up` 不會變） |
 
 ## 快取與 checkpoint {#buffer-checkpoint}
 
@@ -68,7 +68,7 @@
 
 | | MySQL／MariaDB | PostgreSQL |
 |---|---|---|
-| 快取不夠 | [buffer-pool-misses](../components/mysqld_exporter.md#buffer-pool-misses)、[innodb-pressure](../components/mysqld_exporter.md#innodb-pressure) | [cache-and-temp](../components/postgres_exporter.md#cache-and-temp)、[resource-pressure](../components/postgres_exporter.md#resource-pressure) |
+| 快取不夠 | [buffer-pool-misses](../components/mysql.md#buffer-pool-misses)、[innodb-pressure](../components/mysql.md#innodb-pressure) | [cache-and-temp](../components/postgres_exporter.md#cache-and-temp)、[resource-pressure](../components/postgres_exporter.md#resource-pressure) |
 | checkpoint 壓力 | 卡片沒有訊號；global status 的數值都會輸出[^my-global-status-re]，實驗用這些 metric 算出 checkpoint age[^exp-mysql-perf] | [checkpoint-pressure](../components/postgres_exporter.md#checkpoint-pressure)、[version-semantics](../components/postgres_exporter.md#version-semantics) |
 
 ## 交易日誌：redo／binlog 與 WAL {#redo-wal}
@@ -88,10 +88,10 @@
 
 | | MySQL／MariaDB | PostgreSQL |
 |---|---|---|
-| 耐久性 | [durability-settings](../components/mysqld_exporter.md#durability-settings) | 卡片沒有 `synchronous_commit` 的訊號 |
-| 日誌等待 | [innodb-pressure](../components/mysqld_exporter.md#innodb-pressure) | [wal-io-sources](../components/postgres_exporter.md#wal-io-sources)（自訂查詢） |
-| 日誌堆積 | [binlog-growth](../components/mysqld_exporter.md#binlog-growth)、[disk-space](../components/mysqld_exporter.md#disk-space) | [wal-disk](../components/postgres_exporter.md#wal-disk)、[replication-slots](../components/postgres_exporter.md#replication-slots) |
-| 日誌保存 | [binlog-pitr](../components/mysqld_exporter.md#binlog-pitr) | [archiver](../components/postgres_exporter.md#archiver)、[archive-freshness](../components/postgres_exporter.md#archive-freshness)、[archive-config](../components/postgres_exporter.md#archive-config) |
+| 耐久性 | [durability-settings](../components/mysql.md#durability-settings) | 卡片沒有 `synchronous_commit` 的訊號 |
+| 日誌等待 | [innodb-pressure](../components/mysql.md#innodb-pressure) | [wal-io-sources](../components/postgres_exporter.md#wal-io-sources)（自訂查詢） |
+| 日誌堆積 | [binlog-growth](../components/mysql.md#binlog-growth)、[disk-space](../components/mysql.md#disk-space) | [wal-disk](../components/postgres_exporter.md#wal-disk)、[replication-slots](../components/postgres_exporter.md#replication-slots) |
+| 日誌保存 | [binlog-pitr](../components/mysql.md#binlog-pitr) | [archiver](../components/postgres_exporter.md#archiver)、[archive-freshness](../components/postgres_exporter.md#archive-freshness)、[archive-config](../components/postgres_exporter.md#archive-config) |
 
 ## MVCC 清理：purge 與 vacuum {#mvcc}
 
@@ -115,8 +115,8 @@
 
 | | MySQL／MariaDB | PostgreSQL |
 |---|---|---|
-| 擋住的人 | [long-transactions](../components/mysqld_exporter.md#long-transactions) | [xmin-horizon](../components/postgres_exporter.md#xmin-horizon)（含 query-exporter 的 slot、prepared） |
-| 清不掉的量 | [undo-history](../components/mysqld_exporter.md#undo-history) | [autovacuum](../components/postgres_exporter.md#autovacuum) |
+| 擋住的人 | [long-transactions](../components/mysql.md#long-transactions) | [xmin-horizon](../components/postgres_exporter.md#xmin-horizon)（含 query-exporter 的 slot、prepared） |
+| 清不掉的量 | [undo-history](../components/mysql.md#undo-history) | [autovacuum](../components/postgres_exporter.md#autovacuum) |
 | 長期風險 | — | [wraparound](../components/postgres_exporter.md#wraparound)（`database_wraparound` 預設關[^pg-c-wraparound-default]，名稱是 seconds，值是交易數） |
 
 ## 鎖 {#locks}
@@ -141,10 +141,10 @@
 
 | | MySQL／MariaDB | PostgreSQL |
 |---|---|---|
-| 列鎖等待 | [lock-waits](../components/mysqld_exporter.md#lock-waits)（等 row lock 的 session 在 processlist 是 `updating`） | [sessions-and-locks](../components/postgres_exporter.md#sessions-and-locks)（`pg_locks_count` 不分已授予與等待中[^pg-perf-c-locks-nogranted]） |
-| DDL 鎖佇列 | [metadata-locks](../components/mysqld_exporter.md#metadata-locks) | [lock-queue](../components/postgres_exporter.md#lock-queue) |
-| 監控被鎖住 | [exporter-query-timeout](../components/mysqld_exporter.md#exporter-query-timeout) | [lock-blocks-exporter](../components/postgres_exporter.md#lock-blocks-exporter) |
-| deadlock | [deadlocks](../components/mysqld_exporter.md#deadlocks) | [deadlocks-rollbacks](../components/postgres_exporter.md#deadlocks-rollbacks) |
+| 列鎖等待 | [lock-waits](../components/mysql.md#lock-waits)（等 row lock 的 session 在 processlist 是 `updating`） | [sessions-and-locks](../components/postgres_exporter.md#sessions-and-locks)（`pg_locks_count` 不分已授予與等待中[^pg-perf-c-locks-nogranted]） |
+| DDL 鎖佇列 | [metadata-locks](../components/mysql.md#metadata-locks) | [lock-queue](../components/postgres_exporter.md#lock-queue) |
+| 監控被鎖住 | [exporter-query-timeout](../components/mysql.md#exporter-query-timeout) | [lock-blocks-exporter](../components/postgres_exporter.md#lock-blocks-exporter) |
+| deadlock | [deadlocks](../components/mysql.md#deadlocks) | [deadlocks-rollbacks](../components/postgres_exporter.md#deadlocks-rollbacks) |
 
 ## 複寫 {#replication}
 
@@ -167,11 +167,11 @@
 
 | | MySQL／MariaDB | PostgreSQL |
 |---|---|---|
-| 複寫在跑 | [replication-running](../components/mysqld_exporter.md#replication-running)、[replica-status-present](../components/mysqld_exporter.md#replica-status-present) | [standby-streaming](../components/postgres_exporter.md#standby-streaming)、[wal-receiver](../components/postgres_exporter.md#wal-receiver) |
-| 延遲 | [replication-lag](../components/mysqld_exporter.md#replication-lag) | [replication-lag](../components/postgres_exporter.md#replication-lag)、[replication-semantics](../components/postgres_exporter.md#replication-semantics) |
-| 同步複寫 | [semi-sync](../components/mysqld_exporter.md#semi-sync) | [sync-replication](../components/postgres_exporter.md#sync-replication) |
-| 交易一致 | [gtid-consistency](../components/mysqld_exporter.md#gtid-consistency) | — |
-| 保留的日誌 | [binlog-growth](../components/mysqld_exporter.md#binlog-growth) | [replication-slots](../components/postgres_exporter.md#replication-slots) |
+| 複寫在跑 | [replication-running](../components/mysql.md#replication-running)、[replica-status-present](../components/mysql.md#replica-status-present) | [standby-streaming](../components/postgres_exporter.md#standby-streaming)、[wal-receiver](../components/postgres_exporter.md#wal-receiver) |
+| 延遲 | [replication-lag](../components/mysql.md#replication-lag) | [replication-lag](../components/postgres_exporter.md#replication-lag)、[replication-semantics](../components/postgres_exporter.md#replication-semantics) |
+| 同步複寫 | [semi-sync](../components/mysql.md#semi-sync) | [sync-replication](../components/postgres_exporter.md#sync-replication) |
+| 交易一致 | [gtid-consistency](../components/mysql.md#gtid-consistency) | — |
+| 保留的日誌 | [binlog-growth](../components/mysql.md#binlog-growth) | [replication-slots](../components/postgres_exporter.md#replication-slots) |
 
 ## HA 與角色 {#ha}
 
@@ -189,5 +189,5 @@
 
 | | MySQL／MariaDB | PostgreSQL |
 |---|---|---|
-| 從 metric 推角色 | [role-detection](../components/mysqld_exporter.md#role-detection)、[primary-writable](../components/mysqld_exporter.md#primary-writable)、[replica-read-only](../components/mysqld_exporter.md#replica-read-only) | [promotion](../components/postgres_exporter.md#promotion) |
-| 有共識時 | [gr-quorum](../components/mysqld_exporter.md#gr-quorum)、[galera-quorum](../components/mysqld_exporter.md#galera-quorum) | Patroni：[patroni-leader](../components/postgres_exporter.md#patroni-leader)、[patroni-dcs](../components/postgres_exporter.md#patroni-dcs) |
+| 從 metric 推角色 | [role-detection](../components/mysql.md#role-detection)、[primary-writable](../components/mysql.md#primary-writable)、[replica-read-only](../components/mysql.md#replica-read-only) | [promotion](../components/postgres_exporter.md#promotion) |
+| 有共識時 | [gr-quorum](../components/mysql.md#gr-quorum)、[galera-quorum](../components/mariadb.md#galera-quorum) | Patroni：[patroni-leader](../components/postgres_exporter.md#patroni-leader)、[patroni-dcs](../components/postgres_exporter.md#patroni-dcs) |

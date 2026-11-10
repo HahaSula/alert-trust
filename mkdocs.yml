@@ -76,11 +76,17 @@ nav:
   - 資料庫:
       - 總覽: targets/index.md
       - 監控模型: targets/models.md
-      - MySQL／MariaDB:
+      - MySQL:
           - 怎麼監控: targets/mysql.md
-          - 監控訊號: components/mysqld_exporter.md
-          - 查詢與 session 分析: targets/mariadb-ash.md
+          - 監控訊號: components/mysql.md
+          - 版本差異: targets/versions/mysql.md
           - 原始碼到 metric: targets/mysql-appendix.md
+      - MariaDB:
+          - 怎麼監控: targets/mariadb.md
+          - 監控訊號: components/mariadb.md
+          - 查詢與 session 分析: targets/mariadb-ash.md
+          - 版本差異: targets/versions/mariadb.md
+          - 原始碼到 metric: targets/mariadb-appendix.md
       - PostgreSQL:
           - 怎麼監控: targets/postgres.md
           - 監控訊號: components/postgres_exporter.md

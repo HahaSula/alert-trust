@@ -1,6 +1,6 @@
 # MariaDB 各版本的監控差異
 
-這頁列出 MariaDB 10.6、10.11、11.4、11.8、12.3 五條 LTS 線之間會影響監控的差異。目前的卡片只核對過 MariaDB 11.4.13；這頁補上其他版本線，給拆出來的 MariaDB 卡用。
+這頁列出 MariaDB 10.6、10.11、11.4、11.8、12.3 五條 LTS 線之間會影響監控的差異。lab 與原始碼參考是 MariaDB 11.4.13；這頁補上其他版本線。[MariaDB 卡](../../components/mariadb.md)的 `versions_checked` 與版本相關的訊號、規則依這頁寫；本體怎麼監控見 [MariaDB 頁](../mariadb.md)。
 
 依據是各版本線最新 tag 的原始碼（`mariadb-10.6.28`、`mariadb-10.11.19`、`mariadb-11.4.13`、`mariadb-11.8.9`、`mariadb-12.3.3`，2026-11-10 從 [tag 列表](https://github.com/MariaDB/server/tags)選）、mysqld_exporter v0.21.0 的原始碼，以及 [MariaDB downloads REST API](https://downloads.mariadb.org/rest-api/mariadb/) 的版本狀態。沒有做實驗，全部是<span class="at-chip at-ev-code">讀碼</span>；標「推論」的是從原始碼推出、沒有單獨驗證的結果。
 
@@ -84,3 +84,5 @@
 其他訊號（`galera-*` 的 `wsrep_*` 變數、`connections`、`long-transactions`、`lock-waits` 等）這頁沒有逐版比對 Galera 與 wsrep 變數的差異；只確認 `wsrep_on` 在五條線都有。
 
 MySQL 的差異在 [MySQL 各版本的監控差異](mysql.md)。
+
+拆卡時新增的兩個飽和訊號：`Threads_created` 五條線都有；`Innodb_data_pending_fsyncs` 的內容在 10.11 換了（10.6 含 redo log 的 pending flush，10.11 起只算 tablespace），見卡片的 [thread-cache](../../components/mariadb.md#thread-cache)、[pending-fsyncs](../../components/mariadb.md#pending-fsyncs)。<span class="at-chip at-ev-code">讀碼</span>[^spl-mdb106-threads-created][^spl-mdb123-threads-created][^spl-mdb106-pending-fsyncs-calc][^spl-mdb1011-pending-fsyncs]

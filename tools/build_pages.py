@@ -245,10 +245,33 @@ def terms_page(terms: dict) -> str:
     return "\n".join(out)
 
 
-DB_PAGES = {"mysqld_exporter": ("MySQL／MariaDB", "mysql.md"), "postgres_exporter": ("PostgreSQL", "postgres.md"),
+DB_PAGES = {"mysql": ("MySQL", "mysql.md"), "mariadb": ("MariaDB", "mariadb.md"), "postgres_exporter": ("PostgreSQL", "postgres.md"),
             "redis_exporter": ("Valkey／Redis", "valkey.md"), "etcd": ("etcd", "etcd.md"), "tidb": ("TiDB", "tidb.md"),
             "yugabytedb": ("YugabyteDB", "yugabytedb.md"), "clickhouse": ("ClickHouse", "clickhouse.md"),
             "mongodb_exporter": ("MongoDB", "mongodb.md")}
+
+
+# Cards that were split or renamed: the old id still gets a short page so old runbook_url links land somewhere.
+# Every signal id of the new cards keeps its anchor on the old page and links to the same anchor on each new card.
+MOVED = {"mysqld_exporter": {"title": "mysqld_exporter（已拆成 MySQL 與 MariaDB）", "to": ["mysql", "mariadb"],
+                             "why": "MySQL 與 MariaDB 的原始碼與 metric 名稱不同，2026-11-10 起各自一張卡；規則也分成 "
+                                    "`rules/targets/mysql.yml` 與 `rules/targets/mariadb.yml`。"}}
+
+
+def moved_page(old_id: str, info: dict, cards: dict) -> str:
+    new = [cards[c] for c in info["to"] if c in cards]
+    out = [GENERATED, f"# {info['title']}\n", f"這張卡已拆成 " + "、".join(f"[{c['name']}]({c['id']}.md)" for c in new)
+           + f"。{info['why']}\n", "舊的 runbook 連結（`components/" + old_id + "/#訊號`）會落在下面同名的段落，再點到新卡。\n"]
+    seen: dict[str, list[dict]] = {}
+    for c in new:
+        for s in c.get("signals", []):
+            seen.setdefault(s["id"], []).append(c)
+    out.append("## 訊號在哪一張卡\n")
+    for sid, cs in seen.items():
+        q = next(s["question"] for s in cs[0]["signals"] if s["id"] == sid)
+        out.append(f"### {esc(q)} {{#{sid}}}\n")
+        out.append("、".join(f"[{c['name']}]({c['id']}.md#{sid})" for c in cs) + "\n")
+    return "\n".join(out) + "\n"
 
 
 def targets_overview(cards: list[dict]) -> str:
@@ -302,6 +325,11 @@ def main() -> int:
     for card in cards:
         with open(os.path.join(comp_dir, f"{card['id']}.md"), "w", encoding="utf-8") as f:
             f.write(component_page(card, sources, contracts))
+    by_id = {c["id"]: c for c in cards}
+    for old_id, info in MOVED.items():
+        if old_id not in by_id:
+            with open(os.path.join(comp_dir, f"{old_id}.md"), "w", encoding="utf-8") as f:
+                f.write(moved_page(old_id, info, by_id))
     with open(os.path.join(comp_dir, "index.md"), "w", encoding="utf-8") as f:
         f.write(index_page(cards))
     with open(os.path.join(ref_dir, "sources.md"), "w", encoding="utf-8") as f:

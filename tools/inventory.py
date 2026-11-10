@@ -923,10 +923,12 @@ def build(a) -> dict:
             ports = {t.rsplit(":", 1)[-1] for t in j.get("static_targets") or [] if ":" in t}
             by_port = sorted({DEFAULT_PORTS[p] for p in ports if p in DEFAULT_PORTS})
             if len(by_port) == 1 and by_port[0] in votes:
-                out["exporter"] = V(by_port[0], "hint", basis="預設 port，且 rule 讀的 metric 在這張目錄卡片")
+                out["exporter"] = V(by_port[0], "hint", basis="預設 port，且 rule 讀的 metric 在這張目錄卡片"
+                                    + MS.cards_note(by_port[0], C.ROOT))
             elif votes:
                 best = max(sorted(votes), key=lambda c: votes[c])
-                out["exporter"] = V(best, "hint", basis=f"rule 讀這個 job 的 {votes[best]} 個 metric 在目錄卡片 {best}")
+                out["exporter"] = V(best, "hint", basis=f"rule 讀這個 job 的 {votes[best]} 個 metric 在目錄卡片 {best}"
+                                    f"{MS.cards_note(best, C.ROOT)}")
             elif len(by_port) == 1:
                 out["exporter"] = V(by_port[0], "hint", basis="target 用的是它的預設 port")
             else:

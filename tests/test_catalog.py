@@ -14,6 +14,16 @@ import validate  # noqa: E402
 
 
 class CatalogTest(unittest.TestCase):
+    def test_split_card_keeps_old_anchors(self):
+        # mysqld_exporter was split into mysql and mariadb; the old page keeps every signal anchor
+        cards = {c["id"]: c for c in C.load_components()}
+        self.assertNotIn("mysqld_exporter", cards)
+        page = build_pages.moved_page("mysqld_exporter", build_pages.MOVED["mysqld_exporter"], cards)
+        self.assertIn("{#exporter-up}", page)
+        self.assertIn("mariadb.md#galera-quorum", page)
+        self.assertIn("mysql.md#gr-quorum", page)
+        self.assertNotIn("mysql.md#galera-quorum", page)
+
     def test_validate_has_no_errors(self):
         errors, _ = validate.validate()
         self.assertEqual(errors, [], "\n".join(errors))

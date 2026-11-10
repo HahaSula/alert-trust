@@ -1,6 +1,6 @@
 # MySQL 各版本的監控差異
 
-這頁列出 MySQL 8.0、8.4 LTS、9.7 LTS 之間會影響監控的差異：哪些 metric 改名或消失、哪些預設值改了、mysqld_exporter 有沒有處理。目前的卡片只核對過 MySQL 8.4.7；這頁補上其他版本線，給拆出來的 MySQL 卡用。
+這頁列出 MySQL 8.0、8.4 LTS、9.7 LTS 之間會影響監控的差異：哪些 metric 改名或消失、哪些預設值改了、mysqld_exporter 有沒有處理。lab 與多數原始碼參考是 MySQL 8.4.7；這頁補上其他版本線。[MySQL 卡](../../components/mysql.md)的 `versions_checked` 與版本相關的訊號、規則依這頁寫；本體怎麼監控見 [MySQL 頁](../mysql.md)。
 
 依據是各版本線最新 tag 的原始碼（`mysql-8.0.46`、`mysql-8.4.13`、`mysql-9.7.4`，2026-11-10 從 [tag 列表](https://github.com/mysql/mysql-server/tags)選）、mysqld_exporter v0.21.0（目前最新 release）的原始碼，以及官方手冊。沒有做實驗，全部是<span class="at-chip at-ev-code">讀碼</span>；標「推論」的是從原始碼推出、沒有單獨驗證的結果。
 
@@ -87,3 +87,5 @@
 其他訊號（`connections`、`long-transactions`、`deadlocks`、`lock-waits`、`slow-queries`、`table-open-cache`、`autoinc-exhaustion` 等）在這三條線用的 status 變數與 information_schema 表沒有找到改名或移除。這頁沒有逐一比對 `information_schema.INNODB_METRICS` 預設啟用的計數器，`undo-history` 與 `deadlocks` 的 MySQL 寫法在 8.0 與 9.7 上未核對。
 
 MariaDB 的差異在 [MariaDB 各版本的監控差異](mariadb.md)。
+
+拆卡時新增的兩個飽和訊號（`Threads_created`、`Innodb_data_pending_fsyncs`）在 8.0.46、8.4.13、9.7.4 都存在而且算法相同，見卡片的 [thread-cache](../../components/mysql.md#thread-cache)、[pending-fsyncs](../../components/mysql.md#pending-fsyncs)。<span class="at-chip at-ev-code">讀碼</span>[^spl-my80-threads-created][^spl-my97-threads-created][^spl-my80-pending-fsyncs][^spl-my97-pending-fsyncs]

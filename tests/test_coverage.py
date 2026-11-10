@@ -78,6 +78,16 @@ class CoverageDbTest(unittest.TestCase):
         self.assertEqual(it[("db-ok", "exporter-up")]["status"], "covered")
         self.assertEqual(it[("db-ok", "db-up")]["status"], "covered")
 
+    def test_exporter_alias_asks_which_database(self):
+        # env type mysqld_exporter names the exporter, not the database: mysql card plus a question
+        self.assertEqual(CC.card_for("mysqld_exporter", {"mysql", "mariadb"}), "mysql")
+        self.assertEqual(CC.card_for("mariadb", {"mysql", "mariadb"}), "mariadb")
+        it = self.items()
+        q = it[("db-ok", None)]
+        self.assertEqual(q["status"], "needs_input")
+        self.assertIn("MySQL 還是 MariaDB", q["note"])
+        self.assertEqual(it[("db-ok", "exporter-up")]["card"], "mysql")
+
     def test_features_make_signals_not_applicable(self):
         it = self.items()
         self.assertEqual(it[("db-ok", "custom-queries")]["status"], "not_applicable")       # no query-exporter

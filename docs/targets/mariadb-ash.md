@@ -1,6 +1,6 @@
 # 查詢與 session 分析（ASH）
 
-這頁屬於 MySQL／MariaDB 的**工作量與效能**面向，處理最細的一層：單一 session 與單一查詢。
+這頁屬於 [MariaDB](mariadb.md) 的**工作量與效能**面向，處理最細的一層：單一 session 與單一查詢。
 
 
 依據是 MariaDB 11.4.13、MySQL 8.4.7、mysqld_exporter v0.21.0 的原始碼，加上一組小實驗（[`lab/targets/mysql/ash/`](https://github.com/HahaSula/alert-trust/tree/main/lab/targets/mysql/ash)）。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp][^my-asp-exp-ash]
@@ -11,7 +11,7 @@
 
 這需要「每秒記下每個在做事的 session 正在跑哪個語句、在等什麼」的歷史紀錄，Oracle 稱為 ASH（Active Session History），PostgreSQL 社群有 pg_wait_sampling、pgsentinel。
 
-alert-trust 裡相關的訊號：[慢 SQL](mysql.md#workload)、[活動 session](mysql.md#workload)、[鎖等待](mysql.md#saturation)。這些訊號告訴你「出事了」，ASH 回答「是誰、卡在哪」。
+alert-trust 裡相關的訊號：[慢 SQL](mariadb.md#workload)、[活動 session](mariadb.md#workload)、[鎖等待](mariadb.md#saturation)。這些訊號告訴你「出事了」，ASH 回答「是誰、卡在哪」。
 
 ## 現有工具：MariaDB 11.4 有什麼
 
@@ -44,7 +44,7 @@ MariaDB 有、MySQL 沒有的：`SHOW ANALYZE FOR`（MySQL 有 `EXPLAIN FOR CONN
 ## 缺口：沒有 ASH {#gap}
 
 1. **MariaDB 和 MySQL 都沒有內建的 ASH。**兩邊都有 performance_schema 的 `events_*_current`／`_history`／`_history_long` 與 sys schema，但那是「每個 thread 最近 N 筆事件」和「累計值」，不是依時間取樣的 active session 紀錄；Oracle ASH、PostgreSQL 的 pg_wait_sampling、pgsentinel 這類每秒取樣的歷史表，兩邊都沒有。<span class="at-chip at-ev-code">讀碼</span>
-2. **MariaDB 比 MySQL 少的是「事後分析」的料。**digest 摘要表沒有 `QUANTILE_95/99/999`、`SUM_CPU_TIME`、`QUERY_SAMPLE_*`，沒有 `events_statements_histogram_by_digest`、`events_errors_summary_*`、`data_locks`／`data_lock_waits`。實驗中查 `information_schema` 確認這幾張表與欄位在 MariaDB 11.4 不存在、在 MySQL 8.4 存在。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp][^my-asp-my-esms-quantile][^my-asp-my-esms-cpu][^my-asp-my-esmh]exporter 對 MariaDB 輸出的 quantile、`lock_time`、`cpu_time` 一直是 0，原因在[主頁](mysql.md#perf-slow-sql)。[^my-perf-ex-stmt-8028]
+2. **MariaDB 比 MySQL 少的是「事後分析」的料。**digest 摘要表沒有 `QUANTILE_95/99/999`、`SUM_CPU_TIME`、`QUERY_SAMPLE_*`，沒有 `events_statements_histogram_by_digest`、`events_errors_summary_*`、`data_locks`／`data_lock_waits`。實驗中查 `information_schema` 確認這幾張表與欄位在 MariaDB 11.4 不存在、在 MySQL 8.4 存在。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp][^my-asp-my-esms-quantile][^my-asp-my-esms-cpu][^my-asp-my-esmh]exporter 對 MariaDB 輸出的 quantile、`lock_time`、`cpu_time` 一直是 0，原因在[主頁](mariadb.md#perf-slow-sql)。[^my-perf-ex-stmt-8028]
 3. **MariaDB 的 performance_schema 預設全關，開了以後 `events_*_current` 的 consumer 也全關。**實驗中 `performance_schema=ON` 的 MariaDB，`setup_consumers` 只有 `global_instrumentation`、`thread_instrumentation`、`statements_digest` 是 YES，`events_statements_current`、`events_waits_current` 都是 NO。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp][^my-perf-mdb-pfs-default]
 4. **MariaDB 執行中的語句沒有 digest。**MariaDB 只在語句結束時把 digest 複製進 `events_statements_current`；MySQL 在 parse 完就複製。實驗：開 consumer 後 MariaDB 取樣 216 列、有 digest 的 0 列；MySQL 執行中的 `SELECT SLEEP(8)` 已有 `SELECT SLEEP (?)`。所以 MariaDB 的取樣器不能直接用 digest 把執行中的語句分組。<span class="at-chip at-ev-tested">實測</span>[^my-asp-mdb-pfs-digest-at-end][^my-asp-my-pfs-digest-at-parse][^my-asp-exp-ash]
 5. **一個 SQL 寫的取樣器就夠用。**每秒一次的 EVENT 把 `PROCESSLIST`、`performance_schema.threads`、`events_statements_current`、`events_waits_current`、`INNODB_TRX` join 起來存一列。實驗中 row lock、metadata lock、重查詢、`SLEEP` 同時發生的 30 秒內，它正確分出「等 row lock 57 秒、等 MDL 50＋26 秒、重查詢 27 秒」；同一時間 exporter 的 processlist collector 只看得到 `updating` 3、`waiting_for_table_metadata_lock` 3。一次取樣約 3–4 ms（含 client 啟動，是上限）。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp-ash]
@@ -98,7 +98,7 @@ flowchart LR
 
 ### 輸出成 metric
 
-`ash.aas_60s` 每列是「最近 60 秒，這個等待類別 × digest 平均有幾個 active session」。label 上限 7 × 11（前 10 個 digest 加 `other`），可以直接當 gauge。mysqld_exporter 沒有自訂查詢，要用 query-exporter、sql_exporter 這類工具，或由 cron 把結果寫成 textfile。以下是最小的 query-exporter 設定；完整、實測過的版本（含 expiration、取樣器存活檢查與規則）在 [`queries/query-exporter/mysql.yaml`](https://github.com/HahaSula/alert-trust/blob/main/queries/query-exporter/mysql.yaml)，見[主頁的自訂查詢](mysql.md#custom-queries)。實驗中 `lock_row` 的值和直接查 `ash.aas_60s` 相同。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp-ash][^my-q-exp-ash]
+`ash.aas_60s` 每列是「最近 60 秒，這個等待類別 × digest 平均有幾個 active session」。label 上限 7 × 11（前 10 個 digest 加 `other`），可以直接當 gauge。mysqld_exporter 沒有自訂查詢，要用 query-exporter、sql_exporter 這類工具，或由 cron 把結果寫成 textfile。以下是最小的 query-exporter 設定；完整、實測過的版本（含 expiration、取樣器存活檢查與規則）在 [`queries/query-exporter/mysql.yaml`](https://github.com/HahaSula/alert-trust/blob/main/queries/query-exporter/mysql.yaml)，見[主頁的自訂查詢](mariadb.md#custom-queries)。實驗中 `lock_row` 的值和直接查 `ash.aas_60s` 相同。<span class="at-chip at-ev-tested">實測</span>[^my-asp-exp-ash][^my-q-exp-ash]
 
 ```yaml
 databases:
@@ -118,12 +118,12 @@ queries:
 
 ### 接到 alert-trust 的訊號
 
-| 訊號（[元件卡](../components/mysqld_exporter.md)） | 現在用的 metric | 取樣器補上的 | 規則例子（未實測） |
+| 訊號（[元件卡](../components/mariadb.md)） | 現在用的 metric | 取樣器補上的 | 規則例子（未實測） |
 |---|---|---|---|
-| [active-sessions](../components/mysqld_exporter.md#active-sessions) | `mysql_info_schema_processlist_threads`（只有 scrape 那一刻） | 每秒取樣的平均，scrape 之間的尖峰也算進去 | `sum by (instance) (mysql_ash_active_sessions) > 2 * avg_over_time(sum by (instance) (mysql_ash_active_sessions)[1d:5m])` |
-| [lock-waits](../components/mysqld_exporter.md#lock-waits) | `innodb_row_lock_current_waits`、`innodb_row_lock_time` | 哪個語句在等 row lock、等了多久 | `sum by (instance) (mysql_ash_active_sessions{wait_class="lock_row"}) > 2` |
-| [metadata-locks](../components/mysqld_exporter.md#metadata-locks) | processlist 的 `waiting_for_table_metadata_lock` | 事後知道 ALTER 與被擋的語句是誰 | 和現有 `MySQLMetadataLockWaits` 相同，改用 `wait_class="lock_mdl"` |
-| [slow-sql-visibility](../components/mysqld_exporter.md#slow-sql-visibility) | eventsstatements 的累計耗時（MariaDB 沒有 quantile） | 依時間的 digest 分布（要用上面的 digest 補法） | `topk(3, mysql_ash_active_sessions{digest!="other"})` 放在告警 annotation 或 dashboard |
+| [active-sessions](../components/mariadb.md#active-sessions) | `mysql_info_schema_processlist_threads`（只有 scrape 那一刻） | 每秒取樣的平均，scrape 之間的尖峰也算進去 | `sum by (instance) (mysql_ash_active_sessions) > 2 * avg_over_time(sum by (instance) (mysql_ash_active_sessions)[1d:5m])` |
+| [lock-waits](../components/mariadb.md#lock-waits) | `innodb_row_lock_current_waits`、`innodb_row_lock_time` | 哪個語句在等 row lock、等了多久 | `sum by (instance) (mysql_ash_active_sessions{wait_class="lock_row"}) > 2` |
+| [metadata-locks](../components/mariadb.md#metadata-locks) | processlist 的 `waiting_for_table_metadata_lock` | 事後知道 ALTER 與被擋的語句是誰 | 和現有 `MariaDBMetadataLockWaits` 相同，改用 `wait_class="lock_mdl"` |
+| [slow-sql-visibility](../components/mariadb.md#slow-sql-visibility) | eventsstatements 的累計耗時（MariaDB 沒有 quantile） | 依時間的 digest 分布（要用上面的 digest 補法） | `topk(3, mysql_ash_active_sessions{digest!="other"})` 放在告警 annotation 或 dashboard |
 
 規則要搭配取樣器自己的存活訊號：`absent(mysql_ash_active_sessions)` 或 query-exporter 的 `up`，以及 `ash.sample` 最新一列的時間（EVENT 被停用、`event_scheduler=OFF` 時取樣會靜默停止）。
 

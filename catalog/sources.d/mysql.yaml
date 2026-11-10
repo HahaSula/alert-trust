@@ -44,6 +44,13 @@ sources:
     url: https://github.com/HahaSula/alert-trust/tree/main/lab/targets/mysql/ha
     checked: "2026-11-08, mariadb:11.4（11.4.13）、mysql:8.4.7、prom/mysqld-exporter:v0.21.0、prom/prometheus:v3.13.5"
     note: 長交易、deadlock、三種延遲、replication 中斷、semi-sync 退回、連線打滿、primary 被 kill、failover；結果在 ha/results/
+  art-mysql-perf:
+    title: MySQL 8.4／MariaDB 11.4 效能與故障情境（慢查詢、row lock、metadata lock、purge、CPU、buffer pool、暫存表、redo、連線風暴、磁碟滿、OOM）
+    kind: experiment
+    visibility: public
+    url: https://github.com/HahaSula/alert-trust/tree/main/lab/targets/mysql/perf
+    checked: "2026-11-09, mariadb:11.4（11.4.13）、mysql:8.4.7、prom/mysqld-exporter:v0.21.0、prom/prometheus:v3.13.5"
+    note: 兩種資料庫各一台、同時跑同一組情境；結果在 perf/results/
   mysql-server-src:
     title: MySQL Server 8.4.7 原始碼（Seconds_Behind_Source、保留連線）
     kind: upstream-code

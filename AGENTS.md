@@ -16,7 +16,7 @@ alert-trust 回答兩個問題：
 | 路徑 | 內容 | 誰產生 |
 |---|---|---|
 | `catalog/components/*.yaml` | 監控元件卡：prometheus、alertmanager、vmalert、vmagent、victoriametrics、victorialogs、observer | 手寫 |
-| `catalog/targets/*.yaml` | Target 卡：mysqld_exporter、postgres_exporter | 手寫 |
+| `catalog/targets/*.yaml` | Target 卡：mysql、mariadb、postgres_exporter 等（MySQL 與 MariaDB 各一張，共用 mysqld_exporter） | 手寫 |
 | `catalog/target-pattern.yaml` | 每張 target 卡必須回答的標準問題（validate 強制） | 手寫 |
 | `catalog/contracts.yaml` | 信任契約；每個 id 在 `docs/contracts.md` 要有 `{#id}` 錨點 | 手寫 |
 | `catalog/terms.yaml` | 名詞表：每個設定與 metric 的設定位置、預設值、觀察方式；頁面中反引號名稱自動連結到這裡 | 手寫 |

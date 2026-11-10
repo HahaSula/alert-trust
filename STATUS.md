@@ -5,7 +5,7 @@
 ## 現況
 
 - GitHub repo `HahaSula/alert-trust`，Pages 由 GitHub Actions 發布。
-- 18 張卡（10 個監控與主機元件、8 個資料庫 target）、387 個訊號、550 條規則；`validate.py` 0 錯誤、1 個警告；`--strict` 建置通過。
+- 19 張卡（10 個監控與主機元件、9 個資料庫 target）、449 個訊號、623 條規則；`validate.py` 0 錯誤、1 個警告；`--strict` 建置通過。
 - 原始碼參考 105+ 筆（釘版本與行號），實驗參考多數已換成 `lab/` 的公開結果。
 
 ## 已完成
@@ -32,6 +32,7 @@
 | YugabyteDB v2026.1.3.0 target（`model: native`），YSQL 與 PostgreSQL 監控對照（postgres_exporter 實測） | `catalog/targets/yugabytedb.yaml`、`docs/targets/yugabytedb*.md`、`lab/targets/yugabytedb/` |
 | ClickHouse v26.10.2 target（內建 endpoint＋query-exporter 查 system 表）與「分析型」架構頁，2 副本＋3 Keeper lab | `catalog/targets/clickhouse.yaml`、`docs/targets/clickhouse*.md`、`queries/clickhouse/`、`lab/targets/clickhouse/` |
 | MongoDB 8.0.34 target（Percona mongodb_exporter v0.54.0）與「文件型」架構頁，3 成員 replica set lab | `catalog/targets/mongodb_exporter.yaml`、`docs/targets/mongodb*.md`、`lab/targets/mongodb/` |
+| MySQL 與 MariaDB 拆成兩張卡（各 55 個訊號，各引用自己的原始碼；只在 MariaDB 跑過的 lab 結果，MySQL 卡降為讀碼）；舊網址 `components/mysqld_exporter` 保留轉址頁；九個資料庫的版本差異頁（原始碼）與版本條件；各卡 blind_spots 指向主機卡；新增 10 個飽和訊號 | `catalog/targets/`、`docs/targets/versions/` |
 | 一鍵入口 `tools/review.py`，各工具 `--inventory` 共用盤點；路由問題（缺 label、送進空 receiver、critical 不會叫人、inhibit 沒有 `equal`、DMS 路由沒有 Watchdog）；卡片 `key_metrics`／`metrics_any` | `tools/` |
 | 盤點工具 `tools/inventory.py`：從 Prometheus／vmagent config、rule 檔、Alertmanager config 建環境模型（每個值標來源），含 Alertmanager 路由與 inhibit；計算錯誤修正（vmagent timeout 截斷、`--baseline` 下限、d = τ、dedup、正規式 job、subquery、沒資料的 rule、exporter 預設期限、`--prom-version`、覆蓋檢查的 Watchdog 歸屬與 `partial`） | `tools/` |
 | 資料庫資源對照（連線、執行緒、記憶體池、IO／fsync、複寫 worker、背景工作、CPU）與共用的主機／容器卡（node_exporter、cAdvisor、kube-state-metrics），只讀碼 | `docs/architecture/db-resources.md`、`catalog/components/host.yaml`、`rules/host/` |
@@ -46,8 +47,7 @@
 
 ## 進行中
 
-- 版本差異調查（從原始碼）：MySQL、MariaDB；PostgreSQL、MongoDB、Valkey／Redis、etcd、TiDB、YugabyteDB、ClickHouse
-- 之後：MySQL 與 MariaDB 拆成兩張卡（各自盤查原始碼）；資料庫卡的 blind_spots 指向主機卡；新增 10 個飽和訊號；盲測重跑；打 v0.3.0
+- 之後：覆蓋檢查依版本自動判斷不適用；盲測；打 v0.3.0
 - 排定 2026-11-11 01:00：主機卡小實驗（OOM、記憶體接近 limit、唯讀掛載；不用特權容器）
 
 使用者同意的資料庫順序已全部完成；CockroachDB（專有授權）不做。資料庫架構頁依類型分頁：關聯式、記憶體 KV、共識（Raft）、分散式 SQL、分析型、文件型。
@@ -76,6 +76,7 @@
 20. **MongoDB 待補**：sharded cluster、WiredTiger cache／eviction 壓力、ticket 排隊、連線打滿、collStats 成本只讀碼；oplog 被釘住只讀碼。`docs/targets/models.md` 說「8.0、8.2 的 tag 沒有 OTel 程式碼」，MongoDB agent 回報 8.2.12 有 OTLP 檔案／HTTP 推送（沒有 Prometheus 檔案輸出），要附原始碼行號後修正。
 21. **契約複查的後續**：`resend-endsat` 最差情況（`− P`）與 `d > S` 時 `I ≈ d` 只讀碼，要輕量 lab；Grafana Alerting 的續送是否同樣「嚴格大於」才送未查。
 22. **資源調查的後續**：各 target 卡的 blind_spots 改成 `covered_by` 主機卡；`#proposed` 表的 10 個飽和訊號；host 卡要不要新的 family；target-pattern 要不要加「主機層存在」；OOM、唯讀 remount、記憶體上限的小 lab。
+23. **拆卡後續**：MySQL／MariaDB lab 的 compose 仍掛 `rules/targets/mysql.yml`，重跑 MariaDB 要改掛 `mariadb.yml`；新規則 `MariaDBBinlogNotPurged` 與 thread-cache、pending-fsyncs 訊號沒有 lab；MySQL 側多數參考仍釘在 8.4.7。
 
 ## 已做的決定
 

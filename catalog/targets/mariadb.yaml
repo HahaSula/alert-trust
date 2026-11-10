@@ -1,0 +1,1251 @@
+id: mariadb
+name: mysqld_exporter＋MariaDB
+kind: target
+model: exporter
+exporter: mysqld_exporter
+family: database
+status: draft
+stages: [source]
+versions_checked: ["mysqld_exporter 0.21.0", "MariaDB 10.6.28", "MariaDB 10.11.19", "MariaDB 11.4.13（lab 與原始碼參考）", "MariaDB 11.8.9", "MariaDB 12.3.3"]
+architecture: architecture/exporters.md
+role: >-
+  只寫 MariaDB。MySQL 的原始碼與行為不同，另有一張卡（[mysql](mysql.md)）；兩張卡共用的訊號 id 相同，
+  但證據都引用各自的原始碼與 lab。mysqld_exporter 用同一個程式抓兩種資料庫，只有 eventsstatements 與 innodb_tablespaces 會依 @@version 是否含 mariadb 改查詢。
+  Exporter 有三層「活著」：Prometheus 抓得到 exporter（up）、exporter 連得到資料庫（mysql_up）、
+  每個 collector 的查詢成功（mysql_exporter_collector_success）。每一層壞掉時，下一層的 series 不是變 0，
+  而是整組消失，所以用 != 1 或 == 0 寫的規則會回傳空。metric 前綴仍是 mysql_（exporter 決定的），規則的 job="mariadb" 是佔位符。
+  版本差異（10.6、10.11、11.4、11.8、12.3 五條 LTS 線）從原始碼整理在[MariaDB 各版本的監控差異](../targets/versions/mariadb.md)；
+  會隨版本變的訊號在 signal 或 applies_when 寫明。lab 跑的是 MariaDB 11.4.13，其他版本線只讀碼。
+  規則範例在 rules/targets/mariadb.yml。
+  訊號依九個面向分組（aspect 欄位）：exporter、availability、workload、saturation、replication、cluster（Galera）、
+  maintenance（purge、救援模式、碎片）、protection（binlog、耐久性、備份）、capacity（磁碟、auto_increment、連線高水位）。
+  資料庫本身該監控什麼、每個訊號由哪個 collector 提供、需要什麼權限，整理在 docs/targets/mariadb.md；查詢與 session 分析在 docs/targets/mariadb-ash.md。
+
+silent_failures:
+  - text: >-
+      Exporter 停機時 mysql_up 這條 series 消失，mysql_up != 1（mixin MySQLDown）與 mysql_up == 0（awesome）
+      都回傳空，不會觸發；只有 up{job="mariadb"} == 0 與 absent(mysql_up) 成立。
+    evidence: tested
+    source: art-mysql
+    refs: [exp-mysql]
+  - text: >-
+      資料庫停機時 up 仍是 1，mysql_up 變 0，但 mysql_exporter_collector_success 整組消失，
+      所以 collector_success == 0 在這時也不會響；mysql_* 只剩 mysql_up。
+    evidence: tested
+    source: art-mysql
+    refs: [exp-mysql]
+  - text: >-
+      資料庫主機停機時連線會一直等到 context 取消，scrape 耗時約等於 scrape_timeout 減 --timeout-offset（預設 0.25s），
+      實驗中 scrape_timeout 4s 時是 3.75s。
+    evidence: tested
+    source: art-mysql
+    refs: [exp-mysql]
+  - text: >-
+      --timeout-offset 大於等於 scrape_timeout 時 exporter 只記一行錯誤、不設期限；Prometheus 先逾時，up 變 0，
+      所有 mysql_* 消失，症狀從「資料庫停機」變成「exporter 停機」。
+    evidence: code
+    source: mysqld-exporter-main
+  - text: >-
+      收回 PROCESS 後 innodb_cmp、innodb_cmpmem、innodb_metrics 的 collector_success 變 0，相關 metric 消失
+      （實驗 1150 → 1060 條 series），awesome 的 history_len 規則回傳空；up 與 mysql_up 都是 1。
+      processlist collector 仍回報成功，但沒有 PROCESS 只看得到自己的連線，數字偏低。
+    evidence: tested
+    source: art-mysql
+    refs: [exp-mysql]
+  - text: >-
+      SHOW SLAVE STATUS 要 SLAVE MONITOR（REPLICA MONITOR 同義）；REPLICATION CLIENT 在 MariaDB 只是 BINLOG MONITOR 的別名，
+      照 exporter README 給 PROCESS、REPLICATION CLIENT、SELECT 時，replica 上的 slave_status collector_success 變 0，所有 mysql_slave_status_* 消失，
+      replication 規則回傳空。10.6／10.11 的 SUPER 還涵蓋 SLAVE MONITOR、BINLOG MONITOR；11.0 起不涵蓋，
+      在 11.x 新建、只給 SUPER 的帳號也一樣失敗（從 10.x 升上來的帳號載入 grant 表時會自動補上）。
+    evidence: tested
+    source: art-mysql
+    refs: [exp-mysql, ver-mdb-repl-client-alias, ver-mdb-slave-monitor-kw, ver-ex-readme-grants, ver-mdb1011-slave-status-priv, ver-mdb114-slave-status-priv, ver-mdb114-super-upgrade]
+  - text: >-
+      SQL thread 停止或 IO thread 不是 Yes 時 Seconds_Behind_Master 是 NULL，exporter 解析失敗就不輸出，延遲規則回傳空；
+      非 replica 的節點 slave_status 成功但沒有任何 series，和「權限不足被吃掉」從 metric 上很難區分。
+    evidence: code
+    source: mysqld-exporter-slave-status
+    refs: [my-trace-mdb-sbm-null, my-slave-skip]
+  - text: >-
+      沒有啟用 Galera 的 MariaDB 也輸出 mysql_global_status_wsrep_ready=0，mixin 與 awesome 的
+      wsrep_ready != 1 會對每台普通 MariaDB 誤報；被誤報洗過之後，真正的 Galera 告警容易被靜音。
+    evidence: tested
+    source: art-mysql
+    refs: [exp-mysql, my-trace-mdb-wsrep-ifdef]
+  - text: >-
+      exporter 的版本判斷把 @@version 的「主版號.次版號」轉成浮點數（10.6、10.11、11.4…），都大於所有 collector 的門檻（最高 8.0），
+      所以 MySQL 專用的 collector 也不會被跳過：perf_schema.replication_applier_status_by_worker 開了一定失敗（MariaDB 的表沒有 exporter 要的欄位）。
+      透過 collect[] 參數或改啟動旗標少掉的 collector 不會回報失敗。
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, ver-ex-version-float, ver-ex-version-gate, ver-mdb-pfs-worker-cols, ver-ex-applier-version]
+  - text: >-
+      query_response_time collector 預設開；沒裝 plugin 時 @@query_response_time_stats 查不到，collector 回報成功、沒有 series，看不出來沒在量。
+    evidence: code
+    source: mysqld-exporter-src
+    refs: [ver-ex-qrt-nil, my-default-collectors]
+  - text: >-
+      多 target 模式（/probe）下一台 exporter 掛掉，所有 target 的 up 同時變 0，看起來像所有資料庫一起壞；
+      /probe 的輸出不含 exporter 自己的 process 與 go 指標，要另外一個 job 抓 /metrics。
+    evidence: code
+    source: mysqld-exporter-main
+  - text: >-
+      每次 scrape 開新連線（預設最多 2 條）。兩台 HA Prometheus 同時抓，或多 target 併發時，
+      可能超過 README 建議的 MAX_USER_CONNECTIONS 3，mysql_up 間歇變 0，而且只在其中一台 Prometheus 上看得到。
+    evidence: inferred
+    source: mysqld-exporter-readme
+  - text: >-
+      連線數打滿 max_connections 時，exporter 一般帳號也收到 Error 1040，mysql_up 變 0、threads_connected 消失，
+      「連線數 / max_connections > 0.8」這類規則在最需要時回傳空；只有 mysql_up 規則與事後的
+      connection_errors_total{error="max_connections"} 看得到。
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, mariadb-conn-errors]
+  - text: >-
+      max_connections 之外還有一條給 CONNECTION ADMIN 的連線；exporter 預設開兩條連線，給了 CONNECTION ADMIN 也只有一條進得去（讀碼；
+      lab 這一段 MariaDB 的 32 條 app 連線沒有全部建立，不算數）。
+    evidence: code
+    source: mariadb-server-src
+    refs: [my-q-mdb-ignore-maxconn, my-q-mdb-conn-check, my-trace-mdb-conn-check]
+  - text: >-
+      IO thread 停止時 Seconds_Behind_Master 是 NULL，exporter 不輸出；heartbeat 延遲同時持續變大。
+      只看 Seconds_Behind 的延遲規則在 replica 斷線時安靜。
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-trace-mdb-sbm-null]
+  - text: >-
+      heartbeat 寫入程式若是 primary 上的 EVENT，failover 後在新 primary 上是 SLAVESIDE_DISABLED，heartbeat 停住；
+      寫入程式要跟著 primary 角色走（例如 pt-heartbeat 由 HA 工具啟動）。
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha]
+  - text: >-
+      靜態的 role="primary" label 在 failover 後指向舊節點，MariaDBPrimaryReadOnly 之類的規則查不到任何東西；
+      舊 primary 回來時兩台都可寫，只有從 metric 推角色的規則（MariaDBMultipleWritable）看得到。
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha]
+  - text: >-
+      gtid_binlog_pos、gtid_binlog_state 是字串，global_variables 解析失敗就跳過；在 replica 上誤寫造成的 errant GTID 沒有任何 metric 會變。
+      replica 的 Gtid_Slave_Pos 會被拆成 mysql_slave_status_gtid_slave_pos{domain_id,server_id}，但 errant 交易在 gtid_binlog_pos，不在這裡。
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-global-variables-parse, my-trace-ex-slave-gtid, my-trace-mdb-gtid-binlog-pos]
+  - text: >-
+      Semi-sync 是內建的，沒開時 rpl_semi_sync_master_status 也是 0，所以 status == 0 一定要和 enabled == 1 一起看；
+      等 ACK 逾時後退回 async 時 commit 照常成功。
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-trace-mdb-semisync-status, ver-mdb123-semisync-master]
+  - text: >-
+      performance_schema 在五條線都預設 OFF（要重啟才能開），sys.user_summary 與 perf_schema.* collector 回報成功但沒有任何 series。
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, ver-mdb-pfs-default-off, ver-mdb123-pfs-default-off]
+  - text: >-
+      innodb_trx collector 在沒有交易時不輸出任何 series（不是 0），沒開 collector 和「沒有長交易」看起來一樣；
+      要靠 collector_success 確認它在跑。
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-innodb-trx-query]
+  - text: >-
+      11.8 起 replica 狀態的 Master_last_event_time、Slave_last_event_time 是沒有時區的 datetime，exporter 當 UTC 解析成 Unix 秒；
+      伺服器時區不是 UTC 時兩個時間戳會差一個時區偏移（推論，未實測）。
+    evidence: code
+    source: mysqld-exporter-src
+    refs: [ver-mdb118-last-event-time, ver-ex-parse-datetime]
+
+contracts:
+  - scrape-within-interval
+  - lookback
+  - exporter-deadline
+
+signals:
+  # ---------- Exporter：它真的在量嗎 ----------
+  - id: exporter-up
+    aspect: exporter
+    tier: 1
+    question: Exporter 抓得到嗎
+    signal: up{job="mariadb"} == 0，加上 absent(up{job="mariadb"})；不能只靠 mysql_up
+    metrics: [up]
+    evaluate_on: self
+    silent_failure: Exporter 停機時 mysql_up 消失，mixin 的 MySQLDown 不會響
+    evidence: tested
+    source: art-mysql
+    refs: [exp-mysql]
+    upstream: { status: no, note: "mixin 與 awesome 都只看 mysql_up；kps 的 TargetDown 只在用 kps 時有" }
+    rules: [rules/targets/mariadb.yml#MariaDBExporterDown, rules/targets/mariadb.yml#MariaDBExporterMissing]
+
+  - id: db-up
+    aspect: exporter
+    tier: 1
+    question: Exporter 連得到資料庫嗎
+    signal: mysql_up == 0（只代表連線與 SELECT @@version 成功，不代表查詢或寫入可用）
+    metrics: [mysql_up]
+    evaluate_on: self
+    evidence: tested
+    source: art-mysql
+    refs: [exp-mysql, exp-mysql-ha]
+    upstream: { status: partial, note: "mixin 的 mysql_up != 1 與 awesome 的 mysql_up == 0 都有，但 exporter 停機時一起失效" }
+    rules: [rules/targets/mariadb.yml#MariaDBNotReachable]
+
+  - id: collectors-present
+    aspect: exporter
+    tier: 1
+    question: Exporter 有回應，collector 的結果還在嗎
+    signal: up == 1 但 mysql_exporter_collector_success 完全沒有 series
+    metrics: [up, mysql_exporter_collector_success]
+    evaluate_on: self
+    silent_failure: 資料庫停機時 collector_success 整組消失（不是變 0），MariaDBCollectorFailed（== 0）回傳空
+    evidence: tested
+    source: art-mysql
+    refs: [exp-mysql]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有" }
+    rules: [rules/targets/mariadb.yml#MariaDBCollectorsMissing]
+
+  - id: collector-success
+    aspect: exporter
+    tier: 1
+    question: 關鍵 collector 都成功嗎
+    signal: >-
+      mysql_exporter_collector_success == 0；權限不足（SLAVE MONITOR、PROCESS）、表不存在（例如 heartbeat、MariaDB 沒有欄位的
+      perf_schema.replication_applier_status_by_worker）時會變 0
+    metrics: [mysql_exporter_collector_success]
+    evaluate_on: self
+    silent_failure: 資料庫停機時整組消失；被跳過的 collector 不會出現
+    evidence: tested
+    source: art-mysql
+    refs: [exp-mysql, exp-mysql-ha]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有" }
+    rules: [rules/targets/mariadb.yml#MariaDBCollectorFailed]
+
+  - id: custom-queries
+    aspect: exporter
+    tier: 1
+    question: 補盲點的自訂查詢（query-exporter）還在跑嗎
+    signal: >-
+      query-exporter 5.2.2 的內建 metric：up{job="query-exporter"}、queries_total{query=~"mariadb_.*", status!="success"} 與 database_errors_total 的增加量
+      （設定裡叫 queries、database_errors，輸出時 counter 加 _total）。查詢由排程執行，失敗時自訂 metric 不更新；設了 expiration 的 series
+      在 expiration 後消失，所以 MariaDBConnectionsExhausted、MariaDBErrantGtid 這類規則在查詢失敗時回傳空，要靠這三條補位。
+      實驗：mdb2 停機約 90 秒後自訂 series 全部消失，database_errors_total 2
+    metrics: [up, queries_total, database_errors_total, query_timestamp, query_interval]
+    evaluate_on: self
+    applies_when: "有部署 queries/query-exporter/mysql.yaml"
+    silent_failure: >-
+      欄位名稱或數量和設定不符時查詢被永久移除（不重試），之後只剩停止更新的 query_timestamp；
+      沒設 expiration 的 metric 在資料庫停機後一直停在最後一個值
+    evidence: tested
+    source: query-exporter
+    refs: [my-q-exp, my-q-qe-fatal, my-q-qe-doomed, my-q-qe-expiration, my-q-qe-connect-error, my-q-qe-query-timestamp, my-q-qe-interval-labels]
+    upstream: { status: no }
+    rules:
+      - rules/targets/mariadb.yml#MariaDBCustomQueryExporterDown
+      - rules/targets/mariadb.yml#MariaDBCustomQueryFailing
+      - rules/targets/mariadb.yml#MariaDBCustomQueryStale
+
+  - id: probe-blast-radius
+    aspect: exporter
+    tier: 1
+    question: 多 target 模式下是 exporter 壞還是資料庫壞
+    signal: 同一個 job 超過一半的 up 同時是 0；另外用一個 job 抓 exporter 自己的 /metrics
+    metrics: [up]
+    evaluate_on: self
+    applies_when: multi-target probe
+    evidence: code
+    source: mysqld-exporter-main
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBProbeExporterDown]
+
+  - id: exporter-grants
+    aspect: exporter
+    tier: 1
+    question: Exporter 帳號的權限與連線上限夠嗎
+    signal: >-
+      GRANT PROCESS, BINLOG MONITOR, SLAVE MONITOR, SELECT（REPLICATION CLIENT 只等於 BINLOG MONITOR；要 --collect.slave_hosts 再加 REPLICATION MASTER ADMIN）。
+      11.0 起 SUPER 不再涵蓋 SLAVE MONITOR、BINLOG MONITOR，11.x 新建的帳號要明寫；從 10.x 升上來的帳號會自動補上，所以同一份部署腳本在新舊環境結果不同。
+      MAX_USER_CONNECTIONS ≥ max_open_connections ×（同時抓的 Prometheus 數 + /probe 併發數）。密碼輪替要包含 exporter 的 .my.cnf 或環境變數
+    metrics: []
+    evaluate_on: inventory
+    evidence: tested
+    source: art-mysql
+    refs: [exp-mysql, ver-mdb-repl-client-alias, ver-mdb-slave-monitor-kw, ver-mdb1011-slave-status-priv, ver-mdb114-slave-status-priv, ver-mdb1011-binlogs-priv, ver-mdb114-binlogs-priv, ver-mdb114-super-upgrade, ver-mdb114-slave-hosts-priv, ver-ex-readme-grants]
+    upstream: { status: partial, note: "README 只列 PROCESS、REPLICATION CLIENT、SELECT，沒提 SLAVE MONITOR；沒有對應的檢查或規則" }
+    rules: []
+
+  - id: exporter-query-timeout
+    tier: 2
+    aspect: exporter
+    question: Exporter 的查詢會不會被鎖或連線上限卡住
+    signal: "`--exporter.lock_wait_timeout`（預設開啟、2 秒）避免被 metadata lock 卡住；`--exporter.query_timeout` 限制單一 collector。連線打滿時 exporter 自己也被擋，`mysql_up` 變 0，要讓查詢走 `extra_port`（見 blind_spots）"
+    metrics: [mysql_up, mysql_global_status_connection_errors_total]
+    evaluate_on: self
+    silent_failure: max_connections 打滿時 exporter 也收到 Error 1040，依連線比例寫的規則回傳空
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-lock-wait-timeout, my-querytimeout]
+    upstream: { status: no }
+    rules: []
+
+  - id: collector-set
+    aspect: exporter
+    tier: 2
+    question: 回報的 collector 數量有沒有變少
+    signal: >-
+      count(mysql_exporter_collector_success) 比一小時前少；搭配盤點應有的 collector 清單。
+      MariaDB 的版本號轉成浮點數後都大於門檻，collector 不會因版本被跳過，少掉的只會是參數或旗標
+    metrics: [mysql_exporter_collector_success]
+    evaluate_on: self
+    evidence: code
+    source: mysqld-exporter-src
+    refs: [ver-ex-version-float, ver-ex-version-gate]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBCollectorSetShrunk]
+
+  - id: scrape-budget
+    aspect: exporter
+    tier: 2
+    question: Scrape 來得及在 timeout 內完成嗎
+    signal: >-
+      scrape_duration_seconds 接近 scrape_timeout；各 collector 的 collector_duration_seconds。
+      exporter 用 X-Prometheus-Scrape-Timeout-Seconds 減 --timeout-offset 當期限；
+      --exporter.query_timeout 讓單一慢 collector 失敗而不拖垮其他 collector；lock_wait_timeout 預設 2 秒。
+      實驗：資料庫主機停機時 3.75 秒（scrape_timeout 4s）；CPU 限到 0.1 核時 0.97 秒
+    metrics: [scrape_duration_seconds, mysql_exporter_collector_duration_seconds]
+    evaluate_on: self
+    evidence: tested
+    source: art-mysql
+    refs: [exp-mysql, exp-mysql-perf]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBScrapeNearTimeout, rules/targets/mariadb.yml#MariaDBCollectorSlow]
+    contract: exporter-deadline
+
+  - id: db-up-flapping
+    aspect: exporter
+    tier: 2
+    question: mysql_up 有沒有間歇掉下來
+    signal: changes(mysql_up[15m]) > 2；常見原因是連線數超過 MAX_USER_CONNECTIONS 或 max_connections
+    metrics: [mysql_up]
+    evaluate_on: self
+    evidence: inferred
+    source: mysqld-exporter-readme
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBUpFlapping]
+
+  # ---------- 穩定：資料庫自己會不會停、卡住、進救援模式 ----------
+  - id: restarts
+    aspect: availability
+    tier: 3
+    question: 資料庫重啟過或在救援模式嗎
+    signal: >-
+      uptime < 300（crash、OOM kill、手動重啟都會歸零）。救援模式（innodb_force_recovery）見 force-recovery。
+      停機短於 MariaDBNotReachable 的 for 時只有 uptime 看得出來；OOM 的原因要看 kernel log 或容器事件，exporter 看不到
+    metrics: [mysql_global_status_uptime]
+    evaluate_on: self
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-trace-mdb-uptime]
+    upstream: { status: yes, note: "awesome 用 uptime < 60，短於一個 scrape 週期加 for 時容易漏" }
+    rules: [rules/targets/mariadb.yml#MariaDBRestarted]
+
+  - id: crash-oom
+    aspect: availability
+    tier: 3
+    question: 資料庫被 OOM kill 或 crash 後，看得出來嗎
+    signal: >-
+      單次 OOM kill：容器 3 秒內完成 recovery，scrape 5 秒時只抓到一次 mysql_up = 0，下一次 uptime 已是 7–8；
+      用 resets(mysql_global_status_uptime[...]) 或 uptime < 300 看。一直被 kill 但每次都起得來：resets(uptime[1h]) > 1。
+      每次啟動 2 秒就退出的 crash loop（實驗：tablespace 檔案不見時 crash recovery 失敗）：uptime 一次都沒被抓到，只有 mysql_up 規則看得到
+    metrics: [mysql_global_status_uptime, mysql_up]
+    evaluate_on: self
+    silent_failure: >-
+      MariaDBNotReachable（for 1m）在單次 OOM 時不會響；OOM 原因不在任何 mysql_* metric 裡，要看主機或容器層（host 卡的 oom-kills）。
+      實驗中把 buffer pool 加到超過容器上限的那一刻就被 kill，不是慢慢長上去
+    evidence: tested
+    source: art-mysql-perf
+    refs: [exp-mysql-perf]
+    upstream: { status: partial, note: "awesome 有 uptime < 60；沒有重複重啟的規則" }
+    rules: [rules/targets/mariadb.yml#MariaDBRestarted, rules/targets/mariadb.yml#MariaDBRestartedRepeatedly, rules/targets/mariadb.yml#MariaDBNotReachable]
+
+  - id: disk-space
+    aspect: capacity
+    tier: 2
+    question: 資料目錄與 binlog 的磁碟還夠嗎
+    signal: >-
+      node_exporter 看資料目錄所在的檔案系統剩餘比例；binlog 用量用 --collect.binlog_size，11.4 起也可以看 Binlog_disk_use（mysql_global_status_binlog_disk_use）。
+      InnoDB 資料檔長不出去時是立刻回 ERROR 1114（實驗：24 MB tmpfs 上的表），其他表照常寫入；兩種情況 mysql_up 都仍是 1。
+      11.8 起暫存空間有用量（Tmp_space_used）與上限（max_tmp_total_space_usage），超過時查詢被擋
+    metrics: [node_filesystem_avail_bytes, node_filesystem_size_bytes, mysql_binlog_size_bytes]
+    evaluate_on: self
+    silent_failure: >-
+      mysqld_exporter 沒有任何磁碟用量的 metric；1114 只出現在語句錯誤數（perf_schema.eventsstatementssum，要開 performance_schema）。
+      tablespace 檔案不見時（實驗：tmpfs 上的 DATA DIRECTORY 在重啟後是空的）crash recovery 失敗、2 秒退出，進入重啟迴圈
+    evidence: tested
+    source: art-mysql-perf
+    refs: [exp-mysql-perf, ver-mdb114-binlog-disk-use, ver-mdb118-tmp-space, ver-mdb118-max-tmp-total]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有；要靠 node_exporter 的通用磁碟規則，且要知道資料目錄在哪個掛載點" }
+    rules: [rules/targets/mariadb.yml#MariaDBDataDiskFilling, rules/targets/mariadb.yml#MariaDBDataDiskFillingSoon]
+
+  - id: long-transactions
+    aspect: maintenance
+    tier: 2
+    question: 有沒有開太久的交易
+    signal: >-
+      max(mysql_info_schema_innodb_trx_oldest_transaction_age_seconds) > 300。
+      要 --collect.info_schema.innodb_trx（預設關）與 PROCESS；沒有交易時這個 metric 整個不存在，不是 0
+    metrics: [mysql_info_schema_innodb_trx_oldest_transaction_age_seconds, mysql_info_schema_innodb_trx_transactions]
+    evaluate_on: self
+    silent_failure: 沒有 PROCESS 時只看得到自己的交易；沒開 collector 時沒有任何訊號
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-innodb-trx-query, my-trace-mdb-trx-started]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有長交易規則" }
+    rules: [rules/targets/mariadb.yml#MariaDBLongTransaction]
+
+  - id: undo-history
+    aspect: maintenance
+    tier: 2
+    question: Undo history 有沒有被擋住無法 purge
+    signal: >-
+      global status 的 Innodb_history_list_length（預設就有，五條線都有）。實驗：consistent snapshot 擋住 purge 時 414，交易結束後降到 1。
+      開了 innodb_metrics 時 trx_rseg_history_len 也有，值相同
+    metrics:
+      - mysql_global_status_innodb_history_list_length
+    evaluate_on: self
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-trace-mdb-histlen-var, my-trace-mdb-histlen-export, ver-mdb114-history-len]
+    upstream: { status: partial, note: "awesome 只寫 innodb_metrics 的名稱，沒開 collector 時不會響" }
+    rules: [rules/targets/mariadb.yml#MariaDBInnoDBHistoryLength]
+
+  - id: deadlocks
+    aspect: workload
+    tier: 3
+    question: Deadlock 變多了嗎
+    signal: >-
+      mysql_global_status_innodb_deadlocks（預設就有，五條線都有）。innodb_metrics 也有 lock_deadlocks，但 MariaDB 的 type 是 value，
+      名稱是 ..._lock_lock_deadlocks（沒有 _total）
+    metrics:
+      - mysql_global_status_innodb_deadlocks
+    evaluate_on: self
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, mariadb-innodb-deadlocks, my-trace-mdb-deadlock-inc, my-trace-mdb-deadlock-mon]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBDeadlocks]
+
+  # ---------- 使用：連線、鎖、快取與暫存表 ----------
+  - id: connections
+    aspect: saturation
+    tier: 3
+    question: 連線數接近上限了嗎
+    signal: >-
+      threads_connected / max_connections > 0.8；threads_running / max_connections > 0.6；
+      真的被拒絕時看 connection_errors_total{error="max_connections"} 的增加量（滿載當下 exporter 自己也被擋，
+      這個計數要等連線降下來才抓得到；實驗 +2）。extra_port 的連線不算進 Threads_connected
+    metrics:
+      - mysql_global_status_threads_connected
+      - mysql_global_status_threads_running
+      - mysql_global_variables_max_connections
+      - mysql_global_status_connection_errors_total
+      - mysql_global_status_max_used_connections
+    evaluate_on: self
+    silent_failure: 連線打滿時 exporter 一般帳號也連不上，mysql_up 變 0、threads_connected 消失，比例規則回傳空，只剩 MariaDBNotReachable
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, mariadb-conn-errors, my-trace-mdb-connerr-var, my-q-exp]
+    upstream: { status: partial, note: "awesome 有比例規則，沒有被拒絕的計數，也沒提到打滿時規則回傳空" }
+    rules:
+      - rules/targets/mariadb.yml#MariaDBTooManyConnections
+      - rules/targets/mariadb.yml#MariaDBHighThreadsRunning
+      - rules/targets/mariadb.yml#MariaDBConnectionsRefused
+      - rules/targets/mariadb.yml#MariaDBConnectionsExhausted
+
+  - id: thread-cache
+    aspect: saturation
+    tier: 3
+    question: 新連線都要現開 thread 嗎（thread cache 不夠）
+    signal: >-
+      rate(threads_created) / rate(connections) 長時間偏高。one-thread-per-connection 時，新連線先交給 thread cache，
+      接不下才建立新 thread 並讓 Threads_created 加 1；thread_cache_size 預設 256。
+      五條線（10.6.28、10.11.19、11.4.13、11.8.9、12.3.3）都有 Threads_created；global_status 照名稱輸出。門檻是例子
+    metrics:
+      - mysql_global_status_threads_created
+      - mysql_global_status_connections
+      - mysql_global_variables_thread_cache_size
+    evaluate_on: self
+    applies_when: "thread_handling=one-thread-per-connection（預設）"
+    silent_failure: >-
+      thread_handling=pool-of-threads 時連線不經過這段程式，比例沒有意義；連線池（長連線）環境 connections 幾乎不增加，規則另外要求每秒至少 1 條新連線
+    evidence: code
+    source: mariadb-server-src
+    refs: [spl-mdb106-threads-created, spl-mdb1011-threads-created, spl-mdb114-threads-created, spl-mdb118-threads-created, spl-mdb123-threads-created, spl-mdb114-thread-created-inc, spl-mdb114-connections, spl-mdb114-thread-cache-size, dbr-mdb-thread-handling, res-mx-default-gs, my-global-status-skip]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBThreadCacheMisses]
+
+  - id: user-connection-limits
+    aspect: saturation
+    tier: 3
+    question: 個別帳號快碰到 MAX_USER_CONNECTIONS 了嗎
+    signal: >-
+      sys.user_summary 的 current_connections 除以 mysql.user 的 max_user_connections（> 0 的才算）。
+      兩個 collector 都預設關；帳號 label 一個叫 user、一個叫 mysql_user，要 label_replace。
+      超過上限的連線算進 Aborted_connects（實驗 +1），不算進 Connection_errors_*
+    metrics: [mysql_sys_current_connections, mysql_mysql_max_user_connections, mysql_global_status_aborted_connects]
+    evaluate_on: self
+    applies_when: "performance_schema=ON（MariaDB 預設 OFF，要重啟）"
+    silent_failure: performance_schema=OFF 時 sys.user_summary 回報成功但沒有任何 series（lab 實測）；開了之後的數值沒有在 lab 看過
+    evidence: code
+    source: mysqld-exporter-src
+    refs: [my-sys-user-summary, my-mysql-user-maxconn, ver-mdb-pfs-default-off, exp-mysql-ha]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBUserConnectionLimit]
+
+  - id: lock-waits
+    aspect: saturation
+    tier: 3
+    question: 有很多 session 在等鎖嗎
+    signal: >-
+      InnoDB row lock：innodb_row_lock_current_waits（預設就有）。
+      Metadata lock（DDL 卡住）不在任何 status 變數裡，只能從 processlist collector 的
+      state="waiting_for_table_metadata_lock" 看到（預設關，要 PROCESS），見 metadata-locks。
+      current_waits 最多等於應用的連線數：實驗中 8 條連線全部卡住時是 8，> 10 的門檻不會響；
+      rate(innodb_row_lock_time) / 1000 是平均同時在等的 session 數，不受連線數上限影響。
+      等鎖的 session 在 processlist 的 state 是 updating，不是 lock
+    metrics:
+      - mysql_global_status_innodb_row_lock_current_waits
+      - mysql_global_status_innodb_row_lock_time
+      - mysql_info_schema_processlist_threads
+    evaluate_on: self
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-processlist-query, exp-mysql-perf, my-trace-mdb-rowlock-var, my-trace-mdb-rowlock-export]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBRowLockWaits, rules/targets/mariadb.yml#MariaDBRowLockWaitTime]
+
+  - id: slow-queries
+    aspect: workload
+    tier: 3
+    question: 有新的慢查詢嗎
+    signal: >-
+      increase(slow_queries[5m]) > 0。Slow_queries 依 long_query_time（預設 10 秒）計數，不管 slow log 有沒有開；
+      要知道是哪個查詢，見 slow-sql-visibility。實驗中 long_query_time=0.5 時，兩個 client 跑 filesort 全表與 SLEEP(1)，30 秒內 +36
+    metrics: [mysql_global_status_slow_queries]
+    evaluate_on: self
+    evidence: tested
+    source: art-mysql-perf
+    refs: [exp-mysql-perf, my-trace-mdb-slow]
+    upstream: { status: yes }
+    rules: [rules/targets/mariadb.yml#MariaDBSlowQueries]
+
+  - id: innodb-pressure
+    aspect: saturation
+    tier: 3
+    question: InnoDB 在等磁碟或等 buffer pool 嗎
+    signal: >-
+      rate(innodb_log_waits) > 10（log buffer 不夠，不是 redo 檔案太小）；rate(innodb_buffer_pool_wait_free) > 0 持續 15 分鐘。
+      buffer pool 縮小的實驗中 wait_free 一直是 0，要搭配 buffer-pool-misses。11.x 移除 change buffer，不要用 innodb_ibuf_*
+    metrics:
+      - mysql_global_status_innodb_log_waits
+      - mysql_global_status_innodb_buffer_pool_wait_free
+      - mysql_global_status_buffer_pool_pages
+    evaluate_on: self
+    evidence: code
+    source: mysqld-exporter-src
+    refs: [my-global-status-re, my-perf-mdb-log-waits, my-asp-mdb-bp-wait-free, ver-mdb1011-ibuf-size, exp-mysql-perf]
+    upstream: { status: partial, note: "mixin 有 log waits；buffer pool wait_free 沒有規則" }
+    rules: [rules/targets/mariadb.yml#MariaDBInnoDBLogWaits, rules/targets/mariadb.yml#MariaDBBufferPoolWaitFree]
+
+  - id: pending-fsyncs
+    aspect: saturation
+    tier: 3
+    question: InnoDB 的 fsync 在排隊嗎
+    signal: >-
+      Innodb_data_pending_fsyncs 是此刻還沒完成的 fsync 數，avg_over_time(...[10m]) > 1 代表每次 scrape 都有 fsync 在等磁碟。
+      **內容隨版本變**：10.6 是 redo log 加上 tablespace 的 pending flush；10.11、11.4、11.8、12.3 直接讀 fil_n_pending_tablespace_flushes，
+      只算資料檔，不含 redo log 的 fsync。門檻是例子
+    metrics: [mysql_global_status_innodb_data_pending_fsyncs]
+    evaluate_on: self
+    silent_failure: >-
+      是 scrape 那一刻的快照，不是延遲；10.11 起 commit 等 redo fsync 的排隊完全看不到。fsync 延遲本身要看主機層的磁碟寫入時間（host 卡的 disk-latency）
+    evidence: code
+    source: mariadb-server-src
+    refs: [spl-mdb106-pending-fsyncs, spl-mdb106-pending-fsyncs-calc, spl-mdb1011-pending-fsyncs, spl-mdb114-pending-fsyncs, spl-mdb118-pending-fsyncs, spl-mdb123-pending-fsyncs, spl-mdb114-tablespace-flush-inc, res-mx-default-gs]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBPendingFsyncs]
+
+  - id: tmp-tables
+    aspect: saturation
+    tier: 3
+    question: 暫存表常常落到磁碟嗎
+    signal: >-
+      rate(created_tmp_disk_tables) / rate(created_tmp_tables) > 0.25。11.8 起另有暫存空間用量 Tmp_space_used 與上限 max_tmp_total_space_usage
+    metrics: [mysql_global_status_created_tmp_disk_tables, mysql_global_status_created_tmp_tables]
+    evaluate_on: self
+    evidence: upstream
+    source: mysql-status-vars
+    refs: [my-asp-mdb-tmp-disk, ver-mdb118-tmp-space]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBTmpDiskTables]
+
+  - id: table-open-cache
+    aspect: saturation
+    tier: 3
+    question: table_open_cache 夠用嗎
+    signal: rate(table_open_cache_overflows) > 1；也可看 table_open_cache_misses 與 opened_tables 的增加速度
+    metrics:
+      - mysql_global_status_table_open_cache_overflows
+      - mysql_global_status_table_open_cache_misses
+      - mysql_global_status_opened_tables
+    evaluate_on: self
+    evidence: upstream
+    source: mysql-status-vars
+    refs: [my-asp-mdb-toc-overflows]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBTableOpenCacheOverflows]
+
+  - id: aborted-connects
+    aspect: workload
+    tier: 3
+    question: 連線建立失敗變多了嗎
+    signal: >-
+      rate(aborted_connects) > 1；包含密碼錯、超過 MAX_USER_CONNECTIONS、握手逾時。
+      被 max_connections 拒絕的連線在 MariaDB 也加 Aborted_connects（連線風暴實驗：connection_errors +1,840、aborted_connects +2,169），原因細分看 connection_errors_total{error}
+    metrics: [mysql_global_status_aborted_connects, mysql_global_status_aborted_clients, mysql_global_status_connection_errors_total]
+    evaluate_on: self
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, exp-mysql-perf, mariadb-conn-errors, my-asp-mdb-aborted-connects]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBAbortedConnects]
+
+  # ---------- 效能情境（lab/targets/mysql/perf）----------
+  - id: throughput-drop
+    aspect: workload
+    tier: 3
+    question: 吞吐量（TPS／QPS）掉下來了嗎
+    signal: >-
+      rate(commands_total{command="commit"}) 與 rate(queries) 和平常比；實驗中 row lock、metadata lock、CPU 限制都先讓
+      threads_running 升高（情境開始後 4–10 秒），commit 速率在同一個或之後幾個 scrape 跟著掉（row lock 掉到 0.7/s，CPU 0.1 核掉到 73/s）。
+      MariaDB 11.4 沒有 Innodb_rows_* 狀態變數（沒有 innodb_row_ops_total），列操作量要看 handlers_total
+    metrics:
+      - mysql_global_status_commands_total
+      - mysql_global_status_queries
+      - mysql_global_status_threads_running
+      - mysql_global_status_handlers_total
+    evaluate_on: self
+    silent_failure: >-
+      吞吐量掉下來本身不說原因；限速的應用（連線池、每秒固定請求）在資料庫變慢時 QPS 不一定掉，先動的是延遲與 threads_running。
+      MariaDBHighThreadsRunning 用 max_connections 的 60% 當門檻，連線池 8 條時 threads_running 最多 11–13，永遠不會響
+    evidence: tested
+    source: art-mysql-perf
+    refs: [exp-mysql-perf, my-perf-ex-commands, my-perf-mdb-no-rows]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有吞吐量下降的規則" }
+    rules: [rules/targets/mariadb.yml#MariaDBThroughputDrop]
+
+  - id: metadata-locks
+    aspect: saturation
+    tier: 2
+    question: 有 DDL 卡在長交易後面、把整張表的查詢都擋住嗎
+    signal: >-
+      processlist collector 的 mysql_info_schema_processlist_threads{state="waiting_for_table_metadata_lock"}。
+      實驗：一個讀了一列沒 commit 的交易，加上一個 ALTER TABLE ADD COLUMN，10 秒內 9 個 session 在等，
+      commit 速率從 320/s 掉到 0，innodb_row_lock_current_waits 是 0。ALTER 預設的 lock_wait_timeout 是一天，不會自己放棄
+    metrics:
+      - mysql_info_schema_processlist_threads
+      - mysql_info_schema_processlist_seconds
+    evaluate_on: self
+    silent_failure: >-
+      row lock 規則與長交易規則（> 300 秒）都看不到：擋住的交易只開了 25 秒。perf_schema.eventswaits 的 MDL instrument 預設沒開，一直是 0；
+      performance_schema.metadata_locks 也查不到 PENDING。誰擋住要裝 metadata_lock_info plugin（見 blind_spots）
+    evidence: tested
+    source: art-mysql-perf
+    refs: [exp-mysql-perf, my-processlist-query, my-trace-ex-pl-sanitize, my-perf-mdb-mdl-state, my-perf-mdb-lock-wait-timeout, my-perf-ex-waits-query]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBMetadataLockWaits, rules/targets/mariadb.yml#MariaDBMetadataLockBlocker]
+
+  - id: slow-sql-visibility
+    aspect: workload
+    tier: 3
+    question: 慢的是哪一種 SQL
+    signal: >-
+      --collect.perf_schema.eventsstatements 讀 events_statements_summary_by_digest，每個 digest 輸出次數、總時間、rows_examined、
+      錯誤、暫存表、no_index_used 等 counter。用 rate(seconds_total) / rate(total) 算每個 digest 的平均時間。
+      只輸出依 SUM_TIMER_WAIT 排序的前 250 個（--collect.perf_schema.eventsstatements.limit），digest_text 截在 120 字。
+      exporter 在 MariaDB 不查 quantile、lock_time、cpu_time，這些 series 仍然輸出但永遠是 0
+    metrics:
+      - mysql_perf_schema_events_statements_total
+      - mysql_perf_schema_events_statements_seconds_total
+      - mysql_perf_schema_events_statements_rows_examined_total
+      - mysql_global_status_slow_queries
+    evaluate_on: self
+    applies_when: "performance_schema=ON（MariaDB 預設 OFF，要重啟）"
+    silent_failure: >-
+      performance_schema=OFF 時 collector 成功但沒有 series。送 300 種 digest 後 series 數固定在 250 個 digest、4771 條，排不進前 250 的 digest 看不到；
+      digest 在語句結束後才寫入，執行中的長查詢看不到（見 active-sessions）
+    evidence: tested
+    source: art-mysql-perf
+    refs: [exp-mysql-perf, my-perf-ex-stmt-query, my-perf-ex-stmt-topn, my-perf-ex-stmt-digest-text, my-perf-ex-stmt-labels, my-perf-ex-stmt-8028, my-perf-ex-stmt-locktime, my-perf-ex-stmt-defaults, my-perf-ex-stmt-flags, my-perf-mdb-pfs-default, my-asp-mdb-pfs-digest-at-end, ver-ex-flavor]
+    upstream: { status: no, note: "mixin 與 awesome 只有 slow_queries 計數" }
+    rules: [rules/targets/mariadb.yml#MariaDBSlowDigest, rules/targets/mariadb.yml#MariaDBSlowQueries]
+
+  - id: statement-errors
+    aspect: workload
+    tier: 3
+    question: 語句錯誤（lock wait timeout、table is full）變多了嗎
+    signal: >-
+      --collect.perf_schema.eventsstatementssum 的 mysql_perf_schema_events_statements_sum_errors（所有 digest 加總，不受前 250 個限制）。
+      實驗中 row lock 情境的 ERROR 1205 讓它升到 2.1/s；global status 沒有對應的計數器
+    metrics: [mysql_perf_schema_events_statements_sum_errors, mysql_perf_schema_events_statements_errors_total]
+    evaluate_on: self
+    applies_when: "performance_schema=ON（MariaDB 預設 OFF，要重啟）"
+    silent_failure: 錯誤碼不在 metric 裡；MariaDB 沒有 events_errors_summary_* 表
+    evidence: tested
+    source: art-mysql-perf
+    refs: [exp-mysql-perf, my-perf-ex-stmtsum-query, my-perf-ex-stmtsum-errors]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBStatementErrors]
+
+  - id: buffer-pool-misses
+    aspect: saturation
+    tier: 3
+    question: Buffer pool 放得下工作集嗎
+    signal: >-
+      rate(innodb_buffer_pool_reads) / rate(innodb_buffer_pool_read_requests)。實驗把 buffer pool 從 128M 縮到 16M（表 44 MB）後，
+      磁碟讀取升到 1,946/s，約佔讀取請求的 35%；限速負載下 commit 速率幾乎不變，p99 升到 383 ms。
+      buffer_pool_wait_free 一直是 0，所以 MariaDBBufferPoolWaitFree 抓不到這種情況
+    metrics:
+      - mysql_global_status_innodb_buffer_pool_reads
+      - mysql_global_status_innodb_buffer_pool_read_requests
+      - mysql_global_variables_innodb_buffer_pool_size
+    evaluate_on: self
+    evidence: tested
+    source: art-mysql-perf
+    refs: [exp-mysql-perf, my-asp-mdb-bp-reads]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBBufferPoolDiskReads]
+
+  # ---------- HA：replication、角色、semi-sync ----------
+  - id: replication-running
+    aspect: replication
+    tier: 1
+    question: Replication thread 在跑嗎
+    signal: >-
+      min(mysql_slave_status_slave_io_running, mysql_slave_status_slave_sql_running) == 0（依 connection_name 分開）。
+      MariaDB 的 REPLICA 只是 SLAVE 的同義字，五條線的欄位名都是 Slave_IO_Running、Slave_SQL_Running，不像 MySQL 8.4 會改名。
+      IO thread 在重連（Connecting）時 exporter 也輸出 0；Preparing 不在 exporter 的對照表裡，那一次 scrape 的 series 會不見（推論）
+    metrics:
+      - mysql_slave_status_slave_io_running
+      - mysql_slave_status_slave_sql_running
+    evaluate_on: self
+    applies_when: replication
+    silent_failure: IO 或 SQL thread 停止時 Seconds_Behind_Master 是 NULL、metric 消失，只看延遲的規則不會響；缺 SLAVE MONITOR 時整組消失
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-parse-connecting, my-trace-mdb-io-running-vals, ver-mdb-replica-keyword, ver-mdb106-sbm-col, ver-mdb114-sbm-col, ver-mdb-show-all-slaves]
+    upstream: { status: yes, note: "mixin 與 awesome 寫 slave_*，在 MariaDB 名稱是對的；權限不足時一起回傳空" }
+    rules: [rules/targets/mariadb.yml#MariaDBReplicationNotRunning]
+
+  - id: replication-error
+    aspect: replication
+    tier: 2
+    question: Replication 是因為錯誤停下的嗎
+    signal: >-
+      mysql_slave_status_last_sql_errno > 0（例如 1062 重複鍵）。SQL thread 因錯誤停下時不會自己恢復，
+      要人處理；errno 讓告警直接帶出原因。錯誤訊息文字（Last_SQL_Error）是字串，exporter 不輸出；MariaDB 也沒有錯誤名稱表可以補
+    metrics: [mysql_slave_status_last_sql_errno, mysql_slave_status_last_io_errno]
+    evaluate_on: self
+    applies_when: replication
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-slave-skip, my-trace-mdb-last-sql-errno]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBReplicationError]
+
+  - id: replica-status-present
+    aspect: replication
+    tier: 1
+    question: Replica 的狀態資料還在嗎
+    signal: >-
+      一小時前有 slave_sql_running、現在沒有，且 mysql_up == 1；長期作法是用 role label 標出 replica，再用 absent。
+      global status 的 Slave_running（mysql_global_status_slave_running，gauge）沒在複製時是 0、不會整組消失，可以當補充
+    metrics: [mysql_slave_status_slave_sql_running, mysql_up]
+    evaluate_on: self
+    applies_when: replication
+    silent_failure: 權限被收回（SLAVE MONITOR）、RESET SLAVE ALL（升級成 primary）時，所有 replication 規則同時回傳空
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-slave-skip, ver-mdb-slave-running]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBReplicaStatusMissing]
+
+  - id: replication-lag
+    aspect: replication
+    tier: 2
+    question: Replication 延遲量的是真的嗎
+    signal: >-
+      用 heartbeat 表（--collect.heartbeat，pt-heartbeat 格式）：now - stored > 30。
+      Seconds_Behind_Master 只當輔助：只要 IO thread 不是 Yes（Connecting、Preparing、No）就是 NULL，即使 relay log 還沒套用完（讀碼）。
+      11.8 起 SHOW ALL SLAVES STATUS 多 Master_Slave_time_diff（mysql_slave_status_master_slave_time_diff）與 Master_last_event_time，可以當第二個來源。
+      heartbeat 在每台都會變大時，代表 primary 上的寫入程式停了，不是 replica 延遲
+    metrics:
+      - mysql_heartbeat_now_timestamp_seconds
+      - mysql_heartbeat_stored_timestamp_seconds
+      - mysql_slave_status_seconds_behind_master
+      - mysql_slave_status_sql_delay
+    evaluate_on: self
+    applies_when: replication
+    silent_failure: >-
+      IO thread 停止時 Seconds_Behind_Master 消失，heartbeat 卻持續變大（實驗 29 秒）；
+      failover 後若寫入程式是 primary 上的 EVENT，它在升級的 replica 上是停用的，heartbeat 從此停住
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-heartbeat-query, my-trace-mdb-sbm-field, my-trace-mdb-sbm-null, ver-mdb118-is-slave-status, ver-mdb118-last-event-time, ver-mdb118-all-only-cols]
+    upstream: { status: partial, note: "mixin 有 MySQLHeartbeatLag 與 MySQLReplicationLag；後者只用 seconds_behind_master" }
+    rules: [rules/targets/mariadb.yml#MariaDBHeartbeatLag, rules/targets/mariadb.yml#MariaDBReplicationLag]
+
+  - id: replica-read-only
+    aspect: replication
+    tier: 2
+    question: Replica 擋得住寫入嗎
+    signal: >-
+      正在複製的節點 read_only == 0。MariaDB 沒有 super_read_only，有 READ ONLY ADMIN 權限的帳號可以繞過 read_only
+    metrics: [mysql_global_variables_read_only]
+    evaluate_on: self
+    applies_when: replication
+    silent_failure: 在 replica 上寫入時 replication 照常；要等 primary 寫到同一筆資料才會 1062 停下，replica 的 gtid_binlog_pos 會出現自己的 server_id
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-trace-mdb-readonly]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBReplicaWritable]
+
+  - id: role-detection
+    aspect: replication
+    tier: 2
+    question: 每個叢集剛好有一台可寫的 primary 嗎
+    signal: >-
+      從 metric 推角色：可寫（read_only == 0）且沒有 slave_status series 的就是 primary。
+      每個 cluster 數量 == 0 代表沒有 primary，> 1 代表 failover 後舊 primary 回來、兩邊都能寫。
+      cluster 是要自己加的 label；靜態的 role label 在 failover 後就是錯的。Galera 叢集每台都可寫，不要套這條
+    metrics: [mysql_global_variables_read_only, mysql_slave_status_slave_sql_running, mysql_up]
+    evaluate_on: self
+    applies_when: replication
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBNoWritablePrimary, rules/targets/mariadb.yml#MariaDBMultipleWritable]
+
+  - id: primary-writable
+    aspect: availability
+    tier: 2
+    question: Primary 寫得進去嗎
+    signal: >-
+      標成 primary 的節點 read_only == 1；mysql_up 只做 ping，真正的寫入要外部探測
+      （例如應用層或 heartbeat 寫入程式自己回報）。role label 要跟著 failover 更新，否則改用 role-detection
+    metrics: [mysql_global_variables_read_only]
+    evaluate_on: self
+    applies_when: replication
+    evidence: inferred
+    source: mysqld-exporter-src
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBPrimaryReadOnly]
+
+  - id: gtid-consistency
+    aspect: replication
+    tier: 2
+    question: Replica 有沒有 primary 沒有的交易（errant GTID）
+    signal: >-
+      exporter 看不到：gtid_binlog_pos、gtid_binlog_state 是字串，global_variables 跳過（replica 狀態裡的 Gtid_Slave_Pos 有輸出成
+      mysql_slave_status_gtid_slave_pos{domain_id,server_id}，但那只是套用位置）。要另外比對 replica 的 gtid_binlog_state 有沒有出現 replica 自己的 server_id，
+      或用 query-exporter 輸出每個 (domain_id, server_id) 的 seq（見 blind_spots）；gtid_strict_mode=ON 可以在源頭擋掉一部分。failover 前一定要檢查
+    metrics: [mysql_global_variables_gtid_strict_mode]
+    evaluate_on: external
+    applies_when: "GTID replication"
+    silent_failure: 在 replica 上寫一筆後 gtid_binlog_pos 變成 0-2-645（replica 的 server_id 2），exporter 沒有任何 metric 改變
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-global-variables-parse, my-trace-ex-slave-gtid, my-trace-mdb-gtid-binlog-pos, my-trace-mdb-gtid-slave-pos]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有；HA 工具自己會檢查" }
+    rules: [rules/targets/mariadb.yml#MariaDBErrantGtid]
+
+  - id: semi-sync
+    aspect: replication
+    tier: 3
+    question: Semi-sync 有沒有退回 async
+    signal: >-
+      rpl_semi_sync_master_status == 0 且 rpl_semi_sync_master_enabled == 1。MariaDB 內建 semi-sync，五條線的名稱都只有 master（沒有 source）。
+      實驗：primary 開、replica 沒開時 status 一直是 0；replica 開了之後回到 1、clients 1
+    metrics:
+      - mysql_global_status_rpl_semi_sync_master_status
+      - mysql_global_variables_rpl_semi_sync_master_enabled
+    evaluate_on: self
+    applies_when: semi-sync replication
+    silent_failure: 沒開 semi-sync 時 status 也是 0，所以一定要和 enabled 一起看
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-trace-mdb-semisync-status, ver-mdb123-semisync-master]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBSemiSyncDegraded]
+
+  # ---------- 叢集與共識：Galera ----------
+  - id: galera-state
+    aspect: cluster
+    tier: 3
+    question: Galera 節點可以服務嗎
+    signal: >-
+      wsrep_ready != 1 且 wsrep_on == 1；wsrep_local_state != 4 且沒有刻意 desync。
+      wsrep_ready 在官方映像（WITH_WSREP 編譯）固定存在，沒開 Galera 時是 0，所以一定要用 wsrep_on 過濾
+    metrics:
+      - mysql_global_status_wsrep_ready
+      - mysql_global_status_wsrep_local_state
+      - mysql_global_variables_wsrep_on
+      - mysql_global_variables_wsrep_desync
+    evaluate_on: self
+    applies_when: mariadb galera
+    evidence: tested
+    source: art-mysql
+    refs: [exp-mysql, exp-mysql-ha, my-trace-mdb-wsrep-ready, my-trace-mdb-wsrep-ifdef]
+    upstream: { status: partial, note: "mixin 與 awesome 有，但沒用 wsrep_on 過濾，普通 MariaDB 會誤報" }
+    rules: [rules/targets/mariadb.yml#MariaDBGaleraNotReady, rules/targets/mariadb.yml#MariaDBGaleraOutOfSync]
+
+  - id: galera-quorum
+    aspect: cluster
+    tier: 2
+    question: Galera 節點還在 Primary component 嗎
+    signal: >-
+      wsrep_cluster_status 是字串（Primary、non-Primary、Disconnected），exporter 的 parseStatus 把 Primary 轉成 1、其他兩個轉成 0，
+      輸出 mysql_global_status_wsrep_cluster_status；wsrep_cluster_size 是目前 view 的成員數。
+      實驗：三台暫停兩台 29 秒後，倖存的 gal1 是 non-Primary（0）、size 1、wsrep_ready 0，讀取回 ERROR 1047；exporter 照常回應
+    metrics:
+      - mysql_global_status_wsrep_cluster_status
+      - mysql_global_status_wsrep_cluster_size
+      - mysql_global_variables_wsrep_on
+    evaluate_on: self
+    applies_when: mariadb galera
+    silent_failure: >-
+      沒開 Galera 的 MariaDB 也輸出 wsrep_cluster_status 0（Disconnected）與 wsrep_cluster_size 0，不用 wsrep_on 過濾會對每台普通 MariaDB 誤報。
+      cluster_size 掉一台時其餘節點仍是 Primary，只看 cluster_status 要等到再少一台、失去 quorum 才響。五條線的 wsrep 變數沒有逐版比對，只確認 wsrep_on 都有
+    evidence: tested
+    source: art-mysql-asp
+    refs: [my-asp-exp, my-asp-mdb-wsrep-status-var, my-asp-mdb-wsrep-primary, my-asp-mdb-wsrep-nonprimary, my-asp-mdb-wsrep-disconnected, my-asp-mdb-wsrep-size-set, my-asp-ex-gs-wsrep-status, my-asp-ex-parse-nonprimary]
+    upstream: { status: no, note: "mixin 的 galera.yaml 只有 wsrep_ready、wsrep_local_state、donor 落後三條，沒有 cluster_status 或 cluster_size" }
+    rules: [rules/targets/mariadb.yml#MariaDBGaleraNonPrimary, rules/targets/mariadb.yml#MariaDBGaleraClusterShrunk]
+
+  - id: galera-flow-control
+    aspect: cluster
+    tier: 3
+    question: Galera 有沒有因為 flow control 暫停寫入
+    signal: >-
+      wsrep_flow_control_paused_ns 是累計的暫停奈秒數（Galera provider 給的，SHOW GLOBAL STATUS 經 wsrep_show_status 帶出來），
+      rate(...) / 1e9 就是暫停時間比例；wsrep_flow_control_paused 是「自上次 FLUSH STATUS 以來」的平均，不適合寫規則。
+      找出送 flow control 的節點看 wsrep_flow_control_sent 與 wsrep_local_recv_queue
+    metrics:
+      - mysql_global_status_wsrep_flow_control_paused_ns
+      - mysql_global_status_wsrep_flow_control_sent
+      - mysql_global_status_wsrep_local_recv_queue
+      - mysql_global_status_wsrep_local_cert_failures
+    evaluate_on: self
+    applies_when: mariadb galera
+    silent_failure: wsrep_flow_control_active 是字串 true／false，exporter 不認得、直接跳過；lab 沒有觸發 flow control（值維持 0）
+    evidence: code
+    source: galera-src
+    refs: [my-asp-gal-fc-paused-ns, my-asp-gal-fc-paused, my-asp-gal-fc-sent, my-asp-gal-recv-queue, my-asp-gal-cert-failures, my-asp-gal-fc-active, my-asp-mdb-wsrep-provider-vars, my-asp-mdb-wsrep-provider-status, my-asp-exp]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBGaleraFlowControl]
+
+  # ---------- 資料維護與完整性：救援模式、碎片、損毀 ----------
+  - id: force-recovery
+    aspect: maintenance
+    tier: 3
+    question: 資料庫在 InnoDB 救援模式嗎
+    signal: >-
+      innodb_force_recovery != 0（global_variables 預設有輸出）。≥ 4 時 InnoDB 唯讀，但 read_only 仍可能是 0；
+      通常是之前遇到損毀，救完要改回 0 並重啟
+    metrics: [mysql_global_variables_innodb_force_recovery]
+    evaluate_on: self
+    evidence: code
+    source: mariadb-server-src
+    refs: [my-asp-mdb-force-recovery, my-global-variables-parse]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBInnoDBForceRecovery]
+
+  - id: table-fragmentation
+    aspect: maintenance
+    tier: 3
+    question: 有沒有表在大量刪除後留下很多未使用空間
+    signal: >-
+      --collect.info_schema.tables（預設關）讀 information_schema.TABLES，每張表輸出 mysql_info_schema_table_size{component=data_length|index_length|data_free}。
+      data_free 大且超過資料加索引的一半時考慮重建
+    metrics: [mysql_info_schema_table_size, mysql_info_schema_table_rows]
+    evaluate_on: self
+    silent_failure: >-
+      每張表三條以上的 series，表多時 cardinality 高，可用 --collect.info_schema.tables.databases 限定 schema。
+      innodb_file_per_table=OFF 時 data_free 是共用 tablespace 的剩餘空間，每張表都一樣
+    evidence: code
+    source: mysqld-exporter-src
+    refs: [my-asp-ex-tables-query, my-asp-ex-tables-datafree, my-asp-ex-def-tables]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBTableFragmented]
+
+  - id: corruption-signals
+    aspect: maintenance
+    tier: 2
+    question: 有頁面損毀或 checksum 錯誤嗎
+    signal: >-
+      exporter 看不到：沒有「讀到損毀頁」的 status 計數（Innodb_num_pages_page_compression_error 只算 page compression）；損毀只寫在 error log。
+      補法：log pipeline 對 error log 的 InnoDB 損毀訊息告警，加上定期 CHECK TABLE（或 mariadb-check）把結果寫成 textfile metric；
+      innodb_force_recovery 被打開是事後訊號
+    metrics: [mysql_global_status_innodb_num_pages_page_compression_error, mysql_global_variables_innodb_force_recovery]
+    evaluate_on: external
+    silent_failure: >-
+      實驗（perf lab）中 tablespace 檔案不見時 crash recovery 失敗、2 秒退出、進入重啟迴圈，metric 上只看得到 mysql_up 0；
+      只讀到某一頁時才發現的損毀不會讓任何 mysql_* 改變
+    evidence: code
+    source: mariadb-server-src
+    refs: [my-asp-mdb-page-compress-err, my-asp-mdb-force-recovery, exp-mysql-perf]
+    upstream: { status: no }
+    rules: []
+
+  # ---------- 資料保護：PITR、耐久性、備份 ----------
+  - id: binlog-pitr
+    aspect: protection
+    tier: 2
+    question: binlog 有開、保留得夠久，可以做 point-in-time recovery 嗎
+    signal: >-
+      log_bin == 0 代表只能還原到最後一次完整備份；binlog_expire_logs_seconds 要比完整備份週期長（0 代表不依時間刪除）。
+      實驗：MariaDB 預設 log_bin 0、expire 0。binlog 用量用 --collect.binlog_size（要 BINLOG MONITOR）。
+      12.3 的 binlog_storage_engine（預設空）啟用後 binlog 存在 storage engine 裡，這條訊號的做法未核對
+    metrics:
+      - mysql_global_variables_log_bin
+      - mysql_global_variables_binlog_expire_logs_seconds
+      - mysql_binlog_size_bytes
+      - mysql_binlog_files
+    evaluate_on: self
+    silent_failure: >-
+      binlog_size collector 在 log_bin=0 時直接回傳、沒有任何 series（collector_success 仍是 1），「沒開 binlog」和「沒開 collector」看起來一樣，
+      要看 mysql_global_variables_log_bin。binlog 開著不代表有被保存到別處：binlog 和資料在同一顆磁碟上時，磁碟壞掉一起沒了
+    evidence: tested
+    source: art-mysql-asp
+    refs: [my-asp-exp, my-asp-ex-binlog-logbin, my-asp-ex-binlog-skip, my-asp-ex-binlog-query, my-asp-mdb-log-bin, my-asp-mdb-binlog-expire, my-asp-ex-def-binlog, ver-mdb123-binlog-engine, ver-mdb114-binlogs-priv]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBBinlogDisabled, rules/targets/mariadb.yml#MariaDBBinlogRetentionShort]
+
+  - id: durability-settings
+    aspect: protection
+    tier: 3
+    question: 斷電時會不會少掉已 commit 的交易
+    signal: >-
+      sync_binlog != 1（binlog 開著時）或 innodb_flush_log_at_trx_commit != 1。實驗：sync_binlog 預設 0（交給 OS 決定何時寫入磁碟）、
+      flush_log_at_trx_commit 預設 1；MariaDBDurabilityRelaxed 在預設的 MariaDB 上會響，這是刻意的
+    metrics: [mysql_global_variables_sync_binlog, mysql_global_variables_innodb_flush_log_at_trx_commit]
+    evaluate_on: self
+    evidence: tested
+    source: art-mysql-asp
+    refs: [my-asp-exp, my-asp-mdb-sync-binlog]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBDurabilityRelaxed]
+
+  - id: backup-freshness
+    aspect: protection
+    tier: 2
+    question: 最近一次成功的備份是什麼時候
+    signal: >-
+      mysqld_exporter 沒有任何備份相關的 collector。做法：備份 job（mariabackup、mariadb-dump）成功後
+      寫 textfile metric，例如 mysql_backup_last_success_timestamp_seconds{cluster} 與 mysql_backup_size_bytes，由 node_exporter 的
+      textfile collector 或 Pushgateway 送進來；告警看「多久沒有成功」與「metric 整個不見」。還原測試另外記錄
+    metrics: [mysql_backup_last_success_timestamp_seconds]
+    evaluate_on: external
+    silent_failure: >-
+      只在失敗時發通知的備份 job，cron 沒跑或主機停機時什麼都不會發；所以要用「最後成功時間」而不是「失敗事件」，並且 absent 要另外一條規則
+    evidence: inferred
+    source: node-exporter-textfile
+    refs: [my-default-collectors]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有；metric 名稱是本專案的例子" }
+    rules: [rules/targets/mariadb.yml#MariaDBBackupStale, rules/targets/mariadb.yml#MariaDBBackupMetricMissing]
+
+  # ---------- 容量與成長 ----------
+  - id: autoinc-exhaustion
+    aspect: capacity
+    tier: 3
+    question: 有沒有 AUTO_INCREMENT 欄位快用完整數範圍
+    signal: >-
+      --collect.auto_increment.columns（預設關）輸出 mysql_info_schema_auto_increment_column 與 ..._column_max（依型別算 2^n − 1）。
+      實驗：TINYINT 表插入 100 列後馬上是 128／127（已超過上限，下一筆 INSERT 會失敗）；MariaDB 沒有 MySQL 那種一天的統計快取
+    metrics: [mysql_info_schema_auto_increment_column, mysql_info_schema_auto_increment_column_max]
+    evaluate_on: self
+    evidence: tested
+    source: art-mysql-asp
+    refs: [my-asp-exp, my-asp-ex-autoinc-query, my-asp-ex-def-autoinc]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBAutoIncrementNearMax]
+
+  - id: connection-headroom
+    aspect: capacity
+    tier: 3
+    question: 連線數的高峰離 max_connections 還有多遠
+    signal: >-
+      Max_used_connections 是重啟（或 FLUSH STATUS）以來的高水位，scrape 之間的尖峰與 exporter 被擋在外面的那段時間都會記下來，也計入 extra_port 的連線
+      （ha lab：max_connections=30 打滿後是 31）。和 threads_connected / max_connections 的即時比例互補。
+      11.4 起有 Max_used_connections_time（exporter 轉成 Unix 秒，時區問題同 11.8 的事件時間），可以知道高峰發生的時間
+    metrics: [mysql_global_status_max_used_connections, mysql_global_variables_max_connections]
+    evaluate_on: self
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-trace-mdb-max-used, my-trace-mdb-max-used-upd, ver-mdb114-max-used-conn-time, ver-ex-parse-datetime]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBConnectionPeakNearMax]
+
+  - id: binlog-growth
+    aspect: capacity
+    tier: 3
+    question: binlog 有照設定刪除嗎
+    signal: >-
+      mysql_binlog_files 與 mysql_binlog_size_bytes 的趨勢；磁碟預測用 MariaDBDataDiskFillingSoon。
+      11.4 新增 slave_connections_needed_for_purge（預設 1）：沒有 replica 連著時，binlog_expire_logs_seconds 到期也不刪；10.6、10.11 沒有這個變數。
+      purge 時處理過那個 binlog 的 replica 少於這個數就跳過；規則比 Slaves_connected 與這個值。實驗：expire 20 秒，30 秒後 FLUSH，檔案數 5 → 6；改成 0 再 FLUSH 才變 3。11.4 另有 max_binlog_total_size 與 Binlog_disk_use
+    metrics: [mysql_binlog_files, mysql_binlog_size_bytes, mysql_global_variables_slave_connections_needed_for_purge, mysql_global_status_slaves_connected]
+    evaluate_on: self
+    applies_when: "MariaDB 11.4 以上（slave_connections_needed_for_purge）"
+    silent_failure: 單機 MariaDB 開 binlog 做 PITR 時，binlog 會一直長到磁碟滿；設定看起來對（expire 有設），只有檔案數會一直增加
+    evidence: tested
+    source: art-mysql-asp
+    refs: [my-asp-exp, my-asp-mdb-purge-needs-slave, my-asp-ex-binlog-query, spl-mdb114-purge-check, spl-mdb114-slaves-connected, ver-mdb114-purge-needed, ver-mdb114-max-binlog-total, ver-mdb114-binlog-disk-use]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBBinlogNotPurged, rules/targets/mariadb.yml#MariaDBDataDiskFillingSoon]
+
+  - id: data-growth
+    aspect: capacity
+    tier: 3
+    question: 資料量長多快
+    signal: >-
+      --collect.info_schema.schema_size（預設關）每個 schema 一條 mysql_info_schema_schema_size_bytes（DATA_LENGTH + INDEX_LENGTH 加總，
+      不含 mysql、sys、performance_schema、information_schema），用來畫趨勢與做容量規劃；告警交給磁碟預測。實驗：app schema 65536
+    metrics: [mysql_info_schema_schema_size_bytes]
+    evaluate_on: self
+    silent_failure: 是估計值，不等於磁碟上的檔案大小（不含 binlog、redo、undo、暫存檔）
+    evidence: tested
+    source: art-mysql-asp
+    refs: [my-asp-exp, my-asp-ex-schema-size-query, my-asp-ex-def-schema-size]
+    upstream: { status: no }
+    rules: []
+
+  # ---------- 工作量：active session ----------
+  - id: active-sessions
+    aspect: workload
+    tier: 3
+    question: 此刻有多少 session 在做事、在等什麼
+    signal: >-
+      processlist collector（預設關）每次 scrape 依 command、state 計數，等於一個以 scrape 間隔取樣的簡化 ASH：
+      sum(mysql_info_schema_processlist_threads{command!~"sleep|daemon|binlog_dump.*"}) 是 active session 數。
+      要知道是哪個語句、等哪個事件，用 docs/targets/mariadb-ash.md 的取樣器（每秒取樣 PROCESSLIST＋performance_schema、彙總成有界的 metric）
+    metrics: [mysql_info_schema_processlist_threads, mysql_info_schema_processlist_seconds]
+    evaluate_on: self
+    silent_failure: >-
+      等 row lock 的 session state 是 updating，看不出在等鎖；只有 scrape 那一刻的快照，scrape 之間的尖峰看不到；沒有語句或 digest 的維度
+    evidence: tested
+    source: art-mysql-asp
+    refs: [my-asp-exp-ash, my-processlist-query, my-asp-ex-processlist-group]
+    upstream: { status: no }
+    rules: [rules/targets/mariadb.yml#MariaDBAshSamplerStopped, rules/targets/mariadb.yml#MariaDBRowLockActiveSessions]
+
+# 目前無法監控的範圍。category：exporter（資料庫有、exporter 沒輸出）、database（資料庫本身沒提供）、other（要靠其他元件）。
+blind_spots:
+  - what: 連線打滿當下的連線數
+    category: exporter
+    why: exporter 也被擋在外面，整組 metric 消失
+    workaround: >-
+      告警靠 `mysql_up` 與事後的 `connection_errors_total`；或讓查詢走 `extra_port`（`extra_max_connections` 至少 2，預設 1 會被 query-exporter 的常駐連線佔掉）
+    section: targets/mariadb.md#custom-queries
+    covered_by:
+      tool: "query-exporter 5.2.2"
+      config: queries/query-exporter/mysql.yaml
+      metrics: [mysql_q_threads_connected, mysql_q_max_connections]
+      rules: [MariaDBConnectionsExhausted]
+      refs: [my-q-exp, my-q-exp-1, my-q-mdb-extra-scheduler, my-q-mdb-extra-max-default, my-q-qe-pool-persist, ver-mdb123-extra-port]
+  - what: errant GTID
+    category: exporter
+    why: "`gtid_binlog_pos`、`gtid_binlog_state` 是字串，exporter 跳過"
+    workaround: >-
+      自訂查詢讀 gtid_binlog_state 的每個 (domain_id, server_id) seq，在 PromQL 裡比 replica 與 read_only=0 的 primary；
+      不能用 gtid_binlog_pos（每個 domain 只留最後一筆，下一筆複寫事件就蓋掉）；要每台 log_slave_updates=ON
+    section: targets/mariadb.md#custom-queries
+    covered_by:
+      tool: "query-exporter 5.2.2"
+      config: queries/query-exporter/mysql.yaml
+      metrics: [mysql_q_gtid_binlog_state_seq, mysql_q_read_only]
+      rules: [MariaDBErrantGtid]
+      refs: [my-q-exp, my-q-mdb-binlog-state-pair, my-q-mdb-gtid-binlog-state, my-q-qe-row-map]
+  - what: Metadata lock 的細節（誰擋住誰）
+    category: exporter
+    why: 沒有 collector；performance_schema 預設關，`metadata_locks` 也看不到 PENDING
+    workaround: >-
+      裝 metadata_lock_info plugin，自訂查詢彙總成數字：等待數、最久等待、阻擋者數、閒置的阻擋者數、阻擋者持有多久；
+      誰（pid、帳號、SQL）不放 label，告警後查 `information_schema.METADATA_LOCK_INFO`。排在 ALTER 後面、自己沒持有鎖的 SELECT 找不到阻擋者
+    section: targets/mariadb.md#custom-queries
+    covered_by:
+      tool: "query-exporter 5.2.2"
+      config: queries/query-exporter/mysql.yaml
+      metrics: [mysql_q_mdl_waiting_sessions, mysql_q_mdl_oldest_wait_seconds, mysql_q_mdl_blocking_sessions, mysql_q_mdl_idle_blocking_sessions, mysql_q_mdl_blocker_age_seconds]
+      rules: [MariaDBMetadataLockBlocker]
+      refs: [my-q-exp, my-q-mdb-mli-granted, my-q-mdb-mli-time, my-q-qe-null-zero]
+  - what: Replica 的錯誤訊息與錯誤名稱
+    category: database
+    why: "`Last_SQL_Error` 是字串；`replication_applier_status_by_worker` 只在 performance_schema=ON 且 slave_parallel_threads > 0 時有列，也沒有錯誤名稱表"
+    workaround: 用 mysqld_exporter 的 `mysql_slave_status_last_sql_errno`；訊息看 `SHOW SLAVE STATUS`
+    section: targets/mariadb.md#custom-queries
+  - what: 執行中語句的 digest、長尾延遲、CPU 時間
+    category: database
+    why: digest 在語句結束才寫入；沒有 quantile 與 `SUM_CPU_TIME`
+    workaround: ASH 取樣器（資料庫內的 EVENT），用 query-exporter 輸出最近 60 秒的等待類別 × digest 平均；digest 仍只有已結束的語句，quantile 與 CPU 時間仍然沒有
+    section: targets/mariadb-ash.md#sampler
+    covered_by:
+      tool: "query-exporter 5.2.2"
+      config: queries/query-exporter/mysql.yaml
+      metrics: [mysql_q_ash_active_sessions, mysql_q_ash_sampler_enabled, mysql_q_ash_sampler_last_run_age_seconds]
+      rules: [MariaDBAshSamplerStopped, MariaDBRowLockActiveSessions]
+      refs: [my-q-exp, my-asp-exp-ash, my-q-qe-expiration]
+  - what: 每帳號、每查詢統計（performance_schema 關著時）
+    category: database
+    why: performance_schema 五條線都預設 OFF
+    workaround: 開 `performance_schema=ON`（要重啟，佔記憶體）
+    section: targets/mariadb.md#blind-spots
+  - what: 頁面損毀
+    category: database
+    why: 沒有 status 計數，只寫在 error log；`CHECK TABLE` 要讀整張表（並加鎖），不能放進每 15–60 秒的查詢
+    workaround: log 管線對 error log 告警；離峰排程 `CHECK TABLE`／mariadb-check 寫 textfile（query-exporter 的 schedule 也能跑，但成本與鎖要自己評估，這裡不提供）
+    section: targets/mariadb.md#blind-spots
+  - what: 真正的寫入是否成功
+    category: database
+    why: "`mysql_up` 只做 ping"
+    workaround: heartbeat 寫入程式回報成功時間（pt-heartbeat ＋ --collect.heartbeat），或應用層探測；不建議讓監控帳號寫入，所以沒有放進自訂查詢
+    section: targets/mariadb.md#blind-spots
+  - what: 磁碟剩餘空間、檔案系統唯讀
+    category: other
+    why: 不在資料庫裡；mysqld_exporter 沒有磁碟 metric
+    workaround: >-
+      node_exporter 的 `node_filesystem_avail_bytes`、`node_filesystem_readonly`；本卡的 MariaDBDataDiskFilling 指定資料目錄的 mountpoint。
+      主機層規則只讀碼
+    section: targets/mariadb.md#capacity
+    covered_by:
+      tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"
+      config: rules/host/meta.yml
+      metrics: [node_filesystem_avail_bytes, node_filesystem_size_bytes, node_filesystem_files_free, node_filesystem_readonly]
+      rules: [HostFilesystemAlmostFull, HostFilesystemFillingUp, HostInodesAlmostFull, HostFilesystemReadOnly, MariaDBDataDiskFilling, MariaDBDataDiskFillingSoon]
+      refs: [res-nm-fs-filling, res-nm-fs-almost, res-nm-files, res-ne-fs-readonly, res-nm-fs-readonly]
+  - what: 行程 CPU、記憶體、OOM kill、fsync／磁碟延遲
+    category: other
+    why: mysqld_exporter 沒有行程 CPU 與 fsync 延遲（10.11 起 `Innodb_data_pending_fsyncs` 連 redo log 都不算）；OOM kill 在資料庫裡只看得到 uptime 歸零
+    workaround: node_exporter 的 PSI、MemAvailable、vmstat 與磁碟時間；容器用 cAdvisor 的節流、working set 與 OOM 事件。主機層規則只讀碼
+    section: targets/mariadb.md#saturation
+    covered_by:
+      tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"
+      config: rules/host/meta.yml
+      metrics: [node_pressure_cpu_waiting_seconds_total, container_cpu_cfs_throttled_periods_total, node_memory_MemAvailable_bytes, node_vmstat_oom_kill, node_disk_write_time_seconds_total, node_disk_writes_completed_total]
+      rules: [HostCPUPressure, ContainerCPUThrottled, HostMemoryLow, HostMemoryPressure, HostOOMKill, ContainerOOMEvent, ContainerOOMKilled, HostDiskWriteLatencyHigh, HostIOPressure]
+      refs: [res-ne-psi-cpu, res-cadv-throttled, res-ne-mem-avail, res-ne-psi-mem, res-ne-vmstat-fields, res-cadv-oom, res-ksm-terminated, res-ne-disk-writetime, res-ne-disk-writes, res-ne-psi-io]
+  - what: 備份是否成功、多新
+    category: other
+    why: 沒有備份 collector
+    workaround: 備份 job 寫 textfile metric
+    section: targets/mariadb.md#protection

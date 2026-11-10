@@ -270,16 +270,36 @@ def dropped_by(job: dict, metric: str) -> bool:
 
 # ---------- catalog hints ----------
 
+def producer_of(card: dict) -> str:
+    """What produces a card's metrics: its `exporter` when several cards share one (mysql and mariadb both read
+    mysqld_exporter), else the card id. Answers (`producers.<name>`) and hints use this name."""
+    return card.get("exporter") or card["id"]
+
+
+def producer_cards(root: str) -> dict[str, list[str]]:
+    """producer name -> card ids, only for producers that more than one card (or a differently named card) uses."""
+    out: dict[str, set] = {}
+    for card in C.load_components(root):
+        out.setdefault(producer_of(card), set()).add(card["id"])
+    return {k: sorted(v) for k, v in out.items() if v != {k}}
+
+
 def catalog_hints(root: str) -> dict[str, list[str]]:
-    """metric name -> card ids that list it (hint only)."""
+    """metric name -> producers (exporter or card id) whose cards list it (hint only)."""
     out: dict[str, set] = {}
     for card in C.load_components(root):
         for s in card.get("signals", []):
             for m in s.get("metrics") or []:
                 if isinstance(m, str) and re.fullmatch(r"[A-Za-z_:][A-Za-z0-9_:]*", m) and m not in BUILTIN_EXACT \
                         and m != "probe_success" and not m.startswith(BUILTIN_PREFIX):
-                    out.setdefault(m, set()).add(card["id"])
+                    out.setdefault(m, set()).add(producer_of(card))
     return {k: sorted(v) for k, v in out.items()}
+
+
+def cards_note(producer: str, root: str) -> str:
+    """'（目錄卡片：mysql 或 mariadb，要確認是哪一種）' when one exporter serves several cards."""
+    cards = producer_cards(root).get(producer)
+    return f"（目錄卡片：{' 或 '.join(cards)}，要確認是哪一種）" if cards else ""
 
 
 # labels the exporter itself puts on its metrics: never a question about the scrape config
@@ -589,7 +609,7 @@ def report(rows: list[dict], jobs: list[dict]) -> str:
                 groups.setdefault(r["hint"][0] if len(r["hint"]) == 1 else "", set()).add(r["metric"])
         for card in sorted(k for k in groups if k):
             ms = sorted(groups[card])
-            out.append(f"- 目錄提示這 {len(ms)} 個 metric 通常來自 `{card}`：{', '.join('`' + m + '`' for m in ms[:6])}"
+            out.append(f"- 目錄提示這 {len(ms)} 個 metric 通常來自 `{card}`{cards_note(card, C.ROOT)}：{', '.join('`' + m + '`' for m in ms[:6])}"
                        f"{' 等' if len(ms) > 6 else ''}。實際是哪個 scrape job？（寫在 `producers.{card}`）")
         for m in sorted(groups.get("", ())):
             out.append(f"- `{m}` 是哪個 scrape job 產生的？目錄裡沒有唯一的提示，可能是應用程式自己的 metric（寫在 `metrics`）")

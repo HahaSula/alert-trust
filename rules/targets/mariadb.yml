@@ -1,0 +1,690 @@
+# mysqld_exporter＋MariaDB（10.6、10.11、11.4、11.8、12.3）的建議規則。放在抓這個 exporter 的 Prometheus 上評估。
+# MySQL 用 rules/targets/mysql.yml（原始碼與 metric 名稱不同，見 docs/targets/versions/）。metric 前綴仍是 mysql_（exporter 決定的）。
+# job="mariadb" 是佔位符，請換成實際的 job 名稱；多 target（/probe）模式下 instance 是資料庫位址。
+# 其他佔位符：role="primary" 與 cluster（要自己用 relabel 加上）、node_exporter 的 job="node" 與 mountpoint、scrape 耗時門檻 8 秒（假設 scrape_timeout 10s）。
+# 門檻以 scrape 30s 為基準，請依環境調整。
+# 版本：MariaDB 的 REPLICA 是 SLAVE 的同義字，五條線的 replication metric 都是舊欄位名（slave_*、seconds_behind_master），
+# semi-sync 只有 master；不像 MySQL 8.4 會改名。slave_connections_needed_for_purge 只有 11.4 以上（MariaDBBinlogNotPurged）。
+# replication 規則要 exporter 帳號有 SLAVE MONITOR（11.0 起 SUPER 不涵蓋），否則 slave_status 失敗、整組回傳空。
+# runbook_url 指向 alert-trust 網站上對應訊號的段落（components/mariadb/）。
+groups:
+  - name: mariadb-exporter-liveness
+    rules:
+      - alert: MariaDBExporterDown
+        expr: up{job="mariadb"} == 0
+        for: 2m
+        labels: { severity: critical, component: mariadb, tier: "1" }
+        annotations:
+          summary: "抓不到 mysqld_exporter；這時 mysql_up 會消失，上游的 MariaDBDown（mysql_up != 1）不會響"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#exporter-up
+      - alert: MariaDBExporterMissing
+        expr: absent(up{job="mariadb"})
+        for: 5m
+        labels: { severity: critical, component: mariadb, tier: "1" }
+        annotations:
+          summary: "完全沒有 mariadb job 的 target，服務發現或 job 名稱可能錯了，所有 MariaDB 規則都回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#exporter-up
+      - alert: MariaDBNotReachable
+        expr: mysql_up{job="mariadb"} == 0
+        for: 1m
+        labels: { severity: critical, component: mariadb, tier: "1" }
+        annotations:
+          summary: "Exporter 活著但連不上資料庫（停機、密碼輪替、max_user_connections 用完）；collector_success 會整組消失"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#db-up
+          absence_covered_by: "MariaDBExporterDown, MariaDBExporterMissing"
+      - alert: MariaDBCollectorsMissing
+        expr: |
+          up{job="mariadb"} == 1
+            unless on (job, instance) mysql_exporter_collector_success{job="mariadb"}
+        for: 2m
+        labels: { severity: critical, component: mariadb, tier: "1" }
+        annotations:
+          summary: "Exporter 有回應卻沒有任何 collector 結果；MariaDBCollectorFailed（== 0）在這時回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#collectors-present
+      - alert: MariaDBCollectorFailed
+        expr: mysql_exporter_collector_success{job="mariadb"} == 0
+        for: 10m
+        labels: { severity: warning, component: mariadb, tier: "1" }
+        annotations:
+          summary: "Collector {{ $labels.collector }} 一直失敗，它的 metric 已消失，依賴它的規則回傳空（常見原因：權限不足、表不存在）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#collector-success
+          absence_covered_by: "MariaDBCollectorsMissing"
+      - alert: MariaDBProbeExporterDown
+        expr: |
+          count by (job) (up{job="mariadb"} == 0)
+            / count by (job) (up{job="mariadb"}) > 0.5
+        for: 2m
+        labels: { severity: critical, component: mariadb, tier: "1" }
+        annotations:
+          summary: "超過一半的 MariaDB target 同時抓不到；多 target 模式下多半是共用的 exporter 掛了，不是資料庫"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#probe-blast-radius
+
+  - name: mariadb-exporter-budget
+    rules:
+      - alert: MariaDBCollectorSetShrunk
+        expr: |
+          count by (instance) (mysql_exporter_collector_success{job="mariadb"})
+            < count by (instance) (mysql_exporter_collector_success{job="mariadb"} offset 1h)
+        for: 10m
+        labels: { severity: warning, component: mariadb, tier: "2" }
+        annotations:
+          summary: "回報的 collector 比一小時前少；版本門檻、collect[] 參數或啟動旗標變了，少掉的 collector 不會回報失敗"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#collector-set
+      - alert: MariaDBScrapeNearTimeout
+        expr: scrape_duration_seconds{job="mariadb"} > 8
+        for: 10m
+        labels: { severity: warning, component: mariadb, tier: "2" }
+        annotations:
+          summary: "Scrape 耗時接近 scrape_timeout；超過時整次 scrape 失敗，up 變 0，所有 mysql_* 一起消失"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#scrape-budget
+      - alert: MariaDBCollectorSlow
+        expr: mysql_exporter_collector_duration_seconds{job="mariadb"} > 5
+        for: 10m
+        labels: { severity: warning, component: mariadb, tier: "2" }
+        annotations:
+          summary: "{{ $labels.collector }} 單次超過 5 秒；collector=connection 慢代表連線階段就卡住"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#scrape-budget
+      - alert: MariaDBUpFlapping
+        expr: changes(mysql_up{job="mariadb"}[15m]) > 2
+        labels: { severity: warning, component: mariadb, tier: "2" }
+        annotations:
+          summary: "mysql_up 15 分鐘內反覆變化；常見於多台 Prometheus 同時抓，連線數超過 MAX_USER_CONNECTIONS"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#db-up-flapping
+
+  - name: mariadb-replication
+    rules:
+      - alert: MariaDBReplicationNotRunning
+        expr: |
+          min by (instance, connection_name) (
+            {__name__=~"mysql_slave_status_slave_(io|sql)_running", job="mariadb"}
+          ) == 0
+        for: 2m
+        labels: { severity: critical, component: mariadb, tier: "1" }
+        annotations:
+          summary: "Replication IO 或 SQL thread 停止（IO 在 Connecting 也算 0；io 與 sql 兩條 label 相同，所以用 __name__ 正規式，不用 or）；Seconds_Behind 這時消失，延遲規則回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#replication-running
+          absence_covered_by: "MariaDBReplicaStatusMissing"
+      - alert: MariaDBReplicationError
+        expr: |
+          max by (instance, connection_name) (
+            mysql_slave_status_last_sql_errno{job="mariadb"}
+          ) > 0
+        for: 1m
+        labels: { severity: critical, component: mariadb, tier: "2" }
+        annotations:
+          summary: "Replica 的 SQL thread 因錯誤 {{ $value }} 停下（例如 1062 重複鍵），要人處理，不會自己恢復"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#replication-error
+      - alert: MariaDBReplicaStatusMissing
+        expr: |
+          (
+            max by (instance) (mysql_slave_status_slave_sql_running{job="mariadb"} offset 1h)
+              unless on (instance)
+            max by (instance) (mysql_slave_status_slave_sql_running{job="mariadb"})
+          )
+          and on (instance) mysql_up{job="mariadb"} == 1
+        for: 5m
+        labels: { severity: critical, component: mariadb, tier: "1" }
+        annotations:
+          summary: "一小時前是 replica，現在沒有 replica 狀態；SLAVE MONITOR 被收回或 RESET SLAVE ALL（升級成 primary），所有 replication 規則回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#replica-status-present
+      - alert: MariaDBHeartbeatLag
+        expr: |
+          mysql_heartbeat_now_timestamp_seconds{job="mariadb"}
+            - mysql_heartbeat_stored_timestamp_seconds{job="mariadb"} > 30
+        for: 2m
+        labels: { severity: critical, component: mariadb, tier: "2" }
+        annotations:
+          summary: "Heartbeat 表超過 30 秒沒更新；replica 延遲、IO thread 停了，或 primary 上的 heartbeat 寫入程式停了（這時每台都會響）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#replication-lag
+      - alert: MariaDBReplicationLag
+        expr: |
+          (
+            mysql_slave_status_seconds_behind_master{job="mariadb"}
+              - mysql_slave_status_sql_delay{job="mariadb"}
+          ) > 30
+        for: 2m
+        labels: { severity: warning, component: mariadb, tier: "2" }
+        annotations:
+          summary: "Seconds_Behind_Master 扣掉 SQL_Delay 超過 30 秒；IO thread 不是 Yes 或 SQL thread 停止時這個值消失，只能當輔助"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#replication-lag
+
+  - name: mariadb-ha
+    rules:
+      - alert: MariaDBPrimaryReadOnly
+        expr: mysql_global_variables_read_only{job="mariadb", role="primary"} == 1
+        for: 2m
+        labels: { severity: critical, component: mariadb, tier: "2" }
+        annotations:
+          summary: "標成 primary 的節點是 read_only，寫入會失敗，但 up 與 mysql_up 都是 1；role 是靜態 label，failover 後要跟著改"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#primary-writable
+      - alert: MariaDBReplicaWritable
+        expr: |
+          mysql_global_variables_read_only{job="mariadb"} == 0
+          and on (instance) count by (instance) (mysql_slave_status_slave_sql_running{job="mariadb"})
+        for: 5m
+        labels: { severity: warning, component: mariadb, tier: "2" }
+        annotations:
+          summary: "正在複製的節點可以寫入（read_only=0；MariaDB 沒有 super_read_only，READ ONLY ADMIN 的帳號在 read_only=1 時也能寫）；寫進去的資料會和 primary 衝突，gtid_binlog_state 會多出 replica 自己的 server_id"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#replica-read-only
+          absence_covered_by: "MariaDBCollectorFailed, MariaDBCollectorsMissing"
+      - alert: MariaDBNoWritablePrimary
+        expr: |
+          count by (cluster) (mysql_up{job="mariadb"} == 1)
+            unless on (cluster)
+          count by (cluster) (
+            mysql_global_variables_read_only{job="mariadb"} == 0
+              unless on (instance) mysql_slave_status_slave_sql_running{job="mariadb"}
+          )
+          unless on (cluster) count by (cluster) (mysql_up{job="mariadb"} == 0)
+        for: 2m
+        labels: { severity: critical, component: mariadb, tier: "2" }
+        annotations:
+          summary: "叢集 {{ $labels.cluster }} 所有節點都連得上，卻沒有任何可寫、且不是 replica 的節點；有節點連不上時交給 MariaDBNotReachable（連線打滿時 read_only 會消失，不排除會誤報）；cluster 是佔位 label"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#role-detection
+      - alert: MariaDBMultipleWritable
+        expr: |
+          count by (cluster) (
+            mysql_global_variables_read_only{job="mariadb"} == 0
+              unless on (instance) mysql_slave_status_slave_sql_running{job="mariadb"}
+          ) > 1
+        for: 1m
+        labels: { severity: critical, component: mariadb, tier: "2" }
+        annotations:
+          summary: "叢集 {{ $labels.cluster }} 有 {{ $value }} 台可寫且不在複製的節點；failover 後舊 primary 回來時常見，兩邊都能寫"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#role-detection
+      - alert: MariaDBSemiSyncDegraded
+        expr: |
+          mysql_global_status_rpl_semi_sync_master_status{job="mariadb"} == 0
+            and on (instance) mysql_global_variables_rpl_semi_sync_master_enabled{job="mariadb"} == 1
+        for: 2m
+        labels: { severity: warning, component: mariadb, tier: "3" }
+        annotations:
+          summary: "Semi-sync 開著但已退回 async（等 ACK 逾時，或 replica 沒開）；commit 照常成功，只有這個狀態會變；沒開 semi-sync 時 status 也是 0，所以要配 enabled"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#semi-sync
+          absence_covered_by: "MariaDBCollectorFailed, MariaDBCollectorsMissing"
+
+  # 叢集與共識：Galera。沒開 Galera 的 MariaDB 也有 wsrep_ready=0、wsrep_cluster_status=0，所以每條都用 wsrep_on 過濾。
+  - name: mariadb-cluster
+    rules:
+      - alert: MariaDBGaleraNotReady
+        expr: |
+          mysql_global_status_wsrep_ready{job="mariadb"} != 1
+            and on (instance) mysql_global_variables_wsrep_on{job="mariadb"} == 1
+        for: 5m
+        labels: { severity: critical, component: mariadb, tier: "3" }
+        annotations:
+          summary: "Galera 節點不接受讀寫；沒啟用 Galera 的 MariaDB 也有 wsrep_ready=0，所以要用 wsrep_on 過濾"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#galera-state
+          absence_covered_by: "MariaDBExporterDown, MariaDBCollectorsMissing"
+      - alert: MariaDBGaleraOutOfSync
+        expr: |
+          mysql_global_status_wsrep_local_state{job="mariadb"} != 4
+            and on (instance) mysql_global_variables_wsrep_desync{job="mariadb"} == 0
+        for: 5m
+        labels: { severity: warning, component: mariadb, tier: "3" }
+        annotations:
+          summary: "Galera 節點不在 Synced 狀態，也不是刻意 desync"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#galera-state
+          absence_covered_by: "MariaDBExporterDown, MariaDBCollectorsMissing"
+      - alert: MariaDBGaleraNonPrimary
+        expr: |
+          mysql_global_status_wsrep_cluster_status{job="mariadb"} != 1
+            and on (job, instance) mysql_global_variables_wsrep_on{job="mariadb"} == 1
+        for: 1m
+        labels: { severity: critical, component: mariadb, tier: "2" }
+        annotations:
+          summary: "Galera 節點不在 Primary component（失去 quorum 或斷線），拒絕讀寫；exporter 把 Primary 轉成 1、non-Primary／Disconnected 轉成 0；沒開 Galera 的 MariaDB 也是 0，所以要用 wsrep_on 過濾"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#galera-quorum
+          absence_covered_by: "MariaDBExporterDown, MariaDBNotReachable, MariaDBCollectorsMissing"
+      - alert: MariaDBGaleraClusterShrunk
+        expr: |
+          mysql_global_status_wsrep_cluster_size{job="mariadb"}
+            < max_over_time(mysql_global_status_wsrep_cluster_size{job="mariadb"}[1h])
+          and on (job, instance) mysql_global_variables_wsrep_on{job="mariadb"} == 1
+        for: 5m
+        labels: { severity: warning, component: mariadb, tier: "2" }
+        annotations:
+          summary: "Galera 叢集成員數比一小時內的最大值少（{{ $value }}）；再少一台可能失去 quorum。刻意移除節點後這條會持續一小時"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#galera-quorum
+          absence_covered_by: "MariaDBExporterDown, MariaDBNotReachable, MariaDBCollectorsMissing"
+      - alert: MariaDBGaleraFlowControl
+        expr: |
+          rate(mysql_global_status_wsrep_flow_control_paused_ns{job="mariadb"}[5m]) / 1e9 > 0.1
+        for: 10m
+        labels: { severity: warning, component: mariadb, tier: "3" }
+        annotations:
+          summary: "Galera 有 {{ $value | humanizePercentage }} 的時間因 flow control 暫停複寫（整個叢集的寫入一起等最慢的節點）；看各節點的 wsrep_local_recv_queue 與 wsrep_flow_control_sent 找出是誰送的"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#galera-flow-control
+  # 資料維護與完整性：救援模式、表的碎片（長交易與 undo history 在 mysql-stability）
+  - name: mariadb-maintenance
+    rules:
+      - alert: MariaDBInnoDBForceRecovery
+        expr: mysql_global_variables_innodb_force_recovery{job="mariadb"} != 0
+        for: 2m
+        labels: { severity: warning, component: mariadb, tier: "3" }
+        annotations:
+          summary: "innodb_force_recovery 開著，資料庫在救援模式（≥4 時 InnoDB 唯讀）；通常代表之前遇到損毀，救完要改回 0 並重啟"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#force-recovery
+          absence_covered_by: "MariaDBCollectorFailed, MariaDBCollectorsMissing"
+      - alert: MariaDBTableFragmented
+        expr: |
+          mysql_info_schema_table_size{job="mariadb", component="data_free"} > 1e9
+          and on (job, instance, schema, table)
+            mysql_info_schema_table_size{job="mariadb", component="data_free"}
+              > on (job, instance, schema, table) (0.5 * sum without (component) (mysql_info_schema_table_size{job="mariadb", component=~"data_length|index_length"}))
+        for: 1h
+        labels: { severity: info, component: mariadb, tier: "3" }
+        annotations:
+          summary: "{{ $labels.schema }}.{{ $labels.table }} 的未使用空間超過 1 GB 且大於資料加索引的一半（大量 DELETE 後），考慮 OPTIMIZE／重建；要 --collect.info_schema.tables（每張表一組 series）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#table-fragmentation
+
+  # 資料保護：PITR 需要的 binlog、耐久性設定、備份新鮮度（備份工具要自己輸出 metric）
+  - name: mariadb-protection
+    rules:
+      - alert: MariaDBBinlogDisabled
+        expr: mysql_global_variables_log_bin{job="mariadb", pitr!="false"} == 0
+        for: 30m
+        labels: { severity: warning, component: mariadb, tier: "2" }
+        annotations:
+          summary: "binlog 沒開，只能還原到最後一次完整備份（沒有 point-in-time recovery）；MariaDB 預設關（log_bin 0）。不需要 PITR 的節點用 pitr=\"false\" label 排除（label 是佔位符）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#binlog-pitr
+          absence_covered_by: "MariaDBCollectorFailed, MariaDBCollectorsMissing"
+      - alert: MariaDBBinlogRetentionShort
+        expr: |
+          mysql_global_variables_binlog_expire_logs_seconds{job="mariadb"} > 0
+            and mysql_global_variables_binlog_expire_logs_seconds{job="mariadb"} < 7 * 86400
+            and on (job, instance) mysql_global_variables_log_bin{job="mariadb"} == 1
+        for: 30m
+        labels: { severity: warning, component: mariadb, tier: "3" }
+        annotations:
+          summary: "binlog 保留 {{ $value | humanizeDuration }}，比完整備份週期（例子：7 天）短，兩次備份之間的 PITR 會缺一段；0 代表不依時間刪除"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#binlog-pitr
+          absence_covered_by: "MariaDBCollectorFailed, MariaDBCollectorsMissing"
+      - alert: MariaDBDurabilityRelaxed
+        expr: |
+          (mysql_global_variables_sync_binlog{job="mariadb"} != 1 and on (job, instance) mysql_global_variables_log_bin{job="mariadb"} == 1)
+          or mysql_global_variables_innodb_flush_log_at_trx_commit{job="mariadb"} != 1
+        for: 30m
+        labels: { severity: info, component: mariadb, tier: "3" }
+        annotations:
+          summary: "sync_binlog 或 innodb_flush_log_at_trx_commit 不是 1，主機斷電時可能少掉最近已 commit 的交易，binlog 與資料也可能不一致；MariaDB 的 sync_binlog 預設是 0，所以預設設定就會響（刻意的）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#durability-settings
+          absence_covered_by: "MariaDBCollectorFailed, MariaDBCollectorsMissing"
+      - alert: MariaDBBackupStale
+        expr: time() - max by (cluster) (mysql_backup_last_success_timestamp_seconds) > 26 * 3600
+        for: 10m
+        labels: { severity: warning, component: mariadb, tier: "2" }
+        annotations:
+          summary: "叢集 {{ $labels.cluster }} 超過 26 小時沒有成功的備份；mysqld_exporter 沒有備份 metric，這個 metric 要由備份 job 寫 textfile 或推到 Pushgateway（名稱與 26h 是例子）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#backup-freshness
+          absence_covered_by: "MariaDBBackupMetricMissing"
+      - alert: MariaDBBackupMetricMissing
+        expr: absent(mysql_backup_last_success_timestamp_seconds)
+        for: 1h
+        labels: { severity: warning, component: mariadb, tier: "2" }
+        annotations:
+          summary: "完全沒有備份的 metric：備份 job 沒在寫、textfile 路徑錯，或 node_exporter 沒開 textfile collector；這時 MariaDBBackupStale 回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#backup-freshness
+
+  # 容量與成長：趨勢與預測
+  - name: mariadb-capacity
+    rules:
+      - alert: MariaDBDataDiskFillingSoon
+        expr: |
+          predict_linear(node_filesystem_avail_bytes{job="node", mountpoint="/var/lib/mysql"}[6h], 24 * 3600) < 0
+          and node_filesystem_avail_bytes{job="node", mountpoint="/var/lib/mysql"}
+            / node_filesystem_size_bytes{job="node", mountpoint="/var/lib/mysql"} < 0.4
+        for: 1h
+        labels: { severity: warning, component: mariadb, tier: "3" }
+        annotations:
+          summary: "照過去 6 小時的速度，資料目錄 24 小時內會滿；binlog 沒在清（11.4 起沒有 replica 連著時預設不刪，見 MariaDBBinlogNotPurged）、大量匯入、暫存表都會讓它變快"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#disk-space
+      - alert: MariaDBBinlogNotPurged
+        expr: |
+          mysql_global_status_slaves_connected{job="mariadb"}
+            < on (job, instance) mysql_global_variables_slave_connections_needed_for_purge{job="mariadb"}
+          and on (job, instance) mysql_global_variables_log_bin{job="mariadb"} == 1
+          and on (job, instance) mysql_global_variables_binlog_expire_logs_seconds{job="mariadb"} > 0
+        for: 1h
+        labels: { severity: info, component: mariadb, tier: "3" }
+        annotations:
+          summary: "連著的 replica（{{ $value }}）少於 slave_connections_needed_for_purge，binlog 過期也不會刪（11.4 起）；單機開 binlog 時會一直長到磁碟滿。單機要把它設成 0"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#binlog-growth
+          absence_covered_by: "MariaDBCollectorFailed, MariaDBCollectorsMissing"
+      - alert: MariaDBAutoIncrementNearMax
+        expr: |
+          mysql_info_schema_auto_increment_column{job="mariadb"}
+            / on (job, instance, schema, table, column) mysql_info_schema_auto_increment_column_max{job="mariadb"} > 0.8
+        for: 1h
+        labels: { severity: warning, component: mariadb, tier: "3" }
+        annotations:
+          summary: "{{ $labels.schema }}.{{ $labels.table }}.{{ $labels.column }} 已用掉 {{ $value | humanizePercentage }} 的整數範圍，用完後 INSERT 回 duplicate key；要 --collect.auto_increment.columns"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#autoinc-exhaustion
+          absence_covered_by: "MariaDBCollectorFailed"
+      - alert: MariaDBConnectionPeakNearMax
+        expr: |
+          mysql_global_status_max_used_connections{job="mariadb"}
+            / on (job, instance) mysql_global_variables_max_connections{job="mariadb"} >= 0.9
+        for: 5m
+        labels: { severity: info, component: mariadb, tier: "3" }
+        annotations:
+          summary: "重啟（或 FLUSH STATUS）以來連線數曾到 max_connections 的 {{ $value | humanizePercentage }}；這個高水位在 exporter 被擋在外面時也會記下來（打滿時是 max_connections + 1）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#connection-headroom
+          absence_covered_by: "MariaDBNotReachable, MariaDBCollectorFailed"
+
+
+  - name: mariadb-stability
+    rules:
+      - alert: MariaDBRestarted
+        expr: mysql_global_status_uptime{job="mariadb"} < 300
+        labels: { severity: info, component: mariadb, tier: "3" }
+        annotations:
+          summary: "MariaDB 五分鐘內重啟過（含 crash、OOM kill）；停機時間短於 for 的話 mysql_up 規則不會響"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#restarts
+      - alert: MariaDBDataDiskFilling
+        expr: |
+          node_filesystem_avail_bytes{job="node", mountpoint="/var/lib/mysql"}
+            / node_filesystem_size_bytes{job="node", mountpoint="/var/lib/mysql"} < 0.10
+        for: 10m
+        labels: { severity: warning, component: mariadb, tier: "2" }
+        annotations:
+          summary: "資料目錄剩不到 10%；InnoDB 資料檔長不出去時立刻回 ERROR 1114（實測），binlog 等寫入則會卡住重試（手冊）；mysqld_exporter 看不到磁碟，要靠 node_exporter（job、mountpoint 是佔位符）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#disk-space
+      - alert: MariaDBLongTransaction
+        expr: max by (instance) (mysql_info_schema_innodb_trx_oldest_transaction_age_seconds{job="mariadb"}) > 300
+        for: 1m
+        labels: { severity: warning, component: mariadb, tier: "2" }
+        annotations:
+          summary: "有交易開了超過 5 分鐘；需要 --collect.info_schema.innodb_trx 與 PROCESS，沒有交易時這個 metric 不存在"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#long-transactions
+      - alert: MariaDBInnoDBHistoryLength
+        expr: |
+          max by (instance) (mysql_global_status_innodb_history_list_length{job="mariadb"}) > 50000
+        for: 5m
+        labels: { severity: warning, component: mariadb, tier: "2" }
+        annotations:
+          summary: "Undo history 太長（purge 被長交易擋住）；Innodb_history_list_length 是 global status，預設就有"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#undo-history
+      - alert: MariaDBDeadlocks
+        expr: |
+          sum by (instance) (increase(mysql_global_status_innodb_deadlocks{job="mariadb"}[10m])) > 5
+        labels: { severity: info, component: mariadb, tier: "3" }
+        annotations:
+          summary: "10 分鐘內超過 5 次 deadlock（global status 的 Innodb_deadlocks，預設就有）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#deadlocks
+
+  - name: mariadb-usage
+    rules:
+      - alert: MariaDBTooManyConnections
+        expr: |
+          max_over_time(mysql_global_status_threads_connected{job="mariadb"}[1m])
+            / mysql_global_variables_max_connections{job="mariadb"} > 0.8
+        for: 2m
+        labels: { severity: warning, component: mariadb, tier: "3" }
+        annotations:
+          summary: "連線數超過 max_connections 的 80%；真的滿了之後 exporter 也連不上，這條規則反而回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#connections
+      - alert: MariaDBConnectionsRefused
+        expr: increase(mysql_global_status_connection_errors_total{job="mariadb", error="max_connections"}[10m]) > 0
+        labels: { severity: warning, component: mariadb, tier: "2" }
+        annotations:
+          summary: "有連線因為 max_connections 被拒；滿載當下 exporter 也被擋，這個計數在連線降下來後才看得到"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#connections
+      - alert: MariaDBHighThreadsRunning
+        expr: |
+          max_over_time(mysql_global_status_threads_running{job="mariadb"}[1m])
+            / mysql_global_variables_max_connections{job="mariadb"} > 0.6
+        for: 2m
+        labels: { severity: warning, component: mariadb, tier: "3" }
+        annotations:
+          summary: "執行中的 thread 超過 max_connections 的 60%"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#connections
+      - alert: MariaDBUserConnectionLimit
+        expr: |
+          max by (instance, user) (mysql_sys_current_connections{job="mariadb"})
+            / on (instance, user)
+          max by (instance, user) (
+            label_replace(mysql_mysql_max_user_connections{job="mariadb"} > 0, "user", "$1", "mysql_user", "(.*)")
+          ) > 0.8
+        for: 5m
+        labels: { severity: warning, component: mariadb, tier: "3" }
+        annotations:
+          summary: "帳號 {{ $labels.user }} 用了 MAX_USER_CONNECTIONS 的 80% 以上；要 sys.user_summary 與 mysql.user collector；兩者的帳號 label 不同名（user／mysql_user）；要 performance_schema=ON（MariaDB 預設 OFF，沒開時沒有資料）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#user-connection-limits
+      - alert: MariaDBRowLockWaits
+        expr: mysql_global_status_innodb_row_lock_current_waits{job="mariadb"} > 10
+        for: 2m
+        labels: { severity: warning, component: mariadb, tier: "3" }
+        annotations:
+          summary: "超過 10 個 session 在等 InnoDB row lock；metadata lock 不算在內，要看 processlist"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#lock-waits
+      - alert: MariaDBInnoDBLogWaits
+        expr: rate(mysql_global_status_innodb_log_waits{job="mariadb"}[15m]) > 10
+        labels: { severity: warning, component: mariadb, tier: "3" }
+        annotations:
+          summary: "InnoDB log buffer 太小或 redo 寫入在等磁碟"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#innodb-pressure
+      - alert: MariaDBBufferPoolWaitFree
+        expr: rate(mysql_global_status_innodb_buffer_pool_wait_free{job="mariadb"}[5m]) > 0
+        for: 15m
+        labels: { severity: warning, component: mariadb, tier: "3" }
+        annotations:
+          summary: "Buffer pool 找不到乾淨的頁，查詢在等 flush"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#innodb-pressure
+      - alert: MariaDBPendingFsyncs
+        expr: avg_over_time(mysql_global_status_innodb_data_pending_fsyncs{job="mariadb"}[10m]) > 1
+        for: 15m
+        labels: { severity: warning, component: mariadb, tier: "3" }
+        annotations:
+          summary: "InnoDB 平均有 {{ $value | printf \"%.1f\" }} 個 fsync 在排隊；10.11 起只算資料檔（不含 redo log），10.6 含 redo log。延遲本身看主機的磁碟寫入時間；門檻是例子"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#pending-fsyncs
+      - alert: MariaDBThreadCacheMisses
+        expr: |
+          rate(mysql_global_status_threads_created{job="mariadb"}[10m])
+            / rate(mysql_global_status_connections{job="mariadb"}[10m]) > 0.5
+          and rate(mysql_global_status_connections{job="mariadb"}[10m]) > 1
+        for: 30m
+        labels: { severity: info, component: mariadb, tier: "3" }
+        annotations:
+          summary: "超過一半的新連線要現開 thread（Threads_created／Connections）；thread_cache_size（預設 256）不夠或應用一直重建連線。只適用 thread_handling=one-thread-per-connection；門檻是例子"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#thread-cache
+      - alert: MariaDBTmpDiskTables
+        expr: |
+          rate(mysql_global_status_created_tmp_disk_tables{job="mariadb"}[15m])
+            / rate(mysql_global_status_created_tmp_tables{job="mariadb"}[15m]) > 0.25
+        for: 30m
+        labels: { severity: info, component: mariadb, tier: "3" }
+        annotations:
+          summary: "超過四分之一的內部暫存表落到磁碟"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#tmp-tables
+      - alert: MariaDBTableOpenCacheOverflows
+        expr: rate(mysql_global_status_table_open_cache_overflows{job="mariadb"}[15m]) > 1
+        for: 30m
+        labels: { severity: info, component: mariadb, tier: "3" }
+        annotations:
+          summary: "table_open_cache 不夠，表一直被關掉再打開"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#table-open-cache
+      - alert: MariaDBAbortedConnects
+        expr: rate(mysql_global_status_aborted_connects{job="mariadb"}[5m]) > 1
+        for: 10m
+        labels: { severity: info, component: mariadb, tier: "3" }
+        annotations:
+          summary: "連線建立失敗（密碼錯、超過 MAX_USER_CONNECTIONS、握手逾時）每秒超過 1 次"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#aborted-connects
+      - alert: MariaDBSlowQueries
+        expr: increase(mysql_global_status_slow_queries{job="mariadb"}[5m]) > 0
+        for: 2m
+        labels: { severity: info, component: mariadb, tier: "3" }
+        annotations:
+          summary: "有新的慢查詢（超過 long_query_time，不管 slow log 有沒有開都會計數）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#slow-queries
+
+  # 效能與故障情境（lab/targets/mysql/perf）。門檻是例子；比較基準用 offset 1h，請改成符合流量週期的區間。
+  - name: mariadb-performance
+    rules:
+      - alert: MariaDBThroughputDrop
+        expr: |
+          sum by (instance) (rate(mysql_global_status_commands_total{job="mariadb", command="commit"}[5m]))
+            < 0.5 * sum by (instance) (rate(mysql_global_status_commands_total{job="mariadb", command="commit"}[5m] offset 1h))
+          and sum by (instance) (rate(mysql_global_status_commands_total{job="mariadb", command="commit"}[5m] offset 1h)) > 10
+        for: 10m
+        labels: { severity: warning, component: mariadb, tier: "3" }
+        annotations:
+          summary: "Commit 速率不到一小時前的一半；鎖、metadata lock、CPU、I/O 都會先表現成這個，原因要看同時間其他訊號；流量本來就會掉的時段要調整 offset"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#throughput-drop
+          absence_covered_by: "MariaDBNotReachable, MariaDBExporterDown"
+      - alert: MariaDBMetadataLockWaits
+        expr: |
+          sum by (instance) (mysql_info_schema_processlist_threads{job="mariadb", state=~".*metadata_lock.*"}) >= 3
+        for: 1m
+        labels: { severity: warning, component: mariadb, tier: "2" }
+        annotations:
+          summary: "{{ $value }} 個 session 在等 metadata lock（常見：ALTER TABLE 排在長交易後面，後面所有用到這張表的查詢一起排隊）；row lock 規則看不到；要 --collect.info_schema.processlist 與 PROCESS"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#metadata-locks
+          absence_covered_by: "MariaDBCollectorFailed, MariaDBCollectorsMissing"
+      - alert: MariaDBRowLockWaitTime
+        expr: rate(mysql_global_status_innodb_row_lock_time{job="mariadb"}[5m]) / 1000 > 2
+        for: 5m
+        labels: { severity: warning, component: mariadb, tier: "3" }
+        annotations:
+          summary: "平均隨時有 {{ $value | printf \"%.1f\" }} 個 session 在等 InnoDB row lock（innodb_row_lock_time 是毫秒）；current_waits 最多等於應用的連線數，連線池小時 MariaDBRowLockWaits（> 10）不會響"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#lock-waits
+      - alert: MariaDBSlowDigest
+        expr: |
+          (
+            sum by (instance, schema, digest, digest_text) (rate(mysql_perf_schema_events_statements_seconds_total{job="mariadb"}[5m]))
+              / sum by (instance, schema, digest, digest_text) (rate(mysql_perf_schema_events_statements_total{job="mariadb"}[5m]))
+          ) > 1
+          and sum by (instance, schema, digest, digest_text) (rate(mysql_perf_schema_events_statements_total{job="mariadb"}[5m])) > 0.05
+        for: 10m
+        labels: { severity: info, component: mariadb, tier: "3" }
+        annotations:
+          summary: "Digest {{ $labels.digest_text }} 平均每次超過 1 秒；要 --collect.perf_schema.eventsstatements（只輸出前 limit 個 digest），要 performance_schema=ON；MariaDB 的 quantile 永遠是 0，所以用平均"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#slow-sql-visibility
+          absence_covered_by: "MariaDBCollectorFailed, MariaDBCollectorsMissing"
+      - alert: MariaDBStatementErrors
+        expr: rate(mysql_perf_schema_events_statements_sum_errors{job="mariadb"}[5m]) > 1
+        for: 10m
+        labels: { severity: info, component: mariadb, tier: "3" }
+        annotations:
+          summary: "語句錯誤每秒超過 1 次（lock wait timeout、table is full、語法錯都算）；要 --collect.perf_schema.eventsstatementssum 與 performance_schema=ON；細節看 events_statements_errors_total 的 digest"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#statement-errors
+          absence_covered_by: "MariaDBCollectorFailed, MariaDBCollectorsMissing"
+      - alert: MariaDBBufferPoolDiskReads
+        expr: |
+          rate(mysql_global_status_innodb_buffer_pool_reads{job="mariadb"}[10m])
+            / rate(mysql_global_status_innodb_buffer_pool_read_requests{job="mariadb"}[10m]) > 0.05
+          and rate(mysql_global_status_innodb_buffer_pool_reads{job="mariadb"}[10m]) > 50
+        for: 15m
+        labels: { severity: info, component: mariadb, tier: "3" }
+        annotations:
+          summary: "超過 5% 的頁讀取要到磁碟（buffer pool 放不下工作集）；buffer_pool_wait_free 不一定會動"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#buffer-pool-misses
+      - alert: MariaDBRestartedRepeatedly
+        expr: resets(mysql_global_status_uptime{job="mariadb"}[1h]) > 1
+        labels: { severity: warning, component: mariadb, tier: "3" }
+        annotations:
+          summary: "一小時內重啟超過一次（crash loop、反覆 OOM kill）；重啟之間的停機短於 scrape 間隔時 mysql_up 看不到，uptime 歸零才看得到"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#crash-oom
+
+  # ---------- 用 query-exporter 5.2.2 補的盲點（queries/query-exporter/mysql.yaml） ----------
+  # 這組規則的 metric 由 query-exporter 輸出：job="query-exporter" 是佔位符；每個 metric 帶 database（設定檔裡的項目名稱）與 cluster。
+  # query-exporter 的內建 metric 沒有前綴：queries_total{query,status}、database_errors_total（counter 輸出時加 _total）、query_timestamp、query_interval。
+  # 所有自訂 metric 都設了 expiration，查詢失敗時 series 會消失，下面的規則回傳空；由前三條補位。
+  # 同一份設定也跑 MySQL 的查詢（名稱 mysql_*）；這裡只看 mariadb_* 查詢。up 與 database_errors_total 沒有 query label，
+  # mysql.yml 與 mariadb.yml 都載入時 MySQLCustomQueryExporterDown 與 MariaDBCustomQueryExporterDown 會一起響。
+  - name: mariadb-custom-queries
+    rules:
+      - alert: MariaDBCustomQueryExporterDown
+        expr: up{job="query-exporter"} == 0 or absent(up{job="query-exporter"})
+        for: 2m
+        labels: { severity: warning, component: mariadb, tier: "1" }
+        annotations:
+          summary: "抓不到 query-exporter（或沒有這個 job）；連線打滿、errant GTID、metadata lock 阻擋者、replica 錯誤碼的規則都會回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#custom-queries
+      - alert: MariaDBCustomQueryFailing
+        expr: |
+          sum by (instance, database, query, status) (increase(queries_total{job="query-exporter", query=~"mariadb_.*", status!="success"}[5m])) > 0
+          or sum by (instance, database) (increase(database_errors_total{job="query-exporter"}[5m])) > 0
+        for: 5m
+        labels: { severity: warning, component: mariadb, tier: "1" }
+        annotations:
+          summary: "{{ $labels.database }} 的自訂查詢 {{ $labels.query }} 失敗（{{ $labels.status }}；沒有 query label 表示連不上資料庫）；欄位對不上時查詢會被永久移除，要重啟 query-exporter"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#custom-queries
+      - alert: MariaDBCustomQueryStale
+        expr: |
+          sum by (job, instance, cluster, database, query) (
+            increase(queries_total{job="query-exporter", query=~"mariadb_.*", status="success"}[5m])
+          ) == 0
+        for: 2m
+        labels: { severity: warning, component: mariadb, tier: "1" }
+        annotations:
+          summary: "{{ $labels.database }} 的自訂查詢 {{ $labels.query }} 5 分鐘內沒有成功過（連不上、逾時，或欄位對不上被永久移除）；對應的 mysql_q_* 已過 expiration 消失。不用 query_timestamp：查詢回 0 列時它不會更新"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#custom-queries
+          absence_covered_by: "MariaDBCustomQueryExporterDown"
+      - alert: MariaDBConnectionsExhausted
+        expr: mysql_q_threads_connected{job="query-exporter"} / mysql_q_max_connections{job="query-exporter"} >= 0.95
+        for: 1m
+        labels: { severity: critical, component: mariadb, tier: "2" }
+        annotations:
+          summary: "{{ $labels.database }} 連線數到 max_connections 的 {{ $value | humanizePercentage }}；一般帳號（含 mysqld_exporter）已經或快要連不上，這個數字來自 extra_port"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#connections
+          absence_covered_by: "MariaDBCustomQueryExporterDown, MariaDBCustomQueryFailing, MariaDBCustomQueryStale"
+      - alert: MariaDBErrantGtid
+        expr: |
+          (
+            max by (cluster, database, domain_id, server_id) (
+              (mysql_q_gtid_binlog_state_seq{job="query-exporter"} offset 2m)
+                and on (cluster, database) (mysql_q_read_only{job="query-exporter"} == 1)
+            )
+              > on (cluster, domain_id, server_id) group_left
+            max by (cluster, domain_id, server_id) (
+              mysql_q_gtid_binlog_state_seq{job="query-exporter"}
+                and on (cluster, database) (mysql_q_read_only{job="query-exporter"} == 0)
+            )
+          or
+            max by (cluster, database, domain_id, server_id) (
+              mysql_q_gtid_binlog_state_seq{job="query-exporter"}
+                and on (cluster, database) (mysql_q_read_only{job="query-exporter"} == 1)
+            )
+              unless on (cluster, domain_id, server_id)
+            max by (cluster, domain_id, server_id) (
+              mysql_q_gtid_binlog_state_seq{job="query-exporter"}
+                and on (cluster, database) (mysql_q_read_only{job="query-exporter"} == 0)
+            )
+          )
+          and on (cluster) (count by (cluster) (mysql_q_read_only{job="query-exporter"} == 0) == 1)
+        for: 5m
+        labels: { severity: critical, component: mariadb, tier: "2" }
+        annotations:
+          summary: "{{ $labels.database }}（read_only）的 gtid_binlog_state 有 primary 沒有的 GTID（domain {{ $labels.domain_id }}、server_id {{ $labels.server_id }}）；要每台 log_slave_updates=ON"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#gtid-consistency
+          absence_covered_by: "MariaDBCustomQueryExporterDown, MariaDBCustomQueryFailing, MariaDBCustomQueryStale"
+      - alert: MariaDBMetadataLockBlocker
+        expr: |
+          mysql_q_mdl_blocking_sessions{job="query-exporter"} > 0
+            and on (cluster, database) mysql_q_mdl_oldest_wait_seconds{job="query-exporter"} > 30
+        for: 1m
+        labels: { severity: warning, component: mariadb, tier: "2" }
+        annotations:
+          summary: "{{ $labels.database }} 有 session 等 metadata lock 超過 30 秒，{{ $value }} 個 session 擋住它們（mysql_q_mdl_idle_blocking_sessions 是其中交易開著沒在做事的）；是誰看 information_schema.METADATA_LOCK_INFO（metadata_lock_info plugin）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#metadata-locks
+          absence_covered_by: "MariaDBCustomQueryExporterDown, MariaDBCustomQueryFailing, MariaDBCustomQueryStale"
+      - alert: MariaDBAshSamplerStopped
+        expr: |
+          mysql_q_ash_sampler_enabled{job="query-exporter"} == 0
+          or mysql_q_ash_sampler_last_run_age_seconds{job="query-exporter"} > 30
+        for: 2m
+        labels: { severity: warning, component: mariadb, tier: "3" }
+        annotations:
+          summary: "{{ $labels.database }} 的 ASH 取樣 EVENT 停了（event_scheduler=OFF、EVENT 被停用或報錯）；取樣停止時 mysql_q_ash_active_sessions 會在 expiration 後消失"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#active-sessions
+          absence_covered_by: "MariaDBCustomQueryExporterDown, MariaDBCustomQueryFailing, MariaDBCustomQueryStale"
+      - alert: MariaDBRowLockActiveSessions
+        expr: sum by (cluster, database) (mysql_q_ash_active_sessions{job="query-exporter", wait_class="lock_row"}) > 2
+        for: 5m
+        labels: { severity: info, component: mariadb, tier: "3" }
+        annotations:
+          summary: "{{ $labels.database }} 最近 60 秒平均有 {{ $value }} 個 session 在等 row lock；用 ash.sample 找出語句與 digest"
+          runbook_url: https://hahasula.github.io/alert-trust/components/mariadb/#active-sessions
+          absence_covered_by: "MariaDBAshSamplerStopped, MariaDBCustomQueryStale"

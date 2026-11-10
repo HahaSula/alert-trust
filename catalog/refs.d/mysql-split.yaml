@@ -1,0 +1,251 @@
+# MySQL／MariaDB 拆卡（catalog/targets/mysql.yaml、mariadb.yaml）新增的原始碼參考。每一行都用 gh api 取 tag 上的檔案核對過（2026-11-10）。
+# 主要是 docs/architecture/db-resources.md#proposed 的兩個飽和訊號（Threads_created、Innodb_data_pending_fsyncs）在各版本線的位置。
+refs:
+  spl-my80-threads-created:
+    kind: code
+    title: "status：Threads_created（show_num_thread_created）"
+    project: "MySQL"
+    version: "8.0.46"
+    file: "sql/mysqld.cc"
+    line: 10015
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.0.46/sql/mysqld.cc#L10015"
+  spl-my84-threads-created:
+    kind: code
+    title: "status：Threads_created"
+    project: "MySQL"
+    version: "8.4.13"
+    file: "sql/mysqld.cc"
+    line: 11700
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.13/sql/mysqld.cc#L11700"
+  spl-my97-threads-created:
+    kind: code
+    title: "status：Threads_created"
+    project: "MySQL"
+    version: "9.7.4"
+    file: "sql/mysqld.cc"
+    line: 12054
+    url: "https://github.com/mysql/mysql-server/blob/mysql-9.7.4/sql/mysqld.cc#L12054"
+  spl-my84-thread-created-inc:
+    kind: code
+    title: "cache 裡沒有閒置 thread、建立新 thread 後 inc_thread_created()"
+    project: "MySQL"
+    version: "8.4.13"
+    file: "sql/conn_handler/connection_handler_per_thread.cc"
+    line: 437
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.13/sql/conn_handler/connection_handler_per_thread.cc#L437"
+  spl-my84-connections:
+    kind: code
+    title: "status：Connections（連線嘗試總數）"
+    project: "MySQL"
+    version: "8.4.13"
+    file: "sql/mysqld.cc"
+    line: 11399
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.13/sql/mysqld.cc#L11399"
+  spl-my84-thread-cache-var:
+    kind: code
+    title: "thread_cache_size（範圍 0–16384）"
+    project: "MySQL"
+    version: "8.4.13"
+    file: "sql/sys_vars.cc"
+    line: 4930
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.13/sql/sys_vars.cc#L4930"
+  spl-my84-thread-cache-autosize:
+    kind: code
+    title: "沒設 thread_cache_size 時自動設成 8 + max_connections / 100，上限 100"
+    project: "MySQL"
+    version: "8.4.13"
+    file: "sql/mysqld.cc"
+    line: 6728
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.13/sql/mysqld.cc#L6728"
+  spl-my80-pending-fsyncs:
+    kind: code
+    title: "status：Innodb_data_pending_fsyncs"
+    project: "MySQL"
+    version: "8.0.46"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 1195
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.0.46/storage/innobase/handler/ha_innodb.cc#L1195"
+  spl-my84-pending-fsyncs:
+    kind: code
+    title: "status：Innodb_data_pending_fsyncs"
+    project: "MySQL"
+    version: "8.4.13"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 1190
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.13/storage/innobase/handler/ha_innodb.cc#L1190"
+  spl-my97-pending-fsyncs:
+    kind: code
+    title: "status：Innodb_data_pending_fsyncs"
+    project: "MySQL"
+    version: "9.7.4"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 1208
+    url: "https://github.com/mysql/mysql-server/blob/mysql-9.7.4/storage/innobase/handler/ha_innodb.cc#L1208"
+  spl-my84-pending-fsyncs-calc:
+    kind: code
+    title: "Innodb_data_pending_fsyncs = log_pending_flushes() + fil_n_pending_tablespace_flushes"
+    project: "MySQL"
+    version: "8.4.13"
+    file: "storage/innobase/srv/srv0srv.cc"
+    line: 1588
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.13/storage/innobase/srv/srv0srv.cc#L1588"
+  spl-my80-auto-purge:
+    kind: code
+    title: "binlog_expire_logs_auto_purge"
+    project: "MySQL"
+    version: "8.0.46"
+    file: "sql/sys_vars.cc"
+    line: 2240
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.0.46/sql/sys_vars.cc#L2240"
+  spl-my84-auto-purge:
+    kind: code
+    title: "binlog_expire_logs_auto_purge"
+    project: "MySQL"
+    version: "8.4.13"
+    file: "sql/sys_vars.cc"
+    line: 2167
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.13/sql/sys_vars.cc#L2167"
+  spl-my97-auto-purge:
+    kind: code
+    title: "binlog_expire_logs_auto_purge"
+    project: "MySQL"
+    version: "9.7.4"
+    file: "sql/sys_vars.cc"
+    line: 2206
+    url: "https://github.com/mysql/mysql-server/blob/mysql-9.7.4/sql/sys_vars.cc#L2206"
+  spl-mdb106-threads-created:
+    kind: code
+    title: "status：Threads_created"
+    project: "MariaDB"
+    version: "10.6.28"
+    file: "sql/mysqld.cc"
+    line: 7558
+    url: "https://github.com/MariaDB/server/blob/mariadb-10.6.28/sql/mysqld.cc#L7558"
+  spl-mdb1011-threads-created:
+    kind: code
+    title: "status：Threads_created"
+    project: "MariaDB"
+    version: "10.11.19"
+    file: "sql/mysqld.cc"
+    line: 7836
+    url: "https://github.com/MariaDB/server/blob/mariadb-10.11.19/sql/mysqld.cc#L7836"
+  spl-mdb114-threads-created:
+    kind: code
+    title: "status：Threads_created"
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7882
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7882"
+  spl-mdb118-threads-created:
+    kind: code
+    title: "status：Threads_created"
+    project: "MariaDB"
+    version: "11.8.9"
+    file: "sql/mysqld.cc"
+    line: 7984
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.8.9/sql/mysqld.cc#L7984"
+  spl-mdb123-threads-created:
+    kind: code
+    title: "status：Threads_created"
+    project: "MariaDB"
+    version: "12.3.3"
+    file: "sql/mysqld.cc"
+    line: 8242
+    url: "https://github.com/MariaDB/server/blob/mariadb-12.3.3/sql/mysqld.cc#L8242"
+  spl-mdb114-thread-created-inc:
+    kind: code
+    title: "one-thread-per-connection：thread cache 接不下時才 inc_thread_created() 建新 thread"
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 6330
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L6330"
+  spl-mdb114-connections:
+    kind: code
+    title: "status：Connections"
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7672
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7672"
+  spl-mdb114-thread-cache-size:
+    kind: code
+    title: "thread_cache_size 預設 256"
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sys_vars.cc"
+    line: 4253
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sys_vars.cc#L4253"
+  spl-mdb106-pending-fsyncs:
+    kind: code
+    title: "status：Innodb_data_pending_fsyncs（export_vars）"
+    project: "MariaDB"
+    version: "10.6.28"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 967
+    url: "https://github.com/MariaDB/server/blob/mariadb-10.6.28/storage/innobase/handler/ha_innodb.cc#L967"
+  spl-mdb106-pending-fsyncs-calc:
+    kind: code
+    title: "10.6：redo log 待 flush 數 + tablespace 待 flush 數"
+    project: "MariaDB"
+    version: "10.6.28"
+    file: "storage/innobase/srv/srv0srv.cc"
+    line: 972
+    url: "https://github.com/MariaDB/server/blob/mariadb-10.6.28/storage/innobase/srv/srv0srv.cc#L972"
+  spl-mdb1011-pending-fsyncs:
+    kind: code
+    title: "10.11：直接讀 fil_n_pending_tablespace_flushes（不含 redo log）"
+    project: "MariaDB"
+    version: "10.11.19"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 986
+    url: "https://github.com/MariaDB/server/blob/mariadb-10.11.19/storage/innobase/handler/ha_innodb.cc#L986"
+  spl-mdb114-pending-fsyncs:
+    kind: code
+    title: "11.4：fil_n_pending_tablespace_flushes"
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 934
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/handler/ha_innodb.cc#L934"
+  spl-mdb118-pending-fsyncs:
+    kind: code
+    title: "11.8：fil_n_pending_tablespace_flushes"
+    project: "MariaDB"
+    version: "11.8.9"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 987
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.8.9/storage/innobase/handler/ha_innodb.cc#L987"
+  spl-mdb123-pending-fsyncs:
+    kind: code
+    title: "12.3：fil_n_pending_tablespace_flushes"
+    project: "MariaDB"
+    version: "12.3.3"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 995
+    url: "https://github.com/MariaDB/server/blob/mariadb-12.3.3/storage/innobase/handler/ha_innodb.cc#L995"
+  spl-mdb114-tablespace-flush-inc:
+    kind: code
+    title: "tablespace fsync 開始時 fil_n_pending_tablespace_flushes++"
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/innobase/fil/fil0fil.cc"
+    line: 530
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/fil/fil0fil.cc#L530"
+  spl-mdb114-slaves-connected:
+    kind: code
+    title: "status：Slaves_connected（binlog dump thread 數，也就是連著的 replica 數）"
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7812
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7812"
+  spl-mdb114-purge-check:
+    kind: code
+    title: "purge 前檢查：處理過這個 binlog 的 replica 少於 slave_connections_needed_for_purge 時不刪"
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/log.cc"
+    line: 5622
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/log.cc#L5622"

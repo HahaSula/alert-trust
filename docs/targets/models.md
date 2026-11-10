@@ -47,7 +47,7 @@ OTel receiver 的成熟度見 metadata.yaml。[^dbm-otel-mysql][^dbm-otel-postgr
 
 | 模型 | 工具 | 補什麼 | 成本 |
 |---|---|---|---|
-| (a) | mysqld_exporter v0.21.0、query-exporter 5.2.2 | 已做成[元件卡](../components/mysqld_exporter.md)；自訂查詢補 errant GTID、MDL 等盲點 | 佔一條連線；預設只開 6 個 collector[^my-default-collectors] |
+| (a) | mysqld_exporter v0.21.0、query-exporter 5.2.2 | 已做成元件卡（[MySQL](../components/mysql.md)、[MariaDB](../components/mariadb.md)）；自訂查詢補 errant GTID、MDL 等盲點 | 佔一條連線；預設只開 6 個 collector[^my-default-collectors] |
 | (c) | OTel mysqlreceiver（metrics beta） | — | metric 名稱不同 |
 | (d) | performance_schema、sys | 語句 digest、等待事件[^dbm-doc-mysql-pfs] | MariaDB 預設關 |
 | (e) | PMM 3 | QAN 查詢分析；內建 mysql_down、複寫 IO／SQL thread 等範本[^dbm-rules-pmm] | 一套獨立平台 |
