@@ -1,0 +1,212 @@
+# 主機與容器層的規則範本（草稿）。每個資料庫 target 都跑在這一層上，這些規則補上 target 卡裡「要靠其他元件」的盲點。
+# 資料來源：node_exporter v1.12.1、cAdvisor v0.60.6（或 kubelet /metrics/cadvisor）、kube-state-metrics v2.20.0、
+# 選用 process-exporter v0.8.7。只讀碼，沒有在 lab 觸發過。
+# 一定要改的：job=~".*node.*"、job=~".*(cadvisor|kubelet).*" 換成實際 job；fstype 與 mountpoint 依資料目錄調整；
+# 門檻（10%、50ms、0.1、0.25 …）都是例子。node-mixin 的預設 selector 是 job="node"，job 名稱不同時它的規則全部回傳空。
+groups:
+  - name: host-exporter
+    rules:
+      - alert: HostExporterDown
+        expr: up{job=~".*node.*"} == 0
+        for: 2m
+        labels: { severity: critical, component: host, tier: "1", scope: host }
+        annotations:
+          summary: "node_exporter 抓不到；這台主機上所有主機層規則都會一起回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#exporter-up
+      - alert: HostExporterMissing
+        expr: absent(up{job=~".*node.*"})
+        for: 5m
+        labels: { severity: critical, component: host, tier: "1", scope: host }
+        annotations:
+          summary: "完全沒有 node_exporter 的 target；服務發現或 job 名稱可能錯了"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#exporter-up
+      - alert: HostCollectorFailed
+        expr: node_scrape_collector_success == 0
+        for: 10m
+        labels: { severity: warning, component: host, tier: "2", scope: host }
+        annotations:
+          summary: "node_exporter 的 {{ $labels.collector }} collector 失敗；依賴它的規則回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#collector-success
+          absence_covered_by: HostExporterDown, HostExporterMissing
+
+  - name: host-filesystem
+    rules:
+      - alert: HostFilesystemAlmostFull
+        expr: |
+          (
+            node_filesystem_avail_bytes{job=~".*node.*", fstype!~"tmpfs|overlay|squashfs|nsfs|ramfs", mountpoint!=""}
+            / node_filesystem_size_bytes{job=~".*node.*", fstype!~"tmpfs|overlay|squashfs|nsfs|ramfs", mountpoint!=""}
+          ) < 0.10
+          unless on (instance, device, mountpoint) node_filesystem_readonly == 1
+        for: 5m
+        labels: { severity: critical, component: host, tier: "1", scope: host }
+        annotations:
+          summary: "{{ $labels.mountpoint }} 剩不到 10%；資料庫的 WAL／binlog／SST 寫滿時寫入會停"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#disk-space
+      - alert: HostFilesystemFillingUp
+        expr: |
+          (
+            node_filesystem_avail_bytes{job=~".*node.*", fstype!~"tmpfs|overlay|squashfs|nsfs|ramfs", mountpoint!=""}
+            / node_filesystem_size_bytes{job=~".*node.*", fstype!~"tmpfs|overlay|squashfs|nsfs|ramfs", mountpoint!=""}
+          ) < 0.40
+          and predict_linear(node_filesystem_avail_bytes{job=~".*node.*", fstype!~"tmpfs|overlay|squashfs|nsfs|ramfs", mountpoint!=""}[6h], 24 * 3600) < 0
+          unless on (instance, device, mountpoint) node_filesystem_readonly == 1
+        for: 1h
+        labels: { severity: warning, component: host, tier: "2", scope: host }
+        annotations:
+          summary: "{{ $labels.mountpoint }} 照過去 6 小時的速度，24 小時內寫滿"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#disk-space
+      - alert: HostInodesAlmostFull
+        expr: |
+          (
+            node_filesystem_files_free{job=~".*node.*", fstype!~"tmpfs|overlay|squashfs|nsfs|ramfs", mountpoint!=""}
+            / node_filesystem_files{job=~".*node.*", fstype!~"tmpfs|overlay|squashfs|nsfs|ramfs", mountpoint!=""}
+          ) < 0.05
+        for: 15m
+        labels: { severity: warning, component: host, tier: "2", scope: host }
+        annotations:
+          summary: "{{ $labels.mountpoint }} 的 inode 剩不到 5%；空間還夠也建不了新檔"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#disk-space
+      - alert: HostFilesystemReadOnly
+        expr: node_filesystem_readonly{job=~".*node.*", fstype=~"ext4|xfs|btrfs|zfs"} == 1
+        for: 1m
+        labels: { severity: critical, component: host, tier: "1", scope: host }
+        annotations:
+          summary: "{{ $labels.mountpoint }} 變成唯讀；node-mixin 的空間規則會排除它，不會響"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#filesystem-readonly
+      - alert: HostFilesystemDeviceError
+        expr: node_filesystem_device_error{job=~".*node.*", fstype=~"ext4|xfs|btrfs|zfs"} == 1
+        for: 5m
+        labels: { severity: critical, component: host, tier: "1", scope: host }
+        annotations:
+          summary: "{{ $labels.mountpoint }} 的 statfs 失敗；空間與唯讀狀態都讀不到"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#filesystem-readonly
+
+  - name: host-saturation
+    rules:
+      - alert: HostOOMKill
+        expr: increase(node_vmstat_oom_kill{job=~".*node.*"}[10m]) > 0
+        labels: { severity: warning, component: host, tier: "1", scope: host }
+        annotations:
+          summary: "核心在 10 分鐘內 OOM kill 過行程；資料庫的 uptime／restart 訊號會同時跳"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#oom-kills
+      - alert: HostMemoryLow
+        expr: node_memory_MemAvailable_bytes{job=~".*node.*"} / node_memory_MemTotal_bytes{job=~".*node.*"} < 0.10
+        for: 10m
+        labels: { severity: warning, component: host, tier: "2", scope: host }
+        annotations:
+          summary: "可用記憶體（MemAvailable）剩不到 10%；page cache 被擠掉，資料庫讀取會變成讀磁碟"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#memory-available
+      - alert: HostMemoryPressure
+        expr: rate(node_pressure_memory_stalled_seconds_total{job=~".*node.*"}[5m]) > 0.1
+        for: 10m
+        labels: { severity: warning, component: host, tier: "2", scope: host }
+        annotations:
+          summary: "超過 10% 的時間所有非閒置行程都在等記憶體（PSI full）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#memory-available
+      - alert: HostSwapping
+        expr: (rate(node_vmstat_pswpin{job=~".*node.*"}[5m]) + rate(node_vmstat_pswpout{job=~".*node.*"}[5m])) > 100
+        for: 10m
+        labels: { severity: warning, component: host, tier: "2", scope: host }
+        annotations:
+          summary: "每秒換頁超過 100 頁；buffer pool／shared_buffers／maxmemory 的頁被換出時延遲會跳"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#swap-activity
+      - alert: HostCPUPressure
+        expr: rate(node_pressure_cpu_waiting_seconds_total{job=~".*node.*"}[5m]) > 0.5
+        for: 15m
+        labels: { severity: warning, component: host, tier: "2", scope: host }
+        annotations:
+          summary: "超過一半的時間有可執行的行程在等 CPU（PSI some）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#cpu-saturation
+      - alert: HostDiskWriteLatencyHigh
+        expr: |
+          rate(node_disk_write_time_seconds_total{job=~".*node.*"}[5m])
+          / rate(node_disk_writes_completed_total{job=~".*node.*"}[5m]) > 0.05
+          and rate(node_disk_writes_completed_total{job=~".*node.*"}[5m]) > 1
+        for: 10m
+        labels: { severity: warning, component: host, tier: "2", scope: host }
+        annotations:
+          summary: "{{ $labels.device }} 平均每次寫入超過 50ms；WAL／redo／fsync 的延遲會跟著上去"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#disk-latency
+      - alert: HostDiskReadLatencyHigh
+        expr: |
+          rate(node_disk_read_time_seconds_total{job=~".*node.*"}[5m])
+          / rate(node_disk_reads_completed_total{job=~".*node.*"}[5m]) > 0.05
+          and rate(node_disk_reads_completed_total{job=~".*node.*"}[5m]) > 1
+        for: 10m
+        labels: { severity: warning, component: host, tier: "2", scope: host }
+        annotations:
+          summary: "{{ $labels.device }} 平均每次讀取超過 50ms"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#disk-latency
+      - alert: HostIOPressure
+        expr: rate(node_pressure_io_stalled_seconds_total{job=~".*node.*"}[5m]) > 0.1
+        for: 10m
+        labels: { severity: warning, component: host, tier: "2", scope: host }
+        annotations:
+          summary: "超過 10% 的時間所有非閒置行程都在等 IO（PSI full）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#disk-latency
+      - alert: HostFdNearLimit
+        expr: node_filefd_allocated{job=~".*node.*"} / node_filefd_maximum{job=~".*node.*"} > 0.8
+        for: 15m
+        labels: { severity: warning, component: host, tier: "2", scope: host }
+        annotations:
+          summary: "整機的 file descriptor 用到 80%（fs.file-max）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#fd-headroom
+      - alert: ProcessFdNearLimit
+        expr: |
+          process_open_fds / process_max_fds > 0.8
+          or namedprocess_namegroup_worst_fd_ratio > 0.8
+        for: 15m
+        labels: { severity: warning, component: host, tier: "2", scope: process }
+        annotations:
+          summary: "{{ $labels.job }}{{ $labels.groupname }} 的 fd 用到 ulimit 的 80%；打滿時新連線與開檔失敗"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#fd-headroom
+      - alert: HostClockNotSynchronised
+        expr: min_over_time(node_timex_sync_status{job=~".*node.*"}[5m]) == 0 and node_timex_maxerror_seconds{job=~".*node.*"} >= 16
+        for: 10m
+        labels: { severity: warning, component: host, tier: "2", scope: host }
+        annotations:
+          summary: "核心回報時鐘沒有同步（與 node-mixin NodeClockNotSynchronising 同式）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#clock-sync
+      - alert: HostClockOffsetHigh
+        expr: abs(node_timex_offset_seconds{job=~".*node.*"}) > 0.05
+        for: 5m
+        labels: { severity: warning, component: host, tier: "2", scope: host }
+        annotations:
+          summary: "時鐘偏移超過 50ms；YugabyteDB 的 max_clock_skew、TiDB 的 TSO 依賴時鐘"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#clock-sync
+
+  - name: container-resources
+    rules:
+      - alert: ContainerMemoryNearLimit
+        expr: |
+          container_memory_working_set_bytes{job=~".*(cadvisor|kubelet).*", container!=""}
+          / (container_spec_memory_limit_bytes{job=~".*(cadvisor|kubelet).*", container!=""} > 0) > 0.9
+        for: 5m
+        labels: { severity: warning, component: host, tier: "1", scope: container }
+        annotations:
+          summary: "{{ $labels.container }} 的 working set 到 memory limit 的 90%；到 100% 會被 cgroup OOM kill"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#container-memory-limit
+      - alert: ContainerOOMEvent
+        expr: increase(container_oom_events_total{job=~".*(cadvisor|kubelet).*", container!=""}[10m]) > 0
+        labels: { severity: warning, component: host, tier: "1", scope: container }
+        annotations:
+          summary: "{{ $labels.container }} 在 10 分鐘內發生 OOM"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#oom-kills
+      - alert: ContainerOOMKilled
+        expr: |
+          kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+          and on (namespace, pod, container) increase(kube_pod_container_status_restarts_total[10m]) > 0
+        labels: { severity: warning, component: host, tier: "1", scope: container }
+        annotations:
+          summary: "{{ $labels.namespace }}/{{ $labels.pod }} 的 {{ $labels.container }} 上次因 OOMKilled 結束，10 分鐘內重啟過"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#oom-kills
+      - alert: ContainerCPUThrottled
+        expr: |
+          rate(container_cpu_cfs_throttled_periods_total{job=~".*(cadvisor|kubelet).*", container!=""}[5m])
+          / rate(container_cpu_cfs_periods_total{job=~".*(cadvisor|kubelet).*", container!=""}[5m]) > 0.25
+        for: 15m
+        labels: { severity: warning, component: host, tier: "2", scope: container }
+        annotations:
+          summary: "{{ $labels.container }} 超過 25% 的 CFS 週期被節流；平均 CPU 用量看起來不高也會發生"
+          runbook_url: https://hahasula.github.io/alert-trust/components/host/#container-cpu-throttling

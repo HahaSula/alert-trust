@@ -9,6 +9,7 @@
 /env/*.yaml
 !/env/env.example.yaml
 !/env/sources.example.yaml
+!/env/inventory.example.yaml
 /reports/
 /selfcheck-data/
 lab/**/results/raw/

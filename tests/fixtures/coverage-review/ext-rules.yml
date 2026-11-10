@@ -1,0 +1,8 @@
+groups:
+  - name: ext
+    rules:
+      - alert: Watchdog
+        expr: vector(1)
+      - alert: PrometheusDown
+        expr: up{job="prometheus"} == 0
+        for: 1m

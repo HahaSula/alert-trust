@@ -72,6 +72,7 @@ nav:
       - Grafana Alerting: components/grafana_alerting.md
       - Alertmanager: components/alertmanager.md
       - 外部觀察者: components/observer.md
+      - 主機與容器: components/host.md
   - 資料庫:
       - 總覽: targets/index.md
       - 監控模型: targets/models.md
@@ -129,6 +130,7 @@ nav:
           - 分散式 SQL: architecture/db-distsql.md
           - 分析型: architecture/db-olap.md
           - 文件型: architecture/db-doc.md
+          - 資源：池、執行緒與主機: architecture/db-resources.md
       - 來源: reference/sources.md
   - 實驗報告:
       - 總覽: reports/index.md

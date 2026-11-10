@@ -1,0 +1,39 @@
+# Rules from the four simulated reviews (sim-mysql, sim-pg-vm, sim-valkey, sim-etcd), reduced to the cases that
+# exercised calculation bugs in tools/fit_contracts.py.
+groups:
+  - name: absence
+    rules:
+      - alert: CollectorsMissing          # unless: detects disappearance
+        expr: up{job="mysqld"} == 1 unless on (job, instance) mysql_up{job="mysqld"}
+        for: 2m
+      - alert: DbDownCovered              # paired with ExporterDown through absence_covered_by
+        expr: mysql_up{job="mysqld"} == 0
+        for: 1m
+        annotations: { absence_covered_by: ExporterDown }
+      - alert: ExporterDown
+        expr: up{job="mysqld"} == 0
+        for: 2m
+      - alert: ScriptMissing              # name says it detects missing data
+        expr: redis_script_values{job="redis"} == 0
+        for: 5m
+      - alert: ThreadsHigh                # plain threshold: the only one that gets last_over_time
+        expr: mysql_global_status_threads_running{job="mysqld"} > 50
+        for: 5m
+  - name: jobs
+    rules:
+      - alert: EtcdRegex                  # job=~".*etcd.*" matches kube-etcd and etcd-probe: worst is used
+        expr: rate(etcd_server_proposals_failed_total{job=~".*etcd.*"}[5m]) > 0
+      - alert: EtcdNone                   # regex that matches no config job: no data
+        expr: rate(etcd_network_peer_sent_failures_total{job=~"nothing.*"}[5m]) > 0
+      - alert: WrongJob                   # exact job that is not in the config: no data
+        expr: rate(mysql_global_status_questions{job="mysql"}[5m]) > 1000
+      - alert: RedisMemory                # redis_ prefix: job redis is redis_exporter (15s deadline)
+        expr: redis_memory_used_bytes{job="redis"} / redis_memory_max_bytes{job="redis"} > 0.9
+        for: 5m
+  - name: subqueries
+    rules:
+      - alert: LeaderLostRecently         # increase over a subquery: a range, n = 2, I = max(res, inner I)
+        expr: increase((max by (instance) (etcd_server_is_leader{job="kube-etcd"}))[15m:1m]) > 0
+        for: 5m
+      - alert: ShortSubquery              # max_over_time over [1m:30s]: (1+1)·30 + d(τ 10s) = 70s > 1m
+        expr: max_over_time((sum by (instance) (etcd_server_proposals_pending{job="kube-etcd"}))[1m:30s]) > 5

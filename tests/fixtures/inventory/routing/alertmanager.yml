@@ -1,0 +1,37 @@
+global:
+  resolve_timeout: 5m
+route:
+  receiver: default
+  group_by: [alertname]
+  routes:
+    - matchers: ['severity="critical"']
+      receiver: pager
+      group_wait: 10s
+      continue: true
+    - matchers: ['severity=~"critical|warning"', 'team="shop"']
+      receiver: shop
+      repeat_interval: 1h
+      routes:
+        - match: { env: staging }
+          receiver: blackhole
+    - match_re: { alertname: "Noise.*" }
+      receiver: blackhole
+    - matchers: ['instance=~"db-.*"']
+      receiver: dba
+receivers:
+  - name: default
+    webhook_configs: [{ url: "http://example.invalid/hook" }]
+  - name: pager
+    webhook_configs: [{ url: "http://example.invalid/pager" }]
+  - name: shop
+    email_configs: [{ to: "shop@example.invalid" }]
+  - name: dba
+    webhook_configs: [{ url: "http://example.invalid/dba" }]
+  - name: blackhole
+inhibit_rules:
+  - source_matchers: ['alertname="ShopDown"']
+    target_matchers: ['team="shop"']
+    equal: [team]
+  - source_matchers: ['severity="critical"']
+    target_matchers: ['severity="warning"']
+    equal: [instance]

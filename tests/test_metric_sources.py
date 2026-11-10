@@ -116,5 +116,30 @@ class MetricSourcesV2Test(unittest.TestCase):
         self.assertNotIn("不合格", md)
 
 
+class ExporterLabelsTest(unittest.TestCase):
+    """Labels the exporter produces (le, quantile, grpc_*, labels the catalog shows) are not questions."""
+
+    def test_only_identity_or_unknown_labels_are_asked(self):
+        fx = os.path.join(ROOT, "tests", "fixtures", "metric-sources-labels")
+        rows = M.check(M.load_rules([os.path.join(fx, "rules.yml")]), M.load_config(os.path.join(fx, "prometheus.yml")),
+                       {}, None, ROOT)
+        miss = {}
+        for r in rows:
+            miss.setdefault(r["rule"], set()).update(r["labels_missing"])
+        self.assertEqual(miss["GrpcErrors"], set())
+        self.assertEqual(miss["FsyncSlow"], set())
+        self.assertEqual(miss["Summary"], set())          # quantile, and slice on a metric the catalog knows
+        self.assertEqual(miss["RedisCmd"], set())         # cmd: non-identity label on a known exporter metric
+        self.assertEqual(miss["RedisRole"], {"role"})     # identity label: still a question
+        self.assertEqual(miss["AppTier"], {"tier"})       # unknown metric: still a question
+        self.assertTrue(any("grpc_type" in l for r in rows for l in r["labels_exporter"]))
+        md = M.report(rows, [])
+        self.assertNotIn("要 `grpc_type` label", md)
+        self.assertNotIn("要 `quantile` label", md)
+
+    def test_non_ascii_text_does_not_break_the_parser(self):
+        self.assertEqual([s["metric"] for s in M.selectors("中文 up{job=\"a\"} 說明")], ["up"])
+
+
 if __name__ == "__main__":
     unittest.main()

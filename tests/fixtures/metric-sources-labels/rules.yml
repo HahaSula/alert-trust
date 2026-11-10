@@ -1,0 +1,16 @@
+# Labels the exporter produces are not questions (sim-etcd grpc_type, sim-valkey quantile / cmd).
+groups:
+  - name: t
+    rules:
+      - alert: GrpcErrors
+        expr: sum(rate(grpc_server_handled_total{job="kube-etcd", grpc_type="unary", grpc_code!="OK"}[5m])) > 0
+      - alert: FsyncSlow
+        expr: histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="kube-etcd", le!=""}[5m])) > 0.5
+      - alert: Summary
+        expr: prometheus_engine_query_duration_seconds{job="prometheus", quantile="0.9", slice="inner_eval"} > 1
+      - alert: RedisCmd
+        expr: rate(redis_commands_total{job="redis", cmd="get"}[5m]) > 1000
+      - alert: RedisRole
+        expr: redis_instance_info{job="redis", role="master"} == 1
+      - alert: AppTier
+        expr: myapp_requests_total{job="app", tier="gold"} > 0

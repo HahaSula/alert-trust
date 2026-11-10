@@ -1,0 +1,8 @@
+groups:
+  - name: pg
+    rules:
+      - alert: PGRollbackBurst
+        expr: increase(pg_stat_database_xact_rollback{job="pg"}[1m]) > 100
+        for: 1m
+      - alert: PostgresDeadlocks
+        expr: increase(pg_stat_database_deadlocks{job="pg"}[5m]) > 5

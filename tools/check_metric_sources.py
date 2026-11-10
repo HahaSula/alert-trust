@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import functools
 import glob
 import json
 import os
@@ -118,6 +119,9 @@ def selectors(expr: str) -> list[dict]:
             continue
         if c.isalpha() or c in "_:":
             m = re.match(r"[A-Za-z_:][A-Za-z0-9_:]*", expr[i:])
+            if m is None:  # a non-ASCII letter (prose in a card's signal text)
+                i += 1
+                continue
             word = m.group(0)
             j = i + len(word)
             k = j
@@ -275,6 +279,53 @@ def catalog_hints(root: str) -> dict[str, list[str]]:
     return {k: sorted(v) for k, v in out.items()}
 
 
+# labels the exporter itself puts on its metrics: never a question about the scrape config
+EXPORTER_LABELS = {"le", "quantile", "code", "method", "handler"}
+EXPORTER_LABEL_PREFIX = ("grpc_",)
+# labels that describe the target (who it is, where it runs): only the config or the person can say
+IDENTITY_LABELS = {"cluster", "role", "env", "region", "service", "namespace", "pod", "team"}
+
+
+def family(metric: str) -> str:
+    return re.sub(r"_(bucket|sum|count|total|created|info)$", "", metric or "")
+
+
+@functools.lru_cache(maxsize=4)
+def catalog_label_hints(root: str) -> dict[str, set]:
+    """metric family -> labels the catalog shows on it: selectors in the cards' signal text and in the repo's
+    rule templates (rules/**/*.yml, which follow the upstream rules). A label seen there is the exporter's own."""
+    out: dict[str, set] = {}
+
+    def add(expr: str) -> None:
+        for sel in selectors(str(expr)):
+            if sel["metric"]:
+                for (l, _, _) in sel["matchers"]:
+                    if l not in ("job", "instance"):
+                        out.setdefault(family(sel["metric"]), set()).add(l)
+    for card in C.load_components(root):
+        for sg in card.get("signals", []):
+            add(sg.get("signal") or "")
+    for path in sorted(glob.glob(os.path.join(root, "rules", "**", "*.yml"), recursive=True)):
+        for g in (C._load(path) or {}).get("groups", []) or []:
+            for r in g.get("rules", []) or []:
+                add(r.get("expr", ""))
+    return out
+
+
+def exporter_label(label: str, metric: str | None, hints: dict[str, set], has_hint: bool) -> bool:
+    """True when the label is the exporter's own (do not ask where it comes from): le / quantile / grpc_* / code /
+    method / handler, a label the catalog shows on this metric family, or a non-identity label on a metric the
+    catalog knows. Identity labels (cluster, role, env, ...) and labels on unknown metrics stay questions, even when
+    a template uses them (rules/targets/mysql.yml writes role="primary" as a placeholder to add by relabel)."""
+    if label in IDENTITY_LABELS:
+        return False
+    if label in EXPORTER_LABELS or label.startswith(EXPORTER_LABEL_PREFIX):
+        return True
+    if label in hints.get(family(metric or ""), set()):
+        return True
+    return has_hint and label not in IDENTITY_LABELS
+
+
 def hint_for(metric: str, exact: dict[str, list[str]]) -> list[str]:
     if metric in exact:
         return exact[metric]
@@ -325,6 +376,7 @@ def required_labels(matchers: list[tuple[str, str, str]]) -> list[str]:
 def check(rules: list[dict], jobs: list[dict], answers: dict, live: dict | None, root: str) -> list[dict]:
     recorded = {r["name"] for r in rules if r["kind"] == "record"}
     exact = catalog_hints(root)
+    lhints = catalog_label_hints(root)
     ans_metrics = answers.get("metrics") or {}
     ans_producers = answers.get("producers") or {}
     ans_labels = {str(k): str(v) for k, v in (answers.get("labels") or {}).items()}
@@ -351,7 +403,7 @@ def check(rules: list[dict], jobs: list[dict], answers: dict, live: dict | None,
             name_txt = ", ".join(f'__name__{op}"{v}"' for _, op, v in sel["name_matchers"])
             row = {"rule": r["name"], "file": r["file"], "metric": metric or "{" + name_txt + "}", "ask": "",
                    "job_matcher": ", ".join(f'job{op}"{v}"' for _, op, v in jm), "jobs": matched, "hint": [], "detail": "",
-                   "absent": in_absent, "labels_missing": []}
+                   "absent": in_absent, "labels_missing": [], "labels_exporter": []}
             no_job = bool(jm) and bool(jobs) and not matched and not (live is not None and metric in live)
             if metric in recorded:
                 row.update(status="recording", detail="由給定檔案中的 recording rule 產生")
@@ -429,7 +481,13 @@ def check(rules: list[dict], jobs: list[dict], answers: dict, live: dict | None,
                         row.update(status="label_mismatch",
                                    detail=f"`{metric}` 只帶 target label；config 沒有加 `{label}`")
                         continue
+                    if not builtin and exporter_label(label, metric, lhints, bool(row["hint"])):
+                        row["labels_exporter"].append(label)  # the exporter's own label: not a question
+                        continue
                     row["labels_missing"].append(label)
+                if row["labels_exporter"]:
+                    row["detail"] = (row["detail"] + "；" if row["detail"] else "") + \
+                        f"{', '.join('`' + l + '`' for l in row['labels_exporter'])} 是 exporter 自己輸出的 label（目錄提示，未用 live 確認）"
                 if row["labels_missing"] and row["status"] != "label_mismatch":
                     if row["status"] not in ("needs_input", "job_mismatch"):
                         row.update(status="needs_input", ask="label")

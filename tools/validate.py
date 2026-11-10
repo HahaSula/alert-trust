@@ -313,6 +313,42 @@ def load_rule_files(paths: list[str]) -> dict[str, dict]:
     return out
 
 
+def check_absence_jobs(rules: dict[str, dict]) -> list[str]:
+    """absence_covered_by must name a rule that exists in the given files and whose job matcher selects the same
+    job as the annotated rule; otherwise the cover never fires when this rule's data disappears."""
+    import check_metric_sources as MS
+    by_name: dict[str, list[dict]] = {}
+    for ref, rule in rules.items():
+        by_name.setdefault(ref.split("#", 1)[1], []).append(rule)
+
+    def jobs_of(rule: dict) -> list[str]:
+        return sorted({v for sel in MS.selectors(str(rule.get("expr", "")))
+                       for (l, op, v) in sel["matchers"] if l == "job" and op == "="})
+
+    def selects(rule: dict, job: str) -> bool:
+        sels = [x for x in MS.selectors(str(rule.get("expr", ""))) if any(l == "job" for (l, _, _) in x["matchers"])]
+        if not sels:
+            return True  # no job matcher: covers every job
+        return any(all(MS.matches(op, v, job) for (l, op, v) in x["matchers"] if l == "job") for x in sels)
+    errors = []
+    for ref, rule in rules.items():
+        covered = (rule.get("annotations") or {}).get("absence_covered_by")
+        if not covered:
+            continue
+        mine = jobs_of(rule)
+        for alert in [a.strip() for a in str(covered).split(",") if a.strip()]:
+            targets = by_name.get(alert)
+            if not targets:
+                errors.append(f"{ref}: absence_covered_by 指向不存在的規則 {alert}")
+                continue
+            bad = [j for j in mine if not any(selects(t, j) for t in targets)]
+            if bad:
+                theirs = sorted({j for t in targets for j in jobs_of(t)}) or ["（正規式）"]
+                errors.append(f"{ref}: absence_covered_by 指向的 {alert} 選的是 job {', '.join(theirs)}，"
+                              f"不是這條的 job {', '.join(bad)}：這條的資料消失時 {alert} 不會響")
+    return errors
+
+
 def lint_rules(rules: dict[str, dict]) -> tuple[list[str], list[str]]:
     """(errors, advice) for a user's rule set: the presence lint, plus jobs that no `up == 0` / `absent(up)`
     rule watches (when that exporter is down, every rule on the job returns nothing at once)."""
@@ -331,6 +367,7 @@ def lint_rules(rules: dict[str, dict]) -> tuple[list[str], list[str]]:
             elif sel["metric"] and not sel["metric"].startswith(("ALERTS", "scrape_")):
                 for j in jobs:
                     used.setdefault(j, []).append(ref.split("#", 1)[1])
+    errors = list(dict.fromkeys(errors + check_absence_jobs(rules)))  # same text when check_presence found it too
     for job, names in sorted(used.items()):
         if job not in guarded:
             names = list(dict.fromkeys(names))

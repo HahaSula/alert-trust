@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 1m
+  scrape_timeout: 30s
+scrape_configs:
+  - job_name: pg
+    scrape_interval: 15s
+    scrape_timeout: 20s
+    static_configs: [{ targets: ["pg-a:9187", "pg-b:9187"], labels: { cluster: main } }]
+  - job_name: vmagent
+    static_configs: [{ targets: ["localhost:8429"] }]
+  - job_name: victoriametrics
+    static_configs: [{ targets: ["vm:8428"] }]

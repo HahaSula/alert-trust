@@ -1,0 +1,263 @@
+id: host
+name: 主機與容器資源
+kind: infra
+family: shared
+status: draft
+stages: [source]
+versions_checked: ["node_exporter v1.12.1（含 docs/node-mixin）", "cAdvisor v0.60.6", "kubelet v1.37.2 /metrics/cadvisor", "kube-state-metrics v2.20.0", "kubernetes-mixin version-1.5.6", "process-exporter v0.8.7（選用）"]
+architecture: architecture/db-resources.md
+role: >-
+  每個資料庫 target 都跑在一台主機或一個容器上。資料庫自己的 metric 只看得到它管的池（buffer pool、連線上限、cache 配額），
+  看不到 CPU 排隊、page cache、swap、磁碟延遲、檔案系統唯讀、cgroup 記憶體上限與 OOM kill。這張卡把這一層的訊號集中在一處，
+  target 卡的 blind_spots 用 covered_by 指過來。資料來源是 node_exporter（主機）、cAdvisor 或 kubelet 的 /metrics/cadvisor（容器）、
+  kube-state-metrics（OOMKilled 原因），process-exporter 選用（沒有 process_* metric 的 mysqld、postgres 的 fd 與 thread）。
+  全部只讀碼，沒有在 lab 觸發過；門檻是例子。資料庫內部資源和這一層的對照見[資料庫的資源](../architecture/db-resources.md)。
+
+silent_failures:
+  - text: "node-mixin 的 NodeFilesystemSpaceFillingUp／AlmostOutOfSpace 只算 `node_filesystem_readonly == 0` 的檔案系統。ext4 因錯誤 remount 成唯讀時，空間規則反而排除它，mixin 也沒有唯讀規則。"
+    evidence: code
+    source: res-node-mixin
+    refs: [res-nm-fs-filling, res-nm-fs-readonly, res-ne-fs-readonly]
+  - text: "node-mixin 的預設 selector 是 `job=\"node\"`；job 名稱不同時每一條 mixin 規則都回傳空，不會報錯。mixin 也沒有 node_exporter 本身停掉的規則。"
+    evidence: code
+    source: res-node-mixin
+    refs: [res-nm-selector]
+  - text: "node-mixin 的磁碟規則只有 NodeDiskIOSaturation（`node_disk_io_time_weighted_seconds_total` 的速率 > 10，也就是平均佇列長度，for 30m）。單次 IO 延遲（fsync 慢）在佇列不長時看不到；也沒有 swap、PSI、OOM kill 的規則。CPU 規則 NodeCPUHighUsage 的 severity 是 info。"
+    evidence: code
+    source: res-node-mixin
+    refs: [res-nm-diskio, res-nm-cpu, res-ne-disk-weighted]
+  - text: "容器的 `container_memory_working_set_bytes` 是 usage 減 inactive_file。cgroup 的記憶體也算 page cache 的 active 部分，資料庫大量讀檔時 working set 會接近 limit，但不一定會 OOM；反過來，看主機的 MemAvailable 不會知道某個容器快碰到自己的 limit。"
+    evidence: code
+    source: res-cadvisor
+    refs: [res-cadv-wss-calc, res-cadv-wss, res-cadv-memlimit]
+  - text: "kubernetes-mixin version-1.5.6 有 CPUThrottlingHigh（25%），但沒有容器記憶體接近 limit、也沒有 OOMKilled 的告警；OOM 之後只會看到 KubePodCrashLooping（反覆重啟才響）。"
+    evidence: code
+    source: res-k8s-mixin
+    refs: [res-km-throttling, res-km-throttling-pct]
+  - text: "獨立執行的 cAdvisor 預設停用 process 類 metric（`container_file_descriptors`、`container_threads`）；kubelet 的 /metrics/cadvisor 有開。PSI（`container_pressure_*`）在 kubelet 要 KubeletPSI feature gate。"
+    evidence: code
+    source: res-cadvisor
+    refs: [res-cadv-ignore-process, res-kubelet-included, res-kubelet-psi]
+
+contracts: []
+
+signals:
+  - id: exporter-up
+    tier: 1
+    aspect: exporter
+    question: 每台資料庫主機都有 node_exporter，而且抓得到嗎
+    signal: '`up{job=~".*node.*"} == 0`，加上 `absent(up{job=~".*node.*"})`；每個資料庫 instance 都要對得到一台主機'
+    metrics: [up]
+    evaluate_on: observer
+    silent_failure: 沒有 node_exporter 時，這張卡所有規則回傳空，target 卡的「磁碟滿」「OOM」照樣是盲點
+    evidence: code
+    source: res-node-mixin
+    refs: [res-nm-selector]
+    upstream: { status: no, note: "node-mixin 沒有 exporter 停掉的規則" }
+    rules: [rules/host/meta.yml#HostExporterDown, rules/host/meta.yml#HostExporterMissing]
+
+  - id: collector-success
+    tier: 2
+    aspect: exporter
+    question: node_exporter 的 collector 都成功嗎
+    signal: '`node_scrape_collector_success == 0`（例如 filesystem 的 statfs 卡住、pressure 在沒有 PSI 的核心上）'
+    metrics: [node_scrape_collector_success]
+    evaluate_on: observer
+    evidence: code
+    source: res-node-exporter
+    refs: [res-ne-collector-success, res-ne-pressure-default]
+    upstream: { status: no }
+    rules: [rules/host/meta.yml#HostCollectorFailed]
+
+  - id: disk-space
+    tier: 1
+    aspect: capacity
+    question: 資料目錄所在的檔案系統快滿了嗎
+    signal: 剩餘 < 10%，或照 6 小時趨勢 24 小時內寫滿；另看 inode
+    metrics: [node_filesystem_avail_bytes, node_filesystem_size_bytes, node_filesystem_files_free, node_filesystem_files]
+    evaluate_on: observer
+    evidence: code
+    source: res-node-mixin
+    refs: [res-nm-fs-filling, res-nm-fs-almost, res-nm-files, pg-asp-ne-avail, pg-asp-ne-size]
+    upstream: { status: yes, note: "node-mixin NodeFilesystemSpaceFillingUp、AlmostOutOfSpace、AlmostOutOfFiles；但排除唯讀檔案系統" }
+    rules: [rules/host/meta.yml#HostFilesystemAlmostFull, rules/host/meta.yml#HostFilesystemFillingUp, rules/host/meta.yml#HostInodesAlmostFull]
+
+  - id: filesystem-readonly
+    tier: 1
+    aspect: availability
+    question: 資料目錄的檔案系統變成唯讀或讀不到了嗎
+    signal: '`node_filesystem_readonly == 1` 或 `node_filesystem_device_error == 1`（限 ext4／xfs／btrfs／zfs）'
+    metrics: [node_filesystem_readonly, node_filesystem_device_error]
+    evaluate_on: observer
+    silent_failure: 唯讀時 node-mixin 的空間規則排除這個檔案系統；資料庫寫入失敗，但空間看起來正常
+    evidence: code
+    source: res-node-exporter
+    refs: [res-ne-fs-readonly, res-ne-fs-deverr, res-nm-fs-readonly]
+    upstream: { status: no }
+    rules: [rules/host/meta.yml#HostFilesystemReadOnly, rules/host/meta.yml#HostFilesystemDeviceError]
+
+  - id: oom-kills
+    tier: 1
+    aspect: availability
+    question: 資料庫行程被 OOM kill 了嗎
+    signal: 主機 `node_vmstat_oom_kill` 增加；容器 `container_oom_events_total` 增加；K8s 上次結束原因 OOMKilled 且剛重啟
+    metrics: [node_vmstat_oom_kill, container_oom_events_total, kube_pod_container_status_last_terminated_reason, kube_pod_container_status_restarts_total]
+    evaluate_on: observer
+    silent_failure: 資料庫卡片只看得到 uptime 歸零或 up 掉一下，分不出是 OOM、crash 還是人為重啟
+    evidence: code
+    source: res-node-exporter
+    refs: [res-ne-vmstat-fields, res-cadv-oom, res-ksm-terminated, res-ksm-restarts]
+    upstream: { status: no, note: "node-mixin 與 kubernetes-mixin 都沒有 OOM kill 規則" }
+    rules: [rules/host/meta.yml#HostOOMKill, rules/host/meta.yml#ContainerOOMEvent, rules/host/meta.yml#ContainerOOMKilled]
+
+  - id: container-memory-limit
+    tier: 1
+    aspect: saturation
+    question: 容器的記憶體快碰到 cgroup limit 了嗎
+    signal: '`container_memory_working_set_bytes / container_spec_memory_limit_bytes > 0.9`（limit 為 0 表示沒設，排除）'
+    metrics: [container_memory_working_set_bytes, container_spec_memory_limit_bytes]
+    evaluate_on: observer
+    applies_when: 資料庫跑在容器裡（Kubernetes、Docker）
+    silent_failure: 主機 MemAvailable 還很多時，容器照樣被自己的 limit OOM kill
+    evidence: code
+    source: res-cadvisor
+    refs: [res-cadv-wss, res-cadv-wss-calc, res-cadv-memlimit, res-kubelet-included]
+    upstream: { status: no, note: "kubernetes-mixin 沒有這條" }
+    rules: [rules/host/meta.yml#ContainerMemoryNearLimit]
+
+  - id: memory-available
+    tier: 2
+    aspect: saturation
+    question: 主機的可用記憶體與記憶體壓力
+    signal: MemAvailable／MemTotal < 10%，或 PSI memory full 超過 10% 的時間
+    metrics: [node_memory_MemAvailable_bytes, node_memory_MemTotal_bytes, node_pressure_memory_stalled_seconds_total, node_vmstat_pgmajfault]
+    evaluate_on: observer
+    evidence: code
+    source: res-node-exporter
+    refs: [res-ne-mem-avail, res-ne-psi-mem, res-nm-mem, res-nm-mem-th, res-nm-majfault]
+    upstream: { status: partial, note: "node-mixin NodeMemoryHighUtilization（90%）、NodeMemoryMajorPagesFaults；沒有 PSI" }
+    rules: [rules/host/meta.yml#HostMemoryLow, rules/host/meta.yml#HostMemoryPressure]
+
+  - id: swap-activity
+    tier: 2
+    aspect: saturation
+    question: 主機在換頁（swap in／out）嗎
+    signal: '`rate(node_vmstat_pswpin) + rate(node_vmstat_pswpout)` 每秒 > 100 頁；SwapFree 下降'
+    metrics: [node_vmstat_pswpin, node_vmstat_pswpout, node_memory_SwapFree_bytes, node_memory_SwapTotal_bytes]
+    evaluate_on: observer
+    silent_failure: buffer pool、shared_buffers、Valkey 的資料被換出時，資料庫的 hit ratio 不變，延遲卻上升
+    evidence: code
+    source: res-node-exporter
+    refs: [res-ne-vmstat-fields, res-ne-swap-free]
+    upstream: { status: no }
+    rules: [rules/host/meta.yml#HostSwapping]
+
+  - id: cpu-saturation
+    tier: 2
+    aspect: saturation
+    question: 主機的 CPU 夠嗎
+    signal: PSI cpu some 超過 50% 的時間；輔助看非 idle 使用率與 load per core
+    metrics: [node_pressure_cpu_waiting_seconds_total, node_cpu_seconds_total, node_load1]
+    evaluate_on: observer
+    evidence: code
+    source: res-node-exporter
+    refs: [res-ne-psi-cpu, res-ne-cpu, res-nm-cpu, res-nm-cpu-th, res-nm-load]
+    upstream: { status: partial, note: "node-mixin NodeCPUHighUsage（info）、NodeSystemSaturation（load per core > 2）" }
+    rules: [rules/host/meta.yml#HostCPUPressure]
+
+  - id: container-cpu-throttling
+    tier: 2
+    aspect: saturation
+    question: 容器被 CPU quota 節流嗎
+    signal: 被節流的 CFS 週期比例 > 25%，for 15m
+    metrics: [container_cpu_cfs_throttled_periods_total, container_cpu_cfs_periods_total, container_cpu_usage_seconds_total]
+    evaluate_on: observer
+    applies_when: 資料庫跑在有 CPU limit 的容器裡
+    silent_failure: 平均 CPU 使用率遠低於 limit 時，短時間的尖峰照樣被節流；單執行緒的 Valkey 主執行緒、etcd 的 apply 最明顯
+    evidence: code
+    source: res-cadvisor
+    refs: [res-cadv-throttled, res-cadv-periods, res-cadv-cpu, res-km-throttling, res-km-throttling-pct]
+    upstream: { status: yes, note: "kubernetes-mixin CPUThrottlingHigh（25%，for 15m）" }
+    rules: [rules/host/meta.yml#ContainerCPUThrottled]
+
+  - id: disk-latency
+    tier: 2
+    aspect: saturation
+    question: 資料磁碟每次 IO 要多久
+    signal: 平均寫入／讀取時間 > 50ms（有 IO 時才算）；PSI io full 超過 10% 的時間
+    metrics: [node_disk_write_time_seconds_total, node_disk_writes_completed_total, node_disk_read_time_seconds_total, node_disk_reads_completed_total, node_pressure_io_stalled_seconds_total]
+    evaluate_on: observer
+    silent_failure: 資料庫的 fsync 直方圖（etcd、YugabyteDB）會變慢，但 MySQL、PostgreSQL、MongoDB 的卡片沒有 fsync 延遲訊號，只有這一層看得到
+    evidence: code
+    source: res-node-exporter
+    refs: [res-ne-disk-writetime, res-ne-disk-writes, res-ne-disk-readtime, res-ne-disk-reads, res-ne-psi-io]
+    upstream: { status: partial, note: "node-mixin 只有 NodeDiskIOSaturation（佇列長度 > 10，for 30m）" }
+    rules: [rules/host/meta.yml#HostDiskWriteLatencyHigh, rules/host/meta.yml#HostDiskReadLatencyHigh, rules/host/meta.yml#HostIOPressure]
+
+  - id: disk-busy
+    tier: 3
+    aspect: saturation
+    question: 磁碟忙碌時間與佇列
+    signal: '`rate(node_disk_io_time_seconds_total)` 接近 1、`rate(node_disk_io_time_weighted_seconds_total)` 偏高；SSD／NVMe 可平行處理，忙碌 100% 不代表飽和，只當輔助'
+    metrics: [node_disk_io_time_seconds_total, node_disk_io_time_weighted_seconds_total]
+    evaluate_on: observer
+    evidence: code
+    source: res-node-mixin
+    refs: [res-ne-disk-iotime, res-ne-disk-weighted, res-nm-diskio]
+    upstream: { status: yes, note: "node-mixin NodeDiskIOSaturation" }
+    rules: []
+
+  - id: fd-headroom
+    tier: 2
+    aspect: saturation
+    question: 整機與資料庫行程的 file descriptor 還夠嗎
+    signal: 整機 `node_filefd_allocated / node_filefd_maximum > 0.8`；行程 `process_open_fds / process_max_fds`（Go／Rust 的 etcd、TiKV、TiDB、PD 與 exporter 自己）或 process-exporter 的 worst_fd_ratio（mysqld、postgres）
+    metrics: [node_filefd_allocated, node_filefd_maximum, process_open_fds, process_max_fds, namedprocess_namegroup_worst_fd_ratio, container_file_descriptors]
+    evaluate_on: observer
+    silent_failure: 打滿的是行程的 ulimit（RLIMIT_NOFILE），整機的 fs.file-max 通常遠大於它；node-mixin 只看整機
+    evidence: code
+    source: res-node-exporter
+    refs: [res-ne-filefd, res-nm-fd, res-cg-process, res-px-fd-ratio, res-cadv-fds]
+    upstream: { status: partial, note: "node-mixin NodeFileDescriptorLimit 只看整機（70%／90%）" }
+    rules: [rules/host/meta.yml#HostFdNearLimit, rules/host/meta.yml#ProcessFdNearLimit]
+
+  - id: clock-sync
+    tier: 2
+    aspect: availability
+    question: 主機時鐘有同步、偏移多大
+    signal: '`node_timex_sync_status` 為 0 且 maxerror ≥ 16s；或 `|node_timex_offset_seconds| > 50ms`'
+    metrics: [node_timex_sync_status, node_timex_maxerror_seconds, node_timex_offset_seconds]
+    evaluate_on: observer
+    applies_when: 依賴時鐘的資料庫（YugabyteDB 的 hybrid clock、TiDB 的 TSO、MongoDB 的 wall time lag）
+    evidence: code
+    source: res-node-exporter
+    refs: [res-ne-timex-sync, res-ne-timex-offset, res-nm-clock]
+    upstream: { status: yes, note: "node-mixin NodeClockNotSynchronising、NodeClockSkewDetected" }
+    rules: [rules/host/meta.yml#HostClockNotSynchronised, rules/host/meta.yml#HostClockOffsetHigh]
+
+  - id: network-errors
+    tier: 3
+    aspect: saturation
+    question: 網卡有丟包或錯誤嗎
+    signal: '`rate(node_network_receive_drop_total)`、`node_network_receive_errs_total` 持續增加；複寫與 Raft 心跳延遲的旁證'
+    metrics: [node_network_receive_drop_total, node_network_receive_errs_total, node_network_transmit_errs_total]
+    evaluate_on: observer
+    evidence: code
+    source: res-node-mixin
+    refs: [res-ne-net-drop, res-nm-netrx]
+    upstream: { status: yes, note: "node-mixin NodeNetworkReceiveErrs、NodeNetworkTransmitErrs" }
+    rules: []
+
+  - id: process-threads-cpu
+    tier: 3
+    aspect: saturation
+    question: 資料庫行程內哪一類 thread 在吃 CPU
+    signal: process-exporter 依 thread 名稱分的 CPU 時間（mysqld 的 connection 與 InnoDB 背景 thread、TiKV 的 raftstore／apply 已有原生 metric）
+    metrics: [namedprocess_namegroup_thread_cpu_seconds_total, namedprocess_namegroup_memory_bytes, namedprocess_namegroup_num_threads]
+    evaluate_on: observer
+    applies_when: 有裝 process-exporter
+    evidence: code
+    source: res-process-exporter
+    refs: [res-px-thread-cpu, res-px-memory, res-px-threads-flag]
+    upstream: { status: no }
+    rules: []

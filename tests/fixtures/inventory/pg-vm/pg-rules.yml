@@ -1,0 +1,208 @@
+groups:
+- name: postgres-liveness
+  rules:
+  - alert: PostgresExporterDown
+    expr: up{job="pg"} == 0
+    for: 2m
+    labels:
+      severity: critical
+      component: postgres_exporter
+      tier: '1'
+    annotations:
+      summary: 抓不到 postgres_exporter 或 scrape 超時；這時 pg_up 不存在，只看 pg_up 的規則不會響。DB 主機不回應也會落在這裡
+      runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#exporter-up
+  - alert: PostgresExporterMissing
+    expr: absent(up{job="pg"})
+    for: 5m
+    labels:
+      severity: critical
+      component: postgres_exporter
+      tier: '1'
+    annotations:
+      summary: 完全沒有 postgres 的 target，服務發現或 job 名稱可能錯了
+      runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#exporter-up
+  - alert: PostgresDown
+    expr: pg_up{job="pg"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      component: postgres_exporter
+      tier: '1'
+    annotations:
+      summary: exporter 連不上 PostgreSQL（連線被拒、認證失敗、連線額滿）
+      runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#db-up
+      absence_covered_by: PostgresExporterDown, PostgresExporterMissing
+  - alert: PostgresCollectorsMissing
+    expr: "up{job=\"postgres\"} == 1\n  unless on (job, instance) pg_scrape_collector_success{job=\"postgres\"}\n"
+    for: 2m
+    labels:
+      severity: critical
+      component: postgres_exporter
+      tier: '1'
+    annotations:
+      summary: exporter 有回應卻沒有任何 collector 結果；新連線建不起來，pg_up 可能還是 1
+      runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#collectors-present
+  - alert: PostgresCollectorFailed
+    expr: pg_scrape_collector_success{job="pg"} == 0
+    for: 5m
+    labels:
+      severity: warning
+      component: postgres_exporter
+      tier: '1'
+    annotations:
+      summary: collector {{ $labels.collector }} 查詢失敗，它負責的 metric 已經消失
+      runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#collector-success
+      absence_covered_by: PostgresCollectorsMissing
+  - alert: PostgresExporterScrapeError
+    expr: pg_exporter_last_scrape_error{job="pg"} == 1
+    for: 5m
+    labels:
+      severity: warning
+      component: postgres_exporter
+      tier: '1'
+    annotations:
+      summary: 舊架構的查詢（含 queries.yaml 自訂查詢）有失敗；失敗的那組 metric 已經消失
+      runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#legacy-scrape-error
+  - alert: PostgresUserQueriesLoadError
+    expr: pg_exporter_user_queries_load_error{job="pg"} == 1
+    labels:
+      severity: warning
+      component: postgres_exporter
+      tier: '1'
+    annotations:
+      summary: queries.yaml 讀不到或解析失敗，所有自訂 metric 都不存在
+      runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#legacy-scrape-error
+  - alert: PostgresExporterLacksPgMonitor
+    expr: pg_scrape_collector_success{job="pg", collector="wal"} == 0
+    for: 5m
+    labels:
+      severity: warning
+      component: postgres_exporter
+      tier: '1'
+    annotations:
+      summary: wal collector 失敗，exporter 帳號很可能沒有 pg_monitor；這時 stat_activity 看不到別人的 session，卻回報成功
+      runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#monitor-privilege
+      absence_covered_by: PostgresCollectorsMissing
+- name: postgres-service
+  rules:
+  - alert: PostgresLongRunningTransaction
+    expr: max by (job, instance, datname) (pg_stat_activity_max_tx_duration{job="pg", datname!~"template.*"}) > 300
+    for: 2m
+    labels:
+      severity: warning
+      component: postgres_exporter
+      tier: '3'
+    annotations:
+      summary: 資料庫 {{ $labels.datname }} 有交易超過 5 分鐘，會擋住 vacuum；exporter 沒有 pg_monitor 時這條看不到
+      runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#xmin-horizon
+  - alert: PostgresDeadlocks
+    expr: increase(pg_stat_database_deadlocks{job="pg", datname!~"template.*"}[5m]) > 5
+    labels:
+      severity: warning
+      component: postgres_exporter
+      tier: '3'
+    annotations:
+      summary: 資料庫 {{ $labels.datname }} 5 分鐘內 deadlock 超過 5 次
+      runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#deadlocks-rollbacks
+  - alert: PostgresHighRollbackRatio
+    expr: "sum by (job, instance, datname) (rate(pg_stat_database_xact_rollback{job=\"postgres\", datname!~\"template.*\"}[5m]))\n  / sum by (job, instance, datname) (\n      rate(pg_stat_database_xact_rollback{job=\"postgres\", datname!~\"template.*\"}[5m])\n      + rate(pg_stat_database_xact_commit{job=\"postgres\", datname!~\"template.*\"}[5m])\n    ) > 0.1\n"
+    for: 10m
+    labels:
+      severity: warning
+      component: postgres_exporter
+      tier: '3'
+    annotations:
+      summary: 資料庫 {{ $labels.datname }} rollback 比例超過 10%
+      runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#deadlocks-rollbacks
+  - alert: PostgresTooManyDeadTuples
+    expr: "pg_stat_user_tables_n_dead_tup{job=\"postgres\"} > 10000\n  and pg_stat_user_tables_n_dead_tup{job=\"postgres\"}\n    > 0.1 * (pg_stat_user_tables_n_live_tup{job=\"postgres\"} + pg_stat_user_tables_n_dead_tup{job=\"postgres\"})\n"
+    for: 30m
+    labels:
+      severity: warning
+      component: postgres_exporter
+      tier: '3'
+    annotations:
+      summary: 資料表 {{ $labels.relname }} dead tuple 超過 10%，autovacuum 可能跟不上或被長交易擋住
+      runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#autovacuum
+  - alert: PostgresRestarted
+    expr: changes(pg_postmaster_start_time_seconds{job="pg"}[15m]) > 0
+    labels:
+      severity: info
+      component: postgres_exporter
+      tier: '3'
+    annotations:
+      summary: PostgreSQL 15 分鐘內重啟過（需要 --collector.postmaster）
+      runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#restart-and-crash
+  - alert: PostgresRoleChanged
+    expr: changes(pg_replication_is_replica{job="pg"}[5m]) > 0
+    labels:
+      severity: warning
+      component: postgres_exporter
+      tier: '3'
+    annotations:
+      summary: 主從角色改變（failover）；依 is_replica 分流的複製規則要重新對位
+      runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#promotion
+- name: postgres-target-ha
+  rules:
+  - alert: PostgresStandbyCountDropped
+    expr: "count by (job, instance) (pg_stat_replication_pg_wal_lsn_diff{job=\"postgres\", state=\"streaming\"})\n  < max_over_time(count by (job, instance) (pg_stat_replication_pg_wal_lsn_diff{job=\"postgres\", state=\"streaming\"})[1d:5m])\n"
+    for: 5m
+    labels:
+      severity: warning
+      component: postgres_exporter
+      tier: '2'
+    annotations:
+      summary: 主庫上 streaming 的複本比過去一天的最大值少；全部消失時由 PostgresPrimaryWithoutStandby 接手
+      runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#standby-streaming
+  - alert: PostgresMultiplePrimaries
+    expr: count by (cluster) (pg_replication_is_replica{job="pg", cluster!=""} == 0) > 1
+    for: 1m
+    labels:
+      severity: critical
+      component: postgres_exporter
+      tier: '2'
+    annotations:
+      summary: cluster {{ $labels.cluster }} 有 {{ $value }} 台不在 recovery 的 PostgreSQL（split brain，或舊主庫沒有被隔離）
+      runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#promotion
+      absence_covered_by: PostgresCollectorsMissing, PostgresExporterDown
+  - alert: PostgresNoPrimary
+    expr: "count by (cluster) (pg_replication_is_replica{job=\"postgres\", cluster!=\"\"})\n  unless count by (cluster) (pg_replication_is_replica{job=\"postgres\", cluster!=\"\"} == 0)\n"
+    for: 2m
+    labels:
+      severity: critical
+      component: postgres_exporter
+      tier: '2'
+    annotations:
+      summary: cluster {{ $labels.cluster }} 看得到的 PostgreSQL 全都在 recovery，沒有主庫（主庫停機時也可能是 exporter 抓不到，先看 PostgresExporterDown）
+      runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#promotion
+  - alert: PostgresArchiveFailing
+    expr: "increase(pg_stat_archiver_failed_count{job=\"postgres\"}[15m]) > 0\n  and on (job, instance) increase(pg_stat_archiver_archived_count{job=\"postgres\"}[15m]) == 0\n"
+    for: 5m
+    labels:
+      severity: warning
+      component: postgres_exporter
+      tier: '2'
+    annotations:
+      summary: archive_command 15 分鐘內只有失敗沒有成功；WAL 會一直留在 pg_wal，接著是磁碟寫滿
+      runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#archiver
+  - alert: PostgresStandbyQueryConflicts
+    expr: increase(pg_stat_database_conflicts{job="pg", datname!~"template.*"}[10m]) > 0
+    labels:
+      severity: info
+      component: postgres_exporter
+      tier: '3'
+    annotations:
+      summary: 複本上資料庫 {{ $labels.datname }} 有查詢被 recovery 取消（max_standby_streaming_delay 到期）
+      runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#standby-conflicts
+- name: pg-team
+  rules:
+  - alert: PGRollbackBurst
+    expr: increase(pg_stat_database_xact_rollback{job="pg"}[1m]) > 100
+    for: 1m
+    labels:
+      severity: warning
+  - alert: PGTooManyConnections
+    expr: sum by (instance) (pg_stat_activity_count{job="pg"}) / on(instance) pg_settings_max_connections{job="pg"} > 0.9
+    for: 5m
+    labels:
+      severity: critical

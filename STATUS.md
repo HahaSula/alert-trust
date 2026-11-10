@@ -5,7 +5,7 @@
 ## 現況
 
 - GitHub repo `HahaSula/alert-trust`，Pages 由 GitHub Actions 發布。
-- 17 張卡（9 個監控元件、8 個資料庫 target）、371 個訊號、526 條規則；`validate.py` 0 錯誤、1 個警告；`--strict` 建置通過。
+- 18 張卡（10 個監控與主機元件、8 個資料庫 target）、387 個訊號、550 條規則；`validate.py` 0 錯誤、1 個警告；`--strict` 建置通過。
 - 原始碼參考 105+ 筆（釘版本與行號），實驗參考多數已換成 `lab/` 的公開結果。
 
 ## 已完成
@@ -32,6 +32,8 @@
 | YugabyteDB v2026.1.3.0 target（`model: native`），YSQL 與 PostgreSQL 監控對照（postgres_exporter 實測） | `catalog/targets/yugabytedb.yaml`、`docs/targets/yugabytedb*.md`、`lab/targets/yugabytedb/` |
 | ClickHouse v26.10.2 target（內建 endpoint＋query-exporter 查 system 表）與「分析型」架構頁，2 副本＋3 Keeper lab | `catalog/targets/clickhouse.yaml`、`docs/targets/clickhouse*.md`、`queries/clickhouse/`、`lab/targets/clickhouse/` |
 | MongoDB 8.0.34 target（Percona mongodb_exporter v0.54.0）與「文件型」架構頁，3 成員 replica set lab | `catalog/targets/mongodb_exporter.yaml`、`docs/targets/mongodb*.md`、`lab/targets/mongodb/` |
+| 盤點工具 `tools/inventory.py`：從 Prometheus／vmagent config、rule 檔、Alertmanager config 建環境模型（每個值標來源），含 Alertmanager 路由與 inhibit；計算錯誤修正（vmagent timeout 截斷、`--baseline` 下限、d = τ、dedup、正規式 job、subquery、沒資料的 rule、exporter 預設期限、`--prom-version`、覆蓋檢查的 Watchdog 歸屬與 `partial`） | `tools/` |
+| 資料庫資源對照（連線、執行緒、記憶體池、IO／fsync、複寫 worker、背景工作、CPU）與共用的主機／容器卡（node_exporter、cAdvisor、kube-state-metrics），只讀碼 | `docs/architecture/db-resources.md`、`catalog/components/host.yaml`、`rules/host/` |
 | rule-review 改為建議優先：第 0 輪只看檔案就給建議、缺資料用保守假設、每輪最多 3 題但可提前問；工具修正（覆蓋檢查比對 job、`features` 判斷不適用、`fit_contracts --config`、方案 B 可行性、`for` 被 stale 重置的提示、`always_fires`、缺 label 的提問、`validate.py --lint-rules`）；新頁「從哪裡開始」（五階） | `skills/rule-review/`、`tools/`、`docs/tools/start.md` |
 | 時間契約複查（原始碼＋promtool 虛擬時鐘測試，Prometheus 3.13.5／2.51.2、VictoriaMetrics）：range-window 一般化為 `(n+k)·I + max(0, d − O)`、新增 `range-window-1sample`、vm-range-window 改為 `(n+k)·I + max(0, L − D)`、resend-endsat 最差情況 `4 × max − P`；各 range 函式需要的 sample 數表；`fit_contracts.py` 依函式判斷 n；視窗要保留語意時（`keep_range`）改給縮短 S、`query_offset`、`anchored` | `docs/contracts.md#range-functions`、`lab/promql-windows/` |
 | scrape 與 evaluation 的基準值：官方預設與限制、來源比較、由耗時分布推導 S／τ／exporter 期限／E／k 的步驟；`fit_contracts.py` 檢查 τ、exporter 期限、截斷、p99、E ≥ S、VM dedup，`--baseline` 輸出建議值 | `docs/tools/baseline.md`、`tools/fit_contracts.py` |
@@ -69,6 +71,7 @@
 19. **artifact 對照的後續輕量 lab**：429 與 `iteration_missed`、帶 `for` 的 log rule、損毀 block（`reloads_failures_total`）、長查詢卡住 Compact（目前讀碼）。新增的 Prometheus／VM 規則只過 promtool／dryRun，沒有在 lab 觸發過。
 20. **MongoDB 待補**：sharded cluster、WiredTiger cache／eviction 壓力、ticket 排隊、連線打滿、collStats 成本只讀碼；oplog 被釘住只讀碼。`docs/targets/models.md` 說「8.0、8.2 的 tag 沒有 OTel 程式碼」，MongoDB agent 回報 8.2.12 有 OTLP 檔案／HTTP 推送（沒有 Prometheus 檔案輸出），要附原始碼行號後修正。
 21. **契約複查的後續**：`resend-endsat` 最差情況（`− P`）與 `d > S` 時 `I ≈ d` 只讀碼，要輕量 lab；Grafana Alerting 的續送是否同樣「嚴格大於」才送未查。
+22. **資源調查的後續**：各 target 卡的 blind_spots 改成 `covered_by` 主機卡；`#proposed` 表的 10 個飽和訊號；host 卡要不要新的 family；target-pattern 要不要加「主機層存在」；OOM、唯讀 remount、記憶體上限的小 lab。
 
 ## 已做的決定
 

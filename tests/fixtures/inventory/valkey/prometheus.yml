@@ -1,0 +1,15 @@
+# 使用者在第 1 輪以文字提供的內容轉寫；alerting、rule_files 使用者沒提，未寫入（不知道）
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+  - job_name: redis
+    static_configs:
+      - targets: ["cache-1:9121", "cache-2:9121", "cache-3:9121"]
+  - job_name: node
+    static_configs:
+      - targets: []

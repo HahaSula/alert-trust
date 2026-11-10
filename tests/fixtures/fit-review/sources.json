@@ -1,0 +1,4 @@
+{"jobs": [], "rows": [
+  {"rule": "RedisMemory", "metric": "redis_memory_max_bytes", "status": "label_mismatch"},
+  {"rule": "ThreadsHigh", "metric": "mysql_global_status_threads_running", "status": "confirmed"}
+]}

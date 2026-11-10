@@ -1,0 +1,314 @@
+groups:
+- name: valkey-liveness
+  rules:
+  - alert: ValkeyExporterDown
+    expr: up{job="redis"} == 0
+    for: 2m
+    labels:
+      severity: critical
+      component: redis_exporter
+      tier: '1'
+      aspect: exporter
+    annotations:
+      summary: 抓不到 redis_exporter 或 scrape 超時；伺服器忙到 INFO 回不來（--connection-timeout 預設 15s 比 scrape_timeout 長）也會落在這裡，這時 redis_up 不存在
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#exporter-up
+  - alert: ValkeyExporterMissing
+    expr: absent(up{job="redis"})
+    for: 5m
+    labels:
+      severity: critical
+      component: redis_exporter
+      tier: '1'
+      aspect: exporter
+    annotations:
+      summary: 完全沒有 valkey 的 target，服務發現或 job 名稱可能錯了
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#exporter-up
+  - alert: ValkeyDown
+    expr: redis_up{job="redis"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      component: redis_exporter
+      tier: '1'
+      aspect: availability
+    annotations:
+      summary: exporter 連不上 Valkey 或 INFO 失敗（連線被拒、認證失敗、maxclients 額滿、在 --connection-timeout 內沒回應）；--script 出錯也會讓它變 0，先看 redis_exporter_last_scrape_error 的 err label
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#db-up
+      absence_covered_by: ValkeyExporterDown, ValkeyExporterMissing
+  - alert: ValkeyExporterScrapeError
+    expr: redis_exporter_last_scrape_error{job="redis"} == 1
+    for: 5m
+    labels:
+      severity: warning
+      component: redis_exporter
+      tier: '1'
+      aspect: exporter
+    annotations:
+      summary: exporter 這次 scrape 失敗：{{ $labels.err }}
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#collector-success
+  - alert: ValkeyExporterScriptFailed
+    expr: redis_script_result{job="redis"} != 1
+    for: 5m
+    labels:
+      severity: warning
+      component: redis_exporter
+      tier: '1'
+      aspect: exporter
+    annotations:
+      summary: --script {{ $labels.filename }} 失敗或沒有回傳值（0＝錯誤、2＝空結果）；錯誤時 redis_up 也被設成 0
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#collector-success
+      absence_covered_by: ValkeyScriptMissing
+  - alert: ValkeyScriptMissing
+    expr: "redis_up{job=\"valkey\"} == 1\n  unless on (job, instance) redis_script_result{job=\"valkey\"}\n"
+    for: 10m
+    labels:
+      severity: warning
+      component: redis_exporter
+      tier: '1'
+      aspect: exporter
+    annotations:
+      summary: 沒有 --script 的結果；依賴 redis_script_values 的規則（複本斷線多久、min-replicas）都會回傳空
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#collector-success
+  - alert: ValkeyConfigMetricsMissing
+    expr: "redis_up{job=\"valkey\"} == 1\n  unless on (job, instance) redis_config_maxclients{job=\"valkey\"}\n"
+    for: 10m
+    labels:
+      severity: warning
+      component: redis_exporter
+      tier: '1'
+      aspect: exporter
+    annotations:
+      summary: INFO 成功但沒有 redis_config_*：CONFIG GET 被 ACL 拒絕、被 rename，或設了 --config-command=-。exporter 只記 debug log，redis_up 仍是 1，連線比例類規則回傳空
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#collectors-present
+- name: valkey-saturation
+  rules:
+  - alert: ValkeyMemoryNearMaxmemory
+    expr: "redis_memory_used_bytes{job=\"valkey\"} / redis_memory_max_bytes{job=\"valkey\"} > 0.9\n  and on (job, instance) redis_memory_max_bytes{job=\"valkey\"} > 0\n"
+    for: 10m
+    labels:
+      severity: warning
+      component: redis_exporter
+      tier: '2'
+      aspect: saturation
+    annotations:
+      summary: used_memory 超過 maxmemory 的 90%；noeviction 與沒有 TTL 的 volatile-* 會開始拒絕寫入，其他政策開始淘汰
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#maxmemory-eviction
+  - alert: ValkeyEvictingKeys
+    expr: rate(redis_evicted_keys_total{job="redis"}[5m]) > 0
+    for: 15m
+    labels:
+      severity: warning
+      component: redis_exporter
+      tier: '3'
+      aspect: saturation
+    annotations:
+      summary: 持續在淘汰 key；當資料庫用（不是 cache）時代表資料在消失
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#maxmemory-eviction
+  - alert: ValkeyMaxmemoryUnset
+    expr: redis_memory_max_bytes{job="redis"} == 0
+    for: 1h
+    labels:
+      severity: info
+      component: redis_exporter
+      tier: '3'
+      aspect: saturation
+    annotations:
+      summary: 沒有設 maxmemory：記憶體用完時是被 OOM killer 殺掉，而不是回 OOM 錯誤（valkey-doc admin 建議明確設定）
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#maxmemory-eviction
+      absence_covered_by: ValkeyDown
+  - alert: ValkeyHighFragmentation
+    expr: "redis_mem_fragmentation_ratio{job=\"valkey\"} > 1.5\n  and on (job, instance) (redis_memory_used_rss_bytes{job=\"valkey\"} - redis_memory_used_bytes{job=\"valkey\"}) > 512 * 1024 * 1024\n"
+    for: 1h
+    labels:
+      severity: warning
+      component: redis_exporter
+      tier: '3'
+      aspect: saturation
+    annotations:
+      summary: RSS 比 used_memory 多 50% 以上而且多出 512MB；資料量小時比例沒有意義，所以同時看絕對值
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#fragmentation
+  - alert: ValkeyRssBelowUsed
+    expr: "redis_mem_fragmentation_ratio{job=\"valkey\"} < 0.9\n  and on (job, instance) redis_memory_used_bytes{job=\"valkey\"} > 256 * 1024 * 1024\n"
+    for: 15m
+    labels:
+      severity: warning
+      component: redis_exporter
+      tier: '3'
+      aspect: saturation
+    annotations:
+      summary: RSS 小於 used_memory：部分記憶體被 swap 出去，延遲會變高
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#fragmentation
+  - alert: ValkeyConnectionsNearLimit
+    expr: 'redis_connected_clients{job="redis"} / redis_config_maxclients{job="redis"} > 0.85
+
+      '
+    for: 5m
+    labels:
+      severity: warning
+      component: redis_exporter
+      tier: '2'
+      aspect: saturation
+    annotations:
+      summary: 連線數超過 maxclients 的 85%；額滿時 exporter 自己也連不進去（沒有保留位子），redis_up 變 0
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#connections
+  - alert: ValkeyRejectedConnections
+    expr: increase(redis_rejected_connections_total{job="redis"}[5m]) > 0
+    labels:
+      severity: warning
+      component: redis_exporter
+      tier: '2'
+      aspect: saturation
+    annotations:
+      summary: 有連線因為 maxclients 被拒絕；exporter 拿到的是同一個錯誤，額滿期間這個 counter 本身可能沒有資料
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#connections
+  - alert: ValkeyBlockedClientsHigh
+    expr: redis_blocked_clients{job="redis"} > 100
+    for: 10m
+    labels:
+      severity: info
+      component: redis_exporter
+      tier: '3'
+      aspect: saturation
+    annotations:
+      summary: 很多客戶端卡在 BLPOP／XREAD BLOCK／WAIT 之類的阻塞指令（門檻是例子；佇列型應用平常就有一些）
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#blocked-clients
+  - alert: ValkeyMainThreadBusy
+    expr: "rate(redis_cpu_user_main_thread_seconds_total{job=\"valkey\"}[5m])\n  + rate(redis_cpu_sys_main_thread_seconds_total{job=\"valkey\"}[5m]) > 0.9\n"
+    for: 15m
+    labels:
+      severity: warning
+      component: redis_exporter
+      tier: '3'
+      aspect: saturation
+    annotations:
+      summary: 主執行緒用掉超過 0.9 核；指令都在這一條執行緒上跑，加 CPU 核心數不會變快（io-threads 只分擔網路讀寫）
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#main-thread
+- name: valkey-replication
+  rules:
+  - alert: ValkeyReplicaLinkDown
+    expr: redis_master_link_up{job="redis"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      component: redis_exporter
+      tier: '2'
+      aspect: replication
+    annotations:
+      summary: 複本和 {{ $labels.master_host }}:{{ $labels.master_port }} 的連線斷了；master_last_io_seconds_ago 在斷線時是 -1，不能拿來算延遲
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#replication-link
+      absence_covered_by: ValkeyExporterDown, ValkeyDown
+  - alert: ValkeyReplicaLinkDownLong
+    expr: redis_script_values{job="redis", key="master_link_down_since_seconds"} > 300
+    labels:
+      severity: critical
+      component: redis_exporter
+      tier: '2'
+      aspect: replication
+    annotations:
+      summary: 複本已經斷線超過 5 分鐘（INFO master_link_down_since_seconds，exporter 不輸出，由 valkey-extra.lua 補）
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#replication-link
+  - alert: ValkeyReplicaCountDropped
+    expr: "redis_connected_slaves{job=\"valkey\"}\n  < on (job, instance) max_over_time(redis_connected_slaves{job=\"valkey\"}[1h])\nand on (job, instance) redis_instance_info{job=\"valkey\", role=\"master\"}\n"
+    for: 2m
+    labels:
+      severity: warning
+      component: redis_exporter
+      tier: '2'
+      aspect: replication
+    annotations:
+      summary: 主節點的複本比一小時內的最大值少；斷線的複本在 INFO 裡整列消失，它的 lag 規則跟著回傳空
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#replication-lag
+  - alert: ValkeyReplicationLagBytes
+    expr: "redis_master_repl_offset{job=\"valkey\"}\n  - on (job, instance) group_right redis_connected_slave_offset_bytes{job=\"valkey\"} > 10 * 1024 * 1024\n"
+    for: 2m
+    labels:
+      severity: warning
+      component: redis_exporter
+      tier: '2'
+      aspect: replication
+    annotations:
+      summary: 複本 {{ $labels.slave_ip }} 落後主節點超過 10MB（主節點端的 offset 差）；接近 repl-backlog-size 時重連會變成 full resync
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#replication-lag
+  - alert: ValkeyReplicationHeartbeatLag
+    expr: time() - redis_key_value{job="redis", key="at:heartbeat"} > 30
+    for: 1m
+    labels:
+      severity: warning
+      component: redis_exporter
+      tier: '2'
+      aspect: replication
+    annotations:
+      summary: 複本上的 heartbeat key 比現在舊 {{ $value | humanizeDuration }}：主節點每秒寫入時間、複本端 --check-single-keys 讀取，這是唯一以秒計的資料延遲（門檻是例子；包含最多一個 scrape_interval 的誤差）
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#replication-lag
+  - alert: ValkeyReplicaAckStale
+    expr: redis_connected_slave_lag_seconds{job="redis"} > 10
+    for: 1m
+    labels:
+      severity: warning
+      component: redis_exporter
+      tier: '2'
+      aspect: replication
+    annotations:
+      summary: 複本 {{ $labels.slave_ip }} 超過 10 秒沒有回報 offset（lag 是「距上次 REPLCONF ACK 幾秒」，不是資料延遲）
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#replication-lag
+  - alert: ValkeyFullResync
+    expr: increase(redis_replica_resyncs_full{job="redis"}[10m]) > 0
+    labels:
+      severity: warning
+      component: redis_exporter
+      tier: '2'
+      aspect: replication
+    annotations:
+      summary: 主節點做了 full resync：要 fork 產生 RDB、整份傳給複本；常見原因是斷線期間寫入量超過 repl-backlog-size
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#full-resync
+  - alert: ValkeyBacklogTooShort
+    expr: "redis_replication_backlog_bytes{job=\"valkey\"}\n  / rate(redis_master_repl_offset{job=\"valkey\"}[15m]) < 60\nand on (job, instance) redis_instance_info{job=\"valkey\", role=\"master\"}\n"
+    for: 30m
+    labels:
+      severity: info
+      component: redis_exporter
+      tier: '3'
+      aspect: replication
+    annotations:
+      summary: repl-backlog-size 以目前寫入速度只撐得住不到 60 秒的斷線，超過就會 full resync
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#full-resync
+  - alert: ValkeyNoMaster
+    expr: "count by (cluster) (redis_instance_info{job=\"valkey\"})\n  unless count by (cluster) (redis_instance_info{job=\"valkey\", role=\"master\"})\n"
+    for: 1m
+    labels:
+      severity: critical
+      component: redis_exporter
+      tier: '2'
+      aspect: replication
+    annotations:
+      summary: cluster {{ $labels.cluster }} 沒有任何一台回報 role:master
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#role-detection
+  - alert: ValkeyMultipleMasters
+    expr: count by (cluster) (count by (cluster, run_id) (redis_instance_info{job="redis", role="master"})) > 1
+    for: 1m
+    labels:
+      severity: critical
+      component: redis_exporter
+      tier: '2'
+      aspect: replication
+    annotations:
+      summary: cluster {{ $labels.cluster }} 有 {{ $value }} 台回報 role:master（依 run_id 去重，同一台被兩個 job 抓不會重複計算）；failover 後舊主節點回來、Sentinel 還沒把它降級時會出現
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#role-detection
+  - alert: ValkeyFailoverHappened
+    expr: changes(redis_sentinel_master_config_epoch{job="sentinel"}[10m]) > 0
+    labels:
+      severity: warning
+      component: redis_exporter
+      tier: '2'
+      aspect: replication
+    annotations:
+      summary: Sentinel 對 {{ $labels.master_name }} 做了 failover（config-epoch 增加）；master_address label 也會跟著換
+      runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#role-detection
+- name: cache-team
+  rules:
+  - alert: CacheHitRatioLow
+    expr: rate(redis_keyspace_hits_total{job="redis"}[2m]) / (rate(redis_keyspace_hits_total{job="redis"}[2m]) + rate(redis_keyspace_misses_total{job="redis"}[2m])) < 0.8
+    for: 10m
+  - alert: RedisMemoryHigh
+    expr: redis_memory_used_bytes{job="redis"} / redis_memory_max_bytes{job="redis"} > 0.9
+    for: 5m

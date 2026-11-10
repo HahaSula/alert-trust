@@ -1,0 +1,112 @@
+# env/<名稱>.inventory.yaml 的範例（名稱、主機、數字都是虛構的）。
+# 由 tools/inventory.py 從使用者的檔案產生：
+#   python3 tools/inventory.py --rules user/*.yml --config user/prometheus.yml --alertmanager user/alertmanager.yml \
+#       [--answers env/<名稱>.sources.yaml] [--merge env/<名稱>.inventory.yaml] --out env/<名稱>.inventory.yaml --md report/inventory.md
+# 每個值都標來源 from：file（從檔案讀到）、default（官方預設）、hint（目錄卡片或預設 port 推測，要確認）、
+# user（answers 檔或使用者改過）、unknown。使用者可以直接改這份；改過的值加 confirmed: true，--merge 會保留。
+# 來源檔沒變（sha256 相同）時，值和檔案算出來的不同也會當成使用者改的而保留。
+# 真實的 env/*.yaml 含環境資訊，不要 commit。
+
+sources:
+  config: user/prometheus.yml
+  config_kind: { value: prometheus, from: default }     # --config-kind vmagent 時 timeout 會被截成 interval
+  alertmanager: user/alertmanager.yml                   # 沒給就是 null，下面 alertmanager 整段是 unknown
+  rules: [user/shop-rules.yml]
+  answers: null
+  sha256: { user/prometheus.yml: 0123456789abcdef }     # --merge 用來判斷來源檔有沒有變
+
+stack:
+  ruler: { value: prometheus, from: hint, evidence: ["config 是 prometheus.yml；rule 檔沒有任何一方專用的欄位"] }
+  # vmalert 專用的 group 欄位（type、eval_delay、concurrency…）或 Prometheus 的 query_offset 出現時 from: file
+  version: { value: null, from: unknown }
+  evaluation_interval: { value: 30s, from: file }
+  rule_files_loaded: { value: ["/etc/prometheus/rules/*.yml"], from: file }
+  rules_given_are_loaded:                               # true／false／unknown（檔名符合 glob、但路徑不同）
+    value: unknown
+    from: file
+    per_file: { user/shop-rules.yml: unknown }
+  alertmanagers: { value: ["am-1:9093"], from: file }
+  external_labels: { value: { region: east }, from: file }   # 會加到 alert 上，參與路由
+  external_observer: { value: unknown, from: unknown }
+
+jobs:
+  - name: shop-db
+    interval: { value: 30s, from: file }
+    timeout: { value: 10s, from: file, effective: 10s }   # effective：vmagent 截斷後、或 min(global timeout, interval)
+    targets: 2                                            # 只算 static_configs；用 SD 時是 null
+    sd: [static_configs]
+    target_labels:
+      from_static: { cluster: [main] }                    # static_configs labels 的值
+      from_relabel: []                                    # relabel_configs 的 target_label
+      honor_labels: false
+      open: []                                            # honor_labels／labelmap／file_sd：label 無法從 config 列舉
+    dropped_metrics: ["mysql_info_schema_.*"]             # metric_relabel_configs 對 __name__ 的 drop
+    exporter: { value: mysqld_exporter, from: hint, basis: "target 用的是它的預設 port" }
+    exporter_deadline: { value: 9.8s, from: default, basis: "τ − --timeout-offset（預設 0.25s）", ref: "docs/tools/baseline.md#defaults" }
+    measured: { d_p99: null, d_max: null, up0_count: null, from: unknown }   # answers 的 measured.<job>
+
+unscraped_components:
+  - { component: alertmanager, target: "am-1:9093", from: file, fact: "alerting 的 am-1:9093 沒有 scrape job 在抓" }
+
+rules:
+  - name: ShopDbSlowQueries
+    kind: alert
+    file: user/shop-rules.yml
+    group: { name: shop-db, interval: { value: 30s, from: file, inherited: true } }   # 沒寫 interval 時沿用 evaluation_interval
+    jobs_used: ['job="shop-mysql"']
+    jobs_matched: { value: [], from: file }               # 空：job 條件對不到任何已知 job
+    fires: { value: never, from: file, why: [job] }       # never／always（absent 對到空）／partly_empty；沒有就不寫
+    labels_required:
+      - { label: role, match: '="primary"', status: exporter_or_unknown, from: unknown, metrics: [mysql_global_status_slow_queries] }
+      # status：static_label／relabel／static_target／missing／exporter_or_unknown／unknown／answered
+    ranges:
+      - { func: rate, range: 1m, samples_needed: 2, metric: mysql_global_status_slow_queries,
+          data_interval: 30s, short: true, short_basis: "(n+1)·I + τ = 1m40s（k=1、d=τ 的保守值）" }
+    detects_absence: { value: false, via: [] }            # via：absent／unless／up==0／absence_covered_by
+    for: 2m
+    keep_range: { value: unknown, from: unknown }         # 視窗是不是刻意的（annotation keep_range 或 answers）
+    labels_out: { severity: critical }
+    route:
+      receiver: null                                      # 唯一確定的 receiver；不確定或多個時是 null
+      receivers: [dba, pager]
+      depends_on_runtime_labels: [team]                   # 路由用到只有評估時才知道的 label
+      matches:
+        - { receiver: pager, path: "route.routes[0]", certain: true, group_wait: 10s, group_interval: 5m, repeat_interval: 4h }
+        - { receiver: dba, path: "route.routes[1]", certain: false, group_wait: 30s, group_interval: 5m, repeat_interval: 1h }
+      from: file
+
+alertmanager:
+  global: { resolve_timeout: { value: 5m, from: default } }
+  routes_summary: 'severity="critical" → pager（continue）；team="db" → dba；其他 → default'
+  routes:
+    - path: route.routes[1]
+      matchers: 'team="db"'
+      continue: false
+      receiver: { value: dba, from: file }
+      group_by: { value: [alertname], from: file, inherited: true }
+      group_wait: { value: 30s, from: default, inherited: true }
+      group_interval: { value: 5m, from: default, inherited: true }
+      repeat_interval: { value: 1h, from: file }
+  receivers: [{ name: pager, empty: false, kinds: [webhook_configs] }, { name: blackhole, empty: true, kinds: [] }]
+  inhibit:
+    - source: 'severity="critical"'
+      target: 'severity="warning"'
+      equal: [instance]
+      source_rules: [ShopDbSlowQueries]
+      suppressed: [{ target: ShopDbThreads, when_same_labels: { sources: [ShopDbSlowQueries], labels: [instance] } }]
+  unrouted_or_blackholed_rules: []                        # 會落到空 receiver 的 rule（certain：不依 runtime label）
+  ends_at_inputs: { evaluation_interval: 30s, resend_delay: { value: 1m, from: default }, contract: resend-endsat,
+                    note: "只記錄數值；EndsAt 與 repeat_interval 的關係見 docs/contracts.md#resend-endsat" }
+
+findings_from_files:                                      # 只陳述事實；建議由後面的工具給
+  - { kind: job_not_in_config, job: 'job="shop-mysql"', rules: [ShopDbSlowQueries], closest: shop-db,
+      fact: '1 條 rule 用的 job="shop-mysql" 對不到 config 的任何 job（config 有 shop-db；名稱最接近的是 shop-db）' }
+  - { kind: component_unscraped, fact: "alerting 的 am-1:9093 沒有 scrape job 在抓" }
+
+questions:                                                # 先比「會推翻幾項事實」，再比影響幾項；ask_now 最多 3 題
+  - q: 'rule 用的 job="shop-mysql"（是 shop-db 嗎？） 在 config 裡對不到；實際的 job 名稱是什麼（relabel 之後）？'
+    changes: [rule 會不會響, absent() 是否一直在響, metric 來源]
+    affects: 1
+    findings: 2
+    answer_key: job_names                                 # 回答寫到 env/<名稱>.sources.yaml 的哪個 key（或要補的檔案）
+    ask_now: true

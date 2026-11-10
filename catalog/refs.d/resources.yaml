@@ -1,0 +1,987 @@
+# 資源（池、執行緒、主機層）調查的原始碼參考。key 以 res- 開頭。
+# 每一筆在 tag 上用 gh api 取檔、以關鍵字找出行號（行內含關鍵字），2026-11-10。
+refs:
+  res-ne-cpu:
+    kind: code
+    title: "metric：node_cpu_seconds_total"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/cpu_common.go"
+    line: 28
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/cpu_common.go#L28"
+  res-ne-mem-avail:
+    kind: code
+    title: "metric：node_memory_MemAvailable_bytes"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/meminfo_linux.go"
+    line: 121
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/meminfo_linux.go#L121"
+  res-ne-swap-free:
+    kind: code
+    title: "metric：node_memory_SwapFree_bytes"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/meminfo_linux.go"
+    line: 163
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/meminfo_linux.go#L163"
+  res-ne-vmstat-fields:
+    kind: code
+    title: "vmstat 預設欄位含 oom_kill、pswp、pgmajfault"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/vmstat_linux.go"
+    line: 36
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/vmstat_linux.go#L36"
+  res-ne-pressure-default:
+    kind: code
+    title: "pressure（PSI）collector 預設開啟"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/pressure_linux.go"
+    line: 54
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/pressure_linux.go#L54"
+  res-ne-psi-cpu:
+    kind: code
+    title: "metric：node_pressure_cpu_waiting_seconds_total"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/pressure_linux.go"
+    line: 66
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/pressure_linux.go#L66"
+  res-ne-psi-io:
+    kind: code
+    title: "metric：node_pressure_io_stalled_seconds_total"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/pressure_linux.go"
+    line: 76
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/pressure_linux.go#L76"
+  res-ne-psi-mem:
+    kind: code
+    title: "metric：node_pressure_memory_stalled_seconds_total"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/pressure_linux.go"
+    line: 86
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/pressure_linux.go#L86"
+  res-ne-disk-reads:
+    kind: code
+    title: "metric：node_disk_reads_completed_total"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/diskstats_common.go"
+    line: 49
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/diskstats_common.go#L49"
+  res-ne-disk-writes:
+    kind: code
+    title: "metric：node_disk_writes_completed_total"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/diskstats_common.go"
+    line: 61
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/diskstats_common.go#L61"
+  res-ne-disk-iotime:
+    kind: code
+    title: "metric：node_disk_io_time_seconds_total"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/diskstats_common.go"
+    line: 73
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/diskstats_common.go#L73"
+  res-ne-disk-readtime:
+    kind: code
+    title: "metric：node_disk_read_time_seconds_total"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/diskstats_common.go"
+    line: 79
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/diskstats_common.go#L79"
+  res-ne-disk-writetime:
+    kind: code
+    title: "metric：node_disk_write_time_seconds_total"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/diskstats_common.go"
+    line: 86
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/diskstats_common.go#L86"
+  res-ne-disk-weighted:
+    kind: code
+    title: "metric：node_disk_io_time_weighted_seconds_total"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/diskstats_linux.go"
+    line: 158
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/diskstats_linux.go#L158"
+  res-ne-filefd:
+    kind: code
+    title: "metric：node_filefd_allocated／node_filefd_maximum"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/filefd_linux.go"
+    line: 88
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/filefd_linux.go#L88"
+  res-ne-fs-readonly:
+    kind: code
+    title: "metric：node_filesystem_readonly"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/filesystem_common.go"
+    line: 139
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/filesystem_common.go#L139"
+  res-ne-fs-deverr:
+    kind: code
+    title: "metric：node_filesystem_device_error"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/filesystem_common.go"
+    line: 145
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/filesystem_common.go#L145"
+  res-ne-net-drop:
+    kind: code
+    title: "metric：node_network_receive_drop_total"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/netdev_common.go"
+    line: 215
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/netdev_common.go#L215"
+  res-nm-fs-filling:
+    kind: code
+    title: "node-mixin NodeFilesystemSpaceFillingUp"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "docs/node-mixin/alerts/alerts.libsonnet"
+    line: 8
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/docs/node-mixin/alerts/alerts.libsonnet#L8"
+  res-nm-fs-readonly:
+    kind: code
+    title: "node-mixin 空間規則只看 readonly == 0 的檔案系統"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "docs/node-mixin/alerts/alerts.libsonnet"
+    line: 15
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/docs/node-mixin/alerts/alerts.libsonnet#L15"
+  res-nm-fs-almost:
+    kind: code
+    title: "node-mixin NodeFilesystemAlmostOutOfSpace"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "docs/node-mixin/alerts/alerts.libsonnet"
+    line: 48
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/docs/node-mixin/alerts/alerts.libsonnet#L48"
+  res-nm-files:
+    kind: code
+    title: "node-mixin NodeFilesystemAlmostOutOfFiles"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "docs/node-mixin/alerts/alerts.libsonnet"
+    line: 124
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/docs/node-mixin/alerts/alerts.libsonnet#L124"
+  res-nm-fd:
+    kind: code
+    title: "node-mixin NodeFileDescriptorLimit（整機 fd，不是行程）"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "docs/node-mixin/alerts/alerts.libsonnet"
+    line: 281
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/docs/node-mixin/alerts/alerts.libsonnet#L281"
+  res-nm-cpu:
+    kind: code
+    title: "node-mixin NodeCPUHighUsage（severity info）"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "docs/node-mixin/alerts/alerts.libsonnet"
+    line: 313
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/docs/node-mixin/alerts/alerts.libsonnet#L313"
+  res-nm-load:
+    kind: code
+    title: "node-mixin NodeSystemSaturation（load per core）"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "docs/node-mixin/alerts/alerts.libsonnet"
+    line: 329
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/docs/node-mixin/alerts/alerts.libsonnet#L329"
+  res-nm-majfault:
+    kind: code
+    title: "node-mixin NodeMemoryMajorPagesFaults"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "docs/node-mixin/alerts/alerts.libsonnet"
+    line: 347
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/docs/node-mixin/alerts/alerts.libsonnet#L347"
+  res-nm-mem:
+    kind: code
+    title: "node-mixin NodeMemoryHighUtilization"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "docs/node-mixin/alerts/alerts.libsonnet"
+    line: 364
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/docs/node-mixin/alerts/alerts.libsonnet#L364"
+  res-nm-diskio:
+    kind: code
+    title: "node-mixin NodeDiskIOSaturation（佇列長度，for 30m）"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "docs/node-mixin/alerts/alerts.libsonnet"
+    line: 380
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/docs/node-mixin/alerts/alerts.libsonnet#L380"
+  res-nm-netrx:
+    kind: code
+    title: "node-mixin NodeNetworkReceiveErrs"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "docs/node-mixin/alerts/alerts.libsonnet"
+    line: 160
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/docs/node-mixin/alerts/alerts.libsonnet#L160"
+  res-nm-selector:
+    kind: code
+    title: "node-mixin 預設 job=\"node\""
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "docs/node-mixin/config.libsonnet"
+    line: 11
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/docs/node-mixin/config.libsonnet#L11"
+  res-nm-cpu-th:
+    kind: code
+    title: "node-mixin CPU 門檻 90%"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "docs/node-mixin/config.libsonnet"
+    line: 55
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/docs/node-mixin/config.libsonnet#L55"
+  res-nm-mem-th:
+    kind: code
+    title: "node-mixin 記憶體門檻 90%"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "docs/node-mixin/config.libsonnet"
+    line: 95
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/docs/node-mixin/config.libsonnet#L95"
+  res-cadv-cpu:
+    kind: code
+    title: "metric：container_cpu_usage_seconds_total"
+    project: "cAdvisor"
+    version: "v0.60.6"
+    file: "lib/metrics/prometheus.go"
+    line: 180
+    url: "https://github.com/google/cadvisor/blob/v0.60.6/lib/metrics/prometheus.go#L180"
+  res-cadv-periods:
+    kind: code
+    title: "metric：container_cpu_cfs_periods_total"
+    project: "cAdvisor"
+    version: "v0.60.6"
+    file: "lib/metrics/prometheus.go"
+    line: 210
+    url: "https://github.com/google/cadvisor/blob/v0.60.6/lib/metrics/prometheus.go#L210"
+  res-cadv-throttled:
+    kind: code
+    title: "metric：container_cpu_cfs_throttled_periods_total"
+    project: "cAdvisor"
+    version: "v0.60.6"
+    file: "lib/metrics/prometheus.go"
+    line: 225
+    url: "https://github.com/google/cadvisor/blob/v0.60.6/lib/metrics/prometheus.go#L225"
+  res-cadv-wss:
+    kind: code
+    title: "metric：container_memory_working_set_bytes"
+    project: "cAdvisor"
+    version: "v0.60.6"
+    file: "lib/metrics/prometheus.go"
+    line: 531
+    url: "https://github.com/google/cadvisor/blob/v0.60.6/lib/metrics/prometheus.go#L531"
+  res-cadv-wss-calc:
+    kind: code
+    title: "working set = usage − inactive_file"
+    project: "cAdvisor"
+    version: "v0.60.6"
+    file: "lib/container/libcontainer/handler.go"
+    line: 896
+    url: "https://github.com/google/cadvisor/blob/v0.60.6/lib/container/libcontainer/handler.go#L896"
+  res-cadv-memlimit:
+    kind: code
+    title: "metric：container_spec_memory_limit_bytes"
+    project: "cAdvisor"
+    version: "v0.60.6"
+    file: "lib/metrics/prometheus.go"
+    line: 2316
+    url: "https://github.com/google/cadvisor/blob/v0.60.6/lib/metrics/prometheus.go#L2316"
+  res-cadv-oom:
+    kind: code
+    title: "metric：container_oom_events_total"
+    project: "cAdvisor"
+    version: "v0.60.6"
+    file: "lib/metrics/prometheus.go"
+    line: 2088
+    url: "https://github.com/google/cadvisor/blob/v0.60.6/lib/metrics/prometheus.go#L2088"
+  res-cadv-psi-mem:
+    kind: code
+    title: "metric：container_pressure_memory_stalled_seconds_total"
+    project: "cAdvisor"
+    version: "v0.60.6"
+    file: "lib/metrics/prometheus.go"
+    line: 2120
+    url: "https://github.com/google/cadvisor/blob/v0.60.6/lib/metrics/prometheus.go#L2120"
+  res-cadv-psi-io:
+    kind: code
+    title: "metric：container_pressure_io_stalled_seconds_total"
+    project: "cAdvisor"
+    version: "v0.60.6"
+    file: "lib/metrics/prometheus.go"
+    line: 2140
+    url: "https://github.com/google/cadvisor/blob/v0.60.6/lib/metrics/prometheus.go#L2140"
+  res-cadv-fds:
+    kind: code
+    title: "metric：container_file_descriptors"
+    project: "cAdvisor"
+    version: "v0.60.6"
+    file: "lib/metrics/prometheus.go"
+    line: 1862
+    url: "https://github.com/google/cadvisor/blob/v0.60.6/lib/metrics/prometheus.go#L1862"
+  res-cadv-ignore-process:
+    kind: code
+    title: "獨立 cAdvisor 預設停用 process 類 metric"
+    project: "cAdvisor"
+    version: "v0.60.6"
+    file: "cmd/cadvisor.go"
+    line: 90
+    url: "https://github.com/google/cadvisor/blob/v0.60.6/cmd/cadvisor.go#L90"
+  res-kubelet-included:
+    kind: code
+    title: "kubelet /metrics/cadvisor 開啟 process、OOM metric"
+    project: "Kubernetes（kubelet）"
+    version: "v1.37.2"
+    file: "pkg/kubelet/server/server.go"
+    line: 523
+    url: "https://github.com/kubernetes/kubernetes/blob/v1.37.2/pkg/kubelet/server/server.go#L523"
+  res-kubelet-psi:
+    kind: code
+    title: "PSI metric 要 KubeletPSI feature gate"
+    project: "Kubernetes（kubelet）"
+    version: "v1.37.2"
+    file: "pkg/kubelet/server/server.go"
+    line: 527
+    url: "https://github.com/kubernetes/kubernetes/blob/v1.37.2/pkg/kubelet/server/server.go#L527"
+  res-ksm-terminated:
+    kind: code
+    title: "metric：kube_pod_container_status_last_terminated_reason"
+    project: "kube-state-metrics"
+    version: "v2.20.0"
+    file: "internal/store/pod.go"
+    line: 339
+    url: "https://github.com/kubernetes/kube-state-metrics/blob/v2.20.0/internal/store/pod.go#L339"
+  res-ksm-limits:
+    kind: code
+    title: "metric：kube_pod_container_resource_limits"
+    project: "kube-state-metrics"
+    version: "v2.20.0"
+    file: "internal/store/pod.go"
+    line: 179
+    url: "https://github.com/kubernetes/kube-state-metrics/blob/v2.20.0/internal/store/pod.go#L179"
+  res-ksm-restarts:
+    kind: code
+    title: "metric：kube_pod_container_status_restarts_total"
+    project: "kube-state-metrics"
+    version: "v2.20.0"
+    file: "internal/store/pod.go"
+    line: 441
+    url: "https://github.com/kubernetes/kube-state-metrics/blob/v2.20.0/internal/store/pod.go#L441"
+  res-km-throttling:
+    kind: code
+    title: "kubernetes-mixin CPUThrottlingHigh"
+    project: "kubernetes-mixin"
+    version: "version-1.5.6"
+    file: "alerts/resource_alerts.libsonnet"
+    line: 255
+    url: "https://github.com/kubernetes-monitoring/kubernetes-mixin/blob/version-1.5.6/alerts/resource_alerts.libsonnet#L255"
+  res-km-throttling-pct:
+    kind: code
+    title: "CPUThrottlingHigh 門檻 25%"
+    project: "kubernetes-mixin"
+    version: "version-1.5.6"
+    file: "alerts/resource_alerts.libsonnet"
+    line: 105
+    url: "https://github.com/kubernetes-monitoring/kubernetes-mixin/blob/version-1.5.6/alerts/resource_alerts.libsonnet#L105"
+  res-cg-process:
+    kind: code
+    title: "預設 registry 含 process collector（process_cpu_seconds_total 等）"
+    project: "client_golang"
+    version: "v1.23.2"
+    file: "prometheus/registry.go"
+    line: 61
+    url: "https://github.com/prometheus/client_golang/blob/v1.23.2/prometheus/registry.go#L61"
+  res-etcd-default-reg:
+    kind: code
+    title: "etcd /metrics 用預設 registry"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/api/etcdhttp/metrics.go"
+    line: 30
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/api/etcdhttp/metrics.go#L30"
+  res-my-thread-cache:
+    kind: code
+    title: "thread_cache_size"
+    project: "MySQL"
+    version: "mysql-8.4.7"
+    file: "sql/sys_vars.cc"
+    line: 4908
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/sys_vars.cc#L4908"
+  res-my-replica-workers:
+    kind: code
+    title: "replica_parallel_workers 預設 4"
+    project: "MySQL"
+    version: "mysql-8.4.7"
+    file: "sql/sys_vars.cc"
+    line: 6175
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/sys_vars.cc#L6175"
+  res-my-purge-threads:
+    kind: code
+    title: "innodb_purge_threads"
+    project: "MySQL"
+    version: "mysql-8.4.7"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 22299
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/handler/ha_innodb.cc#L22299"
+  res-my-io-capacity:
+    kind: code
+    title: "innodb_io_capacity"
+    project: "MySQL"
+    version: "mysql-8.4.7"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 22223
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/handler/ha_innodb.cc#L22223"
+  res-my-bp-size:
+    kind: code
+    title: "innodb_buffer_pool_size"
+    project: "MySQL"
+    version: "mysql-8.4.7"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 22518
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/handler/ha_innodb.cc#L22518"
+  res-my-pending-fsyncs:
+    kind: code
+    title: "status：Innodb_data_pending_fsyncs"
+    project: "MySQL"
+    version: "mysql-8.4.7"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 1190
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/handler/ha_innodb.cc#L1190"
+  res-my-threads-created:
+    kind: code
+    title: "status：Threads_created"
+    project: "MySQL"
+    version: "mysql-8.4.7"
+    file: "sql/mysqld.cc"
+    line: 11636
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/mysqld.cc#L11636"
+  res-mx-default-applier:
+    kind: code
+    title: "applier worker collector 預設關"
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "config/config.go"
+    line: 207
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/config/config.go#L207"
+  res-mx-default-gs:
+    kind: code
+    title: "global_status collector 預設開"
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "config/config.go"
+    line: 184
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/config/config.go#L184"
+  res-mx-default-fileev:
+    kind: code
+    title: "file_events collector 預設關"
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "config/config.go"
+    line: 202
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/config/config.go#L202"
+  res-pg-shared-buffers:
+    kind: code
+    title: "shared_buffers"
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/misc/guc_tables.c"
+    line: 2262
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/misc/guc_tables.c#L2262"
+  res-pg-wal-senders:
+    kind: code
+    title: "max_wal_senders"
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/misc/guc_tables.c"
+    line: 2936
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/misc/guc_tables.c#L2936"
+  res-pg-worker-procs:
+    kind: code
+    title: "max_worker_processes"
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/misc/guc_tables.c"
+    line: 3164
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/misc/guc_tables.c#L3164"
+  res-pg-av-workers:
+    kind: code
+    title: "autovacuum_max_workers"
+    project: "PostgreSQL"
+    version: "REL_17_11"
+    file: "src/backend/utils/misc/guc_tables.c"
+    line: 3400
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/misc/guc_tables.c#L3400"
+  res-pe-activity-labels:
+    kind: code
+    title: "pg_stat_activity_count 帶 backend_type、wait_event_type label"
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_activity.go"
+    line: 42
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_activity.go#L42"
+  res-pe-activity-join:
+    kind: code
+    title: "只算有 datname 與 state 的行程（checkpointer 等背景行程不在內）"
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_activity.go"
+    line: 94
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_activity.go#L94"
+  res-pe-backend-fsync:
+    kind: code
+    title: "metric：pg_stat_bgwriter_buffers_backend_fsync_total（PG 17 前）"
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_bgwriter.go"
+    line: 87
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_bgwriter.go#L87"
+  res-pe-bgwriter-17:
+    kind: code
+    title: "PG 17 起 bgwriter 查詢不再有 backend fsync"
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_bgwriter.go"
+    line: 119
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_bgwriter.go#L119"
+  res-pe-ckpt-sync:
+    kind: code
+    title: "metric：pg_stat_bgwriter_checkpoint_sync_time_total"
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_bgwriter.go"
+    line: 57
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_bgwriter.go#L57"
+  res-pe-checkpointer-off:
+    kind: code
+    title: "pg_stat_checkpointer collector 預設關"
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_checkpointer.go"
+    line: 30
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_checkpointer.go#L30"
+  res-pe-buffercache-off:
+    kind: code
+    title: "pg_buffercache_summary collector 預設關"
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_buffercache_summary.go"
+    line: 28
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_buffercache_summary.go#L28"
+  res-vk-cobl-stat:
+    kind: code
+    title: "INFO client_output_buffer_limit_disconnections"
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6507
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6507"
+  res-vk-mem-replicas:
+    kind: code
+    title: "INFO mem_clients_slaves"
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6329
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6329"
+  res-vk-cfg-cobl:
+    kind: code
+    title: "client-output-buffer-limit"
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/config.c"
+    line: 3518
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/config.c#L3518"
+  res-rx-cobl:
+    kind: code
+    title: "metric：redis_client_output_buffer_limit_disconnections_total"
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 466
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L466"
+  res-rx-mem-replicas:
+    kind: code
+    title: "metric：redis_mem_clients_slaves"
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 239
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L239"
+  res-rx-cpu-sys:
+    kind: code
+    title: "metric：redis_cpu_sys_seconds_total"
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/exporter.go"
+    line: 451
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/exporter.go#L451"
+  res-mg-repl-writers:
+    kind: code
+    title: "replWriterThreadCount 預設 16"
+    project: "MongoDB"
+    version: "r8.0.34"
+    file: "src/mongo/db/repl/repl_writer_thread_pool_server_parameters.idl"
+    line: 41
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/repl_writer_thread_pool_server_parameters.idl#L41"
+  res-mg-repl-buffer:
+    kind: code
+    title: "serverStatus metrics.repl.buffer 的 sizeBytes／maxSizeBytes"
+    project: "MongoDB"
+    version: "r8.0.34"
+    file: "src/mongo/db/repl/oplog_buffer.h"
+    line: 286
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/oplog_buffer.h#L286"
+  res-mg-repl-buffer-flag:
+    kind: code
+    title: "feature flag 開時欄位改在 buffer.apply／buffer.write 底下"
+    project: "MongoDB"
+    version: "r8.0.34"
+    file: "src/mongo/db/repl/oplog_buffer.h"
+    line: 287
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/repl/oplog_buffer.h#L287"
+  res-mg-cpu-time:
+    kind: code
+    title: "serverStatus extra_info.user_time_us"
+    project: "MongoDB"
+    version: "r8.0.34"
+    file: "src/mongo/util/processinfo_linux.cpp"
+    line: 967
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/util/processinfo_linux.cpp#L967"
+  res-mg-max-incoming:
+    kind: code
+    title: "net.maxIncomingConnections"
+    project: "MongoDB"
+    version: "r8.0.34"
+    file: "src/mongo/db/server_options_general.idl"
+    line: 87
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/server_options_general.idl#L87"
+  res-mgx-ss-prefix:
+    kind: code
+    title: "serverStatus 欄位攤平成 mongodb_ss_*"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/metrics.go"
+    line: 60
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/metrics.go#L60"
+  res-tikv-pending-compaction:
+    kind: code
+    title: "metric：tikv_engine_pending_compaction_bytes"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "components/engine_rocks/src/rocks_metrics.rs"
+    line: 1286
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/components/engine_rocks/src/rocks_metrics.rs#L1286"
+  res-tikv-block-cache:
+    kind: code
+    title: "metric：tikv_engine_block_cache_size_bytes"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "components/engine_rocks/src/rocks_metrics.rs"
+    line: 1266
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/components/engine_rocks/src/rocks_metrics.rs#L1266"
+  res-tikv-config-rocksdb:
+    kind: code
+    title: "metric：tikv_config_rocksdb（含 soft／hard_pending_compaction_bytes_limit）"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "src/server/metrics.rs"
+    line: 440
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/src/server/metrics.rs#L440"
+  res-tikv-soft-pending:
+    kind: code
+    title: "tikv_config_rocksdb 輸出 soft_pending_compaction_bytes_limit"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "src/config/mod.rs"
+    line: 556
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/src/config/mod.rs#L556"
+  res-tikv-cpu-quota:
+    kind: code
+    title: "metric：tikv_server_cpu_cores_quota"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "src/server/metrics.rs"
+    line: 455
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/src/server/metrics.rs#L455"
+  res-tikv-rule-cpu-quota:
+    kind: code
+    title: "官方規則 TiKV_cpu_quota"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/tikv.rules.yml"
+    line: 328
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/metrics/alertmanager/tikv.rules.yml#L328"
+  res-tikv-channel-full:
+    kind: code
+    title: "metric：tikv_channel_full_total"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "components/batch-system/src/metrics.rs"
+    line: 37
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/components/batch-system/src/metrics.rs#L37"
+  res-tikv-rule-channel-full:
+    kind: code
+    title: "官方規則 TiKV_channel_full_total"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/tikv.rules.yml"
+    line: 52
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/metrics/alertmanager/tikv.rules.yml#L52"
+  res-tikv-pending-task:
+    kind: code
+    title: "metric：tikv_worker_pending_task_total"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "components/tikv_util/src/worker/metrics.rs"
+    line: 8
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/components/tikv_util/src/worker/metrics.rs#L8"
+  res-tikv-read-pool:
+    kind: code
+    title: "metric：tikv_unified_read_pool_running_tasks"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "src/read_pool.rs"
+    line: 991
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/src/read_pool.rs#L991"
+  res-tikv-rule-cop-cpu:
+    kind: code
+    title: "官方規則 TiKV_coprocessor_cpu_util"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/tikv.rules.yml"
+    line: 268
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/metrics/alertmanager/tikv.rules.yml#L268"
+  res-yb-threads:
+    kind: code
+    title: "metric：threads_running"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/util/thread.cc"
+    line: 84
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/util/thread.cc#L84"
+  res-yb-cpu-utime:
+    kind: code
+    title: "metric：cpu_utime"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/util/thread.cc"
+    line: 89
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/util/thread.cc#L89"
+  res-yb-block-cache:
+    kind: code
+    title: "metric：block_cache_multi_touch_usage"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/util/cache_metrics.cc"
+    line: 44
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/util/cache_metrics.cc#L44"
+  res-yb-block-cache-pct:
+    kind: code
+    title: "db_block_cache_size_percentage"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/tserver/tablet_memory_manager.cc"
+    line: 81
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/tserver/tablet_memory_manager.cc#L81"
+  res-yb-queue-overflow:
+    kind: code
+    title: "metric：rpcs_queue_overflow"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/rpc/service_pool.cc"
+    line: 101
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/rpc/service_pool.cc#L101"
+  res-yb-svc-queue:
+    kind: code
+    title: "generic_svc_queue_length"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/server/server_base.cc"
+    line: 103
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/server/server_base.cc#L103"
+  res-ch-globalthread:
+    kind: code
+    title: "CurrentMetric GlobalThread"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/CurrentMetrics.cpp"
+    line: 96
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/CurrentMetrics.cpp#L96"
+  res-ch-globalthread-active:
+    kind: code
+    title: "CurrentMetric GlobalThreadActive"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/CurrentMetrics.cpp"
+    line: 97
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/CurrentMetrics.cpp#L97"
+  res-ch-max-thread-pool:
+    kind: code
+    title: "max_thread_pool_size 預設 10000"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Core/ServerSettings.cpp"
+    line: 141
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Core/ServerSettings.cpp#L141"
+  res-ch-tcpconn:
+    kind: code
+    title: "CurrentMetric TCPConnection"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/CurrentMetrics.cpp"
+    line: 43
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/CurrentMetrics.cpp#L43"
+  res-ch-max-connections:
+    kind: code
+    title: "max_connections 預設 4096"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Core/ServerSettings.cpp"
+    line: 280
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Core/ServerSettings.cpp#L280"
+  res-ch-cgroup-cpu:
+    kind: code
+    title: "AsyncMetric CGroupMaxCPU"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/AsynchronousMetrics.cpp"
+    line: 1695
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/AsynchronousMetrics.cpp#L1695"
+  res-ch-os-user:
+    kind: code
+    title: "AsyncMetric OSUserTimeNormalized"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/AsynchronousMetrics.cpp"
+    line: 979
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/AsynchronousMetrics.cpp#L979"
+  res-ch-iowait:
+    kind: code
+    title: "AsyncMetric OSIOWaitTimeNormalized"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/AsynchronousMetrics.cpp"
+    line: 1015
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/AsynchronousMetrics.cpp#L1015"
+  res-ne-timex-offset:
+    kind: code
+    title: "metric：node_timex_offset_seconds"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/timex.go"
+    line: 75
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/timex.go#L75"
+  res-ne-timex-sync:
+    kind: code
+    title: "metric：node_timex_sync_status"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/timex.go"
+    line: 155
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/timex.go#L155"
+  res-ne-collector-success:
+    kind: code
+    title: "metric：node_scrape_collector_success"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "collector/collector.go"
+    line: 39
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/collector/collector.go#L39"
+  res-nm-clock:
+    kind: code
+    title: "node-mixin NodeClockNotSynchronising"
+    project: "node_exporter"
+    version: "v1.12.1"
+    file: "docs/node-mixin/alerts/alerts.libsonnet"
+    line: 238
+    url: "https://github.com/prometheus/node_exporter/blob/v1.12.1/docs/node-mixin/alerts/alerts.libsonnet#L238"
+  res-px-fd-ratio:
+    kind: code
+    title: "metric：namedprocess_namegroup_worst_fd_ratio"
+    project: "process-exporter"
+    version: "v0.8.7"
+    file: "collector/process_collector.go"
+    line: 68
+    url: "https://github.com/ncabatoff/process-exporter/blob/v0.8.7/collector/process_collector.go#L68"
+  res-px-thread-cpu:
+    kind: code
+    title: "metric：namedprocess_namegroup_thread_cpu_seconds_total（依 thread 名稱）"
+    project: "process-exporter"
+    version: "v0.8.7"
+    file: "collector/process_collector.go"
+    line: 122
+    url: "https://github.com/ncabatoff/process-exporter/blob/v0.8.7/collector/process_collector.go#L122"
+  res-px-memory:
+    kind: code
+    title: "metric：namedprocess_namegroup_memory_bytes"
+    project: "process-exporter"
+    version: "v0.8.7"
+    file: "collector/process_collector.go"
+    line: 56
+    url: "https://github.com/ncabatoff/process-exporter/blob/v0.8.7/collector/process_collector.go#L56"
+  res-px-threads-flag:
+    kind: code
+    title: "-threads 預設開"
+    project: "process-exporter"
+    version: "v0.8.7"
+    file: "cmd/process-exporter/main.go"
+    line: 167
+    url: "https://github.com/ncabatoff/process-exporter/blob/v0.8.7/cmd/process-exporter/main.go#L167"
+  res-my-flush-odirect:
+    kind: code
+    title: "8.4 沒設 innodb_flush_method 時，支援就用 O_DIRECT"
+    project: "MySQL"
+    version: "mysql-8.4.7"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 4957
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/handler/ha_innodb.cc#L4957"
+  res-my-commit-order:
+    kind: code
+    title: "replica_preserve_commit_order 預設 ON"
+    project: "MySQL"
+    version: "mysql-8.4.7"
+    file: "sql/sys_vars.cc"
+    line: 4032
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/sys_vars.cc#L4032"
+  res-mg-memlimit:
+    kind: code
+    title: "getMemSizeMB 回傳 memLimit（含 cgroup 上限）"
+    project: "MongoDB"
+    version: "r8.0.34"
+    file: "src/mongo/util/processinfo.h"
+    line: 102
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/util/processinfo.h#L102"
+  res-mg-cgroup-limit:
+    kind: code
+    title: "讀 cgroup v2 memory.max"
+    project: "MongoDB"
+    version: "r8.0.34"
+    file: "src/mongo/util/processinfo_linux.cpp"
+    line: 778
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/util/processinfo_linux.cpp#L778"
+  res-ch-mem-cgroup:
+    kind: code
+    title: "記憶體總量採用 cgroup v2 的上限"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "base/base/getMemoryAmount.cpp"
+    line: 64
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/base/base/getMemoryAmount.cpp#L64"

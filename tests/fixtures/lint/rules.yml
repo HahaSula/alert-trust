@@ -13,3 +13,15 @@ groups:
         expr: up{job="mysqld"} == 0
       - alert: ThreadsHigh
         expr: mysql_global_status_threads_running{job="other"} > 50
+      - alert: PgDown                     # covered by a rule on another job: the cover never fires
+        expr: pg_up{job="pg"} == 0
+        annotations: { absence_covered_by: "PgExporterDownWrongJob, PgExporterDownAnyJob" }
+      - alert: PgExporterDownWrongJob
+        expr: up{job="postgres"} == 0
+      - alert: PgExporterDownAnyJob
+        expr: up == 0
+      - alert: PgCollectorFailed          # regex cover that matches the job: fine
+        expr: pg_scrape_collector_success{job="pg"} == 0
+        annotations: { absence_covered_by: PgExporterDownRegex }
+      - alert: PgExporterDownRegex
+        expr: up{job=~"pg|postgres"} == 0

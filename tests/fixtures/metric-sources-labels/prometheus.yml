@@ -1,0 +1,9 @@
+scrape_configs:
+  - job_name: kube-etcd
+    static_configs: [{ targets: [etcd-1:2379] }]
+  - job_name: prometheus
+    static_configs: [{ targets: [localhost:9090] }]
+  - job_name: redis
+    static_configs: [{ targets: [cache:9121] }]
+  - job_name: app
+    static_configs: [{ targets: [app:8080] }]

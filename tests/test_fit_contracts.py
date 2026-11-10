@@ -20,6 +20,8 @@ class FitContractsTest(unittest.TestCase):
         a.job_interval, a.job_duration = {"mysql": 60.0}, {"mysql": 75.0}
         a.dedup, a.query_step, a.keep_range = None, 300.0, []
         a.timeout, a.p99, a.job_timeout, a.job_p99, a.exporter_deadline, a.job_failrun = None, None, {}, {}, {}, {}
+        a.config_kind, a.tau_clamped, a.job_exporter, a.job_exporter_flag = "prometheus", {}, {}, set()
+        a.prom_version, a.prom_version_text, a.sources_empty, a.cfg_jobs, a.assumptions = None, "", {}, None, []
         for k, v in kw.items():
             setattr(a, k, v)
         return a
@@ -71,8 +73,8 @@ class FitContractsTest(unittest.TestCase):
                                          exporter_deadline={"mysql": 70.0}))
         bad = [t for t, ok, *_ in checks if not ok]
         self.assertTrue(any("截斷" in t and "預設" in t for t in bad))      # d_max == τ
-        self.assertTrue(any("τ 1m < S 1m" in t for t in bad))              # τ must be < S
-        self.assertTrue(any("X 1m10s" in t for t in bad))                   # exporter deadline >= τ
+        self.assertTrue(any("τ 1m = S 1m" in t for t in bad))              # τ must be < S; text states the real relation
+        self.assertTrue(any("X 1m10s ≥ τ 1m" in t for t in bad))            # exporter deadline >= τ, stated as such
         self.assertTrue(any("evaluation_interval" in t for t in bad))      # E < S
 
     def test_failrun_raises_k(self):
@@ -131,12 +133,22 @@ class FitContractsTest(unittest.TestCase):
         rows, _ = F.analyze(a, F.load([FOR_RULES]))
         r = {x["rule"]: x for x in rows}["WrongJob"]
         self.assertEqual(r["job"], "mysql")
-        self.assertIn("用預設值", r["src"])
-        self.assertIn("d = S", r["defaults"])
+        self.assertTrue(r["nodata"])                     # job not in the config: no data, never 符合
+        self.assertFalse(r["ok"])
         self.assertIn("job mysql 不在 config 裡", r["notes"])
         ass = F.assumptions_for(a, rows, [])
-        self.assertTrue(any("用預設值：mysql" in x for x in ass))
         self.assertTrue(any("不在 config" in x for x in ass))
+        md = F.report(a, rows, F.env_checks(a), ass, [])
+        self.assertIn("沒有資料，契約不適用", md)
+        sec2 = md.split("## 2.")[1].split("## 3.")[0].split("### 沒有資料")[0]
+        self.assertNotIn("`WrongJob`", sec2)
+        # without a config the same job falls back to the defaults, said per row
+        a2 = self._db(cfg_jobs=None)
+        rows2, _ = F.analyze(a2, F.load([FOR_RULES]))
+        r2 = {x["rule"]: x for x in rows2}["WrongJob"]
+        self.assertIn("用預設值", r2["src"])
+        self.assertIn("d = τ", r2["defaults"])          # τ 10s known: worst case d = τ, not S
+        self.assertTrue(any("用預設值：mysql" in x for x in F.assumptions_for(a2, rows2, [])))
         ok = {x["rule"]: x for x in rows}["SlowBurst"]
         self.assertEqual(ok["defaults"], [])
         self.assertFalse(any("d 沒給" in x and "mysqld" in x for x in ass))

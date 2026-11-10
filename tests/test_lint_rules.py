@@ -19,6 +19,17 @@ class LintRulesTest(unittest.TestCase):
         self.assertTrue(any("NoSuchAlert" in e for e in errors))
         self.assertTrue(any(w.startswith("job other") and "ThreadsHigh" in w for w in advice))   # no up rule for it
         self.assertFalse(any(w.startswith("job mysqld") for w in advice))                       # ExporterDown guards it
+        self.assertEqual(len([e for e in errors if "NoSuchAlert" in e]), 1)                     # reported once
+
+    def test_absence_cover_must_select_the_same_job(self):
+        errors, _ = V.lint_rules(V.load_rule_files([FX]))
+        pg = [e for e in errors if "#PgDown:" in e]
+        self.assertEqual(len(pg), 1, errors)
+        self.assertIn("PgExporterDownWrongJob", pg[0])
+        self.assertIn("job postgres", pg[0])
+        self.assertFalse(any("PgExporterDownAnyJob" in e for e in errors))                     # no job matcher: covers all
+        self.assertFalse(any("#PgCollectorFailed:" in e for e in errors))                      # regex matches pg
+        self.assertFalse(any("#DbDownCovered:" in e for e in errors))                          # ExporterDown is on mysqld
 
     def test_cli(self):
         p = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "validate.py"), "--lint-rules", FX],

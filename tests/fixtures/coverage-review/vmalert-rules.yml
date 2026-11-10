@@ -1,0 +1,6 @@
+groups:
+  - name: vm-meta
+    rules:
+      - alert: MetaRuleErrors
+        expr: sum by (job, group) (rate(vmalert_alerting_rules_errors_total[2m])) > 0
+        for: 30s

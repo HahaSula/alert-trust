@@ -1,0 +1,9 @@
+# vmagent -promscrape.config (sim-pg-vm): scrape_timeout 20s > scrape_interval 15s is silently set to 15s.
+global: { scrape_interval: 1m, scrape_timeout: 30s }
+scrape_configs:
+  - job_name: pg
+    scrape_interval: 15s
+    scrape_timeout: 20s
+    static_configs: [{ targets: ["pg-a:9187"] }]
+  - job_name: victoriametrics
+    static_configs: [{ targets: ["vm:8428"] }]

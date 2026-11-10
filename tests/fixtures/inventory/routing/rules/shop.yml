@@ -1,0 +1,26 @@
+groups:
+- name: shop
+  interval: 30s
+  rules:
+  - alert: ShopDown
+    expr: up{job="shop"} == 0
+    for: 1m
+    labels: { severity: critical, team: shop }
+  - alert: ShopSlow
+    expr: rate(http_request_duration_seconds_sum{job="shop", role="frontend"}[1m]) > 1
+    labels: { severity: warning, team: shop }
+  - alert: ShopStaging
+    expr: up{job="shop", env="staging"} == 0
+    labels: { severity: warning, team: shop, env: staging }
+  - alert: NoiseCheck
+    expr: vector(1)
+    labels: { severity: info }
+  - alert: TableGrowth
+    expr: delta(mysql_info_schema_table_size{job="mysqld"}[1h]) > 1e9
+    labels: { severity: warning }
+  - alert: EdgeDown
+    expr: up{job="edge"} == 0
+    labels: { severity: warning }
+  - alert: ClusterMissing
+    expr: absent(up{job="shopx"})
+    labels: { severity: critical }

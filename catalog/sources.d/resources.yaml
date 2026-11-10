@@ -1,0 +1,52 @@
+# 資源調查（docs/architecture/db-resources.md）與主機層卡片（catalog/components/host.yaml）引用的來源。key 以 res- 開頭。
+sources:
+  res-node-exporter:
+    title: node_exporter v1.12.1 collector/（cpu、meminfo、vmstat、pressure、diskstats、filesystem、filefd、netdev、timex）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/prometheus/node_exporter/tree/v1.12.1/collector
+    checked: "2026-11-10, v1.12.1"
+  res-node-mixin:
+    title: node-mixin 告警規則（node_exporter v1.12.1 的 docs/node-mixin）
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/prometheus/node_exporter/blob/v1.12.1/docs/node-mixin/alerts/alerts.libsonnet
+    checked: "2026-11-10, v1.12.1"
+    note: 門檻在 docs/node-mixin/config.libsonnet；預設 selector 是 job="node"
+  res-cadvisor:
+    title: cAdvisor v0.60.6 lib/metrics/prometheus.go 與 libcontainer handler（working set 的算法）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/google/cadvisor/tree/v0.60.6/lib
+    checked: "2026-11-10, v0.60.6"
+  res-kubelet:
+    title: Kubernetes v1.37.2 kubelet 的 /metrics/cadvisor（pkg/kubelet/server/server.go）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/kubernetes/kubernetes/blob/v1.37.2/pkg/kubelet/server/server.go
+    checked: "2026-11-10, v1.37.2"
+  res-ksm:
+    title: kube-state-metrics v2.20.0 internal/store/pod.go
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/kubernetes/kube-state-metrics/blob/v2.20.0/internal/store/pod.go
+    checked: "2026-11-10, v2.20.0"
+  res-k8s-mixin:
+    title: kubernetes-mixin version-1.5.6 的 resource 與 apps 告警
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/version-1.5.6/alerts
+    checked: "2026-11-10, version-1.5.6"
+    note: 有 CPUThrottlingHigh；沒有容器記憶體接近 limit、沒有 OOM kill 的告警
+  res-process-exporter:
+    title: process-exporter v0.8.7（選用；每個行程群組的 CPU、記憶體、fd、thread）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/ncabatoff/process-exporter/tree/v0.8.7
+    checked: "2026-11-10, v0.8.7"
+  res-db-sources:
+    title: 各資料庫與 exporter 原始碼（版本同各 target 卡；本調查新增的行號在 catalog/refs.d/resources.yaml）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/HahaSula/alert-trust/blob/main/catalog/refs.d/resources.yaml
+    checked: "2026-11-10"

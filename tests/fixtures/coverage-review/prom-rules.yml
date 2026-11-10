@@ -1,0 +1,9 @@
+groups:
+  - name: etcd-mixin
+    rules:
+      - alert: etcdMembersDown
+        expr: max without (endpoint) (sum without (instance) (up{job=~".*etcd.*"} == bool 0)) > 0
+        for: 10m
+      - alert: etcdNoLeader
+        expr: etcd_server_has_leader{job=~".*etcd.*"} == 0
+        for: 1m

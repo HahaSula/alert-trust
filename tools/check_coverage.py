@@ -20,12 +20,23 @@ Statuses
                   the same selector parser as check_metric_sources.py
   rule_no_data    a rule exists but its selector matches no series (--live), or (--config) no scrape job has
                   the component's job
+  partial         rules watch the signal but do not read all of the card's `metrics` for it (e.g. etcd
+                  health-second-path without probe_success). Cards cannot mark alternative metrics yet, so every
+                  listed metric is required; slave/replica and master/source spellings count as the same metric
   missing         no rule references the signal
   not_applicable  the signal's applies_when does not hold for this component: cluster / replicas / kubernetes,
                   or env.yaml lists `features:` for it and the needed feature is not there (vocabulary: FEATURES,
                   documented in env/env.example.yaml). Without a features list the signal stays and the note
                   says 「需要回答：有沒有 X」.
-  needs_input     only an interview or inventory can answer it (e.g. the observer's failure domain)
+  needs_input     only an interview or inventory can answer it (e.g. the observer's failure domain); env values
+                  `unknown` / `不知道` / empty are not answers
+
+Watchdog: only a rule evaluated on the monitored ruler itself (or, for `dedicated`, a non-observer ruler with
+`role: watchdog`) counts; an observer's own Watchdog only proves the observer is alive. A Watchdog rule also needs
+an external dead man's switch named in env.yaml (`deadman.receiver`, or the component's `deadman`).
+With --config, a component no scrape job scrapes has no data for signals that read its own metrics: rule_no_data,
+whatever the placement. The to-do list is sorted by impact: tier, Watchdog / dead man's switch first, then the
+chain stage of the card (collect → store → query → evaluate → route → receive), then status.
 
 Outputs <out>/coverage.json (for AI) and <out>/coverage.md (for people).
 Requires PyYAML (via tools/catalog.py); live queries use the standard library.
@@ -63,10 +74,27 @@ def card_for(type_: str | None, card_ids: set[str]) -> str | None:
 # components that evaluate alerting rules and expose a Prometheus-style /api/v1/rules
 # (Thanos Ruler: /api/v1/rules; Grafana: /api/prometheus/grafana/api/v1/rules, save it as <id>/rules.json)
 RULER_TYPES = {"prometheus", "vmalert", "thanos", "thanos-ruler", "thanos_ruler", "grafana_alerting", "grafana"}
-STATUS_ORDER = ["missing", "rule_job_mismatch", "rule_no_data", "self_only", "needs_input", "covered", "not_applicable"]
+STATUS_ORDER = ["missing", "rule_job_mismatch", "rule_no_data", "self_only", "partial", "needs_input", "covered",
+                "not_applicable"]
 STATUS_TEXT = {"covered": "涵蓋", "self_only": "只在自己身上", "rule_no_data": "規則在但沒資料", "missing": "缺少",
-               "rule_job_mismatch": "規則在但 job 對不上", "not_applicable": "不適用", "needs_input": "需要回答"}
-ACTION = ("missing", "rule_job_mismatch", "rule_no_data", "self_only")
+               "rule_job_mismatch": "規則在但 job 對不上", "not_applicable": "不適用", "needs_input": "需要回答",
+               "partial": "部分涵蓋"}
+ACTION = ("missing", "rule_job_mismatch", "rule_no_data", "self_only", "partial")
+# chain stages in impact order (catalog cards: `stages:`); `source` (targets) is collected, `notify` is routing,
+# `meta` (observer) receives
+STAGE_ORDER = {"source": 0, "collect": 0, "store": 1, "query": 2, "evaluate": 3, "route": 4, "notify": 4,
+               "receive": 5, "meta": 5}
+DMS_SIGNALS = {"watchdog", "data-watchdog", "own-deadman", "deadman-wait", "end-to-end"}
+NOT_ANSWERS = {"", "unknown", "不知道", "未知", "?", "？", "tbd", "none?", "n/a"}
+
+
+def answered(v) -> bool:
+    """env.yaml values like `unknown` / `不知道` / empty are not answers."""
+    if v is None:
+        return False
+    if isinstance(v, (list, dict)):
+        return bool(v)
+    return str(v).strip().lower() not in NOT_ANSWERS
 # signals whose rules watch other jobs (the data the component scrapes), not the component's own job
 OTHER_JOB_SIGNALS = {"job-freshness", "known-true-canary", "watchdog", "data-watchdog", "scrapes-all-infra",
                      "log-freshness", "health-second-path"}
@@ -212,6 +240,8 @@ FEATURES = {
     "sentinel": "Redis Sentinel", "redis-cluster": "Redis cluster_enabled yes", "rdb": "Redis 有設 save",
     "aof": "Redis appendonly yes", "check-keys": "redis_exporter 有用 --check-keys／--count-keys／--check-key-groups",
     "retention-size": "Prometheus 有設 storage.tsdb.retention.size", "results-limit": "vmalert group limit 或 -rule.resultsLimit > 0",
+    "container": "跑在容器裡（Kubernetes、Docker）", "cpu-limit": "容器有設 CPU limit",
+    "process-exporter": "同一台主機有 process-exporter",
 }
 IMPLIES = {"replication-primary": {"replication"}, "replication-replica": {"replication"}, "gtid": {"replication"},
            "semi-sync": {"replication"}}
@@ -239,6 +269,9 @@ APPLIES_FEATURES = [  # (regex on applies_when, [any-of groups]); first match wi
     (r"archive_mode", [{"archive-mode"}]),
     (r"pgbackrest", [{"pgbackrest"}]),
     (r"node_exporter", [{"node-exporter"}]),
+    (r"process-exporter", [{"process-exporter"}]),
+    (r"CPU limit", [{"cpu-limit"}]),
+    (r"容器", [{"container"}]),
     (r"retention\.size", [{"retention-size"}]),
     (r"resultslimit|group limit", [{"results-limit"}]),
     (r"有複本的主庫", [{"replication-primary"}]),
@@ -249,7 +282,8 @@ APPLIES_FEATURES = [  # (regex on applies_when, [any-of groups]); first match wi
 APPLIES_UNMAPPED = {"MySQL；MariaDB 要先開 performance_schema", "MySQL；MariaDB 要先開 performance_schema（預設 OFF，要重啟）",
                     "MySQL（performance_schema 預設開）；MariaDB 要先開 performance_schema",
                     "MariaDB 預設可用；MySQL 要 --collect.info_schema.innodb_metrics",
-                    "PostgreSQL 17 以上要打開 --collector.stat_checkpointer"}
+                    "PostgreSQL 17 以上要打開 --collector.stat_checkpointer",
+                    "依賴時鐘的資料庫（YugabyteDB 的 hybrid clock、TiDB 的 TSO、MongoDB 的 wall time lag）"}
 # replication signals that only make sense on one side, although the card says just "replication"
 SIGNAL_SIDE = {
     ("mysqld_exporter", "replication-running"): "replication-replica",
@@ -287,6 +321,8 @@ def applies(signal: dict, comp: dict, env: dict, card_id: str | None = None) -> 
     if not cond:
         return True, ""
     if cond == "cluster":
+        if "mode" in comp and not answered(comp.get("mode")):
+            return True, "需要回答：是 single 還是 cluster？（env.yaml 的 mode）"
         ok = comp.get("mode") == "cluster" or comp.get("type") == "vmcluster"
         return ok, "" if ok else "不是 cluster"
     if cond.startswith("replicas"):
@@ -301,6 +337,8 @@ def applies(signal: dict, comp: dict, env: dict, card_id: str | None = None) -> 
     req = feature_requirement(cond, card_id, signal.get("id"))
     words = "、".join(sorted({f for g in req for f in g})) if req else ""
     raw = comp.get("features")
+    if isinstance(raw, str) and not answered(raw) or isinstance(raw, list) and raw and not any(answered(x) for x in raw):
+        raw = None  # `features: unknown` is not a list of what exists
     if raw is None:
         hint = f"（在 env.yaml 的 features 寫 {words}，或列出有的功能）" if words else "（在 env.yaml 的 features 標明）"
         return True, f"需要回答：有沒有「{cond}」{hint}"
@@ -324,19 +362,23 @@ def observer_item(signal: dict, env: dict) -> tuple[str, str]:
     if not obs:
         return "missing", "env.yaml 沒有任何外部觀察者"
     if sid == "failure-domain":
-        bad = [o["id"] for o in obs if not o.get("failure_domain") or o.get("failure_domain") in ("same", "unknown")]
+        bad = [o["id"] for o in obs if not answered(o.get("failure_domain")) or o.get("failure_domain") == "same"]
         return ("needs_input", f"這些觀察者的故障域未標明：{', '.join(bad)}") if bad else ("covered", "依 env.yaml（使用者說的）")
     if sid == "separate-alert-path":
         monitored_am = {c["id"] for c in env["components"] if c.get("type") == "alertmanager"}
-        bad = [o["id"] for o in obs if not o.get("notify_via") or o.get("notify_via") in monitored_am]
-        return ("missing", f"這些觀察者經過被監控的 Alertmanager 或未標明：{', '.join(bad)}") if bad \
-            else ("covered", "依 env.yaml（使用者說的）")
+        unk = [o["id"] for o in obs if not answered(o.get("notify_via"))]
+        bad = [o["id"] for o in obs if answered(o.get("notify_via")) and o.get("notify_via") in monitored_am]
+        if bad:
+            return "missing", f"這些觀察者經過被監控的 Alertmanager：{', '.join(bad)}"
+        if unk:
+            return "needs_input", f"這些觀察者的 notify_via 未標明（unknown 不算回答）：{', '.join(unk)}"
+        return "covered", "依 env.yaml（使用者說的）"
     if sid == "own-deadman":
-        ok = all(o.get("deadman") for o in obs)
+        ok = all(answered(o.get("deadman")) for o in obs)
         return ("covered", "依 env.yaml（使用者說的）") if ok else ("needs_input", "觀察者的 deadman 欄位未填")
     if sid == "deadman-wait":
         dm = env.get("deadman") or {}
-        return ("covered", f"max_silence = {dm.get('max_silence')}，請對照契約確認") if dm.get("max_silence") \
+        return ("covered", f"max_silence = {dm.get('max_silence')}，請對照契約確認") if answered(dm.get("max_silence")) \
             else ("needs_input", "env.yaml 沒有 deadman.max_silence")
     if sid == "scrapes-all-infra":
         infra = {c["id"] for c in env["components"]}
@@ -344,6 +386,58 @@ def observer_item(signal: dict, env: dict) -> tuple[str, str]:
         miss = sorted(infra - seen)
         return ("missing", f"沒有觀察者抓這些元件：{', '.join(miss)}") if miss else ("covered", "依 env.yaml 的 scrapes")
     return "needs_input", "這一項要問架構"
+
+
+# ---------- metric coverage (partial) ----------
+
+def _norm_metric(m: str) -> str:
+    """slave/replica and master/source spellings of the same MySQL/Redis metric count as one."""
+    m = re.sub(r"(?<![A-Za-z0-9])replica(?![A-Za-z0-9])", "slave", m)   # whole tokens only: not "replication"
+    return re.sub(r"(?<![A-Za-z0-9])source(?![A-Za-z0-9])", "master", m)
+
+
+def rule_metrics(expr: str) -> tuple[set[str], list[str]]:
+    """(metric names, __name__ regexes) a rule expression reads."""
+    names, pats = set(), []
+    for x in MS.selectors(expr):
+        if x["metric"]:
+            names.add(x["metric"])
+        for (_, op, v) in x["name_matchers"]:
+            if op == "=~":
+                pats.append(v)
+    return names, pats
+
+
+def missing_metrics(signal: dict, rules: list[dict]) -> list[str]:
+    """Card metrics of the signal that none of the rules read (normalized for slave/replica)."""
+    want = list(dict.fromkeys(_norm_metric(m) for m in signal.get("metrics") or []))
+    names, pats = set(), []
+    for r in rules:
+        n, p = rule_metrics(str(r.get("query", "")))
+        names |= {_norm_metric(x) for x in n}
+        pats += p
+    out = []
+    for m in want:
+        if m in names:
+            continue
+        hit = False
+        for p in pats:
+            try:
+                if re.fullmatch(_norm_metric(p), m) or re.fullmatch(p, m):
+                    hit = True
+                    break
+            except re.error:
+                continue
+        if not hit:
+            out.append(m)
+    return out
+
+
+def dms_named(env: dict, comp: dict) -> bool:
+    dm = comp.get("deadman") if "deadman" in comp else (env.get("deadman") or {})
+    if isinstance(dm, dict):
+        return answered(dm.get("receiver"))
+    return answered(dm)
 
 
 # ---------- main evaluation ----------
@@ -402,7 +496,7 @@ def evaluate(env: dict, snapshot: str, tiers: set[int], live: bool, scrape_jobs:
                 push("needs_input", {"interview": "要問架構", "inventory": "盤點時檢查（/api/v1/rules、/flags）",
                                      "external": "由外部服務判斷，例如 dead man's switch 是否收到"}[s["evaluate_on"]])
                 continue
-            mismatched = []
+            mismatched, foreign_wd = [], []
             for rid, rules in rules_by_ruler.items():
                 for r in rules:
                     m = rule_match(s, r, comp)
@@ -410,8 +504,21 @@ def evaluate(env: dict, snapshot: str, tiers: set[int], live: bool, scrape_jobs:
                         continue
                     entry = {"ruler": rid, "alert": r.get("name"), "placement": placement(rid, rl[rid], comp),
                              "query": r.get("query", "")}
+                    if s["id"] == "watchdog" and rid != comp["id"] and \
+                            (rl[rid].get("_observer") or not (s["evaluate_on"] == "dedicated" and rl[rid].get("role") == "watchdog")):
+                        foreign_wd.append(entry)  # another ruler's Watchdog proves that ruler is alive, not this one
+                        continue
                     (item["rules"] if m == "ok" else mismatched).append(entry)
             item["mismatched_rules"] = mismatched
+            if foreign_wd:
+                item["other_rulers_watchdog"] = foreign_wd
+                extra.append(f"{'、'.join(sorted({r['ruler'] for r in foreign_wd}))} 自己的 Watchdog 只證明它自己活著，"
+                             f"不算 {comp['id']} 的 Watchdog")
+            own_data = bool(s.get("metrics")) and s["id"] not in OTHER_JOB_SIGNALS
+            if unscraped and own_data and scrape_jobs is not None and item["rules"]:
+                push("rule_no_data", f"沒有資料：{comp['id']} 沒有被 scrape，讀它自己 metric 的規則回傳空"
+                                     "（只在自己身上或放在觀察者都一樣）")
+                continue
             if not item["rules"]:
                 if mismatched:
                     names = "、".join(f"`{r['alert']}`" for r in mismatched[:4])
@@ -426,8 +533,16 @@ def evaluate(env: dict, snapshot: str, tiers: set[int], live: bool, scrape_jobs:
             if not good:
                 push("self_only", "只有被監控的元件（或同一故障域的 ruler）在評估，它掛掉時這條規則也停")
                 continue
-            if unscraped and s.get("metrics") and scrape_jobs is not None and comp.get("job") is not None:
-                push("rule_no_data")
+            gaps = missing_metrics(s, good)
+            if gaps:
+                first = _norm_metric((s.get("metrics") or [""])[0])
+                push("partial", f"規則沒有用到 {'、'.join('`' + m + '`' for m in gaps[:4])}{' 等' if len(gaps) > 4 else ''}"
+                                + ("（卡片列的第一個 metric）" if first in gaps else "")
+                                + "；卡片沒有標哪些 metric 可以互相替代，先當成都要")
+                continue
+            if s["id"] == "watchdog" and not dms_named(env, comp):
+                push("needs_input", "Watchdog 規則在，但 env.yaml 沒寫它送到哪個外部 dead man's switch（deadman.receiver）；"
+                                    "沒有外部接收端時 Watchdog 停了也沒有人知道")
                 continue
             if live:
                 has_data = False
@@ -453,7 +568,18 @@ ADVICE = {
                      "多一個 scrape job 的負載"),
     "self_only": ("只有被監控的元件自己在評估", "把規則放到外部觀察者（或另一個故障域的 ruler）",
                   "要多維護一台觀察者"),
+    "partial": ("規則在，但沒用到卡片列的全部 metric", "照說明欄補上沒用到的 metric（範本見建議規則）",
+                "多幾條規則；有些 metric 要先開 collector 或加 probe job"),
 }
+
+
+def impact_key(i: dict, cards: dict | None = None) -> tuple:
+    """Tier first, then Watchdog / dead man's switch, then the card's first chain stage, infra before targets."""
+    card = (cards or {}).get(i.get("card")) or {}
+    stages = card.get("stages") or []
+    stage = min((STAGE_ORDER.get(x, 9) for x in stages), default=9)
+    return (i.get("tier") or 9, 0 if i.get("signal") in DMS_SIGNALS else 1, stage,
+            1 if card.get("kind") == "target" else 0, STATUS_ORDER.index(i["status"]), i["component"])
 
 
 def render_md(env: dict, items: list[dict], tiers: set[int]) -> str:
@@ -479,11 +605,13 @@ def render_md(env: dict, items: list[dict], tiers: set[int]) -> str:
     out += ["", "| " + " | ".join(STATUS_TEXT[k] for k in STATUS_ORDER) + " |",
             "|" + "---|" * len(STATUS_ORDER),
             "| " + " | ".join(str(counts[k]) for k in STATUS_ORDER) + " |", ""]
-    out += ["## 要先處理", "", "| 元件 | 訊號 | 狀態 | 說明 | 建議規則 |", "|---|---|---|---|---|"]
-    for i in sorted(items, key=lambda x: (STATUS_ORDER.index(x["status"]), x["component"])):
+    out += ["## 要先處理", "", "依影響排序：級數、Watchdog／dead man's switch、鏈上的位置（採集 → 儲存 → 查詢 → 評估 → 路由 → 接收）。", "",
+            "| 級 | 元件 | 訊號 | 狀態 | 說明 | 建議規則 |", "|---|---|---|---|---|---|"]
+    cards = {c["id"]: c for c in C.load_components()}
+    for i in sorted(items, key=lambda x: impact_key(x, cards)):
         if i["status"] in ACTION:
             sug = "、".join(f"`{r.split('#')[1]}`" for r in i.get("suggested_rules", [])) or "—"
-            out.append(f"| {i['component']} | [{i.get('question') or i['signal']}]({i.get('runbook', '')}) | "
+            out.append(f"| {i.get('tier') or ''} | {i['component']} | [{i.get('question') or i['signal']}]({i.get('runbook', '')}) | "
                        f"{STATUS_TEXT[i['status']]} | {i.get('note', '')} | {sug} |")
     out.append("")
     for comp in dict.fromkeys(i["component"] for i in items):
