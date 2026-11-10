@@ -1,0 +1,499 @@
+# TiDB（TiDB server、TiKV、PD；內建 /metrics，model: native）的建議規則。TiDB v8.5.8（tikv/tikv、tikv/pd 同 tag）。
+#
+# job 選擇器是佔位用的，和 TiUP 產生的 job 名稱相同。請換成實際的名稱：
+#   job="pd"           Prometheus 抓每台 PD 的 /metrics（client port 2379；含內嵌 etcd 的 etcd_* metric）
+#   job="tikv"         Prometheus 抓每台 TiKV 的 status port（20180）/metrics
+#   job="tidb"         Prometheus 抓每台 TiDB 的 status port（10080）/metrics
+#   job="pd-readyz"    blackbox http probe 探每台 PD 的 /readyz（內嵌 etcd 的端點：linearizable read，要有 quorum）
+#   job="tikv-status"  blackbox http probe 探每台 TiKV 的 /status（只代表 HTTP 有回應）
+#   job="tidb-status"  blackbox http probe 探每台 TiDB 的 /status（只看 process 是否在關機中，不看 PD／TiKV）
+# probe job 都要把 instance relabel 成和被探測元件 /metrics target 相同的 host:port（例子見 lab/targets/tidb/prom/prometheus.base.yml），
+# 三方交叉（up、probe、元件自己的健康 metric）才能用 on (instance) 對上。
+# job 名稱錯了不會安靜：每個 job 都有 absent(up{job=...}) 的規則（TiDBPDEndpointMissing 等）。官方規則把 job="tidb"、job="pd" 寫死，
+# 名稱不同時「規則在但沒資料」，而且沒有任何規則會響（lab 實測）。
+# 一組 job 代表一個 TiDB 叢集；多個叢集共用 job 時，把 by (job) 換成你的 cluster label。
+#
+# PD 的叢集層 metric（pd_cluster_status、pd_regions_status 的真正數值）只有 PD leader 在算；follower 沒有 pd_cluster_status，
+# pd_regions_status 是 0。這裡不用 etcd_server_is_leader 當前提（官方規則的寫法：leader 抓不到時全部安靜），而是用 max 取叢集值，
+# 再用 TiDBPDLeaderMetricsMissing 在「沒有任何一台 PD 以 leader 身分被抓到」時告警，讓前提不成立這件事本身會響。
+#
+# 預期的元件數寫在 tidb-params 這個 group（recording rule），請依叢集修改；TiKV 的預期數改用 PD 自己記得的 store 數。
+# 門檻以 scrape_interval 15s、scrape_timeout 10s 為基準；標「例子」的數字沒有官方依據，請依環境調整。
+# runbook_url 指向 alert-trust 網站上對應訊號的段落。
+groups:
+  - name: tidb-params
+    rules:
+      - record: tidb_expected_members
+        expr: vector(3)
+        labels: { component: pd }
+      - record: tidb_expected_members
+        expr: vector(1)
+        labels: { component: tidb }
+
+  - name: tidb-liveness
+    rules:
+      - alert: TiDBComponentEndpointDown
+        expr: up{job=~"pd|tikv|tidb"} == 0
+        for: 2m
+        labels: { severity: critical, component: tidb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "抓不到 {{ $labels.job }} {{ $labels.instance }} 的 /metrics；和同一台的 probe 一起看：兩者都失敗是 process 或主機，只有這條響是 scrape 路徑"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#endpoint-up
+      - alert: TiDBPDEndpointMissing
+        expr: absent(up{job="pd"})
+        for: 5m
+        labels: { severity: critical, component: tidb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "完全沒有 job=\"pd\" 的 target；服務發現或 job 名稱錯了，所有 PD 規則都回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#endpoint-up
+      - alert: TiDBTiKVEndpointMissing
+        expr: absent(up{job="tikv"})
+        for: 5m
+        labels: { severity: critical, component: tidb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "完全沒有 job=\"tikv\" 的 target；服務發現或 job 名稱錯了，所有 TiKV 規則都回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#endpoint-up
+      - alert: TiDBServerEndpointMissing
+        expr: absent(up{job="tidb"})
+        for: 5m
+        labels: { severity: critical, component: tidb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "完全沒有 job=\"tidb\" 的 target；服務發現或 job 名稱錯了，所有 TiDB server 規則都回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#endpoint-up
+
+      # ---- 三方交叉：PD ----
+      - alert: TiDBPDReadyzProbeFailing
+        expr: probe_success{job="pd-readyz"} == 0
+        for: 1m
+        labels: { severity: critical, component: tidb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "PD {{ $labels.instance }} 的 /readyz（內嵌 etcd 的 linearizable read）失敗：沒有 etcd leader、失去 quorum，或 process 停了"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#health-second-path
+          absence_covered_by: "TiDBProbesMissing"
+      - alert: TiDBPDServingMetricsButNotReady
+        expr: |
+          up{job="pd"} == 1
+            and on (instance) probe_success{job="pd-readyz"} == 0
+        for: 1m
+        labels: { severity: critical, component: tidb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "PD {{ $labels.instance }} 照常回應 /metrics（up=1），/readyz 卻失敗：process 活著但它的 etcd 沒有 quorum。/pd/api/v1/health 在這時仍回 200（lab 實測），不能用它判斷"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#health-second-path
+          absence_covered_by: "TiDBProbesMissing, TiDBPDEndpointMissing"
+      # ---- 三方交叉：TiKV（健康 metric 是 PD 看到的 store 狀態） ----
+      - alert: TiDBTiKVStatusProbeFailing
+        expr: probe_success{job="tikv-status"} == 0
+        for: 1m
+        labels: { severity: critical, component: tidb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "TiKV {{ $labels.instance }} 的 status port 沒有回應；/status 永遠回空的 200，失敗代表 process 或網路"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#health-second-path
+          absence_covered_by: "TiDBProbesMissing"
+      - alert: TiDBTiKVRunningButStoreNotUp
+        expr: |
+          count by (job) (up{job="tikv"} == 1)
+            > on () group_left sum(max by (store, type) (pd_cluster_status{job="pd", type=~"store_(up|slow)_count"}))
+        for: 2m
+        labels: { severity: critical, component: tidb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "有 {{ $value }} 台 TiKV 的 /metrics 抓得到，PD 看到的 Up store 卻比較少：TiKV 活著但送不到 store heartbeat（和 PD 之間的網路、PD 沒有 leader）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#health-second-path
+          absence_covered_by: "TiDBPDLeaderMetricsMissing, TiDBTiKVEndpointMissing"
+      # ---- 三方交叉：TiDB（健康 metric 是 schema lease） ----
+      - alert: TiDBStatusProbeFailing
+        expr: probe_success{job="tidb-status"} == 0
+        for: 1m
+        labels: { severity: critical, component: tidb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "TiDB {{ $labels.instance }} 的 /status 不是 200：process 停了，或正在關機（health 旗標設成 false）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#health-second-path
+          absence_covered_by: "TiDBProbesMissing"
+      - alert: TiDBStatusOkButSchemaLeaseExpired
+        expr: |
+          (time() - tidb_domain_lease_expire_time{job="tidb"} > 0)
+            and on (instance) probe_success{job="tidb-status"} == 1
+        for: 1m
+        labels: { severity: critical, component: tidb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "TiDB {{ $labels.instance }} 的 /status 是 200，schema lease 卻已過期 {{ $value | humanizeDuration }}：這台拿不到 PD／TiKV 的資料，交易會被拒（Information schema is out of date）。/status 不看 PD"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#health-second-path
+          absence_covered_by: "TiDBMetricFamiliesMissing, TiDBProbesMissing"
+      - alert: TiDBProbesMissing
+        expr: |
+          absent(probe_success{job="pd-readyz"})
+            or absent(probe_success{job="tikv-status"})
+            or absent(probe_success{job="tidb-status"})
+        for: 5m
+        labels: { severity: warning, component: tidb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "至少一個 probe job 沒有結果；blackbox_exporter 停了或 job 名稱不對，三方交叉只剩 up 一條路"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#health-second-path
+
+      - alert: TiDBMetricFamiliesMissing
+        expr: |
+          (up{job="pd"} == 1 unless on (job, instance) (etcd_server_has_leader{job="pd"} and on (job, instance) pd_regions_status{job="pd", type="miss-peer-region-count"}))
+            or (up{job="tikv"} == 1 unless on (job, instance) (tikv_raftstore_region_count{job="tikv", type="region"} and on (job, instance) tikv_engine_write_stall{job="tikv"}))
+            or (up{job="tidb"} == 1 unless on (job, instance) (tidb_server_connections{job="tidb"} and on (job, instance) tidb_domain_lease_expire_time{job="tidb"}))
+        for: 5m
+        labels: { severity: warning, component: tidb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "{{ $labels.job }} {{ $labels.instance }} 有回應，關鍵 metric 卻不見了；抓到的可能不是這個元件，或升級後改名。TiKV 很多 metric 要第一次用到才註冊，這裡只挑啟動就有的"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#metric-families-present
+      - alert: TiDBSamplesDropped
+        expr: scrape_samples_scraped{job=~"pd|tikv|tidb"} < 0.5 * (scrape_samples_scraped{job=~"pd|tikv|tidb"} offset 1h)
+        for: 10m
+        labels: { severity: warning, component: tidb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "{{ $labels.job }} {{ $labels.instance }} 的 sample 數比一小時前少一半以上，有一批 metric 消失了"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#metric-families-present
+      - alert: TiDBScrapeNearTimeout
+        expr: scrape_duration_seconds{job=~"pd|tikv|tidb"} > 8
+        for: 5m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: exporter }
+        annotations:
+          summary: "{{ $labels.job }} {{ $labels.instance }} 的 scrape 要 {{ $value }} 秒，接近 scrape_timeout（例子：10 秒）；TiKV 一次約 1MB、1.3 萬個 sample（lab，3 台、幾十個 region）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#scrape-budget
+
+  - name: tidb-cluster
+    rules:
+      - alert: TiDBPDLeaderMetricsMissing
+        expr: absent(service_member_role{job="pd", service="PD"} == 1)
+        for: 1m
+        labels: { severity: critical, component: tidb, tier: "1", aspect: cluster }
+        annotations:
+          summary: "抓得到的 PD 沒有一台是 leader：可能真的沒有 PD leader，或 leader 那台抓不到。這時 store／region 的叢集 metric 只剩 follower 的 0 或完全沒有，下面的叢集規則不可信"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#role-detection
+      - alert: TiDBPDLeaderCountWrong
+        expr: |
+          sum by (job) (service_member_role{job="pd", service="PD"}) > 1
+        for: 1m
+        labels: { severity: critical, component: tidb, tier: "2", aspect: cluster }
+        annotations:
+          summary: "{{ $value }} 台 PD 認為自己是 leader；舊 leader 的 lease 還沒過期，或同一個 job 混了兩個叢集"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#role-detection
+          absence_covered_by: "TiDBPDLeaderMetricsMissing"
+      - alert: TiDBPDQuorumAtRisk
+        expr: |
+          (count(probe_success{job="pd-readyz"} == 1) or vector(0))
+            < on () (floor(tidb_expected_members{component="pd"} / 2) + 1)
+        for: 1m
+        labels: { severity: critical, component: tidb, tier: "1", aspect: cluster }
+        annotations:
+          summary: "/readyz 成功的 PD 少於過半：PD 選不出 leader，TSO 停止，所有交易在 TSO 等待後失敗"
+          description: "成員數取自 tidb-params 的 tidb_expected_members{component=\"pd\"}。PD 內嵌的 etcd 3.5.15 沒有 etcd_network_known_peers，所以要自己給。"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#pd-quorum
+      - alert: TiDBComponentCountLow
+        expr: |
+          count by (job) (up{job="pd"} == 1) < on () group_left tidb_expected_members{component="pd"}
+            or count by (job) (up{job="tidb"} == 1) < on () group_left tidb_expected_members{component="tidb"}
+        for: 5m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: cluster }
+        annotations:
+          summary: "{{ $labels.job }} 只抓得到 {{ $value }} 台，比 tidb-params 的預期少"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#component-count
+          absence_covered_by: "TiDBPDEndpointMissing, TiDBServerEndpointMissing"
+      - alert: TiDBTiKVNotScraped
+        expr: |
+          (count(up{job="tikv"} == 1) or vector(0))
+            < on () sum(max by (store, type) (pd_cluster_status{job="pd", engine="tikv", type=~"store_(up|disconnected|slow|unhealth|down)_count"}))
+        for: 5m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: cluster }
+        annotations:
+          summary: "PD 記得 {{ $value }} 個以上非 Tombstone 的 TiKV store，抓得到的 TiKV 比較少；預期數來自 PD，不必寫死"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#component-count
+          absence_covered_by: "TiDBPDLeaderMetricsMissing"
+      - alert: TiDBPDLeaderChanges
+        expr: increase((max by (job) (etcd_server_leader_changes_seen_total{job="pd"}))[15m:1m]) >= 3
+        labels: { severity: warning, component: tidb, tier: "2", aspect: cluster }
+        annotations:
+          summary: "PD 內嵌 etcd 15 分鐘內換了 {{ $value }} 次 leader（例子）；PD leader 跟著換，TSO 與排程都會中斷一下"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#leader-changes
+      - alert: TiDBRegionDownPeers
+        expr: max by (job) (pd_regions_status{job="pd", type="down-peer-region-count"}) > 0
+        for: 1m
+        labels: { severity: warning, component: tidb, tier: "1", aspect: cluster }
+        annotations:
+          summary: "{{ $value }} 個 region 有 down peer（副本超過 max-peer-down-duration 沒回應）；再壞一台同一批 region 就失去多數"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#region-health
+          absence_covered_by: "TiDBPDLeaderMetricsMissing, TiDBMetricFamiliesMissing"
+      - alert: TiDBRegionMissPeers
+        expr: max by (job) (pd_regions_status{job="pd", type="miss-peer-region-count"}) > 0
+        for: 5m
+        labels: { severity: warning, component: tidb, tier: "1", aspect: cluster }
+        annotations:
+          summary: "{{ $value }} 個 region 的副本數少於 max-replicas；官方規則用 type=\"miss_peer_region_count\"（底線），PD 輸出的是 miss-peer-region-count（連字號），官方那條永遠回傳空（lab 實測）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#region-health
+          absence_covered_by: "TiDBPDLeaderMetricsMissing, TiDBMetricFamiliesMissing"
+      - alert: TiDBRegionOfflinePeers
+        expr: max by (job) (pd_regions_status{job="pd", type="offline-peer-region-count"}) > 0
+        for: 30m
+        labels: { severity: warning, component: tidb, tier: "3", aspect: cluster }
+        annotations:
+          summary: "{{ $value }} 個 region 還有副本在下線中的 store 上，30 分鐘沒搬完（例子）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#region-health
+          absence_covered_by: "TiDBPDLeaderMetricsMissing, TiDBMetricFamiliesMissing"
+      - alert: TiDBPDEtcdWalFsyncSlow
+        expr: histogram_quantile(0.99, sum by (job, instance, le) (rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="pd"}[5m]))) > 1
+        for: 1m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: cluster }
+        annotations:
+          summary: "PD {{ $labels.instance }} 內嵌 etcd 的 WAL fsync p99 {{ $value }} 秒（官方門檻 1 秒）；慢到 heartbeat 送不出時 PD leader 會換"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#leader-changes
+
+  - name: tidb-availability
+    rules:
+      - alert: TiDBStoreDisconnected
+        expr: max by (job, store) (pd_cluster_status{job="pd", type="store_disconnected_count"}) > 0
+        for: 1m
+        labels: { severity: warning, component: tidb, tier: "1", aspect: availability }
+        annotations:
+          summary: "PD 超過 20 秒沒收到 store {{ $labels.store }} 的 heartbeat（Disconnected）；這台上的 region leader 會被選走"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#store-state
+          absence_covered_by: "TiDBPDLeaderMetricsMissing"
+      - alert: TiDBStoreDownOrUnhealthy
+        expr: max by (job, store) (pd_cluster_status{job="pd", type=~"store_(unhealth|down)_count"}) > 0
+        for: 1m
+        labels: { severity: critical, component: tidb, tier: "1", aspect: availability }
+        annotations:
+          summary: "store {{ $labels.store }} 超過 10 分鐘（Unhealthy）或 max-store-down-time（預設 30 分鐘，Down）沒有 heartbeat；Down 之後 PD 才開始在別處補副本。官方 emergency 規則只看 store_down_count，前 30 分鐘不響"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#store-state
+          absence_covered_by: "TiDBPDLeaderMetricsMissing"
+      - alert: TiDBStoreLowSpace
+        expr: max by (job, store) (pd_cluster_status{job="pd", type="store_low_space_count"}) > 0
+        for: 5m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: availability }
+        annotations:
+          summary: "store {{ $labels.store }} 的可用空間低於 low-space-ratio（預設 80% 已用），PD 不再往它搬 region"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#store-state
+          absence_covered_by: "TiDBPDLeaderMetricsMissing"
+      - alert: TiDBTsoRequestsFailing
+        expr: sum by (job, instance) (rate(pd_client_cmd_handle_failed_cmds_duration_seconds_count{job="tidb", type=~"tso|wait"}[5m])) > 0
+        for: 1m
+        labels: { severity: critical, component: tidb, tier: "1", aspect: availability }
+        annotations:
+          summary: "TiDB {{ $labels.instance }} 向 PD 取 TSO 失敗（每秒 {{ $value }} 次）；拿不到 TSO 時交易無法開始或提交"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#tso-available
+          absence_covered_by: "TiDBMetricFamiliesMissing, TiDBServerEndpointMissing"
+
+  - name: tidb-replication
+    rules:
+      - alert: TiDBRegionPendingPeers
+        expr: max by (job) (pd_regions_status{job="pd", type="pending-peer-region-count"}) > 100
+        for: 5m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: replication }
+        annotations:
+          summary: "{{ $value }} 個 region 有 pending peer（follower 的 raft log 落後 leader）；官方門檻 100"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#replication-lag
+          absence_covered_by: "TiDBPDLeaderMetricsMissing, TiDBMetricFamiliesMissing"
+      - alert: TiDBRaftLogLag
+        expr: histogram_quantile(0.99, sum by (job, instance, le) (rate(tikv_raftstore_log_lag_bucket{job="tikv"}[5m]))) > 5000
+        for: 5m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: replication }
+        annotations:
+          summary: "TiKV {{ $labels.instance }} 的 region raft log lag p99 {{ $value }} 筆（官方門檻 5000）。這個 histogram 第一次有落後才註冊，健康時可能完全沒有"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#replication-lag
+
+  - name: tidb-saturation
+    rules:
+      - alert: TiKVRaftAppendSlow
+        expr: histogram_quantile(0.99, sum by (job, instance, le) (rate(tikv_raftstore_append_log_duration_seconds_bucket{job="tikv"}[5m]))) > 1
+        for: 1m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: saturation }
+        annotations:
+          summary: "TiKV {{ $labels.instance }} append raft log p99 {{ $value }} 秒（官方門檻 1 秒）；通常是磁碟慢"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#raftstore-latency
+      - alert: TiKVRaftApplySlow
+        expr: histogram_quantile(0.99, sum by (job, instance, le) (rate(tikv_raftstore_apply_log_duration_seconds_bucket{job="tikv"}[5m]))) > 1
+        for: 1m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: saturation }
+        annotations:
+          summary: "TiKV {{ $labels.instance }} apply raft log p99 {{ $value }} 秒（官方門檻 1 秒）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#raftstore-latency
+      - alert: TiKVRaftCommitSlow
+        expr: histogram_quantile(0.99, sum by (job, instance, le) (rate(tikv_raftstore_commit_log_duration_seconds_bucket{job="tikv"}[5m]))) > 1
+        for: 1m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: saturation }
+        annotations:
+          summary: "TiKV {{ $labels.instance }} commit raft log p99 {{ $value }} 秒（例子）；包含等多數副本確認的時間，網路或對方磁碟慢也會拉長"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#raftstore-latency
+      - alert: TiKVApplyThreadBusy
+        expr: max by (job, instance) (rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"apply_.*"}[5m])) > 0.9
+        for: 5m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: saturation }
+        annotations:
+          summary: "TiKV {{ $labels.instance }} 的 apply 執行緒 CPU {{ $value }}（官方門檻 0.9）。官方規則寫 name=\"apply_.*\"（= 不是 =~），永遠回傳空；執行緒名稱是 apply_0、apply_low_0（lab）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#raftstore-latency
+      - alert: TiKVRaftstoreThreadBusy
+        expr: |
+          sum by (job, instance) (rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"(raftstore|rs)_.*"}[5m]))
+            / count by (job, instance) (tikv_thread_cpu_seconds_total{job="tikv", name=~"(raftstore|rs)_.*"}) > 0.8
+        for: 5m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: saturation }
+        annotations:
+          summary: "TiKV {{ $labels.instance }} 的 raftstore 執行緒用了 80% 以上（例子；官方寫死 1.6 核，對應預設 store-pool-size 2）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#raftstore-latency
+      - alert: TiKVWriteStall
+        expr: max_over_time(tikv_engine_write_stall{job="tikv", type="write_stall_max"}[5m]) > 0
+        for: 1m
+        labels: { severity: critical, component: tidb, tier: "1", aspect: saturation }
+        annotations:
+          summary: "TiKV {{ $labels.instance }} 的 RocksDB（{{ $labels.db }}）發生 write stall：L0 檔案或待 compaction 的資料太多，寫入被減速或停止"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#write-stall
+          absence_covered_by: "TiDBMetricFamiliesMissing"
+      - alert: TiKVServerBusy
+        expr: sum by (job, instance) (rate(tidb_tikvclient_region_err_total{job="tidb", type=~"server_is_busy|tikv_server_busy"}[5m])) > 1
+        for: 5m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: saturation }
+        annotations:
+          summary: "TiDB {{ $labels.instance }} 每秒收到 {{ $value }} 次 TiKV 的 ServerIsBusy（scheduler 太忙、write stall、read pool 滿）；從 TiDB 端看，TiKV 自己沒有對應的單一 metric"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#server-busy
+      - alert: TiKVSchedulerLatchWaitSlow
+        expr: histogram_quantile(0.99, sum by (job, instance, le) (rate(tikv_scheduler_latch_wait_duration_seconds_bucket{job="tikv"}[5m]))) > 1
+        for: 1m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: saturation }
+        annotations:
+          summary: "TiKV {{ $labels.instance }} scheduler latch 等待 p99 {{ $value }} 秒（官方門檻 1 秒）；同一批 key 的寫入在排隊（熱點或衝突）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#server-busy
+      - alert: TiDBComponentMemoryNearQuota
+        expr: |
+          process_resident_memory_bytes{job="tikv"} / on (instance) tikv_server_memory_quota_bytes{job="tikv"} > 0.8
+            or process_resident_memory_bytes{job="tidb"} / on (instance) tidb_server_memory_quota_bytes{job="tidb"} > 0.8
+        for: 5m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: saturation }
+        annotations:
+          summary: "{{ $labels.job }} {{ $labels.instance }} 的 RSS 是記憶體上限的 {{ $value | humanizePercentage }}（官方門檻 80%）。TiDB 的上限是 cgroup 或主機記憶體；超過 tidb_server_memory_limit 時 TiDB 會取消最耗記憶體的 SQL"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#memory-quota
+      - alert: TiDBTsoWaitSlow
+        expr: histogram_quantile(0.99, sum by (job, instance, le) (rate(pd_client_cmd_handle_cmds_duration_seconds_bucket{job="tidb", type="wait"}[5m]))) > 0.1
+        for: 5m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: saturation }
+        annotations:
+          summary: "TiDB {{ $labels.instance }} 等 TSO 的 p99 {{ $value }} 秒（例子）；PD leader 忙、網路慢，或 PD 正在換 leader"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#tso-wait
+
+  - name: tidb-workload
+    rules:
+      - alert: TiDBQueryErrorRate
+        expr: |
+          sum by (job, instance) (rate(tidb_server_query_total{job="tidb", result="Error"}[5m]))
+            / sum by (job, instance) (rate(tidb_server_query_total{job="tidb"}[5m])) > 0.05
+        for: 5m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: workload }
+        annotations:
+          summary: "TiDB {{ $labels.instance }} 有 {{ $value | humanizePercentage }} 的語句失敗（例子：5%）；依 tidb_server_execute_error_total 的 type 看是哪一類錯誤"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#query-errors
+      - alert: TiDBQueryLatencyHigh
+        expr: histogram_quantile(0.99, sum by (job, instance, le) (rate(tidb_server_handle_query_duration_seconds_bucket{job="tidb"}[5m]))) > 1
+        for: 5m
+        labels: { severity: warning, component: tidb, tier: "3", aspect: workload }
+        annotations:
+          summary: "TiDB {{ $labels.instance }} 語句 p99 {{ $value }} 秒（官方門檻 1 秒）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#query-latency
+      - alert: TiDBSlowQueries
+        expr: sum by (job, instance) (increase(tidb_server_slow_query_process_duration_seconds_count{job="tidb"}[10m])) > 100
+        labels: { severity: info, component: tidb, tier: "3", aspect: workload }
+        annotations:
+          summary: "TiDB {{ $labels.instance }} 10 分鐘內有 {{ $value }} 條慢查詢（超過 tidb_slow_log_threshold，預設 300ms；門檻是例子）；內容看 slow query log 或 INFORMATION_SCHEMA.SLOW_QUERY"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#slow-queries
+      - alert: TiDBTokensNearLimit
+        expr: tidb_server_tokens{job="tidb"} > 900
+        for: 5m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: workload }
+        annotations:
+          summary: "TiDB {{ $labels.instance }} 同時執行中的語句 {{ $value }}，接近 token-limit（預設 1000）；超過時新語句排隊"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#connections
+      - alert: TiDBTxnBackoffHigh
+        expr: sum by (job, instance, type) (rate(tidb_tikvclient_backoff_seconds_count{job="tidb"}[5m])) > 10
+        for: 5m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: workload }
+        annotations:
+          summary: "TiDB {{ $labels.instance }} 每秒 {{ $value }} 次 {{ $labels.type }} backoff（例子）：txnLock／txnLockFast 是鎖衝突，regionMiss／updateLeader 是 region 搬動，tikvRPC／pdRPC 是連不到"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#txn-conflicts
+      - alert: TiDBWriteConflicts
+        expr: sum by (job, instance) (rate(tidb_server_execute_error_total{job="tidb", type=~".*:9007"}[5m])) > 1
+        for: 5m
+        labels: { severity: info, component: tidb, tier: "3", aspect: workload }
+        annotations:
+          summary: "TiDB {{ $labels.instance }} 每秒 {{ $value }} 次 write conflict（錯誤碼 9007，樂觀交易）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#txn-conflicts
+      - alert: TiDBCriticalErrors
+        expr: |
+          sum by (job, instance) (increase(tidb_server_panic_total{job="tidb"}[10m])) > 0
+            or sum by (job, instance) (increase(tidb_server_critical_error_total{job="tidb"}[10m])) > 0
+            or sum by (job, instance, type) (increase(tikv_critical_error_total{job="tikv"}[10m])) > 0
+        labels: { severity: critical, component: tidb, tier: "2", aspect: workload }
+        annotations:
+          summary: "{{ $labels.job }} {{ $labels.instance }} 有 panic 或 critical error（{{ $labels.type }}）。這些 counter 第一次發生才出現，沒有時 series 不存在"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#critical-errors
+
+  - name: tidb-maintenance
+    rules:
+      - alert: TiKVGcNotRunning
+        expr: |
+          sum by (job) (increase(tikv_gcworker_gc_tasks_vec{job="tikv", task="gc"}[1d])) < 1
+            and on (job) sum by (job) (increase(tikv_gc_compaction_filter_perform{job="tikv"}[1d])) < 1
+            and on (job) sum by (job) (increase(tikv_engine_event_total{job="tikv", db="kv", cf="write", type="compaction"}[1d])) >= 1
+        labels: { severity: warning, component: tidb, tier: "3", aspect: maintenance }
+        annotations:
+          summary: "一天內 TiKV 沒有做任何 GC，RocksDB 卻有 compaction（官方 TiKV_GC_can_not_work 的條件）；舊版本一直累積"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#gc-progress
+          absence_covered_by: "TiDBGcSafePointStale"
+      - alert: TiDBGcSafePointStale
+        expr: |
+          time() - max by (job) (pd_gc_gc_safepoint{job="pd", type="gc_safepoint"}) / 2^18 / 1000 > 3 * 3600
+            or absent(pd_gc_gc_safepoint{job="pd", type="gc_safepoint"})
+        for: 1h
+        labels: { severity: warning, component: tidb, tier: "3", aspect: maintenance }
+        annotations:
+          summary: "GC safe point 超過 3 小時沒前進（例子；tikv_gc_life_time 預設 10 分鐘），或 PD 從來沒收到 safe point（這條 gauge 第一次更新才出現；GC 預設每 10 分鐘一次）。長交易、卡住的 TiCDC／BR service safe point 都會擋住"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#gc-progress
+      - alert: TiDBLongRunningTxn
+        expr: histogram_quantile(1, sum by (job, instance, le) (tidb_executor_ongoing_txn_duration_seconds_bucket{job="tidb"})) > 3600
+        for: 10m
+        labels: { severity: warning, component: tidb, tier: "3", aspect: maintenance }
+        annotations:
+          summary: "TiDB {{ $labels.instance }} 有執行超過 1 小時的交易（例子）；它的 start_ts 擋住 GC safe point"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#gc-progress
+      - alert: TiDBDdlJobsWaiting
+        expr: sum by (job) (tidb_ddl_waiting_jobs{job="tidb"}) > 5
+        for: 10m
+        labels: { severity: warning, component: tidb, tier: "3", aspect: maintenance }
+        annotations:
+          summary: "有 {{ $value }} 個 DDL job 在排隊（官方門檻 5）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#ddl-and-stats
+      - alert: TiDBAutoAnalyzeFailed
+        expr: increase(tidb_statistics_auto_analyze_total{job="tidb", type="failed"}[1h]) > 0
+        labels: { severity: info, component: tidb, tier: "3", aspect: maintenance }
+        annotations:
+          summary: "TiDB {{ $labels.instance }} 一小時內有 auto analyze 失敗；統計資訊過舊會讓執行計畫變差"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#ddl-and-stats
+
+  - name: tidb-protection
+    rules:
+      - alert: TiDBLogBackupCheckpointLagging
+        expr: time() - max by (job, task) (tidb_log_backup_last_checkpoint{job="tidb"}) / 2^18 / 1000 > 600
+        for: 10m
+        labels: { severity: warning, component: tidb, tier: "3", aspect: protection }
+        annotations:
+          summary: "log backup（PITR）task {{ $labels.task }} 的 checkpoint 落後 {{ $value | humanizeDuration }}（例子：10 分鐘）；checkpoint 是 TSO，右移 18 位是毫秒"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#log-backup
+
+  - name: tidb-capacity
+    rules:
+      - alert: TiKVStoreLowSpace
+        expr: tikv_store_size_bytes{job="tikv", type="available"} / tikv_store_size_bytes{job="tikv", type="capacity"} < 0.2
+        for: 5m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: capacity }
+        annotations:
+          summary: "TiKV {{ $labels.instance }} 可用空間只剩 {{ $value | humanizePercentage }}（官方門檻 20%）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#storage-space
+      - alert: TiDBClusterSpaceHigh
+        expr: |
+          sum by (job) (max by (job, store) (pd_cluster_status{job="pd", type="storage_size"}))
+            / sum by (job) (max by (job, store) (pd_cluster_status{job="pd", type="storage_capacity"})) > 0.8
+        for: 5m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: capacity }
+        annotations:
+          summary: "叢集已用空間是總容量的 {{ $value | humanizePercentage }}（官方門檻 80%）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#storage-space
+          absence_covered_by: "TiDBPDLeaderMetricsMissing"

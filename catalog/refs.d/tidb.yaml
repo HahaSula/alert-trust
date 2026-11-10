@@ -1,0 +1,931 @@
+# TiDB target 的參考：TiDB／TiKV／PD v8.5.8 的原始碼位置（在 tag 上取檔、依關鍵字找行號），官方規則，與 lab 結果。
+# TiDB 用的 PD client 與 client-go 釘在 TiDB v8.5.8 go.mod 的 commit；PD 內嵌的 etcd 釘在 v3.5.15（PD go.mod）。
+refs:
+  tidb-h-status-route:
+    kind: code
+    title: "TiDB status port 註冊 /status"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/server/http_status.go"
+    line: 213
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/server/http_status.go#L213"
+  tidb-h-status-health:
+    kind: code
+    title: "/status 只看 health 旗標：false 時回 500，不檢查 PD 或 TiKV"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/server/http_status.go"
+    line: 590
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/server/http_status.go#L590"
+  tidb-h-status-body:
+    kind: code
+    title: "/status 的內容：連線數、版本、init stats 百分比"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/server/http_status.go"
+    line: 596
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/server/http_status.go#L596"
+  tidb-srv-health-true:
+    kind: code
+    title: "listener 啟動後把 health 設成 true"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/server/server.go"
+    line: 469
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/server/server.go#L469"
+  tidb-srv-health-false:
+    kind: code
+    title: "開始關機時把 health 設成 false（graceful-wait-before-shutdown）"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/server/server.go"
+    line: 592
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/server/server.go#L592"
+  tidb-lease-expire-set:
+    kind: code
+    title: "schema lease 更新時寫 tidb_domain_lease_expire_time（lease 授予時間 + lease）"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/domain/schema_validator.go"
+    line: 148
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/domain/schema_validator.go#L148"
+  tidb-lease-expired-check:
+    kind: code
+    title: "IsLeaseExpired：現在時間超過 latestSchemaExpire"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/domain/schema_validator.go"
+    line: 174
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/domain/schema_validator.go#L174"
+  tidb-m-lease-expire:
+    kind: code
+    title: "metric：tidb_domain_lease_expire_time"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/metrics/domain.go"
+    line: 61
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/metrics/domain.go#L61"
+  tidb-m-connections:
+    kind: code
+    title: "metric：tidb_server_connections"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/metrics/server.go"
+    line: 127
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/metrics/server.go#L127"
+  tidb-m-query-total:
+    kind: code
+    title: "metric：tidb_server_query_total{type,result}"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/metrics/server.go"
+    line: 119
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/metrics/server.go#L119"
+  tidb-m-execute-error:
+    kind: code
+    title: "metric：tidb_server_execute_error_total{type}"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/metrics/server.go"
+    line: 150
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/metrics/server.go#L150"
+  tidb-m-execute-error-label:
+    kind: code
+    title: "execute_error_total 的 type 是錯誤的 RFC code（例如 kv:9007）"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/metrics/server.go"
+    line: 408
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/metrics/server.go#L408"
+  tidb-m-handle-query:
+    kind: code
+    title: "metric：tidb_server_handle_query_duration_seconds"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/metrics/server.go"
+    line: 92
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/metrics/server.go#L92"
+  tidb-m-slow-query:
+    kind: code
+    title: "metric：tidb_server_slow_query_process_duration_seconds（只記超過門檻的語句）"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/metrics/server.go"
+    line: 250
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/metrics/server.go#L250"
+  tidb-m-tokens:
+    kind: code
+    title: "metric：tidb_server_tokens（執行中的語句數）"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/metrics/server.go"
+    line: 319
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/metrics/server.go#L319"
+  tidb-m-memquota:
+    kind: code
+    title: "metric：tidb_server_memory_quota_bytes"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/metrics/server.go"
+    line: 394
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/metrics/server.go#L394"
+  tidb-cfg-token-limit:
+    kind: code
+    title: "token-limit 預設 1000"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/config/config.go"
+    line: 913
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/config/config.go#L913"
+  tidb-cfg-max-conn:
+    kind: code
+    title: "max-server-connections 預設 0（不限制）"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/config/config.go"
+    line: 932
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/config/config.go#L932"
+  tidb-var-memlimit:
+    kind: code
+    title: "tidb_server_memory_limit 預設 80%"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/sessionctx/variable/tidb_vars.go"
+    line: 1885
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/sessionctx/variable/tidb_vars.go#L1885"
+  tidb-var-oom-action:
+    kind: code
+    title: "tidb_mem_oom_action 預設 CANCEL"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/sessionctx/variable/tidb_vars.go"
+    line: 1553
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/sessionctx/variable/tidb_vars.go#L1553"
+  tidb-memlimit-kill:
+    kind: code
+    title: "超過 tidb_server_memory_limit 時殺掉最耗記憶體的 SQL（只寫 log）"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/util/servermemorylimit/servermemorylimit.go"
+    line: 102
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/util/servermemorylimit/servermemorylimit.go#L102"
+  tidb-keepalive-infoschema:
+    kind: code
+    title: "tidb_monitor_keep_alive_total 只剩 metrics_schema 的 PromQL 定義，原始碼沒有註冊這個 metric"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/infoschema/metric_table_def.go"
+    line: 149
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/infoschema/metric_table_def.go#L149"
+  tidb-gc-lifetime-default:
+    kind: code
+    title: "tikv_gc_life_time 預設 10 分鐘"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/store/gcworker/gc_worker.go"
+    line: 141
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/store/gcworker/gc_worker.go#L141"
+  tidb-gc-config-gauge:
+    kind: code
+    title: "tidb_tikvclient_gc_config{type=\"tikv_gc_life_time\"}"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/store/gcworker/gc_worker.go"
+    line: 686
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/store/gcworker/gc_worker.go#L686"
+  tidb-gc-run-job:
+    kind: code
+    title: "GC leader 每次開始 GC job：gc_worker_actions_total{type=\"run_job\"}"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/store/gcworker/gc_worker.go"
+    line: 746
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/store/gcworker/gc_worker.go#L746"
+  tidb-m-ongoing-txn:
+    kind: code
+    title: "metric：tidb_executor_ongoing_txn_duration_seconds（執行中交易的時間）"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/metrics/executor.go"
+    line: 119
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/metrics/executor.go#L119"
+  tidb-logbackup-checkpoint:
+    kind: code
+    title: "log backup advancer 寫 tidb_log_backup_last_checkpoint{task}（TSO）"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "br/pkg/streamhelper/advancer_cliext.go"
+    line: 296
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/br/pkg/streamhelper/advancer_cliext.go#L296"
+  tidb-split-table:
+    kind: code
+    title: "split-table 預設 true"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/config/config.go"
+    line: 911
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/config/config.go#L911"
+  tidb-rule-keepalive:
+    kind: code
+    title: "tidb.rules.yml：TiDB_monitor_keep_alive（metric 不存在、job=\"tidb\" 寫死）"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/metrics/alertmanager/tidb.rules.yml"
+    line: 79
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/metrics/alertmanager/tidb.rules.yml#L79"
+  tidb-rule-memabnormal:
+    kind: code
+    title: "tidb.rules.yml：TiDB_memory_abnormal（job=\"tidb\" 寫死）"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/metrics/alertmanager/tidb.rules.yml"
+    line: 103
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/metrics/alertmanager/tidb.rules.yml#L103"
+  tidb-rule-restart:
+    kind: code
+    title: "tidb.rules.yml：TiDB_node_restart（job=\"tidb\" 寫死）"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/metrics/alertmanager/tidb.rules.yml"
+    line: 175
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/metrics/alertmanager/tidb.rules.yml#L175"
+  tidb-rule-memquota:
+    kind: code
+    title: "tidb.rules.yml：TiDB_memory_quota（job=\"tidb\" 寫死）"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/metrics/alertmanager/tidb.rules.yml"
+    line: 199
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/metrics/alertmanager/tidb.rules.yml#L199"
+  tidb-rule-backoff:
+    kind: code
+    title: "tidb.rules.yml：tidb_tikvclient_backoff_seconds_count > 10（10 分鐘）"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/metrics/alertmanager/tidb.rules.yml"
+    line: 139
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/metrics/alertmanager/tidb.rules.yml#L139"
+  tidb-rule-schema:
+    kind: code
+    title: "tidb.rules.yml：TiDB_schema_error"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/metrics/alertmanager/tidb.rules.yml"
+    line: 19
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/metrics/alertmanager/tidb.rules.yml#L19"
+  tidb-rule-ddl:
+    kind: code
+    title: "tidb.rules.yml：TiDB_ddl_waiting_jobs > 5"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/metrics/alertmanager/tidb.rules.yml"
+    line: 163
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/metrics/alertmanager/tidb.rules.yml#L163"
+  tidb-rule-analyze:
+    kind: code
+    title: "tidb.rules.yml：TiDB_auto_analyze_failed"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/metrics/alertmanager/tidb.rules.yml"
+    line: 67
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/metrics/alertmanager/tidb.rules.yml#L67"
+  tikv-rule-apply:
+    kind: code
+    title: "tikv.rules.yml：TiKV_thread_apply_worker_cpu_seconds（name=\"apply_.*\" 用 =）"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/tikv.rules.yml"
+    line: 173
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/metrics/alertmanager/tikv.rules.yml#L173"
+  tikv-rule-leader-drops:
+    kind: code
+    title: "tikv.rules.yml：TiKV_leader_drops（tikv_pd_heartbeat_tick_total 不存在）"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/tikv.rules.yml"
+    line: 197
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/metrics/alertmanager/tikv.rules.yml#L197"
+  tikv-rule-restart:
+    kind: code
+    title: "tikv.rules.yml：TiKV_node_restart（job=\"tikv\" 寫死）"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/tikv.rules.yml"
+    line: 317
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/metrics/alertmanager/tikv.rules.yml#L317"
+  tikv-rule-memfast:
+    kind: code
+    title: "tikv.rules.yml：TiKV_memory_used_too_fast（job=~\"tikv\" 等於寫死）"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/tikv.rules.yml"
+    line: 17
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/metrics/alertmanager/tikv.rules.yml#L17"
+  tikv-rule-gc:
+    kind: code
+    title: "tikv.rules.yml：TiKV_GC_can_not_work"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/tikv.rules.yml"
+    line: 29
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/metrics/alertmanager/tikv.rules.yml#L29"
+  tikv-rule-stall:
+    kind: code
+    title: "tikv.rules.yml：TiKV_write_stall"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/tikv.rules.yml"
+    line: 65
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/metrics/alertmanager/tikv.rules.yml#L65"
+  tikv-rule-raftstore-cpu:
+    kind: code
+    title: "tikv.rules.yml：TiKV_raftstore_thread_cpu_seconds_total > 1.6"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/tikv.rules.yml"
+    line: 125
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/metrics/alertmanager/tikv.rules.yml#L125"
+  tikv-rule-loglag:
+    kind: code
+    title: "tikv.rules.yml：TiKV_raft_log_lag > 5000"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/tikv.rules.yml"
+    line: 77
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/metrics/alertmanager/tikv.rules.yml#L77"
+  tikv-rule-append:
+    kind: code
+    title: "tikv.rules.yml：TiKV_raft_append_log_duration_secs > 1"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/tikv.rules.yml"
+    line: 137
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/metrics/alertmanager/tikv.rules.yml#L137"
+  tikv-rule-memquota:
+    kind: code
+    title: "tikv.rules.yml：TiKV_memory_quota > 0.8"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/tikv.rules.yml"
+    line: 341
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/metrics/alertmanager/tikv.rules.yml#L341"
+  pd-rule-down:
+    kind: code
+    title: "pd.rules.yml：PD_cluster_down_tikv_nums（以 etcd_server_is_leader 為前提）"
+    project: "PD"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/pd.rules.yml"
+    line: 5
+    url: "https://github.com/tikv/pd/blob/v8.5.8/metrics/alertmanager/pd.rules.yml#L5"
+  pd-rule-miss:
+    kind: code
+    title: "pd.rules.yml：PD_miss_peer_region_count 用 type=\"miss_peer_region_count\"（底線）"
+    project: "PD"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/pd.rules.yml"
+    line: 29
+    url: "https://github.com/tikv/pd/blob/v8.5.8/metrics/alertmanager/pd.rules.yml#L29"
+  pd-rule-disconnected:
+    kind: code
+    title: "pd.rules.yml：PD_cluster_lost_connect_tikv_nums"
+    project: "PD"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/pd.rules.yml"
+    line: 41
+    url: "https://github.com/tikv/pd/blob/v8.5.8/metrics/alertmanager/pd.rules.yml#L41"
+  pd-rule-downpeer:
+    kind: code
+    title: "pd.rules.yml：PD_down_peer_region_nums"
+    project: "PD"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/pd.rules.yml"
+    line: 104
+    url: "https://github.com/tikv/pd/blob/v8.5.8/metrics/alertmanager/pd.rules.yml#L104"
+  pd-rule-pending:
+    kind: code
+    title: "pd.rules.yml：PD_pending_peer_region_count > 100"
+    project: "PD"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/pd.rules.yml"
+    line: 116
+    url: "https://github.com/tikv/pd/blob/v8.5.8/metrics/alertmanager/pd.rules.yml#L116"
+  pd-rule-leaderchange:
+    kind: code
+    title: "pd.rules.yml：PD_leader_change（用 TSO save 事件推算）"
+    project: "PD"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/pd.rules.yml"
+    line: 128
+    url: "https://github.com/tikv/pd/blob/v8.5.8/metrics/alertmanager/pd.rules.yml#L128"
+  pd-rule-timeslow:
+    kind: code
+    title: "pd.rules.yml：PD_system_time_slow"
+    project: "PD"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/pd.rules.yml"
+    line: 152
+    url: "https://github.com/tikv/pd/blob/v8.5.8/metrics/alertmanager/pd.rules.yml#L152"
+  pd-rule-restart:
+    kind: code
+    title: "pd.rules.yml：PD_node_restart（job=\"pd\" 寫死）"
+    project: "PD"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/pd.rules.yml"
+    line: 176
+    url: "https://github.com/tikv/pd/blob/v8.5.8/metrics/alertmanager/pd.rules.yml#L176"
+  pd-rule-cpu:
+    kind: code
+    title: "pd.rules.yml：PD_cpu_quota（job=\"pd\" 寫死）"
+    project: "PD"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/pd.rules.yml"
+    line: 200
+    url: "https://github.com/tikv/pd/blob/v8.5.8/metrics/alertmanager/pd.rules.yml#L200"
+  pd-rule-tso:
+    kind: code
+    title: "pd.rules.yml：PD_tidb_handle_requests_duration（TSO p99 > 0.1s）"
+    project: "PD"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/pd.rules.yml"
+    line: 92
+    url: "https://github.com/tikv/pd/blob/v8.5.8/metrics/alertmanager/pd.rules.yml#L92"
+  pd-rule-fsync:
+    kind: code
+    title: "pd.rules.yml：PD_etcd_write_disk_latency（p99 > 1s）"
+    project: "PD"
+    version: "v8.5.8"
+    file: "metrics/alertmanager/pd.rules.yml"
+    line: 17
+    url: "https://github.com/tikv/pd/blob/v8.5.8/metrics/alertmanager/pd.rules.yml#L17"
+  tikv-h-status:
+    kind: code
+    title: "TiKV /status：一律回空的 200"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "src/server/status_server/mod.rs"
+    line: 790
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/src/server/status_server/mod.rs#L790"
+  tikv-h-metrics:
+    kind: code
+    title: "TiKV /metrics：handle_get_metrics"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "src/server/status_server/mod.rs"
+    line: 787
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/src/server/status_server/mod.rs#L787"
+  tikv-h-metrics-dump:
+    kind: code
+    title: "/metrics 從 registry 輸出（不碰 raftstore 或 RocksDB）"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "src/server/status_server/mod.rs"
+    line: 572
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/src/server/status_server/mod.rs#L572"
+  tikv-thread-sanitize:
+    kind: code
+    title: "thread 名稱的 - 換成 _（apply-0 → apply_0）"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "components/tikv_util/src/metrics/threads_linux.rs"
+    line: 230
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/components/tikv_util/src/metrics/threads_linux.rs#L230"
+  tikv-apply-spawn:
+    kind: code
+    title: "apply pool 的名稱前綴 apply"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "components/raftstore/src/store/fsm/store.rs"
+    line: 1991
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/components/raftstore/src/store/fsm/store.rs#L1991"
+  tikv-batch-thread-name:
+    kind: code
+    title: "batch system 的執行緒名稱 <prefix>-<i>，低優先的是 <prefix>-low-<i>"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "components/batch-system/src/batch.rs"
+    line: 602
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/components/batch-system/src/batch.rs#L602"
+  tikv-m-loglag:
+    kind: code
+    title: "metric：tikv_raftstore_log_lag（lazy_static，第一次用到才註冊）"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "components/raftstore/src/store/metrics.rs"
+    line: 655
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/components/raftstore/src/store/metrics.rs#L655"
+  tikv-m-append:
+    kind: code
+    title: "metric：tikv_raftstore_append_log_duration_seconds"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "components/raftstore/src/store/metrics.rs"
+    line: 437
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/components/raftstore/src/store/metrics.rs#L437"
+  tikv-m-commit:
+    kind: code
+    title: "metric：tikv_raftstore_commit_log_duration_seconds"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "components/raftstore/src/store/metrics.rs"
+    line: 552
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/components/raftstore/src/store/metrics.rs#L552"
+  tikv-m-apply:
+    kind: code
+    title: "metric：tikv_raftstore_apply_log_duration_seconds"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "components/raftstore/src/store/metrics.rs"
+    line: 560
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/components/raftstore/src/store/metrics.rs#L560"
+  tikv-m-write-stall:
+    kind: code
+    title: "metric：tikv_engine_write_stall（RocksDB 的 write stall 統計）"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "components/engine_rocks/src/rocks_metrics.rs"
+    line: 1597
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/components/engine_rocks/src/rocks_metrics.rs#L1597"
+  tikv-m-store-size:
+    kind: code
+    title: "metric：tikv_store_size_bytes{type=capacity|available|used}"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "components/pd_client/src/metrics.rs"
+    line: 119
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/components/pd_client/src/metrics.rs#L119"
+  tikv-m-critical:
+    kind: code
+    title: "metric：tikv_critical_error_total"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "components/tikv_util/src/metrics/mod.rs"
+    line: 90
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/components/tikv_util/src/metrics/mod.rs#L90"
+  tikv-m-memquota:
+    kind: code
+    title: "metric：tikv_server_memory_quota_bytes"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "src/server/metrics.rs"
+    line: 479
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/src/server/metrics.rs#L479"
+  tikv-m-autogc-sp:
+    kind: code
+    title: "metric：tikv_gcworker_autogc_safe_point（lazy_static）"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "src/server/metrics.rs"
+    line: 375
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/src/server/metrics.rs#L375"
+  tikv-sched-too-busy:
+    kind: code
+    title: "scheduler 待寫入量超過門檻時回 SchedTooBusy（client 看到 ServerIsBusy）"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "src/storage/txn/scheduler.rs"
+    line: 524
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/src/storage/txn/scheduler.rs#L524"
+  tikv-max-peer-down:
+    kind: code
+    title: "raftstore.max-peer-down-duration 預設 10 分鐘"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "components/raftstore/src/store/config.rs"
+    line: 574
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/components/raftstore/src/store/config.rs#L574"
+  tikv-peer-down-hibernate:
+    kind: code
+    title: "hibernate-regions 開著時 max-peer-down-duration 至少 2 × peer-stale-state-check-interval"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "components/raftstore/src/store/config.rs"
+    line: 991
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/components/raftstore/src/store/config.rs#L991"
+  tikv-backtrace-loader:
+    kind: code
+    title: "啟動時開 backtrace-loader 執行緒預先載入 debug info"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "components/tikv_util/src/lib.rs"
+    line: 458
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/components/tikv_util/src/lib.rs#L458"
+  tikv-m-scheduler-contex:
+    kind: code
+    title: "metric：tikv_scheduler_contex_total（lazy_static）"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "src/storage/metrics.rs"
+    line: 432
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/src/storage/metrics.rs#L432"
+  tikv-raft-tick:
+    kind: code
+    title: "raft-base-tick-interval 預設 1 秒"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "components/raftstore/src/store/config.rs"
+    line: 530
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/components/raftstore/src/store/config.rs#L530"
+  tikv-raft-election:
+    kind: code
+    title: "raft-election-timeout-ticks 預設 10（10 秒）"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "components/raftstore/src/store/config.rs"
+    line: 532
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/components/raftstore/src/store/config.rs#L532"
+  tikv-store-heartbeat:
+    kind: code
+    title: "store heartbeat 預設每 10 秒"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "components/raftstore/src/store/config.rs"
+    line: 562
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/components/raftstore/src/store/config.rs#L562"
+  tikv-hibernate:
+    kind: code
+    title: "hibernate-regions 預設開（閒置的 region 不送 heartbeat）"
+    project: "TiKV"
+    version: "v8.5.8"
+    file: "components/raftstore/src/store/config.rs"
+    line: 608
+    url: "https://github.com/tikv/tikv/blob/v8.5.8/components/raftstore/src/store/config.rs#L608"
+  pd-h-health:
+    kind: code
+    title: "/pd/api/v1/health：列出成員，各自打 /pd/api/v1/ping，一律回 200"
+    project: "PD"
+    version: "v8.5.8"
+    file: "server/api/health.go"
+    line: 51
+    url: "https://github.com/tikv/pd/blob/v8.5.8/server/api/health.go#L51"
+  pd-h-ping:
+    kind: code
+    title: "/pd/api/v1/ping：空的 handler"
+    project: "PD"
+    version: "v8.5.8"
+    file: "server/api/health.go"
+    line: 78
+    url: "https://github.com/tikv/pd/blob/v8.5.8/server/api/health.go#L78"
+  pd-h-health-route-deprecated:
+    kind: code
+    title: "根目錄 /health 標成 deprecated（實際回應的是內嵌 etcd 的 /health，lab）"
+    project: "PD"
+    version: "v8.5.8"
+    file: "server/api/router.go"
+    line: 391
+    url: "https://github.com/tikv/pd/blob/v8.5.8/server/api/router.go#L391"
+  pd-checkhealth-url:
+    kind: code
+    title: "CheckHealth 打每個成員的 /pd/api/v1/ping"
+    project: "PD"
+    version: "v8.5.8"
+    file: "server/cluster/cluster.go"
+    line: 2701
+    url: "https://github.com/tikv/pd/blob/v8.5.8/server/cluster/cluster.go#L2701"
+  pd-checkhealth:
+    kind: code
+    title: "CheckHealth：200 就算健康"
+    project: "PD"
+    version: "v8.5.8"
+    file: "server/cluster/cluster.go"
+    line: 2704
+    url: "https://github.com/tikv/pd/blob/v8.5.8/server/cluster/cluster.go#L2704"
+  pd-memberlist-nonlinear:
+    kind: code
+    title: "ListEtcdMembers 用 Linearizable: false（沒有 quorum 也回得出成員）"
+    project: "PD"
+    version: "v8.5.8"
+    file: "pkg/utils/etcdutil/etcdutil.go"
+    line: 126
+    url: "https://github.com/tikv/pd/blob/v8.5.8/pkg/utils/etcdutil/etcdutil.go#L126"
+  pd-userhandlers:
+    kind: code
+    title: "PD 的 HTTP API 掛在內嵌 etcd 的 client listener 上"
+    project: "PD"
+    version: "v8.5.8"
+    file: "server/server.go"
+    line: 301
+    url: "https://github.com/tikv/pd/blob/v8.5.8/server/server.go#L301"
+  pd-etcd-version:
+    kind: code
+    title: "PD v8.5.8 內嵌 etcd v3.5.15"
+    project: "PD"
+    version: "v8.5.8"
+    file: "go.mod"
+    line: 58
+    url: "https://github.com/tikv/pd/blob/v8.5.8/go.mod#L58"
+  pd-service-role-1:
+    kind: code
+    title: "成為 PD leader 時 service_member_role{service=\"PD\"} 設 1"
+    project: "PD"
+    version: "v8.5.8"
+    file: "server/server.go"
+    line: 1764
+    url: "https://github.com/tikv/pd/blob/v8.5.8/server/server.go#L1764"
+  pd-service-role-0:
+    kind: code
+    title: "失去 leader 時設 0"
+    project: "PD"
+    version: "v8.5.8"
+    file: "server/server.go"
+    line: 1774
+    url: "https://github.com/tikv/pd/blob/v8.5.8/server/server.go#L1774"
+  pd-m-service-role:
+    kind: code
+    title: "metric：service_member_role{service}"
+    project: "PD"
+    version: "v8.5.8"
+    file: "pkg/member/metrics.go"
+    line: 25
+    url: "https://github.com/tikv/pd/blob/v8.5.8/pkg/member/metrics.go#L25"
+  pd-etcd-leader-priority:
+    kind: code
+    title: "PD leader 依 priority 搬動 etcd leader（PD leader 與 etcd leader 是兩件事）"
+    project: "PD"
+    version: "v8.5.8"
+    file: "pkg/member/member.go"
+    line: 286
+    url: "https://github.com/tikv/pd/blob/v8.5.8/pkg/member/member.go#L286"
+  pd-store-disconnect:
+    kind: code
+    title: "超過 20 秒沒有 store heartbeat 算 Disconnected"
+    project: "PD"
+    version: "v8.5.8"
+    file: "pkg/core/store.go"
+    line: 628
+    url: "https://github.com/tikv/pd/blob/v8.5.8/pkg/core/store.go#L628"
+  pd-store-unhealthy:
+    kind: code
+    title: "超過 10 分鐘算 Unhealthy"
+    project: "PD"
+    version: "v8.5.8"
+    file: "pkg/core/store.go"
+    line: 629
+    url: "https://github.com/tikv/pd/blob/v8.5.8/pkg/core/store.go#L629"
+  pd-store-downtime:
+    kind: code
+    title: "DownTime：距離最後一次 heartbeat 的時間"
+    project: "PD"
+    version: "v8.5.8"
+    file: "pkg/core/store.go"
+    line: 302
+    url: "https://github.com/tikv/pd/blob/v8.5.8/pkg/core/store.go#L302"
+  pd-store-status-order:
+    kind: code
+    title: "store 狀態的判斷順序：Down → Unhealthy → Disconnected → Slow → Up"
+    project: "PD"
+    version: "v8.5.8"
+    file: "pkg/statistics/store_collection.go"
+    line: 101
+    url: "https://github.com/tikv/pd/blob/v8.5.8/pkg/statistics/store_collection.go#L101"
+  pd-store-down-default:
+    kind: code
+    title: "max-store-down-time 預設 30 分鐘"
+    project: "PD"
+    version: "v8.5.8"
+    file: "pkg/schedule/config/config.go"
+    line: 79
+    url: "https://github.com/tikv/pd/blob/v8.5.8/pkg/schedule/config/config.go#L79"
+  pd-m-cluster-status:
+    kind: code
+    title: "metric：pd_cluster_status{type,engine,store}"
+    project: "PD"
+    version: "v8.5.8"
+    file: "pkg/statistics/metrics.go"
+    line: 56
+    url: "https://github.com/tikv/pd/blob/v8.5.8/pkg/statistics/metrics.go#L56"
+  pd-m-regions-status:
+    kind: code
+    title: "metric：pd_regions_status{type}"
+    project: "PD"
+    version: "v8.5.8"
+    file: "pkg/statistics/metrics.go"
+    line: 46
+    url: "https://github.com/tikv/pd/blob/v8.5.8/pkg/statistics/metrics.go#L46"
+  pd-region-miss-label:
+    kind: code
+    title: "pd_regions_status 的 type 用連字號：miss-peer-region-count"
+    project: "PD"
+    version: "v8.5.8"
+    file: "pkg/statistics/region_collection.go"
+    line: 70
+    url: "https://github.com/tikv/pd/blob/v8.5.8/pkg/statistics/region_collection.go#L70"
+  pd-region-down-label:
+    kind: code
+    title: "down-peer-region-count、pending-peer-region-count、offline-peer-region-count"
+    project: "PD"
+    version: "v8.5.8"
+    file: "pkg/statistics/region_collection.go"
+    line: 72
+    url: "https://github.com/tikv/pd/blob/v8.5.8/pkg/statistics/region_collection.go#L72"
+  pd-sched-metrics-collect:
+    kind: code
+    title: "只有 PD leader 的 schedulingController 每 10 秒算 store／region 狀態"
+    project: "PD"
+    version: "v8.5.8"
+    file: "server/cluster/scheduling_controller.go"
+    line: 180
+    url: "https://github.com/tikv/pd/blob/v8.5.8/server/cluster/scheduling_controller.go#L180"
+  pd-sched-metrics-reset:
+    kind: code
+    title: "leader 停止時 reset 這些 metric"
+    project: "PD"
+    version: "v8.5.8"
+    file: "server/cluster/scheduling_controller.go"
+    line: 161
+    url: "https://github.com/tikv/pd/blob/v8.5.8/server/cluster/scheduling_controller.go#L161"
+  pd-metrics-interval:
+    kind: code
+    title: "metricsCollectionJobInterval 10 秒"
+    project: "PD"
+    version: "v8.5.8"
+    file: "server/cluster/cluster.go"
+    line: 97
+    url: "https://github.com/tikv/pd/blob/v8.5.8/server/cluster/cluster.go#L97"
+  pd-gc-safepoint:
+    kind: code
+    title: "PD 收到新的 GC safe point 時寫 pd_gc_gc_safepoint"
+    project: "PD"
+    version: "v8.5.8"
+    file: "pkg/gc/safepoint.go"
+    line: 68
+    url: "https://github.com/tikv/pd/blob/v8.5.8/pkg/gc/safepoint.go#L68"
+  pdc-m-cmd-duration:
+    kind: code
+    title: "metric：pd_client_cmd_handle_cmds_duration_seconds{type}"
+    project: "PD client（TiDB go.mod 所用）"
+    version: "85a975a5ca78"
+    file: "client/metrics/metrics.go"
+    line: 97
+    url: "https://github.com/tikv/pd/blob/85a975a5ca78/client/metrics/metrics.go#L97"
+  pdc-m-wait:
+    kind: code
+    title: "type=\"wait\"：等 TSO 結果的時間"
+    project: "PD client（TiDB go.mod 所用）"
+    version: "85a975a5ca78"
+    file: "client/metrics/metrics.go"
+    line: 289
+    url: "https://github.com/tikv/pd/blob/85a975a5ca78/client/metrics/metrics.go#L289"
+  pdc-m-failed-tso:
+    kind: code
+    title: "取 TSO 失敗：pd_client_cmd_handle_failed_cmds_duration_seconds{type=\"tso\"}"
+    project: "PD client（TiDB go.mod 所用）"
+    version: "85a975a5ca78"
+    file: "client/metrics/metrics.go"
+    line: 319
+    url: "https://github.com/tikv/pd/blob/85a975a5ca78/client/metrics/metrics.go#L319"
+  cg-m-backoff:
+    kind: code
+    title: "metric：tidb_tikvclient_backoff_seconds{type}"
+    project: "client-go（TiDB go.mod 所用）"
+    version: "c3b50791b9fb"
+    file: "metrics/metrics.go"
+    line: 173
+    url: "https://github.com/tikv/client-go/blob/c3b50791b9fb/metrics/metrics.go#L173"
+  cg-m-region-err:
+    kind: code
+    title: "metric：tidb_tikvclient_region_err_total{type}"
+    project: "client-go（TiDB go.mod 所用）"
+    version: "c3b50791b9fb"
+    file: "metrics/metrics.go"
+    line: 224
+    url: "https://github.com/tikv/client-go/blob/c3b50791b9fb/metrics/metrics.go#L224"
+  cg-server-busy-label:
+    kind: code
+    title: "region error 的 label：server_is_busy"
+    project: "client-go（TiDB go.mod 所用）"
+    version: "c3b50791b9fb"
+    file: "internal/locate/region_request.go"
+    line: 1748
+    url: "https://github.com/tikv/client-go/blob/c3b50791b9fb/internal/locate/region_request.go#L1748"
+  pd-etcd-readyz-linear:
+    kind: code
+    title: "/readyz 的 linearizable_read 檢查（要有 quorum）"
+    project: "etcd（PD 內嵌，go.mod v3.5.15）"
+    version: "v3.5.15"
+    file: "server/etcdserver/api/etcdhttp/health.go"
+    line: 290
+    url: "https://github.com/etcd-io/etcd/blob/v3.5.15/server/etcdserver/api/etcdhttp/health.go#L290"
+  pd-etcd-health-noleader:
+    kind: code
+    title: "/health：沒有 leader 時 RAFT NO LEADER"
+    project: "etcd（PD 內嵌，go.mod v3.5.15）"
+    version: "v3.5.15"
+    file: "server/etcdserver/api/etcdhttp/health.go"
+    line: 231
+    url: "https://github.com/etcd-io/etcd/blob/v3.5.15/server/etcdserver/api/etcdhttp/health.go#L231"
+  tidb-exp:
+    kind: experiment
+    title: "TiDB v8.5.8 lab（PD ×3、TiKV ×3、TiDB ×1）：停 TiKV、PD leader 抓不到、停 PD leader、PD 失去 quorum、官方規則稽核（lab/targets/tidb）"
+    url: "https://github.com/HahaSula/alert-trust/tree/main/lab/targets/tidb"
+  tidb-exp-raw:
+    kind: experiment
+    title: "TiDB lab 原始輸出"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/tidb/results/run-20261110.txt"
+  tidb-exp-names:
+    kind: experiment
+    title: "TiDB lab：PD、TiKV、TiDB /metrics 的 metric 名稱清單（v8.5.8）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/tidb/results/names-tikv-8.5.8.txt"
+  tidb-exp-heap:
+    kind: experiment
+    title: "TiDB lab：TiKV 映像啟動時 backtrace-loader 解壓 debug info（heap profile，約 1.9GB）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/tidb/results/summary.md"

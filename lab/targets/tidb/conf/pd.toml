@@ -1,0 +1,3 @@
+# 輕量 lab 用。max-store-down-time 預設 30m，lab 縮成 1m，讓 store 在 lab 時間內從 Disconnected 進到 Down。
+[schedule]
+max-store-down-time = "1m"

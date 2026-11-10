@@ -1,0 +1,53 @@
+# TiDB 卡引用的來源。key 一律以 tidb- 開頭，避免和其他 target 衝突。
+sources:
+  tidb-lab:
+    title: TiDB 健康第二路徑與官方規則實驗（lab/targets/tidb）
+    kind: experiment
+    visibility: public
+    url: https://github.com/HahaSula/alert-trust/tree/main/lab/targets/tidb
+    checked: "2026-11-10, TiDB v8.5.8（PD ×3、TiKV ×3、TiDB ×1）, Prometheus v3.13.5, blackbox_exporter v0.27.0"
+    note: results/run-20261110.txt 是原始輸出，results/summary.md 是摘要
+  tidb-server:
+    title: TiDB v8.5.8 pkg/（server 的 status port、domain 的 schema lease、metrics、gcworker）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/pingcap/tidb/tree/v8.5.8/pkg
+    checked: "2026-11-10, v8.5.8（commit 8b857ef）"
+    note: "gh api repos/pingcap/tidb/releases/latest 回 v7.5.8（最後發布的 LTS 修補版）；版本號最高的穩定版是 v8.5.8，以它為準"
+  tidb-tikv:
+    title: TiKV v8.5.8（status server、raftstore、engine_rocks、gc_worker、scheduler）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/tikv/tikv/tree/v8.5.8
+    checked: "2026-11-10, v8.5.8（commit a1fdd6a）"
+  tidb-pd:
+    title: PD v8.5.8（server/api 健康端點、statistics 的 store／region 狀態、member、內嵌 etcd v3.5.15）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/tikv/pd/tree/v8.5.8
+    checked: "2026-11-10, v8.5.8（commit 4ecadf2）"
+  tidb-clients:
+    title: TiDB v8.5.8 go.mod 所用的 PD client（tikv/pd 85a975a5ca78）與 client-go（tikv/client-go c3b50791b9fb）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/pingcap/tidb/blob/v8.5.8/go.mod
+    checked: "2026-11-10"
+  tidb-rules:
+    title: 官方告警規則（tidb.rules.yml、tikv.rules.yml、pd.rules.yml，v8.5.8）
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/tikv/pd/blob/v8.5.8/metrics/alertmanager/pd.rules.yml
+    checked: "2026-11-10, v8.5.8"
+    note: "另兩份在 pingcap/tidb pkg/metrics/alertmanager/tidb.rules.yml 與 tikv/tikv metrics/alertmanager/tikv.rules.yml；TiUP 用的是 pingcap/monitoring 的副本"
+  tidb-doc-pd-scheduling:
+    title: "TiDB 文件：Scheduling Overview（store 狀態、region 健康、max-store-down-time）"
+    kind: upstream-doc
+    visibility: public
+    url: https://docs.pingcap.com/tidb/stable/tidb-scheduling/
+    checked: "2026-11-10"
+  tidb-doc-gc:
+    title: "TiDB 文件：GC Overview（safe point、tidb_gc_life_time）"
+    kind: upstream-doc
+    visibility: public
+    url: https://docs.pingcap.com/tidb/stable/garbage-collection-overview/
+    checked: "2026-11-10"

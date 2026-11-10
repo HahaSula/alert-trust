@@ -94,10 +94,31 @@ compaction 之後檔案不會縮小，空出來的頁面要 defrag 才還給檔�
 
 **哪個訊號看得到。**[learner](../components/etcd.md#learner)（`etcd_server_is_learner`）。[^etcd-member-islearner]
 
+## TiKV：每個 Region 一組 Raft {#tikv}
+
+以下是 TiKV v8.5.8 的對應；訊號連到 [TiDB 元件卡](../components/tidb.md)，完整清單在 [TiDB 怎麼監控](../targets/tidb.md)。<span class="at-chip at-ev-code">讀碼</span> <span class="at-chip at-ev-tested">實測</span>
+
+**multi-raft。**TiKV 把 key 範圍切成 Region，每個 Region 預設三個副本、各自是一組 Raft；一台 TiKV（store）上有很多組，每組有自己的 leader（lab 只有 5 個 Region）。raft tick 預設 1 秒、election timeout 10 個 tick（10 秒）；閒置的 Region 會休眠（hibernate-regions 預設開），不送 heartbeat。[^tikv-raft-tick][^tikv-raft-election][^tikv-hibernate]所以沒有「這台有沒有 leader」這種單一值，etcd 的 `has_leader` 在 TiKV 沒有對應。
+
+**誰知道哪裡壞了。**每台 TiKV 每 10 秒送 store heartbeat 給 PD；每個 Region 的 leader 另外送 region heartbeat，帶著 down peer（超過 `max-peer-down-duration`，預設 10 分鐘沒回應的副本）與 pending peer（log 落後的副本）。[^tikv-store-heartbeat][^tikv-max-peer-down]PD leader 把這些彙總成 `pd_cluster_status`（每個 store 的狀態）與 `pd_regions_status`（各類 Region 的數量），只有 PD leader 輸出。[^pd-sched-metrics-collect][^pd-store-status-order]
+
+| etcd 的機制 | TiKV 的對應 | 什麼會壞 | 看得到的訊號 |
+|---|---|---|---|
+| [選主](#election) | 每個 Region 各自選 leader；store 停掉時它上面的 leader 在 election timeout 後移走 | 那台上的 Region 短暫不能寫 | [store-state](../components/tidb.md#store-state)、[server-busy](../components/tidb.md#server-busy) |
+| [quorum](#quorum) | 每個 Region 的過半副本；一台停掉時三副本的 Region 剩兩個，仍有過半 | 再停一台，兩台都有副本的 Region 失去過半 | [region-health](../components/tidb.md#region-health)（down peer） |
+| [log 複寫](#replication) | follower 落後成為 pending peer；落後太多改送 snapshot | 副本長時間落後 | [replication-lag](../components/tidb.md#replication-lag) |
+| [fsync](#fsync) | raft log 先寫 raft engine 再 apply 到 RocksDB；append、commit、apply 各有 histogram | 磁碟慢時 append 慢、write stall | [raftstore-latency](../components/tidb.md#raftstore-latency)、[write-stall](../components/tidb.md#write-stall) |
+| 成員數 | PD 記得的 store 數（非 Tombstone） | scrape 漏掉某台 | [component-count](../components/tidb.md#component-count) |
+| PD 自己的 Raft | PD 內嵌 etcd v3.5.15：上面 etcd 的每一節都適用；但 PD leader（etcd lease 選出）不等於 etcd 的 raft leader | PD 失去 quorum 時 TSO 停止 | [pd-quorum](../components/tidb.md#pd-quorum)、[role-detection](../components/tidb.md#role-detection) |
+
+**lab 看到的。**3 台停 1 台（`max-peer-down-duration` 40 秒、`max-store-down-time` 1 分鐘）：+33 秒 store Disconnected、+85 秒 Down、+142 秒 down-peer 5 與 pending-peer 5；SQL 讀寫照常（每個 Region 仍有兩個副本）。只有 3 台時 PD 沒有地方補副本，miss-peer 一直是 0。[^tidb-exp-raw]
+
+**和 etcd 不同的陷阱。**PD 的 store／region 狀態只在 PD leader 上有；PD leader 那台抓不到時，用 `etcd_server_is_leader` 當前提的官方規則全部安靜（lab 實測）。etcd 的 quorum 計數可以用 `etcd_network_known_peers` 當成員數，PD 內嵌的 etcd 3.5.15 沒有這個 metric。[^pd-rule-down][^pd-etcd-version]
+
 ## 之後加入的資料庫
 
 | 資料庫 | Raft 的單位 | 要補的段落 |
 |---|---|---|
-| TiKV（TiDB） | 每個 Region 一組；PD 內嵌 etcd | 每節加 Region 層級的 leader、pending peer、snapshot；PD 規則以 `etcd_server_is_leader` 為前提（見 [models](../targets/models.md#tidb)） |
+| TiKV（TiDB） | 每個 Region 一組；PD 內嵌 etcd | 已加在 [TiKV](#tikv)；snapshot 傳送與 Region 層級的 leader 平衡尚未補 |
 | YugabyteDB | 每個 tablet 一組；master 另一組 | leaderless tablet、follower lag |
 | MongoDB | replica set 的選舉協定（Raft 變體） | term、election、oplog 落後 |

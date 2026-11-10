@@ -1,0 +1,564 @@
+id: tidb
+name: TiDB（TiDB server、TiKV、PD；內建 /metrics）
+kind: target
+model: native
+family: database
+status: draft
+stages: [source]
+versions_checked: ["TiDB v8.5.8", "TiKV v8.5.8", "PD v8.5.8（內嵌 etcd v3.5.15）"]
+architecture: architecture/db-distsql.md
+role: >-
+  TiDB 叢集有三種 process，各自在 status port 提供 /metrics：PD（client port 2379，含內嵌 etcd 的 etcd_* metric）、TiKV（20180）、TiDB server（10080）。
+  沒有 exporter 這一層，up 只代表 process 回應了 HTTP。三種元件的「健康端點」都不看自己能不能服務：TiDB 的 /status 只看關機旗標、TiKV 的 /status 一律回空的 200、
+  PD 的 /pd/api/v1/health 一律回 200（lab 實測）。所以每種元件的三方交叉各用不同的健康 metric：PD 用內嵌 etcd 的 /readyz 與 service_member_role，
+  TiKV 用 PD 看到的 store 狀態，TiDB 用 schema lease 是否過期。叢集層的 store／region 狀態只有 PD leader 在算。
+  完整說明見[TiDB 怎麼監控](../targets/tidb.md)，機制見[分散式 SQL 架構](../architecture/db-distsql.md)與[共識（Raft）架構](../architecture/db-raft.md#tikv)。
+
+silent_failures:
+  - text: >-
+      PD 失去 quorum（3 台停 2 台）時，存活那台照常回應 /metrics（200、357KB），up=1；/pd/api/v1/health 仍是 200（只在 JSON 裡把停掉的成員標 health false），
+      /pd/api/v1/ping 200、/livez 200；/health 503 RAFT NO LEADER，/readyz 12 秒逾時。TiDB 的 /status 200、select 1 成功，讀表與寫入 25 秒逾時。
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, pd-h-health, pd-memberlist-nonlinear, pd-checkhealth-url, pd-h-ping, tidb-h-status-health]
+  - text: >-
+      官方 PD 規則都以 (sum(etcd_server_is_leader) by (instance) > 0) 為前提：PD leader 那台抓不到時（PD 本身正常、仍是 leader），store Down 的 PD_cluster_down_tikv_nums 從 firing 變成回傳空，
+      沒有任何規則告訴你叢集狀態看不到了。follower 的 pd_cluster_status 沒有這條 series、pd_regions_status 是 0，拿掉前提改用 max 也只會得到 0。
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, pd-rule-down, pd-sched-metrics-collect, pd-sched-metrics-reset]
+  - text: >-
+      官方 PD_miss_peer_region_count 用 type="miss_peer_region_count"（底線），PD 輸出的是 miss-peer-region-count（連字號）：selector 對到 0 條，這條規則永遠不會響。
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, pd-rule-miss, pd-region-miss-label]
+  - text: >-
+      官方 TiKV_thread_apply_worker_cpu_seconds 用 name="apply_.*"（= 不是 =~）：0 條；thread 名稱是 apply_0、apply_low_0，改成 =~ 後每台 2 條。
+      TiKV_leader_drops 用的 tikv_pd_heartbeat_tick_total、TiDB_monitor_keep_alive 用的 tidb_monitor_keep_alive_total 在 v8.5.8 原始碼與 /metrics 都不存在。
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, tidb-exp-names, tikv-rule-apply, tikv-thread-sanitize, tikv-batch-thread-name, tikv-rule-leader-drops, tidb-rule-keepalive, tidb-keepalive-infoschema]
+  - text: >-
+      官方規則把 job="tidb"、job="pd"、job="tikv" 寫死。job 名稱不同時這些規則回傳空，而且沒有任何官方規則會因為「沒有 target」而響（lab：同一台 TiDB 用另一個 job 名稱抓，
+      TiDB_memory_abnormal 只看得到 job="tidb" 那一條）。
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, tidb-rule-memabnormal, tidb-rule-restart, pd-rule-restart, tikv-rule-restart]
+  - text: >-
+      官方 PD_cluster_down_tikv_nums（emergency）只看 store_down_count：store 停掉後依序是 Disconnected（20 秒）、Unhealthy（10 分鐘）、Down（max-store-down-time，預設 30 分鐘），
+      前 30 分鐘只有 warning 的 lost_connect、unhealthy 規則。lab 把 max-store-down-time 改成 1 分鐘，+33 秒 Disconnected、+85 秒 Down。
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, pd-store-status-order, pd-store-disconnect, pd-store-unhealthy, pd-store-down-default]
+  - text: >-
+      TiKV 很多 metric 是 lazy_static，第一次用到才註冊：tikv_raftstore_log_lag、tikv_critical_error_total、tikv_channel_full_total 在健康的叢集可能完全沒有 series，
+      依賴它們的規則與「metric 消失」的檢查要分開看。
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, tidb-exp-names, tikv-m-loglag, tikv-m-critical]
+  - text: >-
+      TiKV v8.5.8 映像的 binary 帶壓縮的 debug info，啟動時 backtrace-loader 執行緒把它解壓進記憶體（heap profile 量到約 1.9GB，jemalloc allocated 2.35GB）。
+      記憶體上限小的部署裡 RSS 一直貼著上限，TiKV_memory_quota（RSS / quota > 0.8）一直響。
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-heap, tikv-backtrace-loader]
+
+signals:
+  # ---------- 監測自檢（抓取本身） ----------
+  - id: endpoint-up
+    aspect: exporter
+    tier: 1
+    question: 三種元件的 /metrics 都抓得到嗎
+    signal: >-
+      up{job=~"pd|tikv|tidb"} == 0；每個 job 各一條 absent(up{job=...})，job 名稱錯了或服務發現漏掉時會響（官方規則沒有這一層）
+    metrics: [up]
+    evaluate_on: self
+    silent_failure: up 只代表 HTTP；PD 失去 quorum 時存活那台 up=1，TiDB 拿不到 TSO 時 up=1
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp, tidb-exp-raw]
+    upstream: { status: partial, note: "官方只有 blackbox 的 port probe（pingcap/monitoring blacker.rules.yml），沒有 up 與 absent" }
+    rules:
+      - rules/targets/tidb.yml#TiDBComponentEndpointDown
+      - rules/targets/tidb.yml#TiDBPDEndpointMissing
+      - rules/targets/tidb.yml#TiDBTiKVEndpointMissing
+      - rules/targets/tidb.yml#TiDBServerEndpointMissing
+
+  - id: health-second-path
+    aspect: exporter
+    tier: 1
+    question: 抓得到 /metrics，就代表元件能服務嗎
+    signal: >-
+      每種元件三方交叉，probe 的 instance relabel 成和 /metrics target 相同的 host:port。PD：up、blackbox 探內嵌 etcd 的 /readyz、etcd_server_has_leader；
+      TiKV：up、探 /status（只代表 HTTP）、PD 看到的 store 狀態（抓得到的 TiKV 數多於 PD 的 Up store 數）；TiDB：up、探 /status、time() − tidb_domain_lease_expire_time > 0。
+      lab：PD 失去 quorum 時存活那台 up 1、/readyz 0、has_leader 0；TiDB up 1、/status 1、lease 過期 48 秒；PD leader 抓不到時 up 0、/readyz 1
+    metrics: [up, probe_success, etcd_server_has_leader, service_member_role, pd_cluster_status, tidb_domain_lease_expire_time]
+    evaluate_on: self
+    silent_failure: >-
+      /pd/api/v1/health 永遠 200（成員清單用非 linearizable 讀，每台只打空的 /ping），不能當 PD 的健康探測；TiKV /status 永遠空的 200；
+      TiDB /status 只看關機旗標；PD /readyz 沒有 quorum 時逾時（lab 12 秒），blackbox timeout 較短時以逾時失敗
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, pd-h-health, pd-memberlist-nonlinear, pd-h-ping, pd-etcd-readyz-linear, tikv-h-status, tidb-h-status-health, tidb-lease-expire-set]
+    upstream: { status: no, note: "官方只做 TCP／HTTP port probe，不看 /status 以外的健康" }
+    rules:
+      - rules/targets/tidb.yml#TiDBPDReadyzProbeFailing
+      - rules/targets/tidb.yml#TiDBPDServingMetricsButNotReady
+      - rules/targets/tidb.yml#TiDBTiKVStatusProbeFailing
+      - rules/targets/tidb.yml#TiDBTiKVRunningButStoreNotUp
+      - rules/targets/tidb.yml#TiDBStatusProbeFailing
+      - rules/targets/tidb.yml#TiDBStatusOkButSchemaLeaseExpired
+      - rules/targets/tidb.yml#TiDBProbesMissing
+
+  - id: metric-families-present
+    aspect: exporter
+    tier: 1
+    question: 該有的 metric 都還在嗎
+    signal: >-
+      每種元件挑啟動就有的 metric：PD etcd_server_has_leader 與 pd_regions_status；TiKV tikv_raftstore_region_count 與 tikv_engine_write_stall；
+      TiDB tidb_server_connections 與 tidb_domain_lease_expire_time；up == 1 unless 它們。再加 scrape_samples_scraped 比一小時前少一半。
+      lab 名稱數：PD 331、TiKV 437、TiDB 622
+    metrics: [up, etcd_server_has_leader, pd_regions_status, tikv_raftstore_region_count, tikv_engine_write_stall, tidb_server_connections, tidb_domain_lease_expire_time, scrape_samples_scraped]
+    evaluate_on: self
+    silent_failure: TiKV 很多 metric 第一次用到才註冊，「不存在」不一定是壞了，所以只挑啟動就有的
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, tidb-exp-names, tikv-m-loglag]
+    upstream: { status: no }
+    rules: [rules/targets/tidb.yml#TiDBMetricFamiliesMissing, rules/targets/tidb.yml#TiDBSamplesDropped]
+
+  - id: scrape-budget
+    aspect: exporter
+    tier: 2
+    question: Scrape 來得及在期限內完成、內容沒有超過上限嗎
+    signal: >-
+      scrape_duration_seconds 對 scrape_timeout 80%。lab（3 台、約 5 個 region）每台 TiKV 約 1.1MB、13,119 個 sample，region leader 那台 27,249；
+      TiDB 0.93MB、9,182；PD 0.36MB、3,309（leader 4,524）。TiKV 的 sample 數隨 region leader 數成長，sample_limit 要留空間
+    metrics: [scrape_duration_seconds, scrape_samples_scraped]
+    evaluate_on: self
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw]
+    upstream: { status: no }
+    rules: [rules/targets/tidb.yml#TiDBScrapeNearTimeout]
+
+  - id: endpoint-blocking
+    aspect: exporter
+    tier: 2
+    question: 產生 /metrics 時會不會被元件內部的鎖或忙碌卡住
+    signal: >-
+      TiDB 與 PD 的 /metrics 是 promhttp.Handler()；TiKV 的 /metrics 在 status server 執行緒從 registry 輸出，不碰 raftstore 或 RocksDB。
+      lab 輕量寫入時三者 0.02–0.03 秒，TiKV 有一次 9.68 秒（主機時鐘，只出現一次，原因未查）。用 scrape_duration_seconds 看
+    metrics: [scrape_duration_seconds]
+    evaluate_on: self
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, tikv-h-metrics, tikv-h-metrics-dump, dbm-tidb-status-metrics]
+    upstream: { status: no }
+    rules: [rules/targets/tidb.yml#TiDBScrapeNearTimeout]
+
+  # ---------- 叢集 ----------
+  - id: role-detection
+    aspect: cluster
+    tier: 1
+    question: 剛好有一台 PD leader，而且抓得到它嗎
+    signal: >-
+      absent(service_member_role{service="PD"} == 1) for 1m：沒有任何一台以 PD leader 身分被抓到（沒有 leader，或 leader 抓不到）；
+      sum(service_member_role{service="PD"}) > 1 是兩台都認為自己是 leader。用 service_member_role 不用 etcd_server_is_leader：PD leader 由 etcd lease 選出，
+      和 etcd 的 raft leader 是兩件事。lab：PD leader 抓不到時這條 firing，官方規則全部回傳空
+    metrics: [service_member_role, etcd_server_is_leader]
+    evaluate_on: self
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, pd-service-role-1, pd-service-role-0, pd-m-service-role, pd-etcd-leader-priority, pd-rule-down]
+    upstream: { status: no, note: "官方規則把 etcd_server_is_leader 當前提，前提不成立時安靜" }
+    rules: [rules/targets/tidb.yml#TiDBPDLeaderMetricsMissing, rules/targets/tidb.yml#TiDBPDLeaderCountWrong]
+
+  - id: pd-quorum
+    aspect: cluster
+    tier: 1
+    question: PD 還有過半嗎
+    signal: >-
+      /readyz 探測成功的 PD 數 < floor(預期成員數 / 2) + 1。預期數寫在規則檔的 tidb-params（recording rule），因為 PD 內嵌的 etcd 3.5.15 沒有 etcd_network_known_peers。
+      lab：3 台停 2 台時三台的 /readyz 都失敗、TiDBPDQuorumAtRisk firing
+    metrics: [probe_success, etcd_server_has_leader]
+    evaluate_on: self
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, tidb-exp-names, pd-etcd-readyz-linear, pd-etcd-version]
+    upstream: { status: no }
+    rules: [rules/targets/tidb.yml#TiDBPDQuorumAtRisk]
+
+  - id: component-count
+    aspect: cluster
+    tier: 2
+    question: PD／TiKV／TiDB 每種的台數對嗎
+    signal: >-
+      PD 與 TiDB：count by (job) (up == 1) 對 tidb-params 的預期數。TiKV：抓得到的台數對 PD 記得的非 Tombstone store 數（store_up／disconnected／slow／unhealth／down 的總和），
+      不用寫死。lab：TiKV 停一台時 TiDBTiKVNotScraped pending（for 5m 沒等滿）
+    metrics: [up, pd_cluster_status]
+    evaluate_on: self
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, pd-m-cluster-status, pd-store-status-order]
+    upstream: { status: no }
+    rules: [rules/targets/tidb.yml#TiDBComponentCountLow, rules/targets/tidb.yml#TiDBTiKVNotScraped]
+
+  - id: leader-changes
+    aspect: cluster
+    tier: 2
+    question: PD leader 換得太頻繁、或內嵌 etcd 的磁碟太慢嗎
+    signal: >-
+      叢集內 etcd_server_leader_changes_seen_total 最大值 15 分鐘增加 ≥ 3（例子）；內嵌 etcd 的 WAL fsync p99 > 1 秒（官方門檻）。
+      官方 PD_leader_change 用 count(changes(pd_tso_events{type="save"}[10m]) > 0) >= 2，計的是「有幾台 PD 存過 TSO」。lab：停 PD leader 後 29 秒新 leader 就緒，
+      +5 秒的寫入花 8.71 秒（主機時鐘）成功
+    metrics: [etcd_server_leader_changes_seen_total, etcd_disk_wal_fsync_duration_seconds_bucket, pd_tso_events]
+    evaluate_on: self
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, pd-rule-leaderchange, pd-rule-fsync]
+    upstream: { status: yes, note: "PD_leader_change、PD_etcd_write_disk_latency" }
+    rules: [rules/targets/tidb.yml#TiDBPDLeaderChanges, rules/targets/tidb.yml#TiDBPDEtcdWalFsyncSlow]
+
+  - id: region-health
+    aspect: cluster
+    tier: 1
+    question: 有 region 少了副本或副本沒回應嗎
+    signal: >-
+      max by (job) (pd_regions_status{type="down-peer-region-count"}) > 0、miss-peer-region-count > 0、offline-peer-region-count 30 分鐘沒降。
+      type 用連字號。lab：停一台 TiKV（max-peer-down-duration 40s），+142 秒 down-peer 5、pending-peer 5、miss-peer 0（只有 3 台，PD 沒地方補）、undersized 5
+    metrics: [pd_regions_status]
+    evaluate_on: self
+    silent_failure: >-
+      官方 PD_miss_peer_region_count 用底線，永遠回傳空；官方規則以 etcd_server_is_leader 為前提，PD leader 抓不到時全部安靜
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, pd-region-miss-label, pd-region-down-label, pd-rule-miss, pd-rule-downpeer, tikv-max-peer-down, tikv-peer-down-hibernate]
+    upstream: { status: partial, note: "PD_down_peer_region_nums 可用；PD_miss_peer_region_count 的 type 寫錯" }
+    rules:
+      - rules/targets/tidb.yml#TiDBRegionDownPeers
+      - rules/targets/tidb.yml#TiDBRegionMissPeers
+      - rules/targets/tidb.yml#TiDBRegionOfflinePeers
+
+  # ---------- 可用性 ----------
+  - id: store-state
+    aspect: availability
+    tier: 1
+    question: PD 看每台 TiKV 是什麼狀態
+    signal: >-
+      pd_cluster_status{type="store_disconnected_count"}（> 20 秒沒有 heartbeat）、store_unhealth_count（> 10 分鐘）、store_down_count（≥ max-store-down-time，預設 30 分鐘）、
+      store_low_space_count，每個 store 一條（store label）。只有 PD leader 輸出。lab：+33 秒 Disconnected、+85 秒 Down（max-store-down-time 1m）
+    metrics: [pd_cluster_status]
+    evaluate_on: self
+    silent_failure: 官方 emergency 規則只看 store_down_count，預設前 30 分鐘不響
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, pd-store-status-order, pd-store-disconnect, pd-store-unhealthy, pd-store-down-default, pd-rule-down, pd-rule-disconnected]
+    upstream: { status: partial, note: "PD_cluster_down_tikv_nums、lost_connect、unhealthy、low_space，以 etcd_server_is_leader 為前提" }
+    rules:
+      - rules/targets/tidb.yml#TiDBStoreDisconnected
+      - rules/targets/tidb.yml#TiDBStoreDownOrUnhealthy
+      - rules/targets/tidb.yml#TiDBStoreLowSpace
+
+  - id: tso-available
+    aspect: availability
+    tier: 1
+    question: TiDB 拿得到 TSO 嗎
+    signal: >-
+      rate(pd_client_cmd_handle_failed_cmds_duration_seconds_count{job="tidb", type="tso"}[5m]) > 0。拿不到 TSO 時交易無法開始；select 1 不需要 TSO 仍會成功。
+      lab：PD 失去 quorum 時每秒 3.6 次、pdRPC backoff 2 分鐘 394 次；停 PD leader 時也短暫觸發
+    metrics: [pd_client_cmd_handle_failed_cmds_duration_seconds_count, tidb_tikvclient_backoff_seconds_count]
+    evaluate_on: self
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, pdc-m-failed-tso, cg-m-backoff]
+    upstream: { status: no, note: "官方 tidb_tikvclient_backoff_seconds_count 不分 type，10 分鐘 > 10 次" }
+    rules: [rules/targets/tidb.yml#TiDBTsoRequestsFailing]
+
+  # ---------- 複寫 ----------
+  - id: replication-lag
+    aspect: replication
+    tier: 2
+    question: follower 副本跟得上 region leader 嗎
+    signal: >-
+      pd_regions_status{type="pending-peer-region-count"} > 100（官方門檻）；TiKV 的 tikv_raftstore_log_lag p99 > 5000 筆（官方門檻）。
+      log_lag 是 lazy_static，健康時可能沒有 series（lab 有 13 條 bucket）。lab：TiKV 停掉期間 pending-peer 5，回來後 0
+    metrics: [pd_regions_status, tikv_raftstore_log_lag_bucket]
+    evaluate_on: self
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, pd-rule-pending, tikv-rule-loglag, tikv-m-loglag]
+    upstream: { status: yes, note: "PD_pending_peer_region_count、TiKV_raft_log_lag" }
+    rules: [rules/targets/tidb.yml#TiDBRegionPendingPeers, rules/targets/tidb.yml#TiDBRaftLogLag]
+
+  # ---------- 資源與飽和 ----------
+  - id: raftstore-latency
+    aspect: saturation
+    tier: 2
+    question: TiKV 的 raft append、commit、apply 夠快嗎
+    signal: >-
+      tikv_raftstore_append_log_duration_seconds、commit_log、apply_log 的 p99 > 1 秒（append、apply 是官方門檻）；apply 執行緒 CPU > 0.9（name=~"apply_.*"）；
+      raftstore 執行緒用到 80% 以上（例子；官方寫死 1.6 核）
+    metrics: [tikv_raftstore_append_log_duration_seconds_bucket, tikv_raftstore_commit_log_duration_seconds_bucket, tikv_raftstore_apply_log_duration_seconds_bucket, tikv_thread_cpu_seconds_total]
+    evaluate_on: self
+    silent_failure: 官方 apply 執行緒規則用 name="apply_.*"（=），永遠回傳空（lab 實測）
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, tikv-m-append, tikv-m-commit, tikv-m-apply, tikv-rule-apply, tikv-rule-append, tikv-rule-raftstore-cpu, tikv-thread-sanitize]
+    upstream: { status: partial, note: "TiKV_raft_append_log_duration_secs、apply_log 可用；apply 執行緒那條 matcher 寫錯" }
+    rules:
+      - rules/targets/tidb.yml#TiKVRaftAppendSlow
+      - rules/targets/tidb.yml#TiKVRaftCommitSlow
+      - rules/targets/tidb.yml#TiKVRaftApplySlow
+      - rules/targets/tidb.yml#TiKVApplyThreadBusy
+      - rules/targets/tidb.yml#TiKVRaftstoreThreadBusy
+
+  - id: write-stall
+    aspect: saturation
+    tier: 1
+    question: RocksDB 有 write stall 嗎
+    signal: max_over_time(tikv_engine_write_stall{type="write_stall_max"}[5m]) > 0；L0 檔案或待 compaction 的量太多時寫入被減速或停止。lab 沒有觸發
+    metrics: [tikv_engine_write_stall]
+    evaluate_on: self
+    evidence: code
+    source: tidb-tikv
+    refs: [tikv-m-write-stall, tikv-rule-stall, dbm-tikv-rules-stall]
+    upstream: { status: yes, note: "TiKV_write_stall：delta(tikv_engine_write_stall[10m]) > 0" }
+    rules: [rules/targets/tidb.yml#TiKVWriteStall]
+
+  - id: server-busy
+    aspect: saturation
+    tier: 2
+    question: TiKV 忙到拒絕請求嗎
+    signal: >-
+      TiDB 端 rate(tidb_tikvclient_region_err_total{type="server_is_busy"}[5m]) > 1（例子）：scheduler 待寫入量超過門檻（SchedTooBusy）、write stall、read pool 滿都會讓 TiKV 回 ServerIsBusy；
+      TiKV 端 scheduler latch 等待 p99 > 1 秒（官方門檻）是同一批 key 排隊。lab 沒有觸發
+    metrics: [tidb_tikvclient_region_err_total, tikv_scheduler_latch_wait_duration_seconds_bucket]
+    evaluate_on: self
+    evidence: code
+    source: tidb-tikv
+    refs: [tikv-sched-too-busy, cg-server-busy-label, cg-m-region-err]
+    upstream: { status: partial, note: "TiDB_tikvclient_region_err_total 不分 type（10 分鐘 > 6000）；TiKV_scheduler_latch_wait_duration_seconds" }
+    rules: [rules/targets/tidb.yml#TiKVServerBusy, rules/targets/tidb.yml#TiKVSchedulerLatchWaitSlow]
+
+  - id: memory-quota
+    aspect: saturation
+    tier: 2
+    question: TiKV、TiDB 的記憶體離上限多遠
+    signal: >-
+      process_resident_memory_bytes / tikv_server_memory_quota_bytes（或 tidb_server_memory_quota_bytes）> 0.8（官方門檻）。TiDB 超過 tidb_server_memory_limit（預設 80%）時
+      取消最耗記憶體的 SQL，只寫 log、沒有計數 metric；單條 SQL 超過 tidb_mem_quota_query（1GB）時依 tidb_mem_oom_action（CANCEL）。
+      lab：TiKV 映像未去 debug info 時 RSS 貼著 1GB 上限（啟動時解壓 debug info）
+    metrics: [process_resident_memory_bytes, tikv_server_memory_quota_bytes, tidb_server_memory_quota_bytes]
+    evaluate_on: self
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-heap, tidb-exp-raw, tikv-m-memquota, tidb-m-memquota, tidb-var-memlimit, tidb-var-oom-action, tidb-memlimit-kill, tikv-rule-memquota, tidb-rule-memquota]
+    upstream: { status: yes, note: "TiKV_memory_quota、TiDB_memory_quota（job 寫死）" }
+    rules: [rules/targets/tidb.yml#TiDBComponentMemoryNearQuota]
+
+  - id: tso-wait
+    aspect: saturation
+    tier: 2
+    question: 等 TSO 等很久嗎
+    signal: >-
+      pd_client_cmd_handle_cmds_duration_seconds{type="wait"} p99 > 0.1 秒（例子）。官方 PD_tidb_handle_requests_duration 看 pd_client_request_handle_requests_duration_seconds{type="tso"} p99 > 0.1 秒。
+      lab：PD 恢復後 TiDBTsoWaitSlow pending
+    metrics: [pd_client_cmd_handle_cmds_duration_seconds_bucket, pd_client_request_handle_requests_duration_seconds_bucket]
+    evaluate_on: self
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, pdc-m-cmd-duration, pdc-m-wait, pd-rule-tso]
+    upstream: { status: yes, note: "PD_tidb_handle_requests_duration（在 pd.rules.yml，評估的是 TiDB 的 metric）" }
+    rules: [rules/targets/tidb.yml#TiDBTsoWaitSlow]
+
+  # ---------- 工作量 ----------
+  - id: query-errors
+    aspect: workload
+    tier: 2
+    question: 語句失敗的比例高嗎
+    signal: >-
+      tidb_server_query_total{result="Error"} 占比 > 5%（例子）；錯誤種類看 tidb_server_execute_error_total{type}（RFC code，例如 kv:9007）。
+      lab：PD 換 leader 與失去 quorum 後 firing
+    metrics: [tidb_server_query_total, tidb_server_execute_error_total]
+    evaluate_on: self
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, tidb-m-query-total, tidb-m-execute-error, tidb-m-execute-error-label]
+    upstream: { status: no }
+    rules: [rules/targets/tidb.yml#TiDBQueryErrorRate]
+
+  - id: query-latency
+    aspect: workload
+    tier: 3
+    question: 語句慢嗎
+    signal: tidb_server_handle_query_duration_seconds p99 > 1 秒（官方門檻）。lab：PD 失去 quorum 後官方 TiDB_query_duration firing
+    metrics: [tidb_server_handle_query_duration_seconds_bucket]
+    evaluate_on: self
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, tidb-m-handle-query, dbm-tidb-rules-query]
+    upstream: { status: yes, note: "TiDB_query_duration" }
+    rules: [rules/targets/tidb.yml#TiDBQueryLatencyHigh]
+
+  - id: slow-queries
+    aspect: workload
+    tier: 3
+    question: 慢查詢多嗎
+    signal: >-
+      increase(tidb_server_slow_query_process_duration_seconds_count[10m]) > 100（例子）；只記超過 tidb_slow_log_threshold（預設 300ms）的語句。
+      內容看 slow query log 或 INFORMATION_SCHEMA.SLOW_QUERY、statements_summary
+    metrics: [tidb_server_slow_query_process_duration_seconds_count]
+    evaluate_on: self
+    evidence: code
+    source: tidb-server
+    refs: [tidb-m-slow-query]
+    upstream: { status: no }
+    rules: [rules/targets/tidb.yml#TiDBSlowQueries]
+
+  - id: connections
+    aspect: workload
+    tier: 2
+    question: 連線數與同時執行的語句接近上限嗎
+    signal: >-
+      tidb_server_tokens > 900（token-limit 預設 1000）；tidb_server_connections 對 max-server-connections（預設 0，不限制）。TiDB 是無狀態的，連線分散在多台 TiDB 上
+    metrics: [tidb_server_tokens, tidb_server_connections]
+    evaluate_on: self
+    evidence: code
+    source: tidb-server
+    refs: [tidb-m-tokens, tidb-m-connections, tidb-cfg-token-limit, tidb-cfg-max-conn]
+    upstream: { status: no }
+    rules: [rules/targets/tidb.yml#TiDBTokensNearLimit]
+
+  - id: txn-conflicts
+    aspect: workload
+    tier: 2
+    question: 交易衝突或 backoff 多嗎
+    signal: >-
+      依 type 分的 rate(tidb_tikvclient_backoff_seconds_count[5m]) > 10（例子）：txnLock／txnLockFast 是鎖衝突，regionMiss／updateLeader 是 region 搬動，pdRPC／tikvRPC 是連不到；
+      write conflict（kv:9007）另計。官方規則不分 type，lab 的 PD 換 leader、失去 quorum 都讓它 firing
+    metrics: [tidb_tikvclient_backoff_seconds_count, tidb_server_execute_error_total]
+    evaluate_on: self
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, cg-m-backoff, tidb-rule-backoff, tidb-m-execute-error-label]
+    upstream: { status: partial, note: "tidb_tikvclient_backoff_seconds_count：increase[10m] > 10，不分 type" }
+    rules: [rules/targets/tidb.yml#TiDBTxnBackoffHigh, rules/targets/tidb.yml#TiDBWriteConflicts]
+
+  - id: critical-errors
+    aspect: workload
+    tier: 2
+    question: 有 panic 或 critical error 嗎
+    signal: >-
+      increase(tidb_server_panic_total、tidb_server_critical_error_total、tikv_critical_error_total[10m]) > 0。後兩者第一次發生才有 series（lab：tikv_critical_error_total 0 條）
+    metrics: [tidb_server_panic_total, tidb_server_critical_error_total, tikv_critical_error_total]
+    evaluate_on: self
+    evidence: tested
+    source: tidb-lab
+    refs: [tidb-exp-raw, tikv-m-critical]
+    upstream: { status: yes, note: "TiDB_server_panic_total、TiDB_binlog_error_total、TiKV_critical_error" }
+    rules: [rules/targets/tidb.yml#TiDBCriticalErrors]
+
+  # ---------- 資料維護 ----------
+  - id: gc-progress
+    aspect: maintenance
+    tier: 3
+    question: GC safe point 有在前進嗎
+    signal: >-
+      time() − pd_gc_gc_safepoint / 2^18 / 1000 > 3 小時（例子），或這條 gauge 不存在（PD 第一次收到 safe point 才出現；lab 約 11 分鐘內沒有出現）；
+      執行中交易超過 1 小時（tidb_executor_ongoing_txn_duration_seconds）；官方 TiKV_GC_can_not_work（一天內沒有 GC 但有 compaction）。
+      tidb_gc_life_time 預設 10 分鐘
+    metrics: [pd_gc_gc_safepoint, tidb_executor_ongoing_txn_duration_seconds_bucket, tikv_gcworker_gc_tasks_vec, tidb_tikvclient_gc_config]
+    evaluate_on: self
+    evidence: code
+    source: tidb-pd
+    refs: [pd-gc-safepoint, tidb-gc-lifetime-default, tidb-gc-config-gauge, tidb-gc-run-job, tidb-m-ongoing-txn, tikv-rule-gc, tikv-m-autogc-sp]
+    upstream: { status: partial, note: "TiKV_GC_can_not_work（看 TiKV 有沒有做 GC，不看 safe point）" }
+    rules: [rules/targets/tidb.yml#TiDBGcSafePointStale, rules/targets/tidb.yml#TiDBLongRunningTxn, rules/targets/tidb.yml#TiKVGcNotRunning]
+
+  - id: ddl-and-stats
+    aspect: maintenance
+    tier: 3
+    question: DDL 排隊或統計資訊更新失敗嗎
+    signal: tidb_ddl_waiting_jobs > 5（官方門檻）；tidb_statistics_auto_analyze_total{type="failed"} 增加
+    metrics: [tidb_ddl_waiting_jobs, tidb_statistics_auto_analyze_total]
+    evaluate_on: self
+    evidence: upstream
+    source: tidb-rules
+    refs: [tidb-rule-ddl, tidb-rule-analyze]
+    upstream: { status: yes, note: "TiDB_ddl_waiting_jobs、TiDB_auto_analyze_failed" }
+    rules: [rules/targets/tidb.yml#TiDBDdlJobsWaiting, rules/targets/tidb.yml#TiDBAutoAnalyzeFailed]
+
+  # ---------- 資料保護 ----------
+  - id: log-backup
+    aspect: protection
+    tier: 3
+    question: log backup（PITR）的 checkpoint 跟得上嗎
+    signal: >-
+      time() − tidb_log_backup_last_checkpoint{task} / 2^18 / 1000 > 600（例子）；checkpoint 是 TSO。只在有 log backup task 時存在；全量 BR 備份沒有 metric（見盲點）。lab 沒有做
+    metrics: [tidb_log_backup_last_checkpoint]
+    evaluate_on: self
+    evidence: code
+    source: tidb-server
+    refs: [tidb-logbackup-checkpoint]
+    upstream: { status: no }
+    rules: [rules/targets/tidb.yml#TiDBLogBackupCheckpointLagging]
+
+  # ---------- 容量 ----------
+  - id: storage-space
+    aspect: capacity
+    tier: 2
+    question: 每台 TiKV 與整個叢集的空間夠嗎
+    signal: >-
+      tikv_store_size_bytes{type="available"} / capacity < 0.2（官方門檻）；PD 的 storage_size / storage_capacity > 0.8（官方門檻）。
+      store 已用超過 low-space-ratio 時 PD 不再往它搬 region（store_low_space_count，見 store-state）
+    metrics: [tikv_store_size_bytes, pd_cluster_status]
+    evaluate_on: self
+    evidence: upstream
+    source: tidb-rules
+    refs: [tikv-m-store-size, pd-m-cluster-status]
+    upstream: { status: yes, note: "TiKV_low_space、TiKV_space_used_more_than_80%" }
+    rules: [rules/targets/tidb.yml#TiKVStoreLowSpace, rules/targets/tidb.yml#TiDBClusterSpaceHigh]
+
+# 目前無法監控的範圍。category：exporter（native 模型下指「元件有這個資訊、/metrics 沒輸出」）、database（資料庫本身沒提供）、other（要靠其他元件）。
+blind_spots:
+  - what: 全量備份（BR）的新鮮度與可還原性
+    category: other
+    why: BR 是外部工具，全量備份沒有常駐的 metric；只有 log backup 有 checkpoint
+    workaround: 備份工作成功後寫 textfile metric 給 node_exporter；定期還原演練
+    section: targets/tidb.md#protection
+  - what: SQL 層是否真的能執行交易（端到端）
+    category: database
+    why: TiDB /status 不看 PD 與 TiKV；select 1 不需要 TSO，PD 失去 quorum 時仍成功（lab）
+    workaround: 外部 SQL probe 定期在測試表做一次寫入與讀取（例如 query-exporter 或 blackbox 之外的 SQL probe），對失敗告警
+    section: targets/tidb.md#health-second-path
+  - what: 哪一條 SQL 造成負載（statements_summary、slow query、Top SQL）
+    category: exporter
+    why: /metrics 只有彙總；語句層要查 INFORMATION_SCHEMA 或 TiDB Dashboard，Top SQL 要 ng-monitoring
+    workaround: query-exporter 彙總 statements_summary 後輸出（未實測）
+    section: targets/tidb.md#workload
+  - what: 熱點 region
+    category: exporter
+    why: PD 有 hot region 統計（pd_hotspot_*、pd_hotcache_status），沒有做成規則；門檻依負載而定
+    workaround: 用 server-busy 與 raftstore-latency 當下游訊號；PD 的 hot region API
+    section: targets/tidb.md#saturation
+  - what: TiFlash、TiCDC、TiProxy
+    category: other
+    why: 不在這次範圍；各自有 /metrics 與官方規則（TiCDC changefeed 停住也會擋住 GC safe point）
+    workaround: 用到時另做卡片；至少把它們的 up 與 absent 加上
+    section: targets/tidb.md#blind-spots
+  - what: TLS 憑證到期
+    category: database
+    why: 三種元件的 /metrics 都沒有憑證到期的 metric（讀碼：metric 名稱沒有 cert、tls、expir）
+    workaround: blackbox 的 tls module 探各 port 的 probe_ssl_earliest_cert_expiry
+    section: targets/tidb.md#blind-spots
+  - what: PD leader 抓不到時的叢集狀態
+    category: exporter
+    why: store／region 狀態只有 PD leader 算，follower 沒有可替代的值
+    workaround: TiDBPDLeaderMetricsMissing 讓「看不到」本身會響；必要時用 pd-ctl 或 /pd/api/v1/stores 查
+    section: targets/tidb.md#cluster
+  - what: 時鐘偏移
+    category: database
+    why: PD 只在 leader 的系統時間往回跳時記 pd_tso_events{type="system_time_slow"}；TiKV、TiDB 之間的時鐘差沒有 metric
+    workaround: node_exporter 的 node_timex_offset_seconds
+    section: targets/tidb.md#blind-spots

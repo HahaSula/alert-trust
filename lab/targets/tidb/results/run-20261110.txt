@@ -1,0 +1,783 @@
+環境：TiDB v8.5.8（PD ×3、TiKV ×3、TiDB ×1）、Prometheus v3.13.5（scrape 5s）、blackbox_exporter v0.27.0（timeout 4s）
+PD schedule.max-store-down-time=1m（預設 30m）；TiKV raftstore.max-peer-down-duration=40s（預設 10m）；其餘預設。主機記憶體：
+               total        used        free      shared  buff/cache   available
+Mem:           15953        3753        9276          55        3199       12199
+at-tidb-tidb-1 196.5MiB / 768MiB
+at-tidb-tikv3-1 183.2MiB / 640MiB
+at-tidb-tikv2-1 165MiB / 640MiB
+at-tidb-tikv1-1 163.8MiB / 640MiB
+at-tidb-client-1 508KiB / 128MiB
+at-tidb-pd3-1 70.21MiB / 256MiB
+at-tidb-prometheus-1 232.1MiB / 512MiB
+at-tidb-pd2-1 88.91MiB / 256MiB
+at-tidb-pd1-1 70.88MiB / 256MiB
+at-tidb-blackbox-1 16.19MiB / 64MiB
+
+## A 基線：端點、metric 由誰輸出（08:20:05）
+  PD leader（/pd/api/v1/leader）：pd2
+  > scrape_samples_scraped{job=~"pd|tikv|tidb"}  →  7 series
+    {__name__="scrape_samples_scraped", instance="tikv1:20180", job="tikv"} 13119
+    {__name__="scrape_samples_scraped", instance="tikv3:20180", job="tikv"} 27249
+    {__name__="scrape_samples_scraped", instance="tidb:10080", job="tidb"} 9182
+    {__name__="scrape_samples_scraped", instance="pd3:2379", job="pd"} 3308
+    {__name__="scrape_samples_scraped", instance="pd1:2379", job="pd"} 3309
+    {__name__="scrape_samples_scraped", instance="tikv2:20180", job="tikv"} 13119
+    {__name__="scrape_samples_scraped", instance="pd2:2379", job="pd"} 4524
+  > scrape_response_size_bytes{job=~"pd|tikv|tidb"}  →  0 series
+  > scrape_duration_seconds{job=~"pd|tikv|tidb"}  →  7 series
+    {__name__="scrape_duration_seconds", instance="tikv1:20180", job="tikv"} 0.035836966
+    {__name__="scrape_duration_seconds", instance="tikv3:20180", job="tikv"} 0.069551021
+    {__name__="scrape_duration_seconds", instance="tidb:10080", job="tidb"} 0.018623304
+    {__name__="scrape_duration_seconds", instance="pd3:2379", job="pd"} 0.008761058
+    {__name__="scrape_duration_seconds", instance="pd1:2379", job="pd"} 0.008598315
+    {__name__="scrape_duration_seconds", instance="tikv2:20180", job="tikv"} 0.051842319
+    {__name__="scrape_duration_seconds", instance="pd2:2379", job="pd"} 0.012470077
+  pd /metrics 的 metric 名稱 331 個
+  tikv /metrics 的 metric 名稱 437 個
+  tidb /metrics 的 metric 名稱 622 個
+  GET :29002/health → 200 29B 0.02s {"health":"true","reason":""}
+  GET :29002/readyz → 200 3B 0.02s ok 
+  GET :29002/livez → 200 3B 0.02s ok 
+  GET :29002/pd/api/v1/health → 200 415B 0.02s [   {     "name": "pd2",     "member_id": 3486081234046183923,     "client_urls": [       "http://pd2:2379"     ],     "health": true   },   {     "name": "pd3",     "member_id": 4276097428945878878, 
+  GET :29002/pd/api/v1/ping → 200 0B 0.02s 
+  GET :29002/pd/api/v1/leader → 200 146B 0.02s {   "name": "pd2",   "member_id": 3486081234046183923,   "peer_urls": [     "http://pd2:2380"   ],   "client_urls": [     "http://pd2:2379"   ] } 
+  GET :29011/status → 200 0B 0.02s 
+  GET :29011/health → 404 14B 0.02s path not found
+  GET :29080/status → 200 141B 0.02s {"connections":0,"version":"8.0.11-TiDB-v8.5.8","git_hash":"8b857efa20363d50a8fa2ea7dd9809a85a61b115","status":{"init_stats_percentage":100}}
+  GET :29080/health → 404 19B 0.02s 404 page not found 
+  PD 的叢集 metric 由哪台輸出：
+  > count by (instance) (pd_cluster_status{job="pd"})  →  1 series
+    {instance="pd2:2379"} 54
+  > count by (instance) (pd_regions_status{job="pd"})  →  3 series
+    {instance="pd3:2379"} 10
+    {instance="pd1:2379"} 10
+    {instance="pd2:2379"} 10
+  > etcd_server_is_leader{job="pd"}  →  3 series
+    {__name__="etcd_server_is_leader", instance="pd3:2379", job="pd"} 0
+    {__name__="etcd_server_is_leader", instance="pd1:2379", job="pd"} 0
+    {__name__="etcd_server_is_leader", instance="pd2:2379", job="pd"} 1
+    store 2 tikv1:20160 state_name=Up last_heartbeat=2026-11-10T00:20:01.756096359Z leaders=0 regions=5
+    store 1 tikv3:20160 state_name=Up last_heartbeat=2026-11-10T00:20:01.742431613Z leaders=5 regions=5
+    store 3 tikv2:20160 state_name=Up last_heartbeat=2026-11-10T00:20:01.764221093Z leaders=0 regions=5
+  > tidb_server_memory_quota_bytes{job="tidb"}  →  1 series
+    {__name__="tidb_server_memory_quota_bytes", instance="tidb:10080", job="tidb"} 805306368
+  > tikv_server_memory_quota_bytes{job="tikv"}  →  3 series
+    {__name__="tikv_server_memory_quota_bytes", instance="tikv1:20180", job="tikv"} 671088640
+    {__name__="tikv_server_memory_quota_bytes", instance="tikv3:20180", job="tikv"} 671088640
+    {__name__="tikv_server_memory_quota_bytes", instance="tikv2:20180", job="tikv"} 671088640
+  > process_resident_memory_bytes{job=~"tikv|tidb|pd"}  →  7 series
+    {__name__="process_resident_memory_bytes", instance="tikv1:20180", job="tikv"} 260853760
+    {__name__="process_resident_memory_bytes", instance="tikv3:20180", job="tikv"} 284774400
+    {__name__="process_resident_memory_bytes", instance="pd3:2379", job="pd"} 138432512
+    {__name__="process_resident_memory_bytes", instance="pd1:2379", job="pd"} 140013568
+    {__name__="process_resident_memory_bytes", instance="tikv2:20180", job="tikv"} 260976640
+    {__name__="process_resident_memory_bytes", instance="pd2:2379", job="pd"} 162770944
+    {__name__="process_resident_memory_bytes", instance="tidb:10080", job="tidb"} 324194304
+
+## A2 官方規則：三個問題與 selector 稽核（08:20:07）
+  (a) TiKV_thread_apply_worker_cpu_seconds：name="apply_.*"（=）對 name=~"apply_.*"（=~）
+  > tikv_thread_cpu_seconds_total{name="apply_.*"}  →  0 series
+  > count by (instance) (tikv_thread_cpu_seconds_total{name=~"apply_.*"})  →  3 series
+    {instance="tikv1:20180"} 2
+    {instance="tikv3:20180"} 2
+    {instance="tikv2:20180"} 2
+  > max(rate(tikv_thread_cpu_seconds_total{name="apply_.*"}[1m])) by (instance)  →  0 series
+  > max(rate(tikv_thread_cpu_seconds_total{name=~"apply_.*"}[1m])) by (instance)  →  3 series
+    {instance="tikv1:20180"} 0
+    {instance="tikv3:20180"} 0
+    {instance="tikv2:20180"} 0
+  (b) job="tidb" 寫死：同一個 TiDB 用另一個 job 名稱（tidb-other-name）抓
+  > up{job=~"tidb.*"}  →  4 series
+    {__name__="up", instance="tidb:10080", job="tidb-status"} 1
+    {__name__="up", instance="tidb:10080", job="tidb"} 1
+    {__name__="up", instance="tidb:10080", job="tidb-other-name"} 1
+    {__name__="up", instance="tidb:10080", job="tidb-sql"} 1
+  > changes(process_start_time_seconds{job="tidb"}[5m]) >= 0  →  1 series
+    {instance="tidb:10080", job="tidb"} 2
+  > go_memstats_heap_inuse_bytes{job="tidb"}  →  1 series
+    {__name__="go_memstats_heap_inuse_bytes", instance="tidb:10080", job="tidb"} 115048448
+  > go_memstats_heap_inuse_bytes  →  5 series
+    {__name__="go_memstats_heap_inuse_bytes", instance="tidb:10080", job="tidb-other-name"} 118308864
+    {__name__="go_memstats_heap_inuse_bytes", instance="pd3:2379", job="pd"} 69369856
+    {__name__="go_memstats_heap_inuse_bytes", instance="pd1:2379", job="pd"} 72572928
+    {__name__="go_memstats_heap_inuse_bytes", instance="pd2:2379", job="pd"} 87261184
+    {__name__="go_memstats_heap_inuse_bytes", instance="tidb:10080", job="tidb"} 115048448
+  (d) PD_miss_peer_region_count 的 type：底線對連字號
+  > count(pd_regions_status{type="miss_peer_region_count"})  →  0 series
+  > count(pd_regions_status{type="miss-peer-region-count"})  →  1 series
+    {} 3
+  官方規則每個 selector 對到的 series 數（0 代表那條規則一定回傳空；TiKV 有些 metric 第一次用到才註冊）：
+  [pd.rules.yml]
+    ok   PD_cluster_down_tikv_nums: pd_cluster_status{type="store_down_count"}=3; etcd_server_is_leader=3
+    ok   PD_etcd_write_disk_latency: etcd_disk_wal_fsync_duration_seconds_bucket=45
+    ZERO PD_miss_peer_region_count: pd_regions_status{type="miss_peer_region_count"}=0; etcd_server_is_leader=3
+    ok   PD_cluster_lost_connect_tikv_nums: pd_cluster_status{type="store_disconnected_count"}=3; etcd_server_is_leader=3
+    ok   PD_cluster_unhealthy_tikv_nums: pd_cluster_status{type="store_unhealth_count"}=3; etcd_server_is_leader=3
+    ok   PD_cluster_low_space: pd_cluster_status{type="store_low_space_count"}=3; etcd_server_is_leader=3
+    ok   PD_etcd_network_peer_latency: etcd_network_peer_round_trip_time_seconds_bucket=102
+    ok   PD_tidb_handle_requests_duration: pd_client_request_handle_requests_duration_seconds_bucket{type="tso"}=28
+    ok   PD_down_peer_region_nums: pd_regions_status{type="down-peer-region-count"}=3; etcd_server_is_leader=3
+    ok   PD_pending_peer_region_count: pd_regions_status{type="pending-peer-region-count"}=3; etcd_server_is_leader=3
+    ok   PD_leader_change: pd_tso_events{type="save"}=3
+    ok   TiKV_space_used_more_than_80%: pd_cluster_status{type="storage_size"}=3; pd_cluster_status{type="storage_capacity"}=3
+    ok   PD_system_time_slow: pd_tso_events{type="system_time_slow"}=3
+    ZERO PD_no_store_for_making_replica: pd_checker_event_count{type="replica_checker", name="no_target_store"}=0
+    ok   PD_node_restart: process_start_time_seconds{job="pd"}=3
+    ok   PD_cluster_slow_tikv_nums: pd_cluster_status{type="store_slow_count"}=3; etcd_server_is_leader=3
+    ok   PD_cpu_quota: process_cpu_seconds_total{job="pd"}=3; pd_service_maxprocs=3
+    ok   PD_memory_quota: process_resident_memory_bytes{job="pd"}=3; pd_service_memory_quota_bytes=3
+  [tikv.rules.yml]
+    ZERO TiKV_critical_error: tikv_critical_error_total=0
+    ok   TiKV_memory_used_too_fast: process_resident_memory_bytes{job=~"tikv",instance=~".*"}=3
+    ZERO TiKV_GC_can_not_work: tikv_gcworker_gc_tasks_vec{task="gc"}=0; tikv_engine_event_total{db="kv", cf="write", type="compaction"}=0; tikv_gc_compaction_filter_perform=0
+    ZERO TiKV_server_report_failure_msg_total: tikv_server_report_failure_msg_total{type="unreachable"}=0
+    ZERO TiKV_channel_full_total: tikv_channel_full_total=0
+    ok   TiKV_write_stall: tikv_engine_write_stall=18
+    ok   TiKV_raft_log_lag: tikv_raftstore_log_lag_bucket=13
+    ok   TiKV_async_request_snapshot_duration_seconds: tikv_storage_engine_async_request_duration_seconds_bucket{type="snapshot"}=33
+    ok   TiKV_async_request_write_duration_seconds: tikv_storage_engine_async_request_duration_seconds_bucket{type="write"}=33
+    ok   TiKV_coprocessor_request_wait_seconds: tikv_coprocessor_request_wait_seconds_bucket{type="all"}=270
+    ok   TiKV_raftstore_thread_cpu_seconds_total: tikv_thread_cpu_seconds_total{name=~"(raftstore|rs)_.*"}=3
+    ok   TiKV_raft_append_log_duration_secs: tikv_raftstore_append_log_duration_seconds_bucket=81
+    ok   TiKV_raft_apply_log_duration_secs: tikv_raftstore_apply_log_duration_seconds_bucket=81
+    ok   TiKV_scheduler_latch_wait_duration_seconds: tikv_scheduler_latch_wait_duration_seconds_bucket=1161
+    ZERO TiKV_thread_apply_worker_cpu_seconds: tikv_thread_cpu_seconds_total{name="apply_.*"}=0
+    ZERO TiDB_tikvclient_gc_action_fail: tidb_tikvclient_gc_action_result{type="fail"}=0
+    ZERO TiKV_leader_drops: tikv_pd_heartbeat_tick_total{type="leader"}=0
+    ok   TiKV_raft_process_ready_duration_secs: tikv_raftstore_raft_process_duration_secs_bucket{type='ready'}=81
+    ZERO TiKV_raft_process_tick_duration_secs: tikv_raftstore_raft_process_duration_secs_bucket{type='tick'}=0
+    ok   TiKV_scheduler_context_total: tikv_scheduler_contex_total=1
+    ok   TiKV_scheduler_command_duration_seconds: tikv_scheduler_command_duration_seconds_bucket=1161
+    ZERO TiKV_coprocessor_pending_request: tikv_coprocessor_pending_request=0
+    ZERO TiKV_coprocessor_cpu_util: tikv_thread_cpu_seconds_total{name=~"cop_.*"}=0
+    ok   TiKV_pending_task: tikv_worker_pending_task_total=84
+    ok   TiKV_low_space: tikv_store_size_bytes{type="available"}=3; tikv_store_size_bytes{type="capacity"}=3
+    ok   TiKV_approximate_region_size: tikv_raftstore_region_size_bucket=21
+    ok   TiKV_node_restart: process_start_time_seconds{job="tikv"}=3
+    ok   TiKV_cpu_quota: process_cpu_seconds_total{job="tikv"}=3; tikv_server_cpu_cores_quota=3
+    ok   TiKV_memory_quota: process_resident_memory_bytes{job="tikv"}=3; tikv_server_memory_quota_bytes=3
+  [tidb.rules.yml]
+    ZERO TiDB_schema_error: tidb_session_schema_lease_error_total{type="outdated"}=0
+    ok   TiDB_tikvclient_region_err_total: tidb_tikvclient_region_err_total=2
+    ok   TiDB_binlog_error_total: tidb_server_critical_error_total=2
+    ZERO TiDB_domain_load_schema_total: tidb_domain_load_schema_total{type="failed"}=0
+    ZERO TiDB_auto_analyze_failed: tidb_statistics_auto_analyze_total{type="failed"}=0
+    ZERO TiDB_monitor_keep_alive: tidb_monitor_keep_alive_total{job="tidb"}=0
+    ZERO TiDB_server_panic_total: tidb_server_panic_total=0
+    ok   TiDB_memory_abnormal: go_memstats_heap_inuse_bytes{job="tidb"}=1
+    ok   TiDB_query_duration: tidb_server_handle_query_duration_seconds_bucket=60
+    ZERO TiDB_server_event_error: tidb_server_event_total{type=~"server_start|server_hang"}=0
+    ok   tidb_tikvclient_backoff_seconds_count: tidb_tikvclient_backoff_seconds_count=26
+    ok   TiDB_monitor_time_jump_back_error: tidb_monitor_time_jump_back_total=2
+    ok   TiDB_ddl_waiting_jobs: tidb_ddl_waiting_jobs=6
+    ok   TiDB_node_restart: process_start_time_seconds{job="tidb"}=1
+    ok   TiDB_cpu_quota: process_cpu_seconds_total{job="tidb"}=1; tidb_server_maxprocs=2
+    ok   TiDB_memory_quota: process_resident_memory_bytes{job="tidb"}=1; tidb_server_memory_quota_bytes=2
+
+## B 輕量寫入與 /metrics 耗時（08:20:08）
+  SQL create table if not exists test.t (id int primary key auto_increment, v varchar(200)) rc=0 0.23s  
+  SQL insert into test.t (v) values (repeat('x',200))         rc=0 0.17s  
+  SQL select count(*) from test.t                             rc=0 0.17s 1024 
+  GET :29011/metrics → 200 1101626B 0.03s # HELP process_c
+  GET :29080/metrics → 200 929185B 0.03s # HELP br_raw_bac
+  GET :29001/metrics → 200 356182B 0.02s # HELP etcd_clust
+  GET :29011/metrics → 200 1101628B 0.03s # HELP process_c
+  GET :29080/metrics → 200 929197B 0.03s # HELP br_raw_bac
+  GET :29001/metrics → 200 356170B 0.02s # HELP etcd_clust
+  GET :29011/metrics → 200 1101644B 9.68s # HELP process_c
+  GET :29080/metrics → 200 929206B 0.03s # HELP br_raw_bac
+  GET :29001/metrics → 200 356172B 0.02s # HELP etcd_clust
+
+## C 停掉 1 台 TiKV（docker kill tikv3）（08:20:13）
+  +33s
+    store 2 tikv1:20160 state_name=Up last_heartbeat=2026-11-10T00:20:40.31635325Z leaders=2 regions=5
+    store 1 tikv3:20160 state_name=Disconnected last_heartbeat=2026-11-10T00:20:03.132256938Z leaders=0 regions=5
+    store 3 tikv2:20160 state_name=Up last_heartbeat=2026-11-10T00:20:40.317255272Z leaders=3 regions=5
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"pd|tikv|tidb"}  →  7 series
+    {__name__="up", instance="tikv1:20180", job="tikv"} 1
+    {__name__="up", instance="tikv3:20180", job="tikv"} 0
+    {__name__="up", instance="tidb:10080", job="tidb"} 1
+    {__name__="up", instance="pd3:2379", job="pd"} 1
+    {__name__="up", instance="pd1:2379", job="pd"} 1
+    {__name__="up", instance="tikv2:20180", job="tikv"} 1
+    {__name__="up", instance="pd2:2379", job="pd"} 1
+  > probe_success{job=~"pd-readyz|pd-health|pd-ping|pd-leader-api|tikv-status|tidb-status|tidb-sql"}  →  17 series
+    {__name__="probe_success", instance="tidb:10080", job="tidb-status"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-leader-api"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-leader-api"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-readyz"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-health"} 1
+    {__name__="probe_success", instance="tikv1:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-readyz"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-health"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-ping"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-readyz"} 1
+    {__name__="probe_success", instance="tikv3:20180", job="tikv-status"} 0
+    {__name__="probe_success", instance="pd2:2379", job="pd-health"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-ping"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-ping"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-leader-api"} 1
+    {__name__="probe_success", instance="tikv2:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="tidb:10080", job="tidb-sql"} 0
+  > service_member_role{job="pd", service="PD"}  →  1 series
+    {__name__="service_member_role", instance="pd2:2379", job="pd", service="PD"} 1
+  > etcd_server_has_leader{job="pd"}  →  3 series
+    {__name__="etcd_server_has_leader", instance="pd3:2379", job="pd"} 1
+    {__name__="etcd_server_has_leader", instance="pd1:2379", job="pd"} 1
+    {__name__="etcd_server_has_leader", instance="pd2:2379", job="pd"} 1
+  > max by (store, type) (pd_cluster_status{job="pd", type=~"store_(up|disconnected|slow|unhealth|down)_count"}) > 0  →  3 series
+    {store="1", type="store_disconnected_count"} 1
+    {store="2", type="store_up_count"} 1
+    {store="3", type="store_up_count"} 1
+  > max by (type) (pd_regions_status{job="pd", type=~"(miss|down|pending|offline)-peer-region-count"})  →  4 series
+    {type="down-peer-region-count"} 0
+    {type="miss-peer-region-count"} 0
+    {type="offline-peer-region-count"} 0
+    {type="pending-peer-region-count"} 5
+  > time() - tidb_domain_lease_expire_time{job="tidb"}  →  1 series
+    {instance="tidb:10080", job="tidb"} -31.381999969482422
+  SQL select count(*) from test.t                             rc=0 0.17s 1024 
+  +85s
+    store 1 tikv3:20160 state_name=Down last_heartbeat=2026-11-10T00:20:03.132256938Z leaders=0 regions=5
+    store 3 tikv2:20160 state_name=Up last_heartbeat=2026-11-10T00:21:42.035800142Z leaders=3 regions=5
+    store 2 tikv1:20160 state_name=Up last_heartbeat=2026-11-10T00:21:42.033985292Z leaders=2 regions=5
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"pd|tikv|tidb"}  →  7 series
+    {__name__="up", instance="tikv1:20180", job="tikv"} 1
+    {__name__="up", instance="tikv3:20180", job="tikv"} 0
+    {__name__="up", instance="tidb:10080", job="tidb"} 1
+    {__name__="up", instance="pd3:2379", job="pd"} 1
+    {__name__="up", instance="pd1:2379", job="pd"} 1
+    {__name__="up", instance="tikv2:20180", job="tikv"} 1
+    {__name__="up", instance="pd2:2379", job="pd"} 1
+  > probe_success{job=~"pd-readyz|pd-health|pd-ping|pd-leader-api|tikv-status|tidb-status|tidb-sql"}  →  17 series
+    {__name__="probe_success", instance="tidb:10080", job="tidb-status"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-leader-api"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-leader-api"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-readyz"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-health"} 1
+    {__name__="probe_success", instance="tikv1:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-readyz"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-health"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-ping"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-readyz"} 1
+    {__name__="probe_success", instance="tikv3:20180", job="tikv-status"} 0
+    {__name__="probe_success", instance="pd2:2379", job="pd-health"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-ping"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-ping"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-leader-api"} 1
+    {__name__="probe_success", instance="tikv2:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="tidb:10080", job="tidb-sql"} 0
+  > service_member_role{job="pd", service="PD"}  →  1 series
+    {__name__="service_member_role", instance="pd2:2379", job="pd", service="PD"} 1
+  > etcd_server_has_leader{job="pd"}  →  3 series
+    {__name__="etcd_server_has_leader", instance="pd3:2379", job="pd"} 1
+    {__name__="etcd_server_has_leader", instance="pd1:2379", job="pd"} 1
+    {__name__="etcd_server_has_leader", instance="pd2:2379", job="pd"} 1
+  > max by (store, type) (pd_cluster_status{job="pd", type=~"store_(up|disconnected|slow|unhealth|down)_count"}) > 0  →  3 series
+    {store="1", type="store_down_count"} 1
+    {store="2", type="store_up_count"} 1
+    {store="3", type="store_up_count"} 1
+  > max by (type) (pd_regions_status{job="pd", type=~"(miss|down|pending|offline)-peer-region-count"})  →  4 series
+    {type="down-peer-region-count"} 0
+    {type="miss-peer-region-count"} 0
+    {type="offline-peer-region-count"} 0
+    {type="pending-peer-region-count"} 5
+  > time() - tidb_domain_lease_expire_time{job="tidb"}  →  1 series
+    {instance="tidb:10080", job="tidb"} -27.710000038146973
+  SQL insert into test.t (v) values ('during-tikv-down')      rc=0 0.17s  
+  +142s
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"pd|tikv|tidb"}  →  7 series
+    {__name__="up", instance="tikv1:20180", job="tikv"} 1
+    {__name__="up", instance="tikv3:20180", job="tikv"} 0
+    {__name__="up", instance="tidb:10080", job="tidb"} 1
+    {__name__="up", instance="pd3:2379", job="pd"} 1
+    {__name__="up", instance="pd1:2379", job="pd"} 1
+    {__name__="up", instance="tikv2:20180", job="tikv"} 1
+    {__name__="up", instance="pd2:2379", job="pd"} 1
+  > probe_success{job=~"pd-readyz|pd-health|pd-ping|pd-leader-api|tikv-status|tidb-status|tidb-sql"}  →  17 series
+    {__name__="probe_success", instance="tidb:10080", job="tidb-status"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-leader-api"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-leader-api"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-readyz"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-health"} 1
+    {__name__="probe_success", instance="tikv1:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-readyz"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-health"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-ping"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-readyz"} 1
+    {__name__="probe_success", instance="tikv3:20180", job="tikv-status"} 0
+    {__name__="probe_success", instance="pd2:2379", job="pd-health"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-ping"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-ping"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-leader-api"} 1
+    {__name__="probe_success", instance="tikv2:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="tidb:10080", job="tidb-sql"} 1
+  > service_member_role{job="pd", service="PD"}  →  1 series
+    {__name__="service_member_role", instance="pd2:2379", job="pd", service="PD"} 1
+  > etcd_server_has_leader{job="pd"}  →  3 series
+    {__name__="etcd_server_has_leader", instance="pd3:2379", job="pd"} 1
+    {__name__="etcd_server_has_leader", instance="pd1:2379", job="pd"} 1
+    {__name__="etcd_server_has_leader", instance="pd2:2379", job="pd"} 1
+  > max by (store, type) (pd_cluster_status{job="pd", type=~"store_(up|disconnected|slow|unhealth|down)_count"}) > 0  →  3 series
+    {store="1", type="store_down_count"} 1
+    {store="2", type="store_up_count"} 1
+    {store="3", type="store_up_count"} 1
+  > max by (type) (pd_regions_status{job="pd", type=~"(miss|down|pending|offline)-peer-region-count"})  →  4 series
+    {type="down-peer-region-count"} 5
+    {type="miss-peer-region-count"} 0
+    {type="offline-peer-region-count"} 0
+    {type="pending-peer-region-count"} 5
+  > time() - tidb_domain_lease_expire_time{job="tidb"}  →  1 series
+    {instance="tidb:10080", job="tidb"} -16.628000020980835
+  > max by (type) (pd_regions_status{job="pd"}) > 0  →  4 series
+    {type="down-peer-region-count"} 5
+    {type="empty-region-count"} 5
+    {type="pending-peer-region-count"} 5
+    {type="undersized-region-count"} 5
+  > increase(pd_checker_event_count{type="replica_checker"}[5m]) > 0  →  0 series
+  alerts: 20
+    firing   PD_cluster_down_tikv_nums pd2:2379
+    firing   PD_node_restart pd3:2379
+    firing   PD_node_restart pd1:2379
+    firing   PD_node_restart pd2:2379
+    firing   PD_system_time_slow pd2:2379
+    firing   TiDBComponentEndpointDown tikv3:20180
+    firing   TiDBStoreDownOrUnhealthy 1
+    firing   TiDBTiKVStatusProbeFailing tikv3:20180
+    firing   TiDB_monitor_time_jump_back_error tidb:10080
+    firing   TiDB_monitor_time_jump_back_error tidb:10080
+    firing   TiDB_node_restart tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    pending  PD_down_peer_region_nums pd2:2379
+    pending  TiDBGcSafePointStale 
+    pending  TiDBQueryErrorRate tidb:10080
+    pending  TiDBRegionDownPeers 
+    pending  TiDBTiKVNotScraped 
+
+## D TiKV 仍停著；讓 PD leader 的 scrape 失敗（改去沒有在聽的 port，instance 不變）（08:22:36）
+  PD leader：pd2
+  reload 後 90 秒（PD leader 仍是 pd2）
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"pd|tikv|tidb"}  →  7 series
+    {__name__="up", instance="tikv1:20180", job="tikv"} 1
+    {__name__="up", instance="tikv3:20180", job="tikv"} 0
+    {__name__="up", instance="tidb:10080", job="tidb"} 1
+    {__name__="up", instance="pd3:2379", job="pd"} 1
+    {__name__="up", instance="pd1:2379", job="pd"} 1
+    {__name__="up", instance="tikv2:20180", job="tikv"} 1
+    {__name__="up", instance="pd2:2379", job="pd"} 0
+  > probe_success{job=~"pd-readyz|pd-health|pd-ping|pd-leader-api|tikv-status|tidb-status|tidb-sql"}  →  17 series
+    {__name__="probe_success", instance="tidb:10080", job="tidb-status"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-leader-api"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-leader-api"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-readyz"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-health"} 1
+    {__name__="probe_success", instance="tikv1:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-readyz"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-health"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-ping"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-readyz"} 1
+    {__name__="probe_success", instance="tikv3:20180", job="tikv-status"} 0
+    {__name__="probe_success", instance="pd2:2379", job="pd-health"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-ping"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-ping"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-leader-api"} 1
+    {__name__="probe_success", instance="tikv2:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="tidb:10080", job="tidb-sql"} 0
+  > service_member_role{job="pd", service="PD"}  →  0 series
+  > etcd_server_has_leader{job="pd"}  →  2 series
+    {__name__="etcd_server_has_leader", instance="pd3:2379", job="pd"} 1
+    {__name__="etcd_server_has_leader", instance="pd1:2379", job="pd"} 1
+  > max by (store, type) (pd_cluster_status{job="pd", type=~"store_(up|disconnected|slow|unhealth|down)_count"}) > 0  →  0 series
+  > max by (type) (pd_regions_status{job="pd", type=~"(miss|down|pending|offline)-peer-region-count"})  →  4 series
+    {type="down-peer-region-count"} 0
+    {type="miss-peer-region-count"} 0
+    {type="offline-peer-region-count"} 0
+    {type="pending-peer-region-count"} 0
+  > time() - tidb_domain_lease_expire_time{job="tidb"}  →  1 series
+    {instance="tidb:10080", job="tidb"} -16.867000102996826
+  官方規則用 etcd_server_is_leader 當前提：leader 抓不到時對到幾條
+  > (sum(pd_cluster_status{type="store_down_count"}) by (instance) > 0) and (sum(etcd_server_is_leader) by (instance) > 0)  →  0 series
+  > (sum(pd_regions_status{type="down-peer-region-count"}) by (instance)  > 0) and (sum(etcd_server_is_leader) by (instance) > 0)  →  0 series
+  > sum(etcd_server_is_leader)  →  1 series
+    {} 0
+  不加前提的寫法（follower 的 pd_regions_status 是 0，pd_cluster_status 沒有）
+  > max(pd_regions_status{type="down-peer-region-count"})  →  1 series
+    {} 0
+  > max(pd_cluster_status{type="store_down_count"})  →  0 series
+  alerts: 18
+    firing   PD_node_restart pd1:2379
+    firing   PD_node_restart pd2:2379
+    firing   PD_node_restart pd3:2379
+    firing   PD_system_time_slow pd2:2379
+    firing   TiDBComponentEndpointDown tikv3:20180
+    firing   TiDBPDLeaderMetricsMissing 
+    firing   TiDBTiKVStatusProbeFailing tikv3:20180
+    firing   TiDB_monitor_time_jump_back_error tidb:10080
+    firing   TiDB_monitor_time_jump_back_error tidb:10080
+    firing   TiDB_node_restart tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    pending  TiDBComponentCountLow 
+    pending  TiDBComponentEndpointDown pd2:2379
+    pending  TiDBGcSafePointStale 
+    pending  TiDBQueryErrorRate tidb:10080
+  config 還原、tikv3 重新啟動 60 秒後
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"pd|tikv|tidb"}  →  7 series
+    {__name__="up", instance="tikv1:20180", job="tikv"} 1
+    {__name__="up", instance="tikv3:20180", job="tikv"} 1
+    {__name__="up", instance="tidb:10080", job="tidb"} 1
+    {__name__="up", instance="pd3:2379", job="pd"} 1
+    {__name__="up", instance="pd1:2379", job="pd"} 1
+    {__name__="up", instance="tikv2:20180", job="tikv"} 1
+    {__name__="up", instance="pd2:2379", job="pd"} 1
+  > probe_success{job=~"pd-readyz|pd-health|pd-ping|pd-leader-api|tikv-status|tidb-status|tidb-sql"}  →  17 series
+    {__name__="probe_success", instance="tidb:10080", job="tidb-status"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-leader-api"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-leader-api"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-readyz"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-health"} 1
+    {__name__="probe_success", instance="tikv1:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-readyz"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-health"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-ping"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-readyz"} 1
+    {__name__="probe_success", instance="tikv3:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-health"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-ping"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-ping"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-leader-api"} 1
+    {__name__="probe_success", instance="tikv2:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="tidb:10080", job="tidb-sql"} 0
+  > service_member_role{job="pd", service="PD"}  →  1 series
+    {__name__="service_member_role", instance="pd2:2379", job="pd", service="PD"} 1
+  > etcd_server_has_leader{job="pd"}  →  3 series
+    {__name__="etcd_server_has_leader", instance="pd3:2379", job="pd"} 1
+    {__name__="etcd_server_has_leader", instance="pd1:2379", job="pd"} 1
+    {__name__="etcd_server_has_leader", instance="pd2:2379", job="pd"} 1
+  > max by (store, type) (pd_cluster_status{job="pd", type=~"store_(up|disconnected|slow|unhealth|down)_count"}) > 0  →  3 series
+    {store="1", type="store_up_count"} 1
+    {store="2", type="store_up_count"} 1
+    {store="3", type="store_up_count"} 1
+  > max by (type) (pd_regions_status{job="pd", type=~"(miss|down|pending|offline)-peer-region-count"})  →  4 series
+    {type="down-peer-region-count"} 0
+    {type="miss-peer-region-count"} 0
+    {type="offline-peer-region-count"} 0
+    {type="pending-peer-region-count"} 0
+  > time() - tidb_domain_lease_expire_time{job="tidb"}  →  1 series
+    {instance="tidb:10080", job="tidb"} -21.07800006866455
+  alerts: 13
+    firing   PD_node_restart pd2:2379
+    firing   PD_node_restart pd3:2379
+    firing   PD_node_restart pd1:2379
+    firing   PD_system_time_slow pd2:2379
+    firing   TiDBQueryErrorRate tidb:10080
+    firing   TiDB_monitor_time_jump_back_error tidb:10080
+    firing   TiDB_monitor_time_jump_back_error tidb:10080
+    firing   TiDB_node_restart tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    pending  TiDBGcSafePointStale 
+
+## E 停掉 PD leader（docker kill）（08:25:18）
+  PD leader：pd2
+  SQL insert into test.t (v) values ('pd-leader-killed+5s')   rc=0 8.71s  
+  +29s，新 leader：pd3
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"pd|tikv|tidb"}  →  7 series
+    {__name__="up", instance="tikv1:20180", job="tikv"} 1
+    {__name__="up", instance="tikv3:20180", job="tikv"} 1
+    {__name__="up", instance="tidb:10080", job="tidb"} 1
+    {__name__="up", instance="pd3:2379", job="pd"} 1
+    {__name__="up", instance="pd1:2379", job="pd"} 1
+    {__name__="up", instance="tikv2:20180", job="tikv"} 1
+    {__name__="up", instance="pd2:2379", job="pd"} 0
+  > probe_success{job=~"pd-readyz|pd-health|pd-ping|pd-leader-api|tikv-status|tidb-status|tidb-sql"}  →  17 series
+    {__name__="probe_success", instance="tidb:10080", job="tidb-status"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-leader-api"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-leader-api"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-readyz"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-health"} 0
+    {__name__="probe_success", instance="tikv1:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-readyz"} 0
+    {__name__="probe_success", instance="pd1:2379", job="pd-health"} 0
+    {__name__="probe_success", instance="pd2:2379", job="pd-ping"} 0
+    {__name__="probe_success", instance="pd3:2379", job="pd-readyz"} 1
+    {__name__="probe_success", instance="tikv3:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-health"} 0
+    {__name__="probe_success", instance="pd1:2379", job="pd-ping"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-ping"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-leader-api"} 0
+    {__name__="probe_success", instance="tikv2:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="tidb:10080", job="tidb-sql"} 1
+  > service_member_role{job="pd", service="PD"}  →  1 series
+    {__name__="service_member_role", instance="pd3:2379", job="pd", service="PD"} 1
+  > etcd_server_has_leader{job="pd"}  →  2 series
+    {__name__="etcd_server_has_leader", instance="pd3:2379", job="pd"} 1
+    {__name__="etcd_server_has_leader", instance="pd1:2379", job="pd"} 1
+  > max by (store, type) (pd_cluster_status{job="pd", type=~"store_(up|disconnected|slow|unhealth|down)_count"}) > 0  →  3 series
+    {store="1", type="store_up_count"} 1
+    {store="2", type="store_up_count"} 1
+    {store="3", type="store_up_count"} 1
+  > max by (type) (pd_regions_status{job="pd", type=~"(miss|down|pending|offline)-peer-region-count"})  →  4 series
+    {type="down-peer-region-count"} 0
+    {type="miss-peer-region-count"} 0
+    {type="offline-peer-region-count"} 0
+    {type="pending-peer-region-count"} 0
+  > time() - tidb_domain_lease_expire_time{job="tidb"}  →  1 series
+    {instance="tidb:10080", job="tidb"} -29.359999895095825
+  > etcd_server_is_leader{job="pd"}  →  2 series
+    {__name__="etcd_server_is_leader", instance="pd3:2379", job="pd"} 1
+    {__name__="etcd_server_is_leader", instance="pd1:2379", job="pd"} 0
+  > max by (instance) (etcd_server_leader_changes_seen_total{job="pd"})  →  2 series
+    {instance="pd3:2379"} 2
+    {instance="pd1:2379"} 2
+  SQL insert into test.t (v) values ('pd-leader-killed+20s')  rc=0 0.18s  
+  +91s
+  alerts: 21
+    firing   PD_leader_change 
+    firing   PD_node_restart pd3:2379
+    firing   PD_node_restart pd1:2379
+    firing   PD_node_restart pd2:2379
+    firing   PD_system_time_slow pd2:2379
+    firing   TiDBPDReadyzProbeFailing pd2:2379
+    firing   TiDBQueryErrorRate tidb:10080
+    firing   TiDBTsoRequestsFailing tidb:10080
+    firing   TiDB_monitor_time_jump_back_error tidb:10080
+    firing   TiDB_monitor_time_jump_back_error tidb:10080
+    firing   TiDB_node_restart tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    pending  PD_system_time_slow pd3:2379
+    pending  TiDBComponentCountLow 
+    pending  TiDBComponentEndpointDown pd2:2379
+    pending  TiDBGcSafePointStale 
+  pd2 重新啟動 30 秒後，leader：pd3
+  > service_member_role{job="pd", service="PD"}  →  1 series
+    {__name__="service_member_role", instance="pd3:2379", job="pd", service="PD"} 1
+
+## F 停掉 3 台 PD 中的 2 台（失去 quorum）（08:27:23）
+  存活：pd1（host port 29001）；停掉：pd2 pd3 
+  +16s
+  GET :29001/metrics → 200 357192B 0.02s # HELP etcd_cluster_version Which version is running. 1 for 'cluster_version' label with current cluster version # TYPE etcd_cluster_version gauge etcd_cluster_version{cluster_version="3.
+  GET :29001/health → 503 45B 0.02s {"health":"false","reason":"RAFT NO LEADER"} 
+  GET :29001/readyz → TimeoutError timed out after 12.03s
+  GET :29001/livez → 200 3B 0.02s ok 
+  GET :29001/pd/api/v1/health → 200 417B 2.21s [   {     "name": "pd2",     "member_id": 3486081234046183923,     "client_urls": [       "http://pd2:2379"     ],     "health": false   },   {     "name": "pd3",     "member_id": 4
+  GET :29001/pd/api/v1/leader → 500 40B 1.48s [PD:apiutil:ErrRedirect]redirect failed 
+  GET :29001/pd/api/v1/ping → 200 0B 0.02s 
+  GET :29080/status → 200 141B 0.02s {"connections":0,"version":"8.0.11-TiDB-v8.5.8","git_hash":"8b857efa20363d50a8fa2ea7dd9809a85a61b115","status":{"init_stats_percentage":100}}
+  GET :29011/status → 200 0B 0.02s 
+  SQL select 1                                                rc=0 0.16s 1 
+  SQL select count(*) from test.t                             rc=124 27.07s  
+  SQL insert into test.t (v) values ('pd-quorum-lost')        rc=124 27.88s  
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"pd|tikv|tidb"}  →  7 series
+    {__name__="up", instance="tikv1:20180", job="tikv"} 1
+    {__name__="up", instance="tikv3:20180", job="tikv"} 1
+    {__name__="up", instance="tidb:10080", job="tidb"} 1
+    {__name__="up", instance="pd3:2379", job="pd"} 0
+    {__name__="up", instance="pd1:2379", job="pd"} 1
+    {__name__="up", instance="tikv2:20180", job="tikv"} 1
+    {__name__="up", instance="pd2:2379", job="pd"} 0
+  > probe_success{job=~"pd-readyz|pd-health|pd-ping|pd-leader-api|tikv-status|tidb-status|tidb-sql"}  →  17 series
+    {__name__="probe_success", instance="tidb:10080", job="tidb-status"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-leader-api"} 0
+    {__name__="probe_success", instance="pd3:2379", job="pd-leader-api"} 0
+    {__name__="probe_success", instance="pd1:2379", job="pd-readyz"} 0
+    {__name__="probe_success", instance="pd3:2379", job="pd-health"} 0
+    {__name__="probe_success", instance="tikv1:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-readyz"} 0
+    {__name__="probe_success", instance="pd1:2379", job="pd-health"} 0
+    {__name__="probe_success", instance="pd2:2379", job="pd-ping"} 0
+    {__name__="probe_success", instance="pd3:2379", job="pd-readyz"} 0
+    {__name__="probe_success", instance="tikv3:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-health"} 0
+    {__name__="probe_success", instance="pd1:2379", job="pd-ping"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-ping"} 0
+    {__name__="probe_success", instance="pd2:2379", job="pd-leader-api"} 0
+    {__name__="probe_success", instance="tikv2:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="tidb:10080", job="tidb-sql"} 0
+  > service_member_role{job="pd", service="PD"}  →  0 series
+  > etcd_server_has_leader{job="pd"}  →  1 series
+    {__name__="etcd_server_has_leader", instance="pd1:2379", job="pd"} 0
+  > max by (store, type) (pd_cluster_status{job="pd", type=~"store_(up|disconnected|slow|unhealth|down)_count"}) > 0  →  0 series
+  > max by (type) (pd_regions_status{job="pd", type=~"(miss|down|pending|offline)-peer-region-count"})  →  4 series
+    {type="down-peer-region-count"} 0
+    {type="miss-peer-region-count"} 0
+    {type="offline-peer-region-count"} 0
+    {type="pending-peer-region-count"} 0
+  > time() - tidb_domain_lease_expire_time{job="tidb"}  →  1 series
+    {instance="tidb:10080", job="tidb"} 48.431999921798706
+  +150s
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"pd|tikv|tidb"}  →  7 series
+    {__name__="up", instance="tikv1:20180", job="tikv"} 1
+    {__name__="up", instance="tikv3:20180", job="tikv"} 1
+    {__name__="up", instance="tidb:10080", job="tidb"} 1
+    {__name__="up", instance="pd3:2379", job="pd"} 0
+    {__name__="up", instance="pd1:2379", job="pd"} 1
+    {__name__="up", instance="tikv2:20180", job="tikv"} 1
+    {__name__="up", instance="pd2:2379", job="pd"} 0
+  > probe_success{job=~"pd-readyz|pd-health|pd-ping|pd-leader-api|tikv-status|tidb-status|tidb-sql"}  →  17 series
+    {__name__="probe_success", instance="tidb:10080", job="tidb-status"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-leader-api"} 0
+    {__name__="probe_success", instance="pd3:2379", job="pd-leader-api"} 0
+    {__name__="probe_success", instance="pd1:2379", job="pd-readyz"} 0
+    {__name__="probe_success", instance="pd3:2379", job="pd-health"} 0
+    {__name__="probe_success", instance="tikv1:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-readyz"} 0
+    {__name__="probe_success", instance="pd1:2379", job="pd-health"} 0
+    {__name__="probe_success", instance="pd2:2379", job="pd-ping"} 0
+    {__name__="probe_success", instance="pd3:2379", job="pd-readyz"} 0
+    {__name__="probe_success", instance="tikv3:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-health"} 0
+    {__name__="probe_success", instance="pd1:2379", job="pd-ping"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-ping"} 0
+    {__name__="probe_success", instance="pd2:2379", job="pd-leader-api"} 0
+    {__name__="probe_success", instance="tikv2:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="tidb:10080", job="tidb-sql"} 0
+  > service_member_role{job="pd", service="PD"}  →  0 series
+  > etcd_server_has_leader{job="pd"}  →  1 series
+    {__name__="etcd_server_has_leader", instance="pd1:2379", job="pd"} 0
+  > max by (store, type) (pd_cluster_status{job="pd", type=~"store_(up|disconnected|slow|unhealth|down)_count"}) > 0  →  0 series
+  > max by (type) (pd_regions_status{job="pd", type=~"(miss|down|pending|offline)-peer-region-count"})  →  4 series
+    {type="down-peer-region-count"} 0
+    {type="miss-peer-region-count"} 0
+    {type="offline-peer-region-count"} 0
+    {type="pending-peer-region-count"} 0
+  > time() - tidb_domain_lease_expire_time{job="tidb"}  →  1 series
+    {instance="tidb:10080", job="tidb"} 111.13199996948242
+  SQL select 1                                                rc=0 0.18s 1 
+  SQL select count(*) from test.t                             rc=124 26.26s  
+  > sum by (instance) (rate(pd_client_cmd_handle_failed_cmds_duration_seconds_count{job="tidb"}[1m])) > 0  →  1 series
+    {instance="tidb:10080"} 3.626562223829035
+  > sum by (type) (increase(tidb_tikvclient_backoff_seconds_count{job="tidb"}[2m])) > 0  →  1 series
+    {type="pdRPC"} 394.4204810489063
+  > increase(tidb_session_schema_lease_error_total[5m])  →  0 series
+  alerts: 30
+    firing   PD_leader_change 
+    firing   PD_node_restart pd3:2379
+    firing   PD_node_restart pd1:2379
+    firing   PD_node_restart pd2:2379
+    firing   PD_system_time_slow pd2:2379
+    firing   PD_system_time_slow pd3:2379
+    firing   TiDBComponentEndpointDown pd3:2379
+    firing   TiDBComponentEndpointDown pd2:2379
+    firing   TiDBPDLeaderMetricsMissing 
+    firing   TiDBPDQuorumAtRisk 
+    firing   TiDBPDReadyzProbeFailing pd3:2379
+    firing   TiDBPDReadyzProbeFailing pd2:2379
+    firing   TiDBPDReadyzProbeFailing pd1:2379
+    firing   TiDBPDServingMetricsButNotReady pd1:2379
+    firing   TiDBQueryErrorRate tidb:10080
+    firing   TiDBStatusOkButSchemaLeaseExpired tidb:10080
+    firing   TiDBTsoRequestsFailing tidb:10080
+    firing   TiDB_monitor_time_jump_back_error tidb:10080
+    firing   TiDB_monitor_time_jump_back_error tidb:10080
+    firing   TiDB_node_restart tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    pending  TiDBComponentCountLow 
+    pending  TiDBGcSafePointStale 
+    pending  TiDBQueryLatencyHigh tidb:10080
+    pending  TiDB_query_duration tidb:10080
+  PD 重新啟動 45 秒後
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"pd|tikv|tidb"}  →  7 series
+    {__name__="up", instance="tikv1:20180", job="tikv"} 1
+    {__name__="up", instance="tikv3:20180", job="tikv"} 1
+    {__name__="up", instance="tidb:10080", job="tidb"} 1
+    {__name__="up", instance="pd3:2379", job="pd"} 1
+    {__name__="up", instance="pd1:2379", job="pd"} 1
+    {__name__="up", instance="tikv2:20180", job="tikv"} 1
+    {__name__="up", instance="pd2:2379", job="pd"} 1
+  > probe_success{job=~"pd-readyz|pd-health|pd-ping|pd-leader-api|tikv-status|tidb-status|tidb-sql"}  →  17 series
+    {__name__="probe_success", instance="tidb:10080", job="tidb-status"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-leader-api"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-leader-api"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-readyz"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-health"} 1
+    {__name__="probe_success", instance="tikv1:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-readyz"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-health"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-ping"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-readyz"} 1
+    {__name__="probe_success", instance="tikv3:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-health"} 1
+    {__name__="probe_success", instance="pd1:2379", job="pd-ping"} 1
+    {__name__="probe_success", instance="pd3:2379", job="pd-ping"} 1
+    {__name__="probe_success", instance="pd2:2379", job="pd-leader-api"} 1
+    {__name__="probe_success", instance="tikv2:20180", job="tikv-status"} 1
+    {__name__="probe_success", instance="tidb:10080", job="tidb-sql"} 0
+  > service_member_role{job="pd", service="PD"}  →  1 series
+    {__name__="service_member_role", instance="pd1:2379", job="pd", service="PD"} 1
+  > etcd_server_has_leader{job="pd"}  →  3 series
+    {__name__="etcd_server_has_leader", instance="pd3:2379", job="pd"} 1
+    {__name__="etcd_server_has_leader", instance="pd1:2379", job="pd"} 1
+    {__name__="etcd_server_has_leader", instance="pd2:2379", job="pd"} 1
+  > max by (store, type) (pd_cluster_status{job="pd", type=~"store_(up|disconnected|slow|unhealth|down)_count"}) > 0  →  3 series
+    {store="1", type="store_up_count"} 1
+    {store="2", type="store_up_count"} 1
+    {store="3", type="store_up_count"} 1
+  > max by (type) (pd_regions_status{job="pd", type=~"(miss|down|pending|offline)-peer-region-count"})  →  4 series
+    {type="down-peer-region-count"} 0
+    {type="miss-peer-region-count"} 0
+    {type="offline-peer-region-count"} 0
+    {type="pending-peer-region-count"} 0
+  > time() - tidb_domain_lease_expire_time{job="tidb"}  →  1 series
+    {instance="tidb:10080", job="tidb"} -26.543999910354614
+  SQL insert into test.t (v) values ('pd-restored')           rc=0 0.17s  
+  alerts: 20
+    firing   PD_leader_change 
+    firing   PD_node_restart pd3:2379
+    firing   PD_node_restart pd1:2379
+    firing   PD_node_restart pd2:2379
+    firing   PD_system_time_slow pd2:2379
+    firing   PD_system_time_slow pd3:2379
+    firing   TiDBQueryErrorRate tidb:10080
+    firing   TiDBTsoRequestsFailing tidb:10080
+    firing   TiDB_monitor_time_jump_back_error tidb:10080
+    firing   TiDB_monitor_time_jump_back_error tidb:10080
+    firing   TiDB_node_restart tidb:10080
+    firing   TiDB_query_duration tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    firing   tidb_tikvclient_backoff_seconds_count tidb:10080
+    pending  PD_system_time_slow pd1:2379
+    pending  TiDBGcSafePointStale 
+    pending  TiDBQueryLatencyHigh tidb:10080
+    pending  TiDBTsoWaitSlow tidb:10080
+
+## 結束（08:31:09）
+at-tidb-tidb-1 204.5MiB / 768MiB
+at-tidb-tikv3-1 166.3MiB / 640MiB
+at-tidb-tikv2-1 183.6MiB / 640MiB
+at-tidb-tikv1-1 181.5MiB / 640MiB
+at-tidb-client-1 568KiB / 128MiB
+at-tidb-pd3-1 61.55MiB / 256MiB
+at-tidb-prometheus-1 367.9MiB / 512MiB
+at-tidb-pd2-1 57.82MiB / 256MiB
+at-tidb-pd1-1 91.46MiB / 256MiB
+at-tidb-blackbox-1 17.29MiB / 64MiB
+  殘留容器：0

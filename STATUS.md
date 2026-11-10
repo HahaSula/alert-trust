@@ -5,7 +5,7 @@
 ## 現況
 
 - GitHub repo `HahaSula/alert-trust`，Pages 由 GitHub Actions 發布。
-- 13 張卡（9 個監控元件、4 個資料庫 target）、259 個訊號、323 條規則；`validate.py` 0 錯誤、2 個警告；`--strict` 建置通過。
+- 14 張卡（9 個監控元件、5 個資料庫 target）、287 個訊號、378 條規則；`validate.py` 0 錯誤、2 個警告；`--strict` 建置通過。
 - 原始碼參考 105+ 筆（釘版本與行號），實驗參考多數已換成 `lab/` 的公開結果。
 
 ## 已完成
@@ -28,13 +28,14 @@
 | 資料庫監控模型調查（exporter／內建 endpoint／collector／DB 內歷史／廠商方案）與官方告警規則 | `docs/targets/models.md` |
 | Valkey 9.1／Redis 7.2、8 target（redis_exporter v1.97.0）與「記憶體 KV」架構頁，lab 實測 | `catalog/targets/redis_exporter.yaml`、`docs/targets/valkey*.md`、`lab/targets/valkey/` |
 | etcd v3.7.3 target（第一張 `model: native`）與「共識（Raft）」架構頁，3 節點 lab 實測三方交叉判斷 | `catalog/targets/etcd.yaml`、`docs/targets/etcd*.md`、`lab/targets/etcd/` |
+| TiDB v8.5.8 target（`model: native`，TiDB／TiKV／PD）與「分散式 SQL」架構頁；官方規則 5 類失效實測 | `catalog/targets/tidb.yaml`、`docs/targets/tidb*.md`、`lab/targets/tidb/` |
 | `rule-review` skill 與流程圖：先確認體系與基礎設施覆蓋，再看時間契約；離線用 `tools/rules_to_snapshot.py` | `skills/rule-review/`、`docs/tools/rule-review.md` |
 
 ## 進行中
 
-- TiDB target（`model: native`，TiDB／TiKV／PD）與「分散式 SQL」架構頁；驗證官方規則的三個問題
+（無）
 
-之後的資料庫順序（使用者已同意）：TiDB → YugabyteDB → ClickHouse → MongoDB；CockroachDB（專有授權）不做。資料庫架構頁依類型分頁：關聯式、記憶體 KV、共識（Raft）、分散式 SQL、分析型、文件型。
+之後的資料庫順序（使用者已同意）：YugabyteDB → ClickHouse → MongoDB；CockroachDB（專有授權）不做。資料庫架構頁依類型分頁：關聯式、記憶體 KV、共識（Raft）、分散式 SQL、分析型、文件型。
 
 ## 待辦（依建議順序）
 
@@ -51,7 +52,7 @@
 10. **小項目**：MySQL redo log 太小的情境沒有重現（`log_waits` 一直是 0）；`ThroughputDrop` 規則用「昨天同時段」比較，lab 沒有一天的資料無法驗證；MySQL `NoWritablePrimary` 修正後未重跑；PG17、`/probe`、auto-discover 只讀碼；契約頁的圖未截圖確認；Prometheus 報告的例子（30s／100s／120s）使用者尚未表示意見。
 12. **架構頁發現的卡片缺口**：MySQL 卡沒有 checkpoint age 訊號（`innodb-pressure` 只有 `log_waits`、`wait_free`；lab 有量到 checkpoint age）；PG 卡沒有 `synchronous_commit` 訊號。
 13. （已完成）內建 endpoint 型資料庫的標準問題：`target-pattern.yaml` 的 `required_signals_native`，卡片寫 `model: native`。
-14. **官方 TiDB 規則的問題**（讀規則，未實測）：TiKV `name="apply_.*"` 用 `=` 永遠不匹配；`job="tidb"`、`job="pd"` 寫死；PD 規則都以 `etcd_server_is_leader` 為前提，抓不到 leader 時全部安靜。做 TiDB 時驗證。
+14. （已完成，實測）官方 TiDB 規則的失效：TiKV `name="apply_.*"`（tikv.rules.yml:173）對到 0 條；`job` 寫死；PD 規則以 `etcd_server_is_leader` 為前提，leader 抓不到時回傳空；`miss_peer_region_count` 用底線而 PD 輸出連字號；`tikv_pd_heartbeat_tick_total`、`tidb_monitor_keep_alive_total` 在 v8.5.8 不存在。TiDB 的慢磁碟、write stall、GC 卡住沒做實驗。
 15. **Sentinel 沒測到**：這台機器上 Sentinel 一直進 TILT，failover、sdown、MISCONF 觸發 sdown 只讀碼。
 
 ## 已做的決定

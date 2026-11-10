@@ -1,0 +1,53 @@
+# 輕量 lab 用：把記憶體與執行緒壓到最小。不是正式環境的建議值。
+memory-usage-limit = "512MB"
+
+[server]
+grpc-concurrency = 1
+
+[readpool.unified]
+min-thread-count = 1
+max-thread-count = 1
+
+[storage]
+reserve-space = "0MB"
+reserve-raft-space = "0MB"
+scheduler-worker-pool-size = 1
+
+[storage.block-cache]
+capacity = "64MB"
+
+[raftstore]
+store-pool-size = 1
+apply-pool-size = 1
+# 讓 down-peer 在 lab 時間內出現（預設 10m）。hibernate-regions 開著時 TiKV 會把它調成至少 2 × peer-stale-state-check-interval。
+max-peer-down-duration = "40s"
+peer-stale-state-check-interval = "20s"
+abnormal-leader-missing-duration = "20s"
+max-leader-missing-duration = "40s"
+
+[rocksdb]
+max-background-jobs = 2
+max-open-files = 1024
+
+[raftdb]
+max-background-jobs = 2
+max-open-files = 1024
+
+[rocksdb.defaultcf]
+write-buffer-size = "16MB"
+max-write-buffer-number = 2
+[rocksdb.writecf]
+write-buffer-size = "16MB"
+max-write-buffer-number = 2
+[rocksdb.lockcf]
+write-buffer-size = "16MB"
+max-write-buffer-number = 2
+[raftdb.defaultcf]
+write-buffer-size = "16MB"
+max-write-buffer-number = 2
+
+[raft-engine]
+batch-compression-threshold = "4KB"
+
+[memory]
+enable-thread-exclusive-arena = false

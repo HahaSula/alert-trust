@@ -1,0 +1,21 @@
+modules:
+  http_2xx:
+    prober: http
+    timeout: 4s
+    http:
+      preferred_ip_protocol: ip4
+  # PD 的 /pd/api/v1/health 永遠回 200（成員清單）；要看 body 裡有沒有 "health": false
+  pd_health_all:
+    prober: http
+    timeout: 4s
+    http:
+      preferred_ip_protocol: ip4
+      fail_if_body_matches_regexp: ['"health":\s*false']
+  # MySQL 協定的握手：TiDB 的 greeting 含版本字串 "TiDB"
+  tidb_sql_handshake:
+    prober: tcp
+    timeout: 4s
+    tcp:
+      preferred_ip_protocol: ip4
+      query_response:
+        - expect: "TiDB"

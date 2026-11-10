@@ -464,3 +464,61 @@ terms:
     observe:
       - "超過時 `etcd_server_slow_apply_total` 加 1，並寫 warning log「apply request took too long」"
     refs: [etcd-embed-warn-apply, etcd-txn-slow-apply]
+
+  tidb-max-store-down-time:
+    title: PD 判定 store Down 的時間
+    kind: config
+    systems: [tidb]
+    tokens: [max-store-down-time, schedule.max-store-down-time]
+    where: "PD 設定 `schedule.max-store-down-time`（也可用 pd-ctl `config set max-store-down-time`）"
+    default: "30m"
+    observe:
+      - "`pd_cluster_status{type=\"store_down_count\"}`：超過這個時間沒有 heartbeat 才變 1；之前依序是 Disconnected（20 秒）、Unhealthy（10 分鐘）"
+    note: "官方 PD_cluster_down_tikv_nums 只看 store_down_count，store 停掉的前 30 分鐘不響；Down 之後 PD 才開始在別處補副本。"
+    refs: [pd-store-down-default, pd-store-status-order, pd-store-disconnect, pd-store-unhealthy]
+
+  tidb-max-peer-down-duration:
+    title: TiKV 判定 down peer 的時間
+    kind: config
+    systems: [tidb]
+    tokens: [max-peer-down-duration, raftstore.max-peer-down-duration]
+    where: "TiKV 設定 `raftstore.max-peer-down-duration`"
+    default: "10m；hibernate-regions 開著時至少 2 × peer-stale-state-check-interval"
+    observe:
+      - "`pd_regions_status{type=\"down-peer-region-count\"}`：region leader 回報超過這個時間沒回應的副本"
+    refs: [tikv-max-peer-down, tikv-peer-down-hibernate]
+
+  tidb-gc-life-time:
+    title: TiDB GC 保留舊版本的時間
+    kind: config
+    systems: [tidb]
+    tokens: [tidb_gc_life_time, tikv_gc_life_time]
+    where: "系統變數 `tidb_gc_life_time`（舊版存在 mysql.tidb 的 `tikv_gc_life_time`）"
+    default: "10m"
+    observe:
+      - "`tidb_tikvclient_gc_config{type=\"tikv_gc_life_time\"}`：目前的設定（秒）"
+      - "`pd_gc_gc_safepoint{type=\"gc_safepoint\"}`：PD 收到的 safe point（TSO），右移 18 位是毫秒"
+    note: "長交易、TiCDC 或 BR 的 service safe point 會擋住 safe point 前進，舊版本累積。"
+    refs: [tidb-gc-lifetime-default, tidb-gc-config-gauge, pd-gc-safepoint]
+
+  tidb-server-memory-limit:
+    title: TiDB 整個 process 的記憶體上限
+    kind: config
+    systems: [tidb]
+    tokens: [tidb_server_memory_limit, tidb_mem_oom_action, tidb_mem_quota_query]
+    where: "系統變數 `tidb_server_memory_limit`（全域）；單條 SQL 的上限是 `tidb_mem_quota_query`，超過時依 `tidb_mem_oom_action` 處理"
+    default: "tidb_server_memory_limit 80%；tidb_mem_quota_query 1GB；tidb_mem_oom_action CANCEL"
+    observe:
+      - "`tidb_server_memory_quota_bytes` 與 `process_resident_memory_bytes`；超過上限時 TiDB 取消最耗記憶體的 SQL，只寫 log（global memory controller killed the top1 memory consumer），沒有計數 metric"
+    refs: [tidb-var-memlimit, tidb-var-oom-action, tidb-memlimit-kill, tidb-m-memquota]
+
+  tidb-token-limit:
+    title: TiDB 同時執行的語句上限
+    kind: config
+    systems: [tidb]
+    tokens: [token-limit, max-server-connections]
+    where: "TiDB 設定檔 `token-limit`；連線數上限是 `max-server-connections`"
+    default: "token-limit 1000；max-server-connections 0（不限制）"
+    observe:
+      - "`tidb_server_tokens`：目前拿著 token 的語句數；`tidb_server_connections`：連線數"
+    refs: [tidb-cfg-token-limit, tidb-cfg-max-conn, tidb-m-tokens, tidb-m-connections]

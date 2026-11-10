@@ -1,0 +1,2 @@
+# 輕量 lab：不為每張表切 region，region 數少，TiKV 記憶體才壓得住。
+split-table = false

@@ -11,7 +11,7 @@
 3. **ClickHouse 的端點預設是關的。**預設 `config.xml` 的 `<prometheus>` 區塊整段被註解，要自己打開；而且端點只輸出 `system.metrics`、`system.events`、`system.asynchronous_metrics`、`system.errors` 這類全域數字，每張表的 parts、複寫佇列、mutation 要另外用 SQL 查。[^dbm-ch-prom-commented][^dbm-doc-ch-prometheus]
 4. **MongoDB 8.3 有 OTel metrics，但不能取代 exporter。**8.3 加了把 OTel metrics 寫成 Prometheus 格式檔案（或用 HTTP 推送）的啟動參數，登錄的 metric 只有連線、index build 等十來個；8.0（LTS）與 8.2 的 tag 裡沒有這段程式碼。基礎仍是 Percona mongodb_exporter。[^dbm-mongo-otel-prom][^dbm-mongo-otel-names]
 5. **廠商的整套監控都不監控自己的 Prometheus 與 Alertmanager，或只在同一套裡面監控。**TiUP 部署的規則檔裡沒有任何 `prometheus_*`、`alertmanager_*` 或 Watchdog 規則；blackbox 自己是否存活由 blackbox 自己探測。YugabyteDB Anywhere 與 PMM 有「告警查詢失敗」「agent 掛了」之類的平台告警，但評估它們的就是同一套平台。[^dbm-tiup-rule-files][^dbm-tidb-blacker-blackbox][^dbm-yb-alert-query-failed][^dbm-pmm-agent-down]所以 alert-trust 的監控鏈卡片與外部觀察者，在每一種模型下都還是需要。
-6. **官方規則有可以直接指出的問題。**TiKV 的 apply worker CPU 規則用 `name="apply_.*"`（`=` 不是 `=~`），字面值不會比對到任何 thread，這條規則永遠不會觸發（讀碼推論，未實測）；TiDB、PD 的規則把 `job="tidb"`、`job="pd"` 寫死，job 名稱不同的環境會「規則在但沒資料」。[^dbm-tikv-rules-apply-matcher][^dbm-tidb-rules-keepalive]
+6. **官方規則有可以直接指出的問題。**TiKV 的 apply worker CPU 規則用 `name="apply_.*"`（`=` 不是 `=~`），字面值不會比對到任何 thread，這條規則永遠不會觸發（[TiDB lab](tidb.md#model) 實測：對到 0 條）；TiDB、PD 的規則把 `job="tidb"`、`job="pd"` 寫死，job 名稱不同的環境會「規則在但沒資料」。[^dbm-tikv-rules-apply-matcher][^dbm-tidb-rules-keepalive]
 
 ## 總表 {#matrix}
 
@@ -129,7 +129,7 @@ OTel receiver 的成熟度見 metadata.yaml。[^dbm-otel-mysql][^dbm-otel-postgr
 - TiUP 載入的規則檔（node、blacker、bypass 加各元件）沒有 Prometheus 或 Alertmanager 的規則，也沒有 Watchdog；`monitor_port_probe` 只探 Pushgateway、Grafana、node_exporter、blackbox。[^dbm-tiup-rule-files][^dbm-tiup-monitor-probe]文件的告警頁也沒有這兩個元件。[^dbm-doc-tidb-alert-rules]
 - blackbox 掛了的告警（`Blackbox_exporter_server_is_down`）由 blackbox 自己探測，blackbox 停了時這條也拿不到資料。[^dbm-tidb-blacker-blackbox]
 - PD 的叢集規則都加了 `and etcd_server_is_leader > 0`：PD leader 那台抓不到時，store down、region 缺副本等規則全部回傳空。[^dbm-pd-rules-store-down]
-- `TiDB_monitor_keep_alive` 是資料庫自己產生的心跳計數，接近我們的「exporter 自檢」面向。[^dbm-tidb-rules-keepalive]
+- `TiDB_monitor_keep_alive` 用的 `tidb_monitor_keep_alive_total` 在 v8.5.8 已經不存在（只剩 metrics_schema 的定義），這條規則永遠回傳空；見 [TiDB 頁](tidb.md#model)。[^dbm-tidb-rules-keepalive][^tidb-keepalive-infoschema]
 
 **alert-trust：**以 (b) 為基礎，規則直接取上游 rules.yml（釘版本），改掉寫死的 job selector 與 apply matcher。補盲點：監控鏈卡片（Prometheus、Alertmanager、Watchdog、外部觀察者）補 TiUP 沒做的自我監控；SQL 層的 statements_summary 可用 query-exporter 走 MySQL 協定彙總輸出（未實測）。
 

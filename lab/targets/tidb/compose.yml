@@ -1,0 +1,75 @@
+# TiDB v8.5.8：PD ×3、TiKV ×3、TiDB ×1，Prometheus v3.13.5、blackbox_exporter v0.27.0。執行 ./run.sh，結束會 docker compose down -v。
+# 只對外開 127.0.0.1：29000（TiDB SQL）、29080（TiDB status）、29001–29003（PD）、29011–29013（TiKV status）、29090（Prometheus）、29091（blackbox）。
+# 記憶體刻意壓小（TiKV block-cache 64MB、memory-usage-limit 512MB）；這是輕量 lab，不是正式環境的設定。
+name: at-tidb
+x-pd: &pd
+  image: pingcap/pd:v8.5.8
+  mem_limit: 256m
+  volumes: ["./conf:/conf:ro"]
+x-tikv: &tikv
+  image: pingcap/tikv:v8.5.8
+  mem_limit: 640m
+  memswap_limit: 640m
+  cpus: 2
+  ulimits: { nofile: { soft: 1048576, hard: 1048576 } }
+  # 映像內的 /tikv-server 帶壓縮的 debug info，啟動時 backtrace-loader 執行緒會把它解壓進記憶體（約 1.9GB，lab 的 heap profile 量到）。
+  # run.sh 從同一個映像複製 binary、objcopy --strip-debug 後掛進來執行；程式碼不變，只少了 debug section。
+  entrypoint: ["/labbin/tikv-server"]
+  volumes: ["./conf:/conf:ro", "./.bin:/labbin:ro"]
+  depends_on: [pd1, pd2, pd3]
+x-pdcluster: &pdcluster "--initial-cluster=pd1=http://pd1:2380,pd2=http://pd2:2380,pd3=http://pd3:2380"
+services:
+  pd1:
+    <<: *pd
+    command: [--name=pd1, --data-dir=/data, --client-urls=http://0.0.0.0:2379, --advertise-client-urls=http://pd1:2379,
+      --peer-urls=http://0.0.0.0:2380, --advertise-peer-urls=http://pd1:2380, *pdcluster, --config=/conf/pd.toml]
+    ports: ["127.0.0.1:29001:2379"]
+  pd2:
+    <<: *pd
+    command: [--name=pd2, --data-dir=/data, --client-urls=http://0.0.0.0:2379, --advertise-client-urls=http://pd2:2379,
+      --peer-urls=http://0.0.0.0:2380, --advertise-peer-urls=http://pd2:2380, *pdcluster, --config=/conf/pd.toml]
+    ports: ["127.0.0.1:29002:2379"]
+  pd3:
+    <<: *pd
+    command: [--name=pd3, --data-dir=/data, --client-urls=http://0.0.0.0:2379, --advertise-client-urls=http://pd3:2379,
+      --peer-urls=http://0.0.0.0:2380, --advertise-peer-urls=http://pd3:2380, *pdcluster, --config=/conf/pd.toml]
+    ports: ["127.0.0.1:29003:2379"]
+  tikv1:
+    <<: *tikv
+    command: [--addr=0.0.0.0:20160, --advertise-addr=tikv1:20160, --status-addr=0.0.0.0:20180, --advertise-status-addr=tikv1:20180,
+      --data-dir=/data, "--pd=pd1:2379,pd2:2379,pd3:2379", --config=/conf/tikv.toml]
+    ports: ["127.0.0.1:29011:20180"]
+  tikv2:
+    <<: *tikv
+    command: [--addr=0.0.0.0:20160, --advertise-addr=tikv2:20160, --status-addr=0.0.0.0:20180, --advertise-status-addr=tikv2:20180,
+      --data-dir=/data, "--pd=pd1:2379,pd2:2379,pd3:2379", --config=/conf/tikv.toml]
+    ports: ["127.0.0.1:29012:20180"]
+  tikv3:
+    <<: *tikv
+    command: [--addr=0.0.0.0:20160, --advertise-addr=tikv3:20160, --status-addr=0.0.0.0:20180, --advertise-status-addr=tikv3:20180,
+      --data-dir=/data, "--pd=pd1:2379,pd2:2379,pd3:2379", --config=/conf/tikv.toml]
+    ports: ["127.0.0.1:29013:20180"]
+  tidb:
+    image: pingcap/tidb:v8.5.8
+    mem_limit: 768m
+    cpus: 2
+    command: [--store=tikv, "--path=pd1:2379,pd2:2379,pd3:2379", --advertise-address=tidb, -P, "4000", --status=10080, --config=/conf/tidb.toml]
+    volumes: ["./conf:/conf:ro"]
+    depends_on: [tikv1, tikv2, tikv3]
+    ports: ["127.0.0.1:29000:4000", "127.0.0.1:29080:10080"]
+  client:
+    image: mysql:8.4.7
+    mem_limit: 128m
+    entrypoint: ["sleep", "infinity"]
+  blackbox:
+    image: prom/blackbox-exporter:v0.27.0
+    mem_limit: 64m
+    command: [--config.file=/etc/bb/blackbox.yml]
+    volumes: ["./bb:/etc/bb:ro"]
+    ports: ["127.0.0.1:29091:9115"]
+  prometheus:
+    image: prom/prometheus:v3.13.5
+    mem_limit: 512m
+    command: [--config.file=/etc/lab/prometheus.yml, --web.enable-lifecycle, --storage.tsdb.path=/prometheus]
+    volumes: ["./prom:/etc/lab:ro", "../../../rules/targets/tidb.yml:/etc/rules/tidb.yml:ro", "./official:/etc/official:ro"]
+    ports: ["127.0.0.1:29090:9090"]
