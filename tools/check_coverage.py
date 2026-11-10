@@ -35,12 +35,24 @@ import urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import catalog as C  # noqa: E402
 
-TYPE_TO_CARD = {
-    "prometheus": "prometheus", "alertmanager": "alertmanager", "vmalert": "vmalert", "vmagent": "vmagent",
-    "victoriametrics": "victoriametrics", "vmcluster": "victoriametrics", "vmsingle": "victoriametrics",
-    "victorialogs": "victorialogs", "mysqld_exporter": "mysqld_exporter", "postgres_exporter": "postgres_exporter",
+# env.yaml `type` is normally the card id itself (ls catalog/components catalog/targets); these are accepted aliases.
+TYPE_ALIASES = {
+    "vmcluster": "victoriametrics", "vmsingle": "victoriametrics", "thanos-ruler": "thanos", "thanos_ruler": "thanos",
+    "grafana": "grafana_alerting", "valkey": "redis_exporter", "redis": "redis_exporter", "mysql": "mysqld_exporter",
+    "mariadb": "mysqld_exporter", "postgres": "postgres_exporter", "postgresql": "postgres_exporter",
+    "mongodb": "mongodb_exporter", "mongo": "mongodb_exporter",
 }
-RULER_TYPES = {"prometheus", "vmalert"}
+
+
+def card_for(type_: str | None, card_ids: set[str]) -> str | None:
+    if type_ in card_ids:
+        return type_
+    return TYPE_ALIASES.get(type_ or "")
+
+
+# components that evaluate alerting rules and expose a Prometheus-style /api/v1/rules
+# (Thanos Ruler: /api/v1/rules; Grafana: /api/prometheus/grafana/api/v1/rules, save it as <id>/rules.json)
+RULER_TYPES = {"prometheus", "vmalert", "thanos", "thanos-ruler", "thanos_ruler", "grafana_alerting", "grafana"}
 STATUS_ORDER = ["missing", "rule_no_data", "self_only", "needs_input", "covered", "not_applicable"]
 STATUS_TEXT = {"covered": "涵蓋", "self_only": "只在自己身上", "rule_no_data": "規則在但沒資料", "missing": "缺少",
                "not_applicable": "不適用", "needs_input": "需要回答"}
@@ -208,8 +220,9 @@ def evaluate(env: dict, snapshot: str, tiers: set[int], live: bool) -> list[dict
     rl = rulers(env)
     rules_by_ruler = {rid: load_rules(snapshot, rid) for rid in rl}
     items = []
-    instances = [(c, TYPE_TO_CARD.get(c.get("type"))) for c in env["components"]]
-    instances += [(t, TYPE_TO_CARD.get(t.get("type"))) for t in env["targets"]]
+    ids = set(cards)
+    instances = [(c, card_for(c.get("type"), ids)) for c in env["components"]]
+    instances += [(t, card_for(t.get("type"), ids)) for t in env["targets"]]
     instances.append(({"id": "observers", "type": "observer"}, "observer"))
     for comp, card_id in instances:
         if card_id not in cards:

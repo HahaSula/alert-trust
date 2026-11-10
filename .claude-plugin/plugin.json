@@ -1,10 +1,22 @@
 {
   "name": "alert-trust",
-  "description": "Interactive self-check of the alert chain (collect, write, query, evaluate, route, receive): env profile, read-only snapshot, coverage gaps, timing contracts and per-component packs for Prometheus, VictoriaMetrics, Alertmanager and database exporters",
-  "version": "0.1.0",
-  "author": { "name": "HahaSula" },
+  "description": "Interactive self-check of the alert chain (collect, write, query, evaluate, route, receive): env profile, read-only snapshot, metric-source check, coverage gaps, timing contracts with fix options, and per-component packs for Prometheus, Thanos, VictoriaMetrics, Grafana Alerting, Alertmanager and database targets (MySQL/MariaDB, PostgreSQL, Valkey/Redis, MongoDB, etcd, TiDB, YugabyteDB, ClickHouse)",
+  "version": "0.3.0",
+  "author": {
+    "name": "HahaSula"
+  },
   "homepage": "https://hahasula.github.io/alert-trust/",
   "repository": "https://github.com/HahaSula/alert-trust",
   "license": "MIT",
-  "keywords": ["prometheus", "victoriametrics", "vmalert", "alertmanager", "meta-monitoring", "alerting"]
+  "keywords": [
+    "alerting",
+    "alertmanager",
+    "database",
+    "grafana",
+    "meta-monitoring",
+    "prometheus",
+    "thanos",
+    "victoriametrics",
+    "vmalert"
+  ]
 }

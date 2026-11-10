@@ -1,6 +1,6 @@
 ---
 name: selfcheck
-description: Entry point of the alert-trust self-check for a monitoring stack (Prometheus, VictoriaMetrics/vmalert/vmagent/VictoriaLogs, Alertmanager, database exporters). Runs the 3-stage flow from docs/model.md - env profile, read-only snapshot, coverage gaps - dispatches to the per-component packs and assembles the final report. Use when someone wants to know whether their alerts can be trusted or which monitor-of-monitor signals are missing. 自檢整條 alert 鏈、rule 可信度、monitor of monitor 缺口時使用。
+description: Entry point of the alert-trust self-check for a monitoring stack (Prometheus, Thanos, VictoriaMetrics/vmalert/vmagent/VictoriaLogs, Grafana Alerting, Alertmanager, database targets). Runs the 3-stage flow from docs/model.md - env profile, read-only snapshot, coverage gaps - dispatches to the per-component packs and assembles the final report. Use when someone wants to know whether their alerts can be trusted or which monitor-of-monitor signals are missing. 自檢整條 alert 鏈、rule 可信度、monitor of monitor 缺口時使用。
 when_to_use: 自檢監控、alert 能不能信、alert 不觸發、假 resolved、monitor of monitor、meta-monitoring、dead man's switch、Watchdog、vmalert 自檢、Prometheus 自檢、Alertmanager 自檢、exporter 盲點
 argument-hint: "[env/<name>.yaml]"
 ---
@@ -59,6 +59,8 @@ argument-hint: "[env/<name>.yaml]"
 | `vmagent` | `--vmagent <id>=<url>` |
 | `victorialogs` | `--vlogs <id>=<url>` |
 | `alertmanager` | `--am <id>=<url>`；HA 時每台各一個 id |
+| `thanos`（Ruler 或 Querier） | `--prom <id>=<url>`：Prometheus 相容的查詢與 `/api/v1/rules` 拿得到；Prometheus 專有的 flags、config、targets 會記成錯誤，屬正常 |
+| `grafana_alerting` | collect 不支援。請使用者存下 `/api/prometheus/grafana/api/v1/rules` 的回應，放到 `<快照>/<id>/rules.json` |
 
 ```bash
 python3 "$AT/tools/collect.py" --out selfcheck-data/<name>-<YYYYMMDD> --range 7d \
@@ -101,7 +103,9 @@ python3 "$AT/tools/check_coverage.py" --env env/<name>.yaml \
 | `prometheus`（含觀察者） | `prometheus` | 尖峰、rule 時間契約、資源邊際、升級路徑 |
 | `vmalert`、`victoriametrics`、`vmagent`、`victorialogs` | `victoriametrics` | vmalert 視窗契約、log rule、partial response、假 resolved、唯讀 |
 | `alertmanager` | `alertmanager` | 路由、DMS、失敗告警視窗、HA、送達失敗 |
-| `targets` 裡任何 type | `database-targets` | Exporter 的三層存活、collector 盲點、查詢期限 |
+| `thanos` | 沒有專屬 pack：讀 `$AT/catalog/components/thanos.yaml` 與 `$AT/docs/architecture/thanos.md`，逐條看第 1 級訊號與 `silent_failures` | store 少掉時查詢仍回成功（`partial_response_strategy` 擋不住）、Querier 掛掉的假 resolved、Compactor 停擺 `up` 仍是 1、sidecar 上傳 |
+| `grafana_alerting` | 沒有專屬 pack：讀 `$AT/catalog/components/grafana_alerting.yaml` 與 `$AT/docs/architecture/grafana-alerting.md` | NoData／Error 設成 OK 會悄悄 resolved、`execErrState` 預設、重送 30s 寫死的 EndsAt、HA |
+| `targets` 裡任何 type | `database-targets` | 依卡片的 `model`：exporter 型的三層存活與查詢期限；native 型的 `up`／探測／健康 metric 交叉判斷 |
 | 任何 ruler，且使用者要可重複的規則 | `policy-lint` | 依 policy 列出違反項與建議值 |
 
 `observers` 由本 skill 處理：讀 `$AT/catalog/components/observer.yaml`，`needs_input` 的訊號用它的 `question` 直接問（每組最多 3 題）。

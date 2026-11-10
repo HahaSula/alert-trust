@@ -29,6 +29,17 @@ class CoverageTest(unittest.TestCase):
         self.assertEqual(self.items[("observers", "separate-alert-path")]["status"], "covered")
         self.assertEqual(self.items[("observers", "scrapes-all-infra")]["status"], "covered")
 
+    def test_every_card_is_a_valid_type(self):
+        import catalog as C
+        ids = {c["id"] for c in C.load_components()}
+        for cid in ids:
+            self.assertEqual(CC.card_for(cid, ids), cid)
+        self.assertEqual(CC.card_for("valkey", ids), "redis_exporter")
+        self.assertEqual(CC.card_for("thanos-ruler", ids), "thanos")
+        self.assertIsNone(CC.card_for("zabbix", ids))
+        env = {"components": [{"id": "tr", "type": "thanos"}, {"id": "g", "type": "grafana_alerting"}], "observers": []}
+        self.assertEqual(set(CC.rulers(env)), {"tr", "g"})
+
     def test_job_matcher(self):
         self.assertTrue(CC.job_matches('up{job=~".*prometheus.*"}', "my-prometheus"))
         self.assertFalse(CC.job_matches('up{job=~".*prometheus.*"}', "prom-a-self"))

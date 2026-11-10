@@ -32,6 +32,7 @@
 | YugabyteDB v2026.1.3.0 target（`model: native`），YSQL 與 PostgreSQL 監控對照（postgres_exporter 實測） | `catalog/targets/yugabytedb.yaml`、`docs/targets/yugabytedb*.md`、`lab/targets/yugabytedb/` |
 | ClickHouse v26.10.2 target（內建 endpoint＋query-exporter 查 system 表）與「分析型」架構頁，2 副本＋3 Keeper lab | `catalog/targets/clickhouse.yaml`、`docs/targets/clickhouse*.md`、`queries/clickhouse/`、`lab/targets/clickhouse/` |
 | MongoDB 8.0.34 target（Percona mongodb_exporter v0.54.0）與「文件型」架構頁，3 成員 replica set lab | `catalog/targets/mongodb_exporter.yaml`、`docs/targets/mongodb*.md`、`lab/targets/mongodb/` |
+| Skill 與工具跟上新卡片：覆蓋檢查器認得所有卡片 id 與常見別名、Thanos Ruler／Grafana 算 ruler；database-targets 依 `model` 分 exporter／native 兩條流程；selfcheck 分派 Thanos、Grafana；plugin 0.3.0 | `tools/check_coverage.py`、`skills/`、`.claude-plugin/` |
 | artifact 對照後的修正：VM 報告只留公開 lab 數字、VictoriaLogs storage-reachable 改規則（重跑 lab）、Prometheus retention／notifier／磁碟訊號、VM 系列第 2、3 級訊號 | `docs/reports/`、`catalog/components/`、`rules/`、`lab/vm/vl/` |
 | 時間契約不合時給兩個方向：目前合格的 rule、方案 A 改 rule（最短合格視窗，可另存）、方案 B 改環境（`scrape_interval`、`query_offset`） | `tools/fit_contracts.py` |
 | metric 來源檢查：每個 metric 要對到 config 的 scrape job、live 快照或使用者回答，不假定（使用者在 v0.1.0 用 opencode 時回報 AI 直接假定來源） | `tools/check_metric_sources.py`、`env/sources.example.yaml` |
@@ -39,7 +40,8 @@
 
 ## 進行中
 
-（無）
+- scrape／evaluation 基準值調查（完成後更新 skill，再打 v0.3.0）
+- 時間契約與 PromQL range 函式的原始碼＋實驗複查
 
 使用者同意的資料庫順序已全部完成；CockroachDB（專有授權）不做。資料庫架構頁依類型分頁：關聯式、記憶體 KV、共識（Raft）、分散式 SQL、分析型、文件型。
 
