@@ -1,0 +1,23 @@
+# 不靠牆鐘：資料用明確時間戳匯入（2026-01-01T00:00:00Z 起），查詢指定 time=。
+name: at-pqw-server
+services:
+  prom:
+    image: prom/prometheus:v3.13.5
+    user: "${UID:-1000}:${GID:-1000}"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/data
+      - --storage.tsdb.retention.time=100y
+      - --enable-feature=promql-experimental-functions,promql-extended-range-selectors
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ${PROM_DATA:?}:/data
+    ports: ["127.0.0.1:33001:9090"]
+  vm:
+    image: victoriametrics/victoria-metrics:v1.155.0
+    command: [-retentionPeriod=100y, -search.disableCache]
+    ports: ["127.0.0.1:33002:8428"]
+  vm-minstale:
+    image: victoriametrics/victoria-metrics:v1.155.0
+    command: [-retentionPeriod=100y, -search.disableCache, -search.minStalenessInterval=1m]
+    ports: ["127.0.0.1:33003:8428"]

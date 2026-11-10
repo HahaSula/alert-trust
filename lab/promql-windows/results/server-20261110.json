@@ -1,0 +1,689 @@
+[
+ {
+  "target": "prom",
+  "group": "H 對照",
+  "why": "沒有 modifier：R = I 只有 1 個 sample，rate 空",
+  "query": "count(rate(c[30s]))",
+  "at": 119,
+  "step": null,
+  "expect": null,
+  "got": null,
+  "labels": [],
+  "ok": true
+ },
+ {
+  "target": "prom",
+  "group": "H anchored",
+  "why": "anchored：視窗內 1 個 sample＋lookback 內的錨點",
+  "query": "count(rate(c[30s] anchored))",
+  "at": 119,
+  "step": null,
+  "expect": 1,
+  "got": [
+   1.0
+  ],
+  "labels": [
+   {}
+  ],
+  "ok": true
+ },
+ {
+  "target": "prom",
+  "group": "H anchored",
+  "why": "anchored：視窗內沒有 sample",
+  "query": "count(rate(c[29s] anchored))",
+  "at": 119,
+  "step": null,
+  "expect": null,
+  "got": null,
+  "labels": [],
+  "ok": true
+ },
+ {
+  "target": "prom",
+  "group": "H anchored",
+  "why": "anchored increase：錨點 60s(20) 到 90s(30)，不外推",
+  "query": "increase(c[30s] anchored)",
+  "at": 119,
+  "step": null,
+  "expect": 10,
+  "got": [
+   10.0
+  ],
+  "labels": [
+   {
+    "job": "lab"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "target": "prom",
+  "group": "H anchored",
+  "why": "anchored changes：1 個 sample 也看得到變化",
+  "query": "changes(g[30s] anchored)",
+  "at": 119,
+  "step": null,
+  "expect": 1,
+  "got": [
+   1.0
+  ],
+  "labels": [
+   {
+    "job": "lab"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "target": "prom",
+  "group": "H anchored",
+  "why": "對照：一般 changes 只有 1 個 sample 時是 0",
+  "query": "changes(g[30s])",
+  "at": 119,
+  "step": null,
+  "expect": 0,
+  "got": [
+   0.0
+  ],
+  "labels": [
+   {
+    "job": "lab"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "target": "prom",
+  "group": "H smoothed",
+  "why": "smoothed：視窗後有 sample（120s）時，視窗內 0 個也有值",
+  "query": "count(rate(c[29s] smoothed))",
+  "at": 119,
+  "step": null,
+  "expect": 1,
+  "got": [
+   1.0
+  ],
+  "labels": [
+   {}
+  ],
+  "ok": true
+ },
+ {
+  "target": "prom",
+  "group": "H smoothed",
+  "why": "smoothed 在「現在」：視窗後還沒有 sample，視窗內 0 個就空（d = 20s）",
+  "query": "count(rate(c_inflight[49s] smoothed))",
+  "at": 139,
+  "step": null,
+  "expect": null,
+  "got": null,
+  "labels": [],
+  "ok": true
+ },
+ {
+  "target": "prom",
+  "group": "H smoothed",
+  "why": "smoothed 在「現在」：視窗內 1 個＋錨點",
+  "query": "count(rate(c_inflight[50s] smoothed))",
+  "at": 139,
+  "step": null,
+  "expect": 1,
+  "got": [
+   1.0
+  ],
+  "labels": [
+   {}
+  ],
+  "ok": true
+ },
+ {
+  "target": "prom",
+  "group": "H 實驗函式",
+  "why": "double_exponential_smoothing：R = 2I − 1s",
+  "query": "count(double_exponential_smoothing(g[59s], 0.5, 0.5))",
+  "at": 119,
+  "step": null,
+  "expect": null,
+  "got": null,
+  "labels": [],
+  "ok": true
+ },
+ {
+  "target": "prom",
+  "group": "H 實驗函式",
+  "why": "double_exponential_smoothing：R = 2I",
+  "query": "count(double_exponential_smoothing(g[60s], 0.5, 0.5))",
+  "at": 119,
+  "step": null,
+  "expect": 1,
+  "got": [
+   1.0
+  ],
+  "labels": [
+   {}
+  ],
+  "ok": true
+ },
+ {
+  "target": "prom",
+  "group": "H 實驗函式",
+  "why": "mad_over_time：R = I − 1s",
+  "query": "count(mad_over_time(g[29s]))",
+  "at": 119,
+  "step": null,
+  "expect": null,
+  "got": null,
+  "labels": [],
+  "ok": true
+ },
+ {
+  "target": "prom",
+  "group": "H 實驗函式",
+  "why": "mad_over_time：R = I",
+  "query": "mad_over_time(g[30s])",
+  "at": 119,
+  "step": null,
+  "expect": 0,
+  "got": [
+   0.0
+  ],
+  "labels": [
+   {
+    "job": "lab"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "target": "prom",
+  "group": "H 實驗函式",
+  "why": "first_over_time：R = I − 1s",
+  "query": "count(first_over_time(g[29s]))",
+  "at": 119,
+  "step": null,
+  "expect": null,
+  "got": null,
+  "labels": [],
+  "ok": true
+ },
+ {
+  "target": "prom",
+  "group": "H 實驗函式",
+  "why": "first_over_time：R = I",
+  "query": "first_over_time(g[30s])",
+  "at": 119,
+  "step": null,
+  "expect": 4,
+  "got": [
+   4.0
+  ],
+  "labels": [
+   {
+    "__name__": "g",
+    "job": "lab"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M 左開",
+  "why": "count_over_time：R = 2I，左邊界不算（同 Prometheus 3.x）",
+  "query": "count_over_time(c[1m])",
+  "at": 120,
+  "step": "5m",
+  "expect": 2,
+  "got": [
+   2.0
+  ],
+  "labels": [
+   {
+    "job": "lab"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M 左開",
+  "why": "count_over_time：R = I",
+  "query": "count_over_time(c[30s])",
+  "at": 60,
+  "step": "5m",
+  "expect": 1,
+  "got": [
+   1.0
+  ],
+  "labels": [
+   {
+    "job": "lab"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M 前一個 sample",
+  "why": "rate：視窗內 1 個 sample，用視窗前的 60s 補",
+  "query": "rate(c[30s])",
+  "at": 119,
+  "step": "5m",
+  "expect": 0.3333333333333333,
+  "got": [
+   0.3333333333333333
+  ],
+  "labels": [
+   {
+    "job": "lab"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M 前一個 sample",
+  "why": "rate：視窗內 0 個 sample",
+  "query": "rate(c[29s])",
+  "at": 119,
+  "step": "5m",
+  "expect": null,
+  "got": null,
+  "labels": [],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M 前一個 sample",
+  "why": "increase：視窗內 1 個 sample",
+  "query": "increase(c[30s])",
+  "at": 119,
+  "step": "5m",
+  "expect": 10,
+  "got": [
+   10.0
+  ],
+  "labels": [
+   {
+    "job": "lab"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M 前一個 sample",
+  "why": "increase：視窗內 0 個 sample",
+  "query": "increase(c[29s])",
+  "at": 119,
+  "step": "5m",
+  "expect": null,
+  "got": null,
+  "labels": [],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M 前一個 sample",
+  "why": "irate：視窗內 1 個 sample",
+  "query": "irate(c[30s])",
+  "at": 119,
+  "step": "5m",
+  "expect": 0.3333333333333333,
+  "got": [
+   0.3333333333333333
+  ],
+  "labels": [
+   {
+    "job": "lab"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M 前一個 sample",
+  "why": "delta：視窗內 1 個 sample",
+  "query": "delta(g[30s])",
+  "at": 119,
+  "step": "5m",
+  "expect": 1,
+  "got": [
+   1.0
+  ],
+  "labels": [
+   {
+    "job": "lab"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M 前一個 sample",
+  "why": "idelta：視窗內 1 個 sample",
+  "query": "idelta(g[30s])",
+  "at": 119,
+  "step": "5m",
+  "expect": 1,
+  "got": [
+   1.0
+  ],
+  "labels": [
+   {
+    "job": "lab"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M 前一個 sample",
+  "why": "changes：把視窗前的 sample 算進去",
+  "query": "changes(g[30s])",
+  "at": 119,
+  "step": "5m",
+  "expect": 1,
+  "got": [
+   1.0
+  ],
+  "labels": [
+   {
+    "job": "lab"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M 前一個 sample",
+  "why": "resets：視窗內 1 個 sample",
+  "query": "resets(c[30s])",
+  "at": 119,
+  "step": "5m",
+  "expect": 0,
+  "got": [
+   0.0
+  ],
+  "labels": [
+   {
+    "job": "lab"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M 前一個 sample",
+  "why": "holt_winters：視窗內 1 個 sample",
+  "query": "count(holt_winters(g[30s], 0.5, 0.5))",
+  "at": 119,
+  "step": "5m",
+  "expect": 1,
+  "got": [
+   1.0
+  ],
+  "labels": [
+   {}
+  ],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M Prometheus 相容",
+  "why": "rate_prometheus：要 2 個 sample",
+  "query": "rate_prometheus(c[30s])",
+  "at": 119,
+  "step": "5m",
+  "expect": null,
+  "got": null,
+  "labels": [],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M Prometheus 相容",
+  "why": "increase_prometheus：要 2 個 sample",
+  "query": "increase_prometheus(c[30s])",
+  "at": 119,
+  "step": "5m",
+  "expect": null,
+  "got": null,
+  "labels": [],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M 1 個 sample",
+  "why": "deriv：1 個 sample 時回傳 0（Prometheus 是空）",
+  "query": "deriv(g[30s])",
+  "at": 119,
+  "step": "5m",
+  "expect": 0,
+  "got": [
+   0.0
+  ],
+  "labels": [
+   {
+    "job": "lab"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M 1 個 sample",
+  "why": "predict_linear：1 個 sample 時斜率當 0",
+  "query": "predict_linear(g[30s], 60)",
+  "at": 119,
+  "step": "5m",
+  "expect": 4,
+  "got": [
+   4.0
+  ],
+  "labels": [
+   {
+    "__name__": "g",
+    "job": "lab"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M 1 個 sample",
+  "why": "last_over_time：R = I − 1s",
+  "query": "last_over_time(g[29s])",
+  "at": 119,
+  "step": "5m",
+  "expect": null,
+  "got": null,
+  "labels": [],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M 1 個 sample",
+  "why": "last_over_time：R = I",
+  "query": "last_over_time(g[30s])",
+  "at": 119,
+  "step": "5m",
+  "expect": 4,
+  "got": [
+   4.0
+  ],
+  "labels": [
+   {
+    "__name__": "g",
+    "job": "lab"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M 1 個 sample",
+  "why": "absent_over_time：視窗內沒有 sample 回傳 1",
+  "query": "absent_over_time(c[29s])",
+  "at": 119,
+  "step": "5m",
+  "expect": 1,
+  "got": [
+   1.0
+  ],
+  "labels": [
+   {}
+  ],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M step",
+  "why": "前一個 sample 要在 step 內：step 20s 時 60s 的 sample 太舊",
+  "query": "rate(c[30s])",
+  "at": 119,
+  "step": "20s",
+  "expect": null,
+  "got": null,
+  "labels": [],
+  "ok": true
+ },
+ {
+  "target": "vm-minstale",
+  "group": "M step",
+  "why": "同上，加 -search.minStalenessInterval=1m",
+  "query": "rate(c[30s])",
+  "at": 119,
+  "step": "20s",
+  "expect": 0.3333333333333333,
+  "got": [
+   0.3333333333333333
+  ],
+  "labels": [
+   {
+    "job": "lab"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M 省略視窗",
+  "why": "rate(c)：視窗 = step（5m）",
+  "query": "rate(c)",
+  "at": 119,
+  "step": "5m",
+  "expect": 0.3333333333333333,
+  "got": [
+   0.3333333333333333
+  ],
+  "labels": [
+   {
+    "job": "lab"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M 省略視窗",
+  "why": "rate(c)：step 20s 時視窗只有 20s",
+  "query": "rate(c)",
+  "at": 119,
+  "step": "20s",
+  "expect": null,
+  "got": null,
+  "labels": [],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M 失敗 k=1",
+  "why": "rate：90s 缺，R = I，前一個 sample 用 60s",
+  "query": "rate(c_gap[30s])",
+  "at": 120,
+  "step": "5m",
+  "expect": 0.3333333333333333,
+  "got": [
+   0.3333333333333333
+  ],
+  "labels": [
+   {
+    "job": "lab"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M 失敗 k=1",
+  "why": "同上，step 30s：前一個 sample 要在 (tStart − step, tStart] = (60s, 90s] 內，60s 不算",
+  "query": "rate(c_gap[30s])",
+  "at": 120,
+  "step": "30s",
+  "expect": null,
+  "got": null,
+  "labels": [],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M vm-range-window",
+  "why": "D = 0：R = I + L − 1s",
+  "query": "rate(c_inflight[49s])",
+  "at": 139,
+  "step": "5m",
+  "expect": null,
+  "got": null,
+  "labels": [],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M vm-range-window",
+  "why": "D = 0：R = I + L",
+  "query": "rate(c_inflight[50s])",
+  "at": 139,
+  "step": "5m",
+  "expect": 0.3333333333333333,
+  "got": [
+   0.3333333333333333
+  ],
+  "labels": [
+   {
+    "job": "lab"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M vm-range-window",
+  "why": "D = 20s（查詢時間 119s）：R = I + L − D − 1s",
+  "query": "rate(c_inflight[29s])",
+  "at": 119,
+  "step": "5m",
+  "expect": null,
+  "got": null,
+  "labels": [],
+  "ok": true
+ },
+ {
+  "target": "vm",
+  "group": "M vm-range-window",
+  "why": "D = 20s：R = I + L − D",
+  "query": "rate(c_inflight[30s])",
+  "at": 119,
+  "step": "5m",
+  "expect": 0.3333333333333333,
+  "got": [
+   0.3333333333333333
+  ],
+  "labels": [
+   {
+    "job": "lab"
+   }
+  ],
+  "ok": true
+ }
+]

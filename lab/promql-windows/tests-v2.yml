@@ -1,0 +1,82 @@
+# Prometheus 2.51.2：閉區間對照
+# 由 gen_tests.py 產生，不要手改。
+rule_files: []
+evaluation_interval: 30s
+tests:
+  - interval: 30s
+    input_series:
+      - series: "c{job=\"lab\"}"
+        values: "0+10x20"
+      - series: "g{job=\"lab\"}"
+        values: "1+1x20"
+      - series: "c_gap{job=\"lab\"}"
+        values: "0 10 20 _ 40 50 60 70 80 90"
+      - series: "c_inflight{job=\"lab\"}"
+        values: "0 10 20 30"
+      - series: "s{job=\"lab\"}"
+        values: "0 10 20 stale"
+    promql_expr_test:
+      # [A 閉區間] R = 2I，兩端邊界的 sample 都算：3 個
+      - expr: "count_over_time(c[1m])"
+        eval_time: 2m
+        exp_samples:
+          - labels: "{job=\"lab\"}"
+            value: 3
+      # [A 閉區間] R = I：2 個 sample，rate 有值（3.x 是空）
+      - expr: "count(rate(c[30s]))"
+        eval_time: 1m
+        exp_samples:
+          - labels: "{}"
+            value: 1
+      # [A 閉區間] R = I：count_over_time 是 2
+      - expr: "count_over_time(c[30s])"
+        eval_time: 1m
+        exp_samples:
+          - labels: "{job=\"lab\"}"
+            value: 2
+      # [B 2 個 sample] rate：R = 2I − 1s，eval 在 1m59s 時左邊界剛好落在 60s，仍有 2 個
+      - expr: "count(rate(c[59s]))"
+        eval_time: 1m59s
+        exp_samples:
+          - labels: "{}"
+            value: 1
+      # [B 2 個 sample] rate：R = 2I − 1s，換成最差相位（1m59.5s）只剩 1 個
+      - expr: "count(rate(c[59s]))"
+        eval_time: 1m59s500ms
+        exp_samples: []
+      # [B 2 個 sample] rate：R = 2I，最差相位也有 2 個
+      - expr: "count(rate(c[60s]))"
+        eval_time: 1m59s500ms
+        exp_samples:
+          - labels: "{}"
+            value: 1
+      # [B 2 個 sample] holt_winters：R = 2I − 1s，最差相位
+      - expr: "count(holt_winters(g[59s], 0.5, 0.5))"
+        eval_time: 1m59s500ms
+        exp_samples: []
+      # [B 2 個 sample] holt_winters：R = 2I
+      - expr: "count(holt_winters(g[60s], 0.5, 0.5))"
+        eval_time: 1m59s500ms
+        exp_samples:
+          - labels: "{}"
+            value: 1
+      # [C 1 個 sample] last_over_time：R = I − 1s，最差相位
+      - expr: "count(last_over_time(g[29s]))"
+        eval_time: 1m59s500ms
+        exp_samples: []
+      # [C 1 個 sample] last_over_time：R = I
+      - expr: "count(last_over_time(g[30s]))"
+        eval_time: 1m59s500ms
+        exp_samples:
+          - labels: "{}"
+            value: 1
+      # [F staleness] marker 之後：instant selector 立刻變空
+      - expr: "s"
+        eval_time: 1m40s
+        exp_samples: []
+      # [F staleness] last_over_time 回傳 marker 之前的舊值
+      - expr: "last_over_time(s[2m])"
+        eval_time: 1m40s
+        exp_samples:
+          - labels: "s{job=\"lab\"}"
+            value: 20

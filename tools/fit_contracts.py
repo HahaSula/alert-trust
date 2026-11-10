@@ -18,9 +18,11 @@ The report answers, in this order (the order a reviewer needs):
      smallest query_offset / eval_delay that make it fit).
   4. One environment change that makes every current rule fit (option B for all rules at once).
 
-Contracts (docs/contracts.md): Prometheus range-window R >= (2+k)·I + d, or R >= (2+k)·I when the
-offset (query_offset + selector offset) >= d; I = S when d <= S, else ceil(d/S)·S. vmalert
-vm-range-window R >= I + L - D. A rule reading a recording rule gets I = that group's interval, d = 0
+Contracts (docs/contracts.md): Prometheus R >= (n+k)·I + max(0, d - O), O = query_offset + selector
+offset; n = 2 for rate/increase/delta/irate/idelta/deriv/predict_linear/changes/resets (range-window),
+n = 1 for *_over_time (range-window-1sample). I = S when d <= S, else ceil(d/S)·S as an upper bound.
+vmalert vm-range-window R >= (n+k)·I + max(0, L - D), n = 1 when (1+k)·I < -datasource.queryStep
+(MetricsQL uses the sample before the window), else 2; *_prometheus functions always 2. A rule reading a recording rule gets I = that group's interval, d = 0
 (approximation; say so in the review). Numbers you were not given are reported as assumptions.
 
 --baseline prints suggested S, τ, exporter deadline X, E, k and R_min per job from measured
@@ -92,7 +94,42 @@ def kv(items: list[str]) -> dict[str, float]:
 
 
 def eff_interval(S: float, d: float) -> float:
+    """Data interval. When d > S the next scrape starts right after the slow one (one pending tick),
+    so I is about max(S, d); ceil(d/S)·S is kept as a conservative upper bound (docs/contracts.md)."""
     return S if d <= S else math.ceil(d / S) * S
+
+
+# samples needed in the window for a non-empty / meaningful result (docs/contracts.md#range-functions)
+TWO_SAMPLES = {"rate", "increase", "delta", "irate", "idelta", "deriv", "predict_linear", "holt_winters",
+               "double_exponential_smoothing", "changes", "resets"}  # changes/resets: 2 to detect a change
+ONE_SAMPLE = {f"{x}_over_time" for x in ("avg", "min", "max", "sum", "count", "stddev", "stdvar", "quantile",
+                                          "last", "present", "absent", "mad")}
+
+
+def enclosing_func(expr: str, pos: int) -> str:
+    """Name of the innermost function whose parenthesis encloses position pos ('' if none)."""
+    depth = 0
+    for i in range(pos - 1, -1, -1):
+        c = expr[i]
+        if c == ")":
+            depth += 1
+        elif c == "(":
+            if depth == 0:
+                m = re.search(r"([A-Za-z_][A-Za-z0-9_]*)\s*$", expr[:i])
+                return m.group(1) if m else ""
+            depth -= 1
+    return ""
+
+
+def samples_needed(a, func: str, I: float, k: int) -> int:
+    if a.stack == "vmalert":
+        # MetricsQL uses the last sample before the window when it is within the query step
+        if func.endswith("_prometheus") or (1 + k) * I >= a.query_step:
+            return 2
+        return 1
+    if func in ONE_SAMPLE:
+        return 1
+    return 2  # TWO_SAMPLES, or an unknown wrapper: conservative
 
 
 def k_for(a, job) -> int:
@@ -100,11 +137,12 @@ def k_for(a, job) -> int:
     return max(a.k, int(a.job_failrun.get(job, 0)))
 
 
-def need_window(a, I: float, d: float, offset: float, k: int | None = None) -> float:
-    if a.stack == "vmalert":
-        return I + a.latency - a.eval_delay
+def need_window(a, I: float, d: float, offset: float, k: int | None = None, n: int = 2) -> float:
+    """range-window / range-window-1sample: (n+k)·I + max(0, d − O); vmalert: (n+k)·I + max(0, L − D)."""
     k = a.k if k is None else k
-    return (2 + k) * I + (0 if offset >= d else d)
+    if a.stack == "vmalert":
+        return (n + k) * I + max(0.0, a.latency - a.eval_delay)
+    return (n + k) * I + max(0.0, d - offset)
 
 
 def load(files: list[str]) -> list[tuple[str, dict]]:
@@ -148,19 +186,21 @@ def analyze(a, docs):
                     if a.stack == "vmalert" and a.dedup and metric not in recorded:
                         I = max(I, a.dedup)  # VictoriaMetrics keeps one sample per -dedup.minScrapeInterval
                     k = k_for(a, job)
-                    need = need_window(a, I, d, off, k)
-                    row = {"file": path, "group": g.get("name"), "rule": name, "metric": metric, "R": R, "S": S,
+                    func = enclosing_func(expr, m.start())
+                    n = samples_needed(a, func, I, k)
+                    need = need_window(a, I, d, off, k, n)
+                    row = {"file": path, "group": g.get("name"), "rule": name, "metric": metric, "func": func, "n": n, "R": R, "S": S,
                            "d": d, "I": I, "offset": off, "need": need, "src": src, "ok": R >= need}
                     if not row["ok"]:
                         fit = nice_up(need)
                         row["fit_R"] = fit
                         new_expr = new_expr.replace(m.group(0), m.group(0).replace(f"[{m.group('r')}]", f"[{fmt(fit)}]", 1), 1)
                         if a.stack == "vmalert":
-                            row["opt_b"] = {"eval_delay": max(0.0, I + a.latency - R),
-                                            "scrape_interval": R - a.latency + a.eval_delay}
+                            row["opt_b"] = {"eval_delay": max(0.0, (n + k) * I + a.latency - R),
+                                            "scrape_interval": (R - max(0.0, a.latency - a.eval_delay)) / (n + k)}
                         else:
-                            b = {"scrape_interval": (R - d) / (2 + k) if R > d else 0.0,
-                                 "scrape_interval_with_offset": R / (2 + k), "query_offset": d}
+                            b = {"scrape_interval": (R - d) / (n + k) if R > d else 0.0,
+                                 "scrape_interval_with_offset": R / (n + k), "query_offset": d}
                             row["opt_b"] = b
                     rows.append(row)
                 if new_expr != expr:
@@ -258,8 +298,8 @@ def report(a, rows, checks, assumptions) -> str:
     bad = [r for r in rows if not r["ok"]]
     out.append("\n## 2. 在目前規格下合格的 rule\n")
     if ok_rows:
-        out.append("| rule | metric | 視窗 R | 需要 ≥ | 邊際 |\n|---|---|---|---|---|")
-        out += [f"| `{r['rule']}` | `{r['metric']}` | {fmt(r['R'])} | {fmt(r['need'])} | +{fmt(r['R'] - r['need'])} |"
+        out.append("| rule | 函式（需要幾個 sample） | metric | 視窗 R | 需要 ≥ | 邊際 |\n|---|---|---|---|---|---|")
+        out += [f"| `{r['rule']}` | `{r['func'] or '—'}`（{r['n']}） | `{r['metric']}` | {fmt(r['R'])} | {fmt(r['need'])} | +{fmt(r['R'] - r['need'])} |"
                 for r in ok_rows]
     else:
         out.append("沒有。")
@@ -330,6 +370,7 @@ def main() -> int:
     ap.add_argument("--lookback", default="5m")
     ap.add_argument("--latency", default="0s", help="L：資料延遲（vmalert）")
     ap.add_argument("--eval-delay", default="30s", help="D：-rule.evalDelay（vmalert，預設 30s）")
+    ap.add_argument("--query-step", default="5m", help="vmalert -datasource.queryStep（預設 5m）")
     ap.add_argument("--dedup-interval", help="VictoriaMetrics 的 -dedup.minScrapeInterval；大於 S 時實際間隔用它")
     ap.add_argument("--out", required=True)
     ap.add_argument("--write-fitted", help="把方案 A 改好的 rule 寫到這個檔（不動原檔；註解不會保留）")
@@ -339,6 +380,7 @@ def main() -> int:
     a.T, a.lookback, a.latency, a.eval_delay = dur(a.group_duration), dur(a.lookback), dur(a.latency), dur(a.eval_delay)
     a.job_interval, a.job_duration = kv(a.job_interval), kv(a.job_duration)
     a.timeout, a.p99, a.dedup = dur(a.scrape_timeout), dur(a.scrape_p99), dur(a.dedup_interval)
+    a.query_step = dur(a.query_step)
     a.job_timeout, a.job_p99, a.exporter_deadline = kv(a.job_timeout), kv(a.job_p99), kv(a.exporter_deadline)
     a.job_failrun = {k: int(v) for k, _, v in (x.partition("=") for x in a.job_failrun)}
     if not a.rules and not a.baseline:

@@ -1,0 +1,9 @@
+# 時間契約與 range 函式複查的來源。key 以 pqw- 開頭。
+sources:
+  pqw-lab:
+    title: PromQL／MetricsQL range 函式的最小視窗（promtool 單元測試＋明確時間戳的查詢實驗，lab/promql-windows）
+    kind: experiment
+    visibility: public
+    url: https://github.com/HahaSula/alert-trust/tree/main/lab/promql-windows
+    checked: "2026-11-10, Prometheus v3.13.5、v2.51.2（promtool test rules）, VictoriaMetrics v1.155.0 single-node"
+    note: results/promtool-20261110.md 是 promtool 輸出與每個 case；results/server-20261110.md 是查詢結果

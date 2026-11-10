@@ -32,6 +32,7 @@
 | YugabyteDB v2026.1.3.0 target（`model: native`），YSQL 與 PostgreSQL 監控對照（postgres_exporter 實測） | `catalog/targets/yugabytedb.yaml`、`docs/targets/yugabytedb*.md`、`lab/targets/yugabytedb/` |
 | ClickHouse v26.10.2 target（內建 endpoint＋query-exporter 查 system 表）與「分析型」架構頁，2 副本＋3 Keeper lab | `catalog/targets/clickhouse.yaml`、`docs/targets/clickhouse*.md`、`queries/clickhouse/`、`lab/targets/clickhouse/` |
 | MongoDB 8.0.34 target（Percona mongodb_exporter v0.54.0）與「文件型」架構頁，3 成員 replica set lab | `catalog/targets/mongodb_exporter.yaml`、`docs/targets/mongodb*.md`、`lab/targets/mongodb/` |
+| 時間契約複查（原始碼＋promtool 虛擬時鐘測試，Prometheus 3.13.5／2.51.2、VictoriaMetrics）：range-window 一般化為 `(n+k)·I + max(0, d − O)`、新增 `range-window-1sample`、vm-range-window 改為 `(n+k)·I + max(0, L − D)`、resend-endsat 最差情況 `4 × max − P`；各 range 函式需要的 sample 數表；`fit_contracts.py` 依函式判斷 n | `docs/contracts.md#range-functions`、`lab/promql-windows/` |
 | scrape 與 evaluation 的基準值：官方預設與限制、來源比較、由耗時分布推導 S／τ／exporter 期限／E／k 的步驟；`fit_contracts.py` 檢查 τ、exporter 期限、截斷、p99、E ≥ S、VM dedup，`--baseline` 輸出建議值 | `docs/tools/baseline.md`、`tools/fit_contracts.py` |
 | Skill 與工具跟上新卡片：覆蓋檢查器認得所有卡片 id 與常見別名、Thanos Ruler／Grafana 算 ruler；database-targets 依 `model` 分 exporter／native 兩條流程；selfcheck 分派 Thanos、Grafana；plugin 0.3.0 | `tools/check_coverage.py`、`skills/`、`.claude-plugin/` |
 | artifact 對照後的修正：VM 報告只留公開 lab 數字、VictoriaLogs storage-reachable 改規則（重跑 lab）、Prometheus retention／notifier／磁碟訊號、VM 系列第 2、3 級訊號 | `docs/reports/`、`catalog/components/`、`rules/`、`lab/vm/vl/` |
@@ -41,7 +42,6 @@
 
 ## 進行中
 
-- 時間契約與 PromQL range 函式的原始碼＋實驗複查
 
 使用者同意的資料庫順序已全部完成；CockroachDB（專有授權）不做。資料庫架構頁依類型分頁：關聯式、記憶體 KV、共識（Raft）、分散式 SQL、分析型、文件型。
 
@@ -67,6 +67,7 @@
 18. **query-exporter 排程跳過**：間隔對齊時較長間隔的查詢會被跳過（ClickHouse lab 錯開間隔後解決；MySQL lab 也看過 `misfire_grace_time` 1 秒的跳過）。PostgreSQL 的 5 分鐘查詢可能受影響，要檢查 `queries/query-exporter/postgres.yaml` 的間隔。
 19. **artifact 對照的後續輕量 lab**：429 與 `iteration_missed`、帶 `for` 的 log rule、損毀 block（`reloads_failures_total`）、長查詢卡住 Compact（目前讀碼）。新增的 Prometheus／VM 規則只過 promtool／dryRun，沒有在 lab 觸發過。
 20. **MongoDB 待補**：sharded cluster、WiredTiger cache／eviction 壓力、ticket 排隊、連線打滿、collStats 成本只讀碼；oplog 被釘住只讀碼。`docs/targets/models.md` 說「8.0、8.2 的 tag 沒有 OTel 程式碼」，MongoDB agent 回報 8.2.12 有 OTLP 檔案／HTTP 推送（沒有 Prometheus 檔案輸出），要附原始碼行號後修正。
+21. **契約複查的後續**：`resend-endsat` 最差情況（`− P`）與 `d > S` 時 `I ≈ d` 只讀碼，要輕量 lab；Grafana Alerting 的續送是否同樣「嚴格大於」才送未查。
 
 ## 已做的決定
 

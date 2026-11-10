@@ -55,9 +55,9 @@
 <text x="610" y="130" class="lbl-b">4 · 時間契約</text>
 <text x="610" y="154" class="lbl-s">依第 1 步選公式：</text>
 <text x="610" y="178" class="tk">Prometheus</text>
-<text x="610" y="194" class="tk">R ≥ (2+k)·I + d</text>
+<text x="610" y="194" class="tk">R≥(n+k)·I+max(0,d−O)</text>
 <text x="610" y="218" class="tk">vmalert</text>
-<text x="610" y="234" class="tk">R ≥ I + L − D</text>
+<text x="610" y="234" class="tk">R≥(n+k)·I+max(0,L−D)</text>
 <text x="610" y="258" class="tk">Alertmanager 視窗</text>
 <text x="610" y="274" class="tk">≥ 2 × group_interval</text>
 <text x="610" y="304" class="lbl-s">數字拿不到就問</text>

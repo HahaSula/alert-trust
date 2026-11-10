@@ -110,6 +110,26 @@ terms:
     note: "沒寫 range 的查詢最多往回找這麼久。資料停止後，`m > 0` 這類條件還會繼續成立約 6 分鐘。"
     refs: [vma-querystep]
 
+  search_min_staleness_interval:
+    title: VictoriaMetrics 的最小 staleness 間隔
+    kind: config
+    systems: [victoriametrics]
+    tokens: [-search.minStalenessInterval]
+    where: "vmselect（或 single-node）的 `-search.minStalenessInterval`"
+    default: "0（不調整）"
+    note: "MetricsQL 的 `rate`、`increase` 會用視窗前最後一個 sample，但那個 sample 要在 step 內（vmalert 送的 step 是 `-datasource.queryStep`）。這個 flag 把「step 內」的下限拉長，也會拉長省略視窗時的預設視窗。"
+    refs: [pqw-vm-minstale-flag, pqw-vm-minstale-use, pqw-lab-server]
+
+  search_latency_offset:
+    title: VictoriaMetrics 的查詢延遲
+    kind: config
+    systems: [victoriametrics]
+    tokens: [-search.latencyOffset, latency_offset]
+    where: "vmselect（或 single-node）的 `-search.latencyOffset`，單次查詢可用 `latency_offset` 參數覆寫"
+    default: "30s"
+    note: "Instant query 的時間離現在不到這麼久、又沒帶 `nocache=1` 時，查詢時間改成 now − 30s。vmalert 的 `eval_delay` 設得比它小時，實際的查詢延遲至少是它。"
+    refs: [pqw-vm-latency-offset, pqw-vm-latency-apply]
+
   query_max_concurrency:
     title: Prometheus 查詢併發上限
     kind: config

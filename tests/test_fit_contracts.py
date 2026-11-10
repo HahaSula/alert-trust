@@ -17,7 +17,7 @@ class FitContractsTest(unittest.TestCase):
         a.stack, a.S, a.d, a.E, a.O, a.k = "prometheus", 30.0, 10.0, 30.0, 0.0, 1
         a.T, a.lookback, a.latency, a.eval_delay = 5.0, 300.0, 0.0, 30.0
         a.job_interval, a.job_duration = {"mysql": 60.0}, {"mysql": 75.0}
-        a.dedup = None
+        a.dedup, a.query_step = None, 300.0
         a.timeout, a.p99, a.job_timeout, a.job_p99, a.exporter_deadline, a.job_failrun = None, None, {}, {}, {}, {}
         for k, v in kw.items():
             setattr(a, k, v)
@@ -37,12 +37,22 @@ class FitContractsTest(unittest.TestCase):
         self.assertAlmostEqual(by["ErrorsHigh"]["opt_b"]["scrape_interval"], 50 / 3)
         self.assertEqual(by["MySQLSlow"]["I"], 120)                     # d 75s > S 60s -> I = 2S
         self.assertEqual(by["RecordedWindow"]["S"], 60)                 # recording rule: group interval
+        self.assertEqual(by["RecordedWindow"]["n"], 1)                  # max_over_time needs 1 sample
+        self.assertTrue(by["RecordedWindow"]["ok"])                     # (1+1)*60 + 0 = 2m
+        self.assertEqual(by["ErrorsHigh"]["func"], "rate")
         exprs = [r["expr"] for _, d in fitted for g in d["groups"] for r in g["rules"]]
         self.assertIn('rate(http_errors_total{job="api"}[1m45s]) > 1', exprs)
 
     def test_offset_removes_d(self):
         rows, _ = F.analyze(self._args(O=10.0), F.load([RULES]))
         self.assertEqual({r["rule"]: r for r in rows}["ErrorsHigh"]["need"], 90)
+        rows, _ = F.analyze(self._args(O=5.0), F.load([RULES]))           # partial offset: max(0, d - O)
+        self.assertEqual({r["rule"]: r for r in rows}["ErrorsHigh"]["need"], 95)
+
+    def test_enclosing_func(self):
+        e = 'histogram_quantile(0.9, sum by (le) (rate(x_bucket[5m]))) and max_over_time(up[2m])'
+        self.assertEqual(F.enclosing_func(e, e.index("x_bucket")), "rate")
+        self.assertEqual(F.enclosing_func(e, e.index("up[")), "max_over_time")
 
     def test_env_check_flags_slow_scrape(self):
         checks = F.env_checks(self._args())
@@ -70,13 +80,18 @@ class FitContractsTest(unittest.TestCase):
 
     def test_vmalert(self):
         rows, _ = F.analyze(self._args(stack="vmalert", latency=40.0), F.load([RULES]))
-        self.assertTrue({r["rule"]: r for r in rows}["ErrorsHigh"]["ok"])   # 1m >= 30+40-30
+        r = {x["rule"]: x for x in rows}["ErrorsHigh"]
+        self.assertEqual(r["n"], 1)                 # MetricsQL uses the sample before the window
+        self.assertEqual(r["need"], 70)             # (1+1)*30 + (40-30)
+        rows, _ = F.analyze(self._args(stack="vmalert", latency=40.0, query_step=60.0), F.load([RULES]))
+        self.assertEqual({x["rule"]: x for x in rows}["ErrorsHigh"]["n"], 2)   # (1+k)*I >= step
 
     def test_vm_dedup(self):
         rows, _ = F.analyze(self._args(stack="vmalert", latency=40.0, dedup=60.0), F.load([RULES]))
         r = {x["rule"]: x for x in rows}["ErrorsHigh"]
         self.assertEqual(r["I"], 60)            # dedup 60s > S 30s
-        self.assertFalse(r["ok"])               # need 60+40-30 = 70s > 1m
+        self.assertEqual(r["need"], 130)        # (1+1)*60 + (40-30)
+        self.assertFalse(r["ok"])
 
     def test_cli_exit_code(self):
         with tempfile.TemporaryDirectory() as d:

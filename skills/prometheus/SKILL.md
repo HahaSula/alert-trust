@@ -72,14 +72,14 @@ argument-hint: "[snapshot-dir] [component-id]"
 |---|---|
 | `S` | `targets.json` 的 `scrapeInterval`（依 rule 用到的 job） |
 | `d` | `peaks.json: scrape_duration_peak{job}` |
-| `I` | `d ≤ S` 時是 `S`，否則約 `⌈d/S⌉ × S`（推算） |
+| `I` | `d ≤ S` 時是 `S`，否則約 `d`（下一次 scrape 在慢的那次結束後立刻開始；`⌈d/S⌉ × S` 是保守上限，讀碼） |
 | `E` | `rules.json` group 的 `interval`；`T` 是 `group_duration_peak` |
 | `R`、`O`、`F` | 從 `rules.json` 的 `query` 讀 range 與 `offset`；group `queryOffset` 或 `config.json` 的 `rule_query_offset`；`duration` |
 | rule 用到哪些 job | `metric_jobs.json` |
 | `k` | 最長連續失敗次數，至少 1：`sum_over_time((up{job="<job>"} == bool 0)[7d:<S>])` 算次數，連續幾次看 `up` 的圖；沒有資料就問使用者 |
 | `τ`、p99 | `targets.json` 的 `scrapeTimeout`；`quantile_over_time(0.99, scrape_duration_seconds{job="<job>"}[7d])`。`scrape_timeout_seconds` 要設 `extra_scrape_metrics: true` 才有 |
 
-**Prometheus 的視窗契約：**沒有 offset 時 `R ≥ (2+k)·I + d`；`O ≥ d` 時 `R ≥ (2+k)·I`。違反時 `rate` 回傳空、pending 被刪、`for` 歸零，**不報錯**。逐條算邊際，附在報告的邊際總表。
+**Prometheus 的視窗契約：**`R ≥ (n+k)·I + max(0, d − O)`。`n` 依函式：`rate`、`increase`、`delta`、`irate`、`deriv`、`predict_linear`、`changes`、`resets` 是 2；`*_over_time` 是 1；`absent_over_time` 反過來，視窗太短會誤報消失（`$AT/docs/contracts.md#range-functions`）。`O` 是 `query_offset` 加上表達式的 `offset`；0 < O < d 時還要多涵蓋 `d − O`。違反時 `rate` 回傳空、pending 被刪、`for` 歸零，**不報錯**。逐條算邊際，附在報告的邊際總表。
 
 **偵測延遲上限（推算）：**`I + max(O, d) + E' + T + F`，`E'` 是 `T > E` 時約 `⌈T/E⌉ × E`。拿它和使用者的通知時限（env 檔 `critical.notify_within`）比較，再加上 Alertmanager 的 `group_wait`／`group_interval`（`alertmanager` pack）。
 

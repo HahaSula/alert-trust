@@ -7,7 +7,7 @@
 alert-trust 回答兩個問題：
 
 1. **整條 alert 鏈壞在哪一段時，有沒有人知道？**（monitor of monitor）每個監控元件與 target 一張「元件卡」，列出分級訊號。
-2. **在實際尖峰下，rule 還能不能信？**（信任契約）一組時間不等式，例如 Prometheus `R ≥ (2+k)·I + d`、vmalert `R ≥ I + L − D`。
+2. **在實際尖峰下，rule 還能不能信？**（信任契約）一組時間不等式，例如 Prometheus `R ≥ (n+k)·I + max(0, d − O)`、vmalert `R ≥ (n+k)·I + max(0, L − D)`（n 依函式，見 `docs/contracts.md#range-functions`）。
 
 產出是：目錄（YAML）、規則範本、工具（collect、coverage、validate）、Claude Code skill、MkDocs 網站（GitHub Pages）、可重現的小型 lab。
 

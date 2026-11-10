@@ -1,0 +1,19 @@
+# rules.yml 的 alert：k = 1 時 R = 2I 永遠不 firing，R = (2+1)I 會 firing。
+# 由 gen_tests.py 產生，不要手改。
+rule_files: [rules.yml]
+evaluation_interval: 30s
+tests:
+  - interval: 30s
+    input_series:
+      # 每 3 次 scrape 少 1 次（60s、150s、240s、330s、420s 沒有 sample）
+      - series: 'c_gap3{job="lab"}'
+        values: '0 10 _ 30 40 _ 60 70 _ 90 100 _ 120 130 _ 150 160'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: RateR60
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: RateR90
+        exp_alerts:
+          - exp_labels:
+              job: lab

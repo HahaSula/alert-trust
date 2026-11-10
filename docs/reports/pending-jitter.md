@@ -46,7 +46,7 @@ Rule 在 `ts` 查 `(ts−5m, ts]`。例如實際間隔是 120 秒、scrape 耗�
 
 `scrape_timeout` 必須 ≤ `scrape_interval`，設定檔載入時會檢查。[^p-cfg-timeout-check]但這個 timeout 只套用在 HTTP 抓取與讀取 body 的階段。之後的 parse、append、`Commit()` 不受 timeout 限制，target 很大或 Prometheus 忙碌時，整段可以遠超過 interval。[^p-scrape-report]
 
-Scrape loop 用 Go 的 `time.Ticker`，處理不完的 tick 會被直接丟掉，所以實際間隔 I 約等於 ⌈d / S⌉ × S。[^p-scrape-run]每個 sample 的時間戳記是 scrape **開始**的時間，但整批 sample 要到 commit 時才查得到。
+Scrape loop 用 Go 的 `time.Ticker`，處理不完的 tick 只保留一個，下一次 scrape 在慢的那次結束後立刻開始，所以實際間隔 I 約等於 d；⌈d / S⌉ × S 是保守上限（讀碼，見[契約](../contracts.md#scrape-within-interval)）。[^p-scrape-run]每個 sample 的時間戳記是 scrape **開始**的時間，但整批 sample 要到 commit 時才查得到。
 
 <!-- figure: scrape-window-timeline -->
 
@@ -498,7 +498,7 @@ Alert 依賴 recording rule 時要放在**同一個 group**，這樣同一輪就
 
 | 規則 | 式子 | 範例代入 |
 |---|---|---|
-| 實際 scrape 間隔 | `d > S` 時 `I = ⌈d / S⌉ × S` | 120s |
+| 實際 scrape 間隔 | `d > S` 時 I 約 d，上限 `⌈d / S⌉ × S` | 上限 120s |
 | sample 何時查得到 | 時間戳 `t`（scrape 開始），可見時間 `t + d` | 晚約 100s |
 | rule 的查詢窗口 | `(ts − O − R, ts − O]`；v2 左閉、v3 左開 | `(ts − 5m, ts]` |
 | 與事後查詢一致 | `O ≥ max(d)` | 不成立 |

@@ -42,7 +42,7 @@
 
 | Policy | 嚴重度 | 判斷 | 依據 |
 |---|---|---|---|
-| `VM_RANGE_TOO_SHORT` | FAIL | `R ≥ I + L − D`；`D` 用 group `eval_delay` 或 flag `rule.evalDelay` | `vm-range-window` |
+| `VM_RANGE_TOO_SHORT` | FAIL | `R ≥ (n+k)·I + max(0, L − D)`（MetricsQL 用視窗前的 sample 時 n = 1）；`D` 用 group `eval_delay` 或 flag `rule.evalDelay` | `vm-range-window` |
 | `VM_LOOKBACK_STICKY` | INFO | 沒有 range 的條件型 alert：資料停止後仍會成立到 `datasource.queryStep`（預設 5m） | `lookback` |
 | `LOG_RULE_DELAY` | FAIL／WARN | `type: vlogs` 的 group：`L > D + E` 為 FAIL；`D < L ≤ D + E` 為 WARN；沒有 `_time` 視窗時要說明 | `vl-log-delay` |
 | `RESEND_DELAY_ZERO` | WARN | 業務 vmalert 的 `rule.resendDelay` 為 0（預設）：查詢中斷 `4 × E` 就假 resolved | `resend-endsat`、`vmalert#resolve-settings` |

@@ -75,7 +75,7 @@ flowchart LR
 
 | 契約 | 違反時 | 怎麼查 | 證據 |
 |---|---|---|---|
-| `R ≥ I + L − D` | 視窗內沒有可見 sample，查詢回空，`for` 永遠歸零 | `time() - timestamp(m)` 的尖峰值，搭配 scrape 間隔 | <span class="at-chip at-ev-tested">實測</span>[^exp-vm-matrix] |
+| `R ≥ I + L − D`（k = 0、n = 1 的特例；一般式 `(n+k)·I + max(0, L − D)` 見[契約](../contracts.md#vm-range-window)） | 視窗內沒有可見 sample，查詢回空，`for` 永遠歸零 | `time() - timestamp(m)` 的尖峰值，搭配 scrape 間隔 | <span class="at-chip at-ev-tested">實測</span>[^exp-vm-matrix] |
 | 資料還在流入 | 資料停了，條件型 rule 還會繼續成立約 6 分鐘 | 每條關鍵 job 一條 heartbeat | <span class="at-chip at-ev-tested">實測</span>[^exp-vm-faults] |
 | 查詢中斷短於 `4 × max(E, resendDelay)` | Alertmanager 自動 resolve，恢復時再次 firing | `vmalert_alerting_rules_errors_total` | <span class="at-chip at-ev-tested">實測</span>[^exp-vm-resend] |
 | VM cluster 沒有 partial，或 rule 容忍 partial | 聚合結果變小，比例與 `increase` 可能假觸發 | `vm_partial_results_total` | <span class="at-chip at-ev-tested">實測</span>[^exp-vm-faults] |
@@ -93,7 +93,7 @@ flowchart LR
 | 60s | 275 | 275 | 308 ⚠ | —（1） |
 | 120s | 375 | 375 ⚠ | —（3） | —（1） |
 
-- **公式與結果相符。**違反 `R ≥ I + L − D`（I + L > 150）的有 6 格。滿足契約的 6 格三輪都 firing；(60, 180)、(120, 120)、(120, 180) 三輪都沒有 firing。逐次 evaluation 比對 61 次，「視窗內有沒有已寫入的 sample」的預測 0 次不符。
+- **公式與結果相符。**違反 `R ≥ I + L − D`（k = 0 的特例，I + L > 150）的有 6 格。滿足契約的 6 格三輪都 firing；(60, 180)、(120, 120)、(120, 180) 三輪都沒有 firing。逐次 evaluation 比對 61 次，「視窗內有沒有已寫入的 sample」的預測 0 次不符。
 - **⚠ 是違反契約仍 firing 的格子。**它們只超出 30 秒，而這台機器的查詢時間落後牆上 50–77 秒，比設定的 30 秒大。查詢時間由 `evalDelay` 與 group 的啟動相位決定[^vma-eval-ts][^vma-start-phase]，不能依賴，所以公式是保證條件。
 - **只要視窗夠大就沒問題。**對照組 `rate(lab_m[5m])` 12 格全部 firing。
 - **視窗內沒有 sample 時 `rate` 回空，不是 0。**`for: 2m` 這輪另有 `rate(lab_m[2m]) == 0`，整輪 0 次成立。[^vms-rate-empty]

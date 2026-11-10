@@ -6,14 +6,14 @@ contracts:
     violation: Tick 被丟掉，實際間隔 I 拉長，視窗內樣本變少
     evidence: code
     source: art-prom
-    refs: [p-scrape-run, vmag-ticker]
+    refs: [p-scrape-run, vmag-ticker, pqw-p3-scrape-run, pqw-p3-scrape-wait-tick, pqw-go-ticker-buffer]
   range-window:
     applies_to: [prometheus]
-    expr: "沒有 offset：R ≥ (2+k)·I + d；O ≥ d：R ≥ (2+k)·I"
+    expr: "R ≥ (2+k)·I + max(0, d − O)：沒有 offset 是 (2+k)·I + d，O ≥ d 是 (2+k)·I；適用要 2 個 sample 的函式（rate、increase、delta、irate、idelta、deriv、predict_linear、double_exponential_smoothing）"
     violation: 視窗內不足 2 個可見 sample，rate 回傳空，pending 被刪除，for 歸零
     evidence: tested
     source: art-prom
-    refs: [exp-prom-range, exp-prom-silent]
+    refs: [exp-prom-range, exp-prom-silent, pqw-lab-promtool, pqw-p3-matrix-leftopen, pqw-p3-scrape-time, pqw-p3-alert-query, pqw-p3-extrap-min2, pqw-p3-instant-min2]
   group-within-interval:
     applies_to: [prometheus, vmalert]
     expr: "T ≤ E（預警門檻 0.8）"
@@ -23,25 +23,25 @@ contracts:
     refs: [exp-prom-cpu, p-group-missed, vma-missed]
   lookback:
     applies_to: [prometheus]
-    expr: "I + d < lookback（預設 5m）"
+    expr: "I + max(0, d − O) < lookback（預設 5m，3.x 是嚴格小於）；只管 sample 晚到，scrape 失敗或 series 消失時 staleness marker 讓 selector 立刻變空"
     violation: 不用 range 的 selector（如 up == 0）間歇回傳空
-    evidence: upstream
+    evidence: code
     source: art-prom
-    refs: [exp-vm-faults]
+    refs: [exp-vm-faults, p-lookback, pqw-p3-lookback-open, pqw-p3-instant-stale, pqw-p3-failed-stale, pqw-lab-promtool]
   resend-endsat:
     applies_to: [prometheus, vmalert]
-    expr: "續送中斷 < 4 × max(resend, E)"
+    expr: "續送中斷 < 4 × max(resend, E) − P，P = E × (⌊resend ÷ E⌋ + 1) 是實際續送週期（最差情況：中斷剛好從該續送的那一次開始）"
     violation: Alertmanager 在 EndsAt 自動 resolve，通知 firing／resolved 交替（假 resolved）
     evidence: tested
     source: art-vm
-    refs: [p-alert-validuntil, exp-vm-resend]
+    refs: [p-alert-validuntil, exp-vm-resend, pqw-p3-validuntil, pqw-p3-needs-sending, pqw-vma-needs-sending, pqw-vma-resolve-duration]
   vm-range-window:
     applies_to: [vmalert]
-    expr: "R ≥ I + L − D"
+    expr: "R ≥ (1+k)·I + max(0, L − D)：視窗前最後一個 sample 要在 step（-datasource.queryStep，預設 5m）內；不然，或用 rate_prometheus 這類函式，要 (2+k)·I + max(0, L − D)"
     violation: 視窗內沒有可見 sample，查詢回空，for 永遠歸零
     evidence: tested
     source: art-vm
-    refs: [exp-vm-matrix]
+    refs: [exp-vm-matrix, pqw-lab-server, pqw-vm-prev-value, pqw-vm-maxprev-step, pqw-vma-step-param, pqw-vm-rate-1sample]
   vl-log-delay:
     applies_to: [vmalert, victorialogs]
     expr: "L ≤ D 保證；L > D + E 必定漏"
@@ -49,6 +49,13 @@ contracts:
     evidence: tested
     source: art-vm
     refs: [exp-vm-vl]
+  range-window-1sample:
+    applies_to: [prometheus]
+    expr: "R ≥ (1+k)·I + max(0, d − O)：1 個 sample 就有值的函式（*_over_time、changes、resets、anchored）；absent_over_time 反過來，視窗太短會誤報消失"
+    violation: 視窗內沒有可見 sample，結果是空；absent_over_time 在資料其實還在時回傳 1
+    evidence: tested
+    source: pqw-lab
+    refs: [pqw-lab-promtool, pqw-lab-server, pqw-p3-aggr-over-time, pqw-p3-absent-over-time, pqw-p3-changes-first]
   am-failure-window:
     applies_to: [alertmanager]
     expr: "告警視窗 ≥ 2 × 最大 group_interval"

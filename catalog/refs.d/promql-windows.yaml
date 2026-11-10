@@ -1,0 +1,578 @@
+# 時間契約與 PromQL／MetricsQL range 函式的原始碼位置（lab/promql-windows）。
+# 行號已用 gh api 抓 tag 上的檔案、以關鍵字核對（mkrefs 腳本在 agent 的 scratchpad，規則同 tools/gen_code_refs.py）。
+refs:
+  pqw-p3-scrape-offset:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "scrape/target.go"
+    line: 170
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/scrape/target.go#L170"
+  pqw-p3-scrape-run:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "scrape/scrape.go"
+    line: 1263
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/scrape/scrape.go#L1263"
+  pqw-p3-scrape-time:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "scrape/scrape.go"
+    line: 1309
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/scrape/scrape.go#L1309"
+  pqw-p3-scrape-tolerance:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "scrape/scrape.go"
+    line: 67
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/scrape/scrape.go#L67"
+  pqw-p3-scrape-wait-tick:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "scrape/scrape.go"
+    line: 1329
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/scrape/scrape.go#L1329"
+  pqw-p3-scrape-duration:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "scrape/scrape.go"
+    line: 1380
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/scrape/scrape.go#L1380"
+  pqw-p3-scrape-append:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "scrape/scrape.go"
+    line: 1446
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/scrape/scrape.go#L1446"
+  pqw-p3-failed-stale:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "scrape/scrape.go"
+    line: 1444
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/scrape/scrape.go#L1444"
+  pqw-p3-stale-markers:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "scrape/scrape.go"
+    line: 1570
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/scrape/scrape.go#L1570"
+  pqw-p3-timeout-check:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "config/config.go"
+    line: 910
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/config/config.go#L910"
+  pqw-go-ticker-drop:
+    kind: code
+    project: "Go"
+    version: "go1.26.0"
+    file: "src/time/tick.go"
+    line: 24
+    url: "https://github.com/golang/go/blob/go1.26.0/src/time/tick.go#L24"
+  pqw-go-ticker-buffer:
+    kind: code
+    project: "Go"
+    version: "go1.26.0"
+    file: "src/time/tick.go"
+    line: 40
+    url: "https://github.com/golang/go/blob/go1.26.0/src/time/tick.go#L40"
+  pqw-p3-group-evalts:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "rules/group.go"
+    line: 422
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/rules/group.go#L422"
+  pqw-p3-group-missed:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "rules/group.go"
+    line: 265
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/rules/group.go#L265"
+  pqw-p3-query-offset:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "rules/group.go"
+    line: 693
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/rules/group.go#L693"
+  pqw-p3-alert-query:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "rules/alerting.go"
+    line: 389
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/rules/alerting.go#L389"
+  pqw-p3-record-query:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "rules/recording.go"
+    line: 87
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/rules/recording.go#L87"
+  pqw-p3-send-call:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "rules/group.go"
+    line: 553
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/rules/group.go#L553"
+  pqw-p3-needs-sending:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "rules/alerting.go"
+    line: 112
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/rules/alerting.go#L112"
+  pqw-p3-validuntil:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "rules/alerting.go"
+    line: 625
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/rules/alerting.go#L625"
+  pqw-p3-matrix-stale:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/engine.go"
+    line: 3013
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/engine.go#L3013"
+  pqw-p3-matrix-leftopen:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/engine.go"
+    line: 3017
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/engine.go#L3017"
+  pqw-p2-matrix-closed:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "promql/engine.go"
+    line: 2182
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/promql/engine.go#L2182"
+  pqw-p3-lookback-default:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/engine.go"
+    line: 64
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/engine.go#L64"
+  pqw-p3-lookback-open:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/engine.go"
+    line: 2729
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/engine.go#L2729"
+  pqw-p2-lookback-closed:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "promql/engine.go"
+    line: 1958
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/promql/engine.go#L1958"
+  pqw-p3-instant-stale:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/engine.go"
+    line: 2733
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/engine.go#L2733"
+  pqw-p3-absent-over-time:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/engine.go"
+    line: 2414
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/engine.go#L2414"
+  pqw-p3-subquery-start:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/engine.go"
+    line: 1951
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/engine.go#L1951"
+  pqw-p3-anchored-lookback:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/engine.go"
+    line: 2821
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/engine.go#L2821"
+  pqw-p3-extend-floats:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/engine.go"
+    line: 4843
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/engine.go#L4843"
+  pqw-p3-extrap-min2:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/functions.go"
+    line: 526
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/functions.go#L526"
+  pqw-p3-rate-reset:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/functions.go"
+    line: 521
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/functions.go#L521"
+  pqw-p3-extrap-threshold:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/functions.go"
+    line: 549
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/functions.go#L549"
+  pqw-p3-extrap-zero:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/functions.go"
+    line: 564
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/functions.go#L564"
+  pqw-p3-extended-rate:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/functions.go"
+    line: 309
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/functions.go#L309"
+  pqw-p3-instant-min2:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/functions.go"
+    line: 777
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/functions.go#L777"
+  pqw-p3-irate-reset:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/functions.go"
+    line: 842
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/functions.go#L842"
+  pqw-p3-des-min2:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/functions.go"
+    line: 932
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/functions.go#L932"
+  pqw-p3-aggr-over-time:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/functions.go"
+    line: 1128
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/functions.go#L1128"
+  pqw-p3-last-over-time:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/functions.go"
+    line: 1339
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/functions.go#L1339"
+  pqw-p3-compare-over-time:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/functions.go"
+    line: 1455
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/functions.go#L1455"
+  pqw-p3-quantile-over-time:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/functions.go"
+    line: 1578
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/functions.go#L1578"
+  pqw-p3-variance-over-time:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/functions.go"
+    line: 1602
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/functions.go#L1602"
+  pqw-p3-mad-over-time:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/functions.go"
+    line: 1368
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/functions.go#L1368"
+  pqw-p3-present-over-time:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/functions.go"
+    line: 1664
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/functions.go#L1664"
+  pqw-p3-deriv-min2:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/functions.go"
+    line: 1898
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/functions.go#L1898"
+  pqw-p3-predict-min2:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/functions.go"
+    line: 1926
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/functions.go#L1926"
+  pqw-p3-resets:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/functions.go"
+    line: 2258
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/functions.go#L2258"
+  pqw-p3-changes:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/functions.go"
+    line: 2330
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/functions.go#L2330"
+  pqw-p3-changes-first:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/functions.go"
+    line: 2358
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/functions.go#L2358"
+  pqw-p3-anchored-safe:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/functions.go"
+    line: 2667
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/functions.go#L2667"
+  pqw-p3-ext-flag:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "cmd/prometheus/main.go"
+    line: 309
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/cmd/prometheus/main.go#L309"
+  pqw-p3-des-experimental:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "promql/parser/functions.go"
+    line: 221
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/promql/parser/functions.go#L221"
+  pqw-p2-holt-winters:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "promql/parser/functions.go"
+    line: 205
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/promql/parser/functions.go#L205"
+  pqw-promtool-engine-parser:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "cmd/promtool/unittest.go"
+    line: 612
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/cmd/promtool/unittest.go#L612"
+  pqw-vm-window-leftopen:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmselect/promql/rollup.go"
+    line: 846
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmselect/promql/rollup.go#L846"
+  pqw-vm-maxprev-step:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmselect/promql/rollup.go"
+    line: 724
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmselect/promql/rollup.go#L724"
+  pqw-vm-minstale-use:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmselect/promql/rollup.go"
+    line: 734
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmselect/promql/rollup.go#L734"
+  pqw-vm-minstale-flag:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmselect/promql/rollup.go"
+    line: 20
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmselect/promql/rollup.go#L20"
+  pqw-vm-default-window:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmselect/promql/rollup.go"
+    line: 747
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmselect/promql/rollup.go#L747"
+  pqw-vm-prev-value:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmselect/promql/rollup.go"
+    line: 780
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmselect/promql/rollup.go#L780"
+  pqw-vm-rate:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmselect/promql/rollup.go"
+    line: 1954
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmselect/promql/rollup.go#L1954"
+  pqw-vm-rate-1sample:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmselect/promql/rollup.go"
+    line: 1975
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmselect/promql/rollup.go#L1975"
+  pqw-vm-increase:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmselect/promql/rollup.go"
+    line: 1859
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmselect/promql/rollup.go#L1859"
+  pqw-vm-rate-prometheus:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmselect/promql/rollup.go"
+    line: 1903
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmselect/promql/rollup.go#L1903"
+  pqw-vm-irate:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmselect/promql/rollup.go"
+    line: 1991
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmselect/promql/rollup.go#L1991"
+  pqw-vm-deriv-const:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmselect/promql/rollup.go"
+    line: 1103
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmselect/promql/rollup.go#L1103"
+  pqw-vm-changes:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmselect/promql/rollup.go"
+    line: 2106
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmselect/promql/rollup.go#L2106"
+  pqw-vm-absent:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmselect/promql/rollup.go"
+    line: 1755
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmselect/promql/rollup.go#L1755"
+  pqw-vm-counter-resets:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmselect/promql/rollup.go"
+    line: 921
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmselect/promql/rollup.go#L921"
+  pqw-vm-drop-stale:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmselect/promql/eval.go"
+    line: 2109
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmselect/promql/eval.go#L2109"
+  pqw-vm-instant-step:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmselect/prometheus/prometheus.go"
+    line: 809
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmselect/prometheus/prometheus.go#L809"
+  pqw-vm-default-step:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmselect/prometheus/prometheus.go"
+    line: 73
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmselect/prometheus/prometheus.go#L73"
+  pqw-vm-latency-offset:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmselect/prometheus/prometheus.go"
+    line: 39
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmselect/prometheus/prometheus.go#L39"
+  pqw-vm-latency-apply:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmselect/prometheus/prometheus.go"
+    line: 893
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmselect/prometheus/prometheus.go#L893"
+  pqw-vma-step-param:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/datasource/client_prom.go"
+    line: 273
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/datasource/client_prom.go#L273"
+  pqw-vma-adjust-ts:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/group.go"
+    line: 702
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/group.go#L702"
+  pqw-vma-resolve-duration:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/group.go"
+    line: 691
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/group.go#L691"
+  pqw-vma-needs-sending:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/alerting.go"
+    line: 886
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/alerting.go#L886"
+  pqw-vmag-tick-ts:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "lib/promscrape/scrapework.go"
+    line: 374
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/lib/promscrape/scrapework.go#L374"
+  pqw-lab-promtool:
+    kind: experiment
+    title: "PromQL 視窗 lab：promtool test rules（虛擬時鐘），3.13.5 與 2.51.2 每個 range 函式在最小視窗差 1 秒與剛好時的結果"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/promql-windows/results/promtool-20261110.md"
+  pqw-lab-server:
+    kind: experiment
+    title: "PromQL 視窗 lab：Prometheus 3.13.5（anchored、smoothed、實驗函式）與 VictoriaMetrics v1.155.0（MetricsQL）用明確時間戳的資料查詢"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/promql-windows/results/server-20261110.md"

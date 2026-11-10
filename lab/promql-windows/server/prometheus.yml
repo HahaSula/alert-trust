@@ -1,0 +1,3 @@
+# 不 scrape 任何東西；資料由 promtool tsdb create-blocks-from openmetrics 回填。
+global:
+  scrape_interval: 30s

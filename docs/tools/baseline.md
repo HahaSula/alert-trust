@@ -30,7 +30,7 @@
 1. τ 只管 HTTP 請求與讀取 body。之後的 parse 與寫入不受 τ 限制，所以 `scrape_duration_seconds` 可以大於 τ 且成功。[^bl-p3-scrape-ctx][^p-scrape-report]
 2. 逾時就是失敗：`up` = 0，並且當成「空的 scrape」寫入，上一次有的 series 全部拿到 stale 標記。[^bl-p3-failed-stale][^bl-p3-up-health]
 3. 被標成 stale 的 series，之後的查詢**立刻**查不到（不是等 5 分鐘 lookback）。[^bl-p3-doc-staleness]所以沒有 range 的 alert（例如 `mysql_global_status_threads_running > 50`、帶 `for`）遇到一次逾時就回傳空；evaluation 成功但沒有這個 alert 時 pending 被刪除、`for` 重新計時。[^p-alert-delete][^exp-prom-silent] 兩者合起來的效果是推論，沒有單獨實驗。
-4. 一個 target 的整個 scrape loop 是依序的：耗時超過 S 時 tick 被丟掉，實際間隔變成約 `⌈d/S⌉ × S`。[^p-scrape-run][^vmag-ticker]
+4. 一個 target 的整個 scrape loop 是依序的：耗時超過 S 時多出來的 tick 被丟掉，只保留一個，下一次 scrape 在慢的那次結束後立刻開始，實際間隔約 `d`（讀碼；`⌈d/S⌉ × S` 是保守上限，見[契約](../contracts.md#scrape-within-interval)）。[^p-scrape-run][^vmag-ticker]
 
 ### Exporter 怎麼用這個期限
 
@@ -85,7 +85,7 @@
 | 6. 定 exporter 期限 X | `X = τ − margin`，margin 取 1s 或 τ 的 10%（取大）；讀 header 的 exporter 用 offset 參數 | [`X < τ < S`](../contracts.md#exporter-deadline) |
 | 7. 定 E | `E = S`（讀多個 job 的 group，取這些 S 的最大值或公倍數） | 再量 T：`max_over_time(prometheus_rule_group_last_duration_seconds[7d]) ≤ 0.8 E` |
 | 8. 選 k | 步驟 2 的最長連續失敗，至少 1 | — |
-| 9. 算最短視窗 | 沒有 offset：`R_min = (2+k)·I + d_max`；`query_offset ≥ d_max`：`R_min = (2+k)·I` | [`range-window`](../contracts.md#range-window) |
+| 9. 算最短視窗 | `R_min = (n+k)·I + max(0, d_max − O)`；`rate` 類 n = 2、`*_over_time` n = 1（[各函式](../contracts.md#range-functions)）。沒有 offset 是 `(2+k)·I + d_max`，`query_offset ≥ d_max` 是 `(2+k)·I` | [`range-window`](../contracts.md#range-window) |
 | 10. 其他檢查 | lookback `I + d < 5m`；EndsAt `4 × max(resend-delay, E)` | [`lookback`](../contracts.md#lookback)、[`resend-endsat`](../contracts.md#resend-endsat) |
 
 步驟 5 的 0.8 與契約、vmagent 文件用的預警線相同（`scrape_duration_seconds / scrape_timeout_seconds > 0.8`）。[^bl-vm-doc-timeout-ratio]這是本專案的選擇，不是官方建議的餘裕倍數。

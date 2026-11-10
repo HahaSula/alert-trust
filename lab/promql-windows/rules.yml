@@ -1,0 +1,13 @@
+# 給 tests-alerts.yml 用：同一條 rule，只差 range 長度。
+groups:
+  - name: k-missed-scrape
+    interval: 30s
+    rules:
+      # c_gap3 每 3 次 scrape 少 1 次（k = 1）。R = 2I：缺點的那一刻只剩 1 個 sample，rate 回傳空，pending 歸零。
+      - alert: RateR60
+        expr: rate(c_gap3[1m]) > 0
+        for: 2m
+      # R = (2 + k)·I = 90s：任何時刻至少 2 個 sample。
+      - alert: RateR90
+        expr: rate(c_gap3[90s]) > 0
+        for: 2m

@@ -32,6 +32,17 @@
     return out;
   }
 
+  // samples a function needs in its window (docs/contracts.md#range-functions)
+  function samplesNeeded(expr) {
+    if (!expr) return 2;
+    var two = /\b(rate|increase|delta|irate|idelta|deriv|predict_linear|holt_winters|double_exponential_smoothing|changes|resets)\s*\(/;
+    return (/_over_time\s*\(/.test(expr) && !two.test(expr)) ? 1 : 2;
+  }
+  // worst-case tolerable outage before Alertmanager resolves on EndsAt: 4·max(resend, E) − P, P = E·(⌊resend/E⌋ + 1)
+  function resendSlack(resend, E) {
+    return 4 * Math.max(resend, E) - E * (Math.floor(resend / E) + 1);
+  }
+
   function status(margin, warnBelow) {
     if (!isFinite(margin)) return ["未填", "na"];
     if (margin < 1) return ["不成立", "bad"];
@@ -58,20 +69,22 @@
     if (ex.O !== undefined) O = ex.O;
     var I = d > S ? Math.ceil(d / S) * S : S;
     var Ep = T > E ? Math.ceil(T / E) * E : E;
-    var needR = (2 + k) * I + (O >= d ? 0 : d);
+    var n = samplesNeeded(val(form, "expr"));
+    var needR = (n + k) * I + Math.max(0, d - O);
     var rows = [];
     rows.push(row("Scrape 在 interval 內完成", "scrape-within-interval", "d = " + fmt(d), "≤ S = " + fmt(S), S / d, status(S / d, 1.25),
       d > S ? "實際間隔 I ≈ " + fmt(I) : ""));
-    rows.push(row("視窗內至少 2 個可見樣本", "range-window", "R = " + fmt(R) + (O ? "，O = " + fmt(O) : ""),
-      "≥ " + fmt(needR) + (O >= d ? "（O ≥ d）" : "（含 d）"), R / needR, status(R / needR, 1.25),
-      O < d && O > 0 ? "offset 小於 d，仍要多涵蓋 d" : ""));
+    rows.push(row("視窗內至少 " + n + " 個可見樣本", n === 1 ? "range-window-1sample" : "range-window",
+      "R = " + fmt(R) + (O ? "，O = " + fmt(O) : ""),
+      "≥ (" + n + "+k)·I + max(0, d − O) = " + fmt(needR), R / needR, status(R / needR, 1.25),
+      O < d && O > 0 ? "offset 小於 d，還要多涵蓋 d − O" : ""));
     rows.push(row("Rule group 在 interval 內跑完", "group-within-interval", "T = " + fmt(T), "≤ 0.8 × E = " + fmt(0.8 * E),
       (0.8 * E) / T, status(E / T, 1.25), T > E ? "實際 evaluation 間隔 ≈ " + fmt(Ep) : ""));
     rows.push(row("Lookback（不用 range 的 selector）", "lookback", "I + d = " + fmt(I + d), "< " + fmt(lb), lb / (I + d),
       status(lb / (I + d), 1.25), ex.hasRange ? "這條表達式有 range，主要看上一列" : ""));
-    var endsAt = 4 * Math.max(resend, E);
-    rows.push(row("續送中斷短於 EndsAt", "resend-endsat", "T = " + fmt(T), "遠小於 " + fmt(endsAt), endsAt / T,
-      status(endsAt / T, 2), "查詢中斷超過 " + fmt(endsAt) + " 會假 resolved"));
+    var slack = resendSlack(resend, E);
+    rows.push(row("續送中斷短於 EndsAt 寬限", "resend-endsat", "T = " + fmt(T), "遠小於 " + fmt(slack), slack / T,
+      status(slack / T, 2), "最差情況查詢中斷超過 " + fmt(slack) + " 就會假 resolved（EndsAt = 送出時間 + " + fmt(4 * Math.max(resend, E)) + "）"));
     var lat = I + Math.max(O, d) + Ep + T + F;
     return { rows: rows, latency: lat, target: target };
   }
@@ -84,14 +97,19 @@
     var ex = fromExpr(val(form, "vexpr"));
     if (ex.R !== undefined) R = ex.R;
     if (!isFinite(D)) D = 30;
-    var needR = Math.max(I + L - D, 0.001);
+    var vk = parseInt(val(form, "vk"), 10); if (!isFinite(vk)) vk = 1;
+    var step = parseDur(val(form, "vstep")) || 300;
+    var vexpr = val(form, "vexpr") || "";
+    var n = (/_prometheus\s*\(/.test(vexpr) || (1 + vk) * I >= step) ? 2 : 1;
+    var needR = Math.max((n + vk) * I + Math.max(0, L - D), 0.001);
     var rows = [];
-    rows.push(row("vmalert 視窗", "vm-range-window", "R = " + fmt(R), "≥ I + L − D = " + fmt(needR), R / needR, status(R / needR, 1.25), ""));
+    rows.push(row("vmalert 視窗", "vm-range-window", "R = " + fmt(R), "≥ (" + n + "+k)·I + max(0, L − D) = " + fmt(needR), R / needR,
+      status(R / needR, 1.25), n === 1 ? "MetricsQL 用視窗前最後一個 sample（要在 queryStep 內）" : "要 2 個 sample（*_prometheus 或超過 queryStep）"));
     if (isFinite(T)) rows.push(row("Group 在 interval 內跑完", "group-within-interval", "T = " + fmt(T), "≤ 0.8 × E = " + fmt(0.8 * E),
       (0.8 * E) / T, status(E / T, 1.25), "查詢飽和時 iteration_missed 可能仍為 0"));
-    var endsAt = 4 * Math.max(E, resend);
-    rows.push(row("續送中斷短於 EndsAt", "resend-endsat", "可能中斷 " + fmt(outage), "< " + fmt(endsAt), endsAt / outage,
-      status(endsAt / outage, 1.25), "Watchdog 所在的 vmalert 不要設 resendDelay"));
+    var vslack = resendSlack(resend, E);
+    rows.push(row("續送中斷短於 EndsAt 寬限", "resend-endsat", "可能中斷 " + fmt(outage), "< " + fmt(vslack) + "（最差情況）", vslack / outage,
+      status(vslack / outage, 1.25), "Watchdog 所在的 vmalert 不要設 resendDelay"));
     var logSt, logMargin = D / L;
     if (!isFinite(L)) logSt = ["未填", "na"];
     else if (L <= D) logSt = ["成立", "ok"];

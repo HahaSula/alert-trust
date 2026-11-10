@@ -51,14 +51,16 @@ VM 的 `peaks.json` 只有在各元件的 `/metrics` 有被抓進這個 VM 時�
 
 使用者只丟 rule 檔要你「檢查」時，改走 `rule-review` skill，不要直接從時間契約開始。
 
-## 1. vmalert 視窗契約 `R ≥ I + L − D`
+## 1. vmalert 視窗契約 `R ≥ (n+k)·I + max(0, L − D)`
 
 逐條 alerting rule（只看 `type` 是 `prometheus` 的 group）：
+
+`n`：MetricsQL 的 `rate`、`increase` 等會用視窗前最後一個 sample（要在 `-datasource.queryStep`，預設 5m 內），所以 n = 1；`*_prometheus` 函式或 `(1+k)·I` ≥ queryStep 時 n = 2。省略 `[R]` 時視窗等於 step。工具：`$AT/tools/fit_contracts.py --stack vmalert`。
 
 | 符號 | 從哪裡取 |
 |---|---|
 | `R` | `rules.json` 的 `query` 裡的 range |
-| `I` | 實際的資料間隔：vmagent 的 `scrape_interval` 與尖峰 `scrape_duration_seconds`（`peaks.json: scrape_duration_peak`），`d > S` 時約 `⌈d/S⌉ × S` |
+| `I` | 實際的資料間隔：vmagent 的 `scrape_interval` 與尖峰 `scrape_duration_seconds`（`peaks.json: scrape_duration_peak`），`d > S` 時約 `d`（`⌈d/S⌉ × S` 是保守上限）；`-dedup.minScrapeInterval` 較大時用它 |
 | `L` | 資料從時間戳到查得到的延遲尖峰：`max_over_time((time() - timestamp(m))[7d:1m])` 這類查詢（請使用者在 VM 上跑，或你用 GET 查），包含 vmagent 的 remote write 延遲 |
 | `D` | `eval_delay`：group 的設定，否則 flag `rule.evalDelay`（預設 30s）。`eval_alignment` 會讓實際值落在 `D` 到 `D + E`；代入時用最小值 `D`（推論：取整只會讓查詢更舊） |
 
@@ -87,7 +89,7 @@ VM 的 `peaks.json` 只有在各元件的 `/metrics` 有被抓進這個 VM 時�
 
 ## 4. 假 resolved 與 Watchdog（`resend-endsat`）
 
-- `EndsAt = 4 × max(E, -rule.resendDelay)`。`resendDelay` 預設 0，`E` = 30s 時只有 2 分鐘寬限：**查詢失敗超過 2 分鐘，Alertmanager 就把所有 alert 標成 resolved，連 Watchdog 也一樣**。
+- `EndsAt = 送出時間 + 4 × max(E, -rule.resendDelay)`，但續送要嚴格超過 resendDelay 才送，最差情況能撐的中斷是 `4 × max(E, resend) − P`，`P = E × (⌊resend ÷ E⌋ + 1)`（讀碼，見 `$AT/docs/contracts.md#resend-endsat`）。`resendDelay` 預設 0、`E` = 30s 時最差只有 **1.5 分鐘**：**查詢失敗超過這麼久，Alertmanager 就把所有 alert 標成 resolved，連 Watchdog 也一樣**。
 - 讀 `flags.json`：`rule.resendDelay`、`rule.maxResolveDuration`、`notifier.blackhole`（設了就根本沒送）。
 - 判斷：業務 vmalert 把 `resendDelay` 設成大於預期的查詢中斷（lab：`-rule.resendDelay=3m` 時 vmselect 停 240 秒，Alertmanager 沒有任何 alert 消失；預設值在 +101s 全部假 resolved；見 `lab/vm/README.md`）；**Watchdog 放在不設 `resendDelay` 的獨立 vmalert**（env 檔 `role: watchdog`）。兩者在同一台時，Watchdog 會被延後才斷。
 - DMS 等待時間要大於 `4 × max(resend, E) + repeat_interval + group_interval`（`alertmanager` pack 一起算）。
