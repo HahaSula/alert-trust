@@ -19,7 +19,7 @@ silent_failures:
     evidence: tested
     source: art-vm
     refs: [exp-vm-faults, vma-querystep]
-  - text: 查詢飽和（429）時 vmalert_iteration_missed_total 仍是 0。
+  - text: 查詢飽和（429）時查詢失敗得很快，vmalert_iteration_missed_total 可能仍是 0（lab 未重測）。
     evidence: inferred
     source: art-vm
   - text: 設了 -rule.resendDelay=3m 後，部分真正的 resolved 會晚 2–3 分鐘才到 Alertmanager（lab 23 次中 5 次）；預設值時 0 次。
@@ -143,3 +143,16 @@ signals:
     source: vm-rules
     upstream: { status: yes }
     rules: []
+
+  - id: results-limit
+    tier: 3
+    question: Rule 結果數接近上限了嗎
+    signal: "vmalert_alerting_rules_last_evaluation_samples ÷ vmalert_group_rule_results_limit > 0.8；超過 limit 時該 rule 的 active alert 全部被清空並回報錯誤"
+    metrics: [vmalert_alerting_rules_last_evaluation_samples, vmalert_group_rule_results_limit, vmalert_alerting_rules_errors_total]
+    evaluate_on: observer
+    evidence: code
+    source: art-vm
+    refs: [vma-results-limit, vma-results-limit-flag, vma-results-limit-gauge, vma-eval-samples-gauge]
+    upstream: { status: no }
+    applies_when: "group limit 或 -rule.resultsLimit > 0"
+    rules: [rules/victoriametrics/meta.yml#MetaRuleNearResultsLimit]

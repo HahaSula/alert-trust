@@ -113,6 +113,34 @@ groups:
           runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#notify-to-alertmanager
           absence_covered_by: "PrometheusDown, PrometheusMissing"
 
+  - name: prometheus-notify-early     # 第 2 級：在丟通知之前先看到
+    rules:
+      - alert: NotificationQueueFilling
+        expr: |
+          max by (job, instance) (prometheus_notifications_queue_length)
+            / on (job, instance) max by (job, instance) (prometheus_notifications_queue_capacity) > 0.5
+        for: 5m
+        labels: { severity: warning, component: prometheus, tier: "2", scope: prometheus }
+        annotations:
+          summary: "通知 queue 超過一半；滿了之後丟最舊的通知（3.10 起每台 Alertmanager 各一條 queue）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#notify-early-warning
+      - alert: NotificationErrorRatio
+        expr: |
+          sum by (job, instance) (rate(prometheus_notifications_errors_total[5m]))
+            / sum by (job, instance) (rate(prometheus_notifications_sent_total[5m])) > 0.01
+        for: 5m
+        labels: { severity: warning, component: prometheus, tier: "2", scope: prometheus }
+        annotations:
+          summary: "送往 Alertmanager 的錯誤比例超過 1%；多台 Alertmanager 時比 NotificationsFailing 更能看出是不是只有一台有問題"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#notify-early-warning
+      - alert: NotificationLatencyHigh
+        expr: max by (job, instance, alertmanager) (prometheus_notifications_latency_seconds{quantile="0.99"}) > 5
+        for: 10m
+        labels: { severity: warning, component: prometheus, tier: "2", scope: prometheus }
+        annotations:
+          summary: "送一批通知超過 5 秒；2.x 一台 Alertmanager 慢會拖住整條 queue"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#notify-early-warning
+
   - name: prometheus-storage
     rules:
       - alert: WALWriteFailed
@@ -147,6 +175,53 @@ groups:
         annotations:
           summary: "Head 超過 4 小時未落成 block（以預設 2h block range 計算）"
           runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#tsdb-maintenance
+      - alert: BlockReloadFailing
+        expr: increase(prometheus_tsdb_reloads_failures_total[30m]) > 0
+        labels: { severity: critical, component: prometheus, tier: "2", scope: prometheus }
+        annotations:
+          summary: "Reload 失敗（block 打不開或損毀）；每次 reload 都在刪 block 之前返回，retention 不執行"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#tsdb-maintenance
+      - alert: RetentionBlockedByCompaction
+        expr: |
+          increase(prometheus_tsdb_compactions_failed_total[3h]) > 0
+          and increase(prometheus_tsdb_reloads_total[15m]) == 0
+        labels: { severity: critical, component: prometheus, tier: "2", scope: prometheus }
+        annotations:
+          summary: "Compaction 失敗且 reload 停止：retention 被 compaction 擋住；prometheus_tsdb_storage_blocks_bytes 此時凍結"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#tsdb-maintenance
+      - alert: WALNotTruncated
+        expr: |
+          increase(prometheus_tsdb_wal_truncations_total[8h]) == 0
+          and increase(prometheus_tsdb_head_truncations_total[8h]) >= 3
+        labels: { severity: warning, component: prometheus, tier: "2", scope: prometheus }
+        annotations:
+          summary: "Head 已落成 block 3 次以上，WAL 卻沒有截斷（checkpoint 失敗時不會嘗試截斷）；WAL 會持續長大"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#tsdb-maintenance
+      - alert: WALTruncationFailing
+        expr: increase(prometheus_tsdb_wal_truncations_failed_total[6h]) > 0
+        labels: { severity: warning, component: prometheus, tier: "2", scope: prometheus }
+        annotations:
+          summary: "WAL segment 刪除失敗；下一次 checkpoint 才會再試"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#tsdb-maintenance
+      - alert: PrometheusStorageOverSizeLimit
+        expr: |
+          (
+            prometheus_tsdb_storage_blocks_bytes
+            + prometheus_tsdb_wal_storage_size_bytes
+            + prometheus_tsdb_head_chunks_storage_size_bytes
+          ) > prometheus_tsdb_retention_limit_bytes
+          and prometheus_tsdb_retention_limit_bytes > 0
+        for: 1h
+        labels: { severity: warning, component: prometheus, tier: "2", scope: prometheus }
+        annotations:
+          summary: "用量超過 size retention 上限 1 小時：reload 停了，或 WAL 與 Head chunk 本身就超過上限（WAL 計入但不會被 retention 刪）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#size-retention
+      - alert: PrometheusSizeRetentionDeleting
+        expr: increase(prometheus_tsdb_size_retentions_total[1h]) > 0
+        labels: { severity: info, component: prometheus, tier: "3", scope: prometheus }
+        annotations:
+          summary: "Size retention 正在刪 block，實際保留期比 time retention 短；WAL 長大時刪得更多"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#size-retention
       - alert: RetentionBehind
         expr: |
           (time() - prometheus_tsdb_lowest_timestamp_seconds)
@@ -178,6 +253,28 @@ groups:
           summary: "新設定或 rule 沒有生效，仍在跑舊設定"
           runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#root-cause
           absence_covered_by: "PrometheusDown, PrometheusMissing"
+
+  - name: prometheus-disk           # 需要 node_exporter 或 kubelet；Prometheus 自己的 metric 看不到磁碟剩餘空間
+    rules:
+      - alert: PrometheusDiskLow
+        expr: |
+          node_filesystem_avail_bytes{mountpoint="/prometheus"}
+            / node_filesystem_size_bytes{mountpoint="/prometheus"} < 0.15
+          or predict_linear(node_filesystem_avail_bytes{mountpoint="/prometheus"}[6h], 24 * 3600) < 0
+        for: 15m
+        labels: { severity: warning, component: prometheus, tier: "2", scope: node }
+        annotations:
+          summary: "Prometheus 資料目錄剩不到 15% 或 24 小時內會用完；mountpoint 要換成實際的資料目錄"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#disk-free
+      - alert: PrometheusPVCLow
+        expr: |
+          kubelet_volume_stats_available_bytes{persistentvolumeclaim=~"prometheus-.*"}
+            / kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~"prometheus-.*"} < 0.15
+        for: 15m
+        labels: { severity: warning, component: prometheus, tier: "2", scope: container }
+        annotations:
+          summary: "Prometheus 的 PVC 剩不到 15%；PVC 名稱要換成實際值（kubelet_volume_stats_* 尚未在 lab 驗證）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#disk-free
 
   - name: prometheus-resources        # K8s，需要 cAdvisor 與 kube-state-metrics
     rules:

@@ -96,7 +96,7 @@ Prometheus 大部分工作都是並行的，但每條路徑上都有單序的環
 | 單一 rule group 內 | 同一條 alert，放在重 group 延遲變近兩倍還會漏事件；獨立小 group 不受影響 <span class="at-chip at-ev-tested">實測</span>[^exp-prom-cpu] | 拆 group，關鍵 alert 獨立。`concurrent-rule-eval` 在 2.x 有依賴判斷問題，不建議優先使用 |
 | 查詢 slot | 重查詢佔滿後，rule group 從幾秒變 40 秒，scrape 不受影響 <span class="at-chip at-ev-tested">實測</span>[^exp-prom-query] | 限制 Grafana 查詢；確認 queue time 真的偏高才加大 `max-concurrency` |
 | WAL 全域寫入 | 10 IOPS 時 scrape 和 rule 不受影響，因為只寫 page cache；磁碟寫滿時 scrape 和 rule 同時失敗 <span class="at-chip at-ev-tested">實測</span>[^exp-prom-storage] | 預留磁碟空間，監控寫入失敗 |
-| TSDB 維護 | Compaction 用完空間時 reload 歸零；長查詢卡住 Compact 時 reload 也停止 <span class="at-chip at-ev-tested">實測</span>[^exp-prom-storage] | 監控 `reloads_total` 與 `compactions_failed_total` |
+| TSDB 維護 | Compaction 用完空間時 reload 歸零 <span class="at-chip at-ev-tested">實測</span>[^exp-prom-storage]；長查詢佔住 block reader 時 `Compact` 卡住、reload 也停止 <span class="at-chip at-ev-code">讀碼</span>[^p3-compact-lock][^p3-block-close-wait] | 監控 `reloads_total` 與 `compactions_failed_total` |
 | Notifier 送出迴圈 | 一台 Alertmanager 慢會拖累全部：由原始碼確認，本次沒有實測慢 Alertmanager <span class="at-chip at-ev-code">讀碼</span>[^p-notifier-wait] | 監控 `notifications_latency_seconds`。3.10 起每台各一條 queue，互不影響 |
 
 **怎麼用這張表：**scrape 尖峰偏高時，先看是否集中在少數 target，因為單序環節不會因為加 CPU 變快。慢的 rule group 會拖累同 group 的所有 alert，把關鍵 alert 移出來最有效。Notifier 和 TSDB 維護都只有一條路徑，要各自監控。<span class="at-chip at-ev-inferred">推算</span>

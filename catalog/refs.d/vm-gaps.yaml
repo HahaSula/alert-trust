@@ -1,0 +1,206 @@
+# lab/vm 證據修正與 VM 系列缺口補齊時核對的原始碼位置。行號已對照 tag 上的檔案（VictoriaLogs v1.53.0、VictoriaMetrics v1.155.0）。
+refs:
+  exp-vm-vl-reachable:
+    kind: experiment
+    title: "VictoriaLogs lab：cluster 停 1 台 vlstorage 時 vlinsert／vlselect 的 metric（只寫 1 條 stream 與寫 8 條 stream）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/vm/vl/results/vl-reachable-summary.json"
+  exp-vm-vl-ingested:
+    kind: experiment
+    title: "VictoriaLogs lab：3 種 Content-Type 下寫入請求數與實際收進筆數"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/vm/vl/results/vl-ingested.json"
+  vl-insert-reachable:
+    kind: code
+    project: "VictoriaLogs"
+    version: "v1.53.0"
+    file: "app/vlstorage/netinsert/netinsert.go"
+    line: 119
+    url: "https://github.com/VictoriaMetrics/VictoriaLogs/blob/v1.53.0/app/vlstorage/netinsert/netinsert.go#L119"
+  vl-insert-disable:
+    kind: code
+    project: "VictoriaLogs"
+    version: "v1.53.0"
+    file: "app/vlstorage/netinsert/netinsert.go"
+    line: 311
+    url: "https://github.com/VictoriaMetrics/VictoriaLogs/blob/v1.53.0/app/vlstorage/netinsert/netinsert.go#L311"
+  vl-insert-route:
+    kind: code
+    project: "VictoriaLogs"
+    version: "v1.53.0"
+    file: "app/vlstorage/netinsert/netinsert.go"
+    line: 457
+    url: "https://github.com/VictoriaMetrics/VictoriaLogs/blob/v1.53.0/app/vlstorage/netinsert/netinsert.go#L457"
+  vl-select-send-errors:
+    kind: code
+    project: "VictoriaLogs"
+    version: "v1.53.0"
+    file: "app/vlstorage/netselect/netselect.go"
+    line: 776
+    url: "https://github.com/VictoriaMetrics/VictoriaLogs/blob/v1.53.0/app/vlstorage/netselect/netselect.go#L776"
+  vl-select-502:
+    kind: code
+    project: "VictoriaLogs"
+    version: "v1.53.0"
+    file: "app/vlstorage/netselect/netselect.go"
+    line: 787
+    url: "https://github.com/VictoriaMetrics/VictoriaLogs/blob/v1.53.0/app/vlstorage/netselect/netselect.go#L787"
+  vl-jsonline-requests:
+    kind: code
+    project: "VictoriaLogs"
+    version: "v1.53.0"
+    file: "app/vlinsert/jsonline/jsonline.go"
+    line: 29
+    url: "https://github.com/VictoriaMetrics/VictoriaLogs/blob/v1.53.0/app/vlinsert/jsonline/jsonline.go#L29"
+  vl-rows-ingested:
+    kind: code
+    project: "VictoriaLogs"
+    version: "v1.53.0"
+    file: "app/vlinsert/insertutil/common_params.go"
+    line: 350
+    url: "https://github.com/VictoriaMetrics/VictoriaLogs/blob/v1.53.0/app/vlinsert/insertutil/common_params.go#L350"
+  vl-free-disk:
+    kind: code
+    project: "VictoriaLogs"
+    version: "v1.53.0"
+    file: "app/vlstorage/main.go"
+    line: 690
+    url: "https://github.com/VictoriaMetrics/VictoriaLogs/blob/v1.53.0/app/vlstorage/main.go#L690"
+  vl-select-timeout:
+    kind: code
+    project: "VictoriaLogs"
+    version: "v1.53.0"
+    file: "app/vlselect/main.go"
+    line: 88
+    url: "https://github.com/VictoriaMetrics/VictoriaLogs/blob/v1.53.0/app/vlselect/main.go#L88"
+  vl-rule-disk:
+    kind: code
+    project: "VictoriaLogs"
+    version: "v1.53.0"
+    file: "deployment/docker/rules/alerts-vlogs.yml"
+    line: 7
+    url: "https://github.com/VictoriaMetrics/VictoriaLogs/blob/v1.53.0/deployment/docker/rules/alerts-vlogs.yml#L7"
+  vl-rule-queryload:
+    kind: code
+    project: "VictoriaLogs"
+    version: "v1.53.0"
+    file: "deployment/docker/rules/alerts-vlogs.yml"
+    line: 37
+    url: "https://github.com/VictoriaMetrics/VictoriaLogs/blob/v1.53.0/deployment/docker/rules/alerts-vlogs.yml#L37"
+  vma-results-limit:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/alerting.go"
+    line: 607
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/alerting.go#L607"
+  vma-results-limit-flag:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/group.go"
+    line: 29
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/group.go#L29"
+  vma-results-limit-gauge:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/group.go"
+    line: 319
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/group.go#L319"
+  vma-eval-samples-gauge:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/alerting.go"
+    line: 93
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/alerting.go#L93"
+  vmag-pq-free:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "lib/persistentqueue/fastqueue.go"
+    line: 105
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/lib/persistentqueue/fastqueue.go#L105"
+  vmag-pq-pending:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "lib/persistentqueue/fastqueue.go"
+    line: 98
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/lib/persistentqueue/fastqueue.go#L98"
+  vmag-rw-retries:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmagent/remotewrite/client.go"
+    line: 211
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmagent/remotewrite/client.go#L211"
+  vmag-rw-packets-dropped:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmagent/remotewrite/client.go"
+    line: 210
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmagent/remotewrite/client.go#L210"
+  vmag-rule-pq-drop:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "deployment/docker/rules/alerts-vmagent.yml"
+    line: 12
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/deployment/docker/rules/alerts-vmagent.yml#L12"
+  vmag-rule-rw-errors:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "deployment/docker/rules/alerts-vmagent.yml"
+    line: 68
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/deployment/docker/rules/alerts-vmagent.yml#L68"
+  vmag-rule-pq-4h:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "deployment/docker/rules/alerts-vmagent.yml"
+    line: 190
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/deployment/docker/rules/alerts-vmagent.yml#L190"
+  vm-app-unclean:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "lib/appmetrics/appmetrics.go"
+    line: 69
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/lib/appmetrics/appmetrics.go#L69"
+  vm-rule-restarts:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "deployment/docker/rules/alerts-health.yml"
+    line: 10
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/deployment/docker/rules/alerts-health.yml#L10"
+  vm-rule-unclean:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "deployment/docker/rules/alerts-health.yml"
+    line: 20
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/deployment/docker/rules/alerts-health.yml#L20"
+  vl-agent-pending:
+    kind: code
+    project: "VictoriaLogs"
+    version: "v1.53.0"
+    file: "app/vlagent/remotewrite/remotewrite.go"
+    line: 236
+    url: "https://github.com/VictoriaMetrics/VictoriaLogs/blob/v1.53.0/app/vlagent/remotewrite/remotewrite.go#L236"
+  vl-rule-vlagent-drop:
+    kind: code
+    project: "VictoriaLogs"
+    version: "v1.53.0"
+    file: "deployment/docker/rules/alerts-vlagent.yml"
+    line: 17
+    url: "https://github.com/VictoriaMetrics/VictoriaLogs/blob/v1.53.0/deployment/docker/rules/alerts-vlagent.yml#L17"
+  vl-insert-retry:
+    kind: code
+    project: "VictoriaLogs"
+    version: "v1.53.0"
+    file: "app/vlstorage/netinsert/netinsert.go"
+    line: 220
+    url: "https://github.com/VictoriaMetrics/VictoriaLogs/blob/v1.53.0/app/vlstorage/netinsert/netinsert.go#L220"

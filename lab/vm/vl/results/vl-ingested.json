@@ -1,0 +1,32 @@
+[
+ {
+  "content_type": null,
+  "http_status": 200,
+  "delta": {
+   "requests": 1.0,
+   "errors": 0.0,
+   "rows_ingested": 5.0
+  },
+  "query_count": "{\"c\":\"5\"}"
+ },
+ {
+  "content_type": "application/x-www-form-urlencoded",
+  "http_status": 200,
+  "delta": {
+   "requests": 1.0,
+   "errors": 0.0,
+   "rows_ingested": 0.0
+  },
+  "query_count": "{\"c\":\"0\"}"
+ },
+ {
+  "content_type": "application/stream+json",
+  "http_status": 200,
+  "delta": {
+   "requests": 1.0,
+   "errors": 0.0,
+   "rows_ingested": 5.0
+  },
+  "query_count": "{\"c\":\"5\"}"
+ }
+]

@@ -42,7 +42,7 @@
 | 起點 | 經過 | 結果 | 證據 |
 |---|---|---|---|
 | Grafana 重查詢 | Prometheus 查詢 slot | Rule group 從幾秒變 40 秒，scrape 不受影響 | <span class="at-chip at-ev-tested">實測</span>[^exp-prom-query] |
-| Grafana 重查詢 | vmselect 併發上限 | vmalert 查詢收到 429，約 2 分鐘後 alert 被標成假 resolved | <span class="at-chip at-ev-tested">實測</span>[^exp-vm-faults] |
+| Grafana 重查詢 | vmselect 併發上限 | vmalert 查詢收到 429，走查詢失敗路徑；和 vmselect 停一樣，約 2 分鐘後 alert 會被標成假 resolved | <span class="at-chip at-ev-inferred">推論</span>[^vms-queue][^vma-exec-send]（vmselect 停的假 resolved 有實測[^exp-vm-faults]，查詢飽和沒有） |
 | 一台 Alertmanager 變慢 | Prometheus 3.10 以前的單一 queue | 所有 alert 的通知一起延遲 | <span class="at-chip at-ev-code">讀碼</span>[^p-notifier-wait] |
 | 一台 Alertmanager 變慢 | vmalert 每條 rule 同步送通知 | 同 group 的評估時間拉長，可能跳過 evaluation | <span class="at-chip at-ev-code">讀碼</span>[^vma-exec-send] |
 | SMTP 不回應 | Alertmanager 的 aggregation group | 該 group 所有通知停止，counter 不動 | <span class="at-chip at-ev-tested">實測</span>[^exp-am-smtp] |

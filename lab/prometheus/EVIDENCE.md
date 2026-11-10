@@ -187,7 +187,7 @@ Minikube、kube-prometheus-stack 57.2、Prometheus 2.51.2、2 個各 15 萬 seri
 | 單一 rule group 內 | 同一條 alert 放在重 group，延遲變近兩倍還會漏事件；獨立小 group 不受影響 | 實測 |
 | 查詢 slot | 重查詢佔滿後，rule group 從幾秒變 40 秒，scrape 不受影響 | 實測 |
 | WAL 全域寫入 | 10 IOPS 時 scrape 和 rule 不受影響；磁碟寫滿時兩者同時失敗 | 實測；page cache 吃緊的情況未測 |
-| TSDB 維護 | Compaction 用完空間時 reload 歸零；長查詢卡住 Compact 時 reload 也停止 | 實測 |
+| TSDB 維護 | Compaction 用完空間時 reload 歸零；長查詢卡住 Compact 時 reload 也停止 | 前者實測；後者讀碼（v3.13.5 `tsdb/db.go` `Compact` 持有 `cmtx`、`tsdb/block.go` `Close` 等待 reader），本 lab 沒有重現 |
 | Notifier 送出迴圈 | 一台 Alertmanager 慢會拖累全部 | 讀碼；實驗只測過 Alertmanager 完全停機 |
 
 依據（v2.51.2）：`scrape/scrape.go`（`sync`、`scrapeLoop.run`、`scrapeAndReport`）、`tsdb/wlog/wlog.go`（`Log`、`nextSegment`）、`tsdb/head.go`、`tsdb/chunks/chunk_write_queue.go`、`rules/manager.go`、`rules/group.go`（`run`、`Eval`）、`promql/engine.go`（`queueActive`）、`notifier/notifier.go`、`tsdb/db.go`（`run`）。Alertmanager 0.27.0：`dispatch/dispatch.go`（`aggrGroup.run`）、`notify/notify.go`（`FanoutStage`、`RetryStage`）。

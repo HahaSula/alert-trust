@@ -5,7 +5,7 @@
 ## 現況
 
 - GitHub repo `HahaSula/alert-trust`，Pages 由 GitHub Actions 發布。
-- 16 張卡（9 個監控元件、7 個資料庫 target）、336 個訊號、469 條規則；`validate.py` 0 錯誤、2 個警告；`--strict` 建置通過。
+- 16 張卡（9 個監控元件、7 個資料庫 target）、344 個訊號、489 條規則；`validate.py` 0 錯誤、1 個警告；`--strict` 建置通過。
 - 原始碼參考 105+ 筆（釘版本與行號），實驗參考多數已換成 `lab/` 的公開結果。
 
 ## 已完成
@@ -31,6 +31,7 @@
 | TiDB v8.5.8 target（`model: native`，TiDB／TiKV／PD）與「分散式 SQL」架構頁；官方規則 5 類失效實測 | `catalog/targets/tidb.yaml`、`docs/targets/tidb*.md`、`lab/targets/tidb/` |
 | YugabyteDB v2026.1.3.0 target（`model: native`），YSQL 與 PostgreSQL 監控對照（postgres_exporter 實測） | `catalog/targets/yugabytedb.yaml`、`docs/targets/yugabytedb*.md`、`lab/targets/yugabytedb/` |
 | ClickHouse v26.10.2 target（內建 endpoint＋query-exporter 查 system 表）與「分析型」架構頁，2 副本＋3 Keeper lab | `catalog/targets/clickhouse.yaml`、`docs/targets/clickhouse*.md`、`queries/clickhouse/`、`lab/targets/clickhouse/` |
+| artifact 對照後的修正：VM 報告只留公開 lab 數字、VictoriaLogs storage-reachable 改規則（重跑 lab）、Prometheus retention／notifier／磁碟訊號、VM 系列第 2、3 級訊號 | `docs/reports/`、`catalog/components/`、`rules/`、`lab/vm/vl/` |
 | 時間契約不合時給兩個方向：目前合格的 rule、方案 A 改 rule（最短合格視窗，可另存）、方案 B 改環境（`scrape_interval`、`query_offset`） | `tools/fit_contracts.py` |
 | metric 來源檢查：每個 metric 要對到 config 的 scrape job、live 快照或使用者回答，不假定（使用者在 v0.1.0 用 opencode 時回報 AI 直接假定來源） | `tools/check_metric_sources.py`、`env/sources.example.yaml` |
 | `rule-review` skill 與流程圖：先確認體系與基礎設施覆蓋，再看時間契約；離線用 `tools/rules_to_snapshot.py` | `skills/rule-review/`、`docs/tools/rule-review.md` |
@@ -38,7 +39,6 @@
 ## 進行中
 
 - MongoDB target（mongodb_exporter）與「文件型」架構頁
-- 修正 artifact 對照找到的證據不一致（VM 報告、VictoriaLogs storage-reachable、retention 規則等）
 
 之後的資料庫順序（使用者已同意）：MongoDB；CockroachDB（專有授權）不做。資料庫架構頁依類型分頁：關聯式、記憶體 KV、共識（Raft）、分散式 SQL、分析型、文件型。
 
@@ -47,7 +47,7 @@
 1. **VM lab 沒重測到的項目**（`lab/vm/README.md`）：查詢飽和 429 與 `iteration_missed`、磁碟突然 0 byte 的 panic、vmalert／Alertmanager 本身停機、VL `allow_partial_response`、operator。相關說法已降為「推論」。注意這台機器 Docker 容器的單調時鐘比牆鐘慢約 30%，時間類數字要以牆鐘解讀。
 2. （已完成）Target 標準問題加入 role-detection、replication-lag、exporter-query-timeout；`aliases` 讓同義的訊號 id 也算數。
 3. **剩下的未公開參考**：`exp-am-compat`（版本相容）、`exp-am-rules`（告警規則測試），在 `catalog/refs.d/reports.yaml`；重做或改引用。
-4. **2 個第 1 級訊號沒有規則範本**：`victorialogs#ingested`、`observer#scrapes-all-infra`。
+4. **1 個第 1 級訊號沒有規則範本**：`observer#scrapes-all-infra`。
 5. **規則範本的 job selector**：`PrometheusDown`、`PrometheusCrashLooping` 用 `job=~".*prometheus.*"`，job 名稱不同的環境會「規則在但沒資料」（`lab/coverage` 實測）。要在文件與 skill 強調必須調整，或改成 label 參數化。
 6. **覆蓋狀態輸出成 metric**：讓 `check_coverage.py` 定期執行並輸出每個元件、每個訊號的狀態，由外部觀察者抓取並告警，讓 monitor of monitor 的缺口本身也會通知。
 7. **CI 用的 policy lint**：舊 repo 的 `policy_lint.py`、`analyze_rules.py` 尚未改寫成讀新目錄。
@@ -62,6 +62,7 @@
 16. **YugabyteDB lab 待補**：四個 job 改 `honor_timestamps: false` 重跑（舊值留約 5 分鐘、out-of-order 丟棄，目前只是推論可解）；`/api/v1/tablet-under-replication` 整段 lab 都空的原因；修正後的 `YBMasterLeaderProbeMissing` 只做過即時查詢，沒有整檔重跑；慢磁碟、write stall、記憶體拒絕、YCQL 在 master 失去 quorum 時沒做實驗。
 17. **ClickHouse 待補**：修正後的 Keeper session 規則（5 分鐘內有變化）只看到 firing，沒等到解除；慢或滿的磁碟、慢 Keeper、卡住的 ON CLUSTER DDL、全伺服器記憶體上限只讀碼。
 18. **query-exporter 排程跳過**：間隔對齊時較長間隔的查詢會被跳過（ClickHouse lab 錯開間隔後解決；MySQL lab 也看過 `misfire_grace_time` 1 秒的跳過）。PostgreSQL 的 5 分鐘查詢可能受影響，要檢查 `queries/query-exporter/postgres.yaml` 的間隔。
+19. **artifact 對照的後續輕量 lab**：429 與 `iteration_missed`、帶 `for` 的 log rule、損毀 block（`reloads_failures_total`）、長查詢卡住 Compact（目前讀碼）。新增的 Prometheus／VM 規則只過 promtool／dryRun，沒有在 lab 觸發過。
 
 ## 已做的決定
 

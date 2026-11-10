@@ -1,0 +1,225 @@
+[
+ {
+  "phase": "A-steady",
+  "insert_status": {
+   "200": 6
+  },
+  "query_status": {
+   "200": 6
+  },
+  "reachable": {
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-1:9428\"}": [
+    1.0
+   ],
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-2:9428\"}": [
+    1.0
+   ]
+  },
+  "first_change_s": {
+   "vl_rows_ingested_total{type=\"jsonline\"}": 5.0
+  },
+  "end": {
+   "vl_http_errors_total{path=\"/insert/journald/upload\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/jsonline\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/multitenant/native\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/native\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/opentelemetry/v1/logs\",format=\"protobuf\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/splunk\"}": 0.0,
+   "vl_http_errors_total{path=\"/internal/insert\"}": 0.0,
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-1:9428\"}": 1.0,
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-2:9428\"}": 1.0,
+   "vl_insert_remote_send_errors_total{addr=\"vlstorage-1:9428\"}": 0.0,
+   "vl_insert_remote_send_errors_total{addr=\"vlstorage-2:9428\"}": 0.0,
+   "vl_rows_ingested_total{type=\"jsonline\"}": 6.0,
+   "vl_select_remote_send_errors_total{addr=\"vlstorage-1:9428\"}": 0.0,
+   "vl_select_remote_send_errors_total{addr=\"vlstorage-2:9428\"}": 0.0
+  }
+ },
+ {
+  "phase": "A-down",
+  "insert_status": {
+   "200": 12
+  },
+  "query_status": {
+   "502": 12
+  },
+  "reachable": {
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-1:9428\"}": [
+    1.0
+   ],
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-2:9428\"}": [
+    1.0
+   ]
+  },
+  "first_change_s": {
+   "vl_rows_ingested_total{type=\"jsonline\"}": 4.4,
+   "vl_select_remote_send_errors_total{addr=\"vlstorage-2:9428\"}": 4.4
+  },
+  "end": {
+   "vl_http_errors_total{path=\"/insert/journald/upload\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/jsonline\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/multitenant/native\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/native\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/opentelemetry/v1/logs\",format=\"protobuf\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/splunk\"}": 0.0,
+   "vl_http_errors_total{path=\"/internal/insert\"}": 0.0,
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-1:9428\"}": 1.0,
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-2:9428\"}": 1.0,
+   "vl_insert_remote_send_errors_total{addr=\"vlstorage-1:9428\"}": 0.0,
+   "vl_insert_remote_send_errors_total{addr=\"vlstorage-2:9428\"}": 0.0,
+   "vl_rows_ingested_total{type=\"jsonline\"}": 18.0,
+   "vl_select_remote_send_errors_total{addr=\"vlstorage-1:9428\"}": 0.0,
+   "vl_select_remote_send_errors_total{addr=\"vlstorage-2:9428\"}": 12.0
+  }
+ },
+ {
+  "phase": "A-up",
+  "insert_status": {
+   "200": 4
+  },
+  "query_status": {
+   "200": 4
+  },
+  "reachable": {
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-1:9428\"}": [
+    1.0
+   ],
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-2:9428\"}": [
+    1.0
+   ]
+  },
+  "first_change_s": {
+   "vl_rows_ingested_total{type=\"jsonline\"}": 0.3
+  },
+  "end": {
+   "vl_http_errors_total{path=\"/insert/journald/upload\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/jsonline\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/multitenant/native\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/native\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/opentelemetry/v1/logs\",format=\"protobuf\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/splunk\"}": 0.0,
+   "vl_http_errors_total{path=\"/internal/insert\"}": 0.0,
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-1:9428\"}": 1.0,
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-2:9428\"}": 1.0,
+   "vl_insert_remote_send_errors_total{addr=\"vlstorage-1:9428\"}": 0.0,
+   "vl_insert_remote_send_errors_total{addr=\"vlstorage-2:9428\"}": 0.0,
+   "vl_rows_ingested_total{type=\"jsonline\"}": 22.0,
+   "vl_select_remote_send_errors_total{addr=\"vlstorage-1:9428\"}": 0.0,
+   "vl_select_remote_send_errors_total{addr=\"vlstorage-2:9428\"}": 12.0
+  }
+ },
+ {
+  "phase": "B-steady",
+  "insert_status": {
+   "200": 6
+  },
+  "query_status": {
+   "200": 6
+  },
+  "reachable": {
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-1:9428\"}": [
+    1.0
+   ],
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-2:9428\"}": [
+    1.0
+   ]
+  },
+  "first_change_s": {
+   "vl_rows_ingested_total{type=\"jsonline\"}": 0.0
+  },
+  "end": {
+   "vl_http_errors_total{path=\"/insert/journald/upload\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/jsonline\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/multitenant/native\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/native\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/opentelemetry/v1/logs\",format=\"protobuf\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/splunk\"}": 0.0,
+   "vl_http_errors_total{path=\"/internal/insert\"}": 0.0,
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-1:9428\"}": 1.0,
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-2:9428\"}": 1.0,
+   "vl_insert_remote_send_errors_total{addr=\"vlstorage-1:9428\"}": 0.0,
+   "vl_insert_remote_send_errors_total{addr=\"vlstorage-2:9428\"}": 0.0,
+   "vl_rows_ingested_total{type=\"jsonline\"}": 76.0,
+   "vl_select_remote_send_errors_total{addr=\"vlstorage-1:9428\"}": 0.0,
+   "vl_select_remote_send_errors_total{addr=\"vlstorage-2:9428\"}": 12.0
+  }
+ },
+ {
+  "phase": "B-down",
+  "insert_status": {
+   "200": 12
+  },
+  "query_status": {
+   "502": 12
+  },
+  "reachable": {
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-1:9428\"}": [
+    1.0
+   ],
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-2:9428\"}": [
+    0.0
+   ]
+  },
+  "first_change_s": {
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-2:9428\"}": 4.2,
+   "vl_insert_remote_send_errors_total{addr=\"vlstorage-2:9428\"}": 4.2,
+   "vl_rows_ingested_total{type=\"jsonline\"}": 4.2,
+   "vl_select_remote_send_errors_total{addr=\"vlstorage-2:9428\"}": 4.2
+  },
+  "end": {
+   "vl_http_errors_total{path=\"/insert/journald/upload\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/jsonline\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/multitenant/native\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/native\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/opentelemetry/v1/logs\",format=\"protobuf\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/splunk\"}": 0.0,
+   "vl_http_errors_total{path=\"/internal/insert\"}": 0.0,
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-1:9428\"}": 1.0,
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-2:9428\"}": 0.0,
+   "vl_insert_remote_send_errors_total{addr=\"vlstorage-1:9428\"}": 0.0,
+   "vl_insert_remote_send_errors_total{addr=\"vlstorage-2:9428\"}": 12.0,
+   "vl_rows_ingested_total{type=\"jsonline\"}": 184.0,
+   "vl_select_remote_send_errors_total{addr=\"vlstorage-1:9428\"}": 0.0,
+   "vl_select_remote_send_errors_total{addr=\"vlstorage-2:9428\"}": 24.0
+  }
+ },
+ {
+  "phase": "B-up",
+  "insert_status": {
+   "200": 6
+  },
+  "query_status": {
+   "200": 6
+  },
+  "reachable": {
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-1:9428\"}": [
+    1.0
+   ],
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-2:9428\"}": [
+    0.0,
+    1.0
+   ]
+  },
+  "first_change_s": {
+   "vl_rows_ingested_total{type=\"jsonline\"}": 0.3,
+   "vl_insert_remote_send_errors_total{addr=\"vlstorage-2:9428\"}": 5.3,
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-2:9428\"}": 16.0
+  },
+  "end": {
+   "vl_http_errors_total{path=\"/insert/journald/upload\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/jsonline\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/multitenant/native\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/native\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/opentelemetry/v1/logs\",format=\"protobuf\"}": 0.0,
+   "vl_http_errors_total{path=\"/insert/splunk\"}": 0.0,
+   "vl_http_errors_total{path=\"/internal/insert\"}": 0.0,
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-1:9428\"}": 1.0,
+   "vl_insert_remote_is_reachable{addr=\"vlstorage-2:9428\"}": 1.0,
+   "vl_insert_remote_send_errors_total{addr=\"vlstorage-1:9428\"}": 0.0,
+   "vl_insert_remote_send_errors_total{addr=\"vlstorage-2:9428\"}": 14.0,
+   "vl_rows_ingested_total{type=\"jsonline\"}": 238.0,
+   "vl_select_remote_send_errors_total{addr=\"vlstorage-1:9428\"}": 0.0,
+   "vl_select_remote_send_errors_total{addr=\"vlstorage-2:9428\"}": 24.0
+  }
+ }
+]

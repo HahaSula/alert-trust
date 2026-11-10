@@ -24,6 +24,8 @@ python3 faults/run.py rf1b               # RF=1：全部 vmstorage 唯讀、vmin
 python3 faults/run.py rf2                # RF=2：一台 vmstorage 掛、vmagent 掛
 python3 vl/run.py                        # VL 全部情境
 python3 vl/run.py readonly               # 只重跑 VL single 唯讀
+python3 vl/reachable.py && python3 vl/reachable.py summarize   # 停 1 台 vlstorage 時哪個 metric 會變（約 4 分鐘）
+python3 vl/ingested.py                   # 3 種 Content-Type 的寫入請求數與收進筆數（約 30 秒）
 python3 vl/summarize.py > vl/results/vl-logdelay.json
 python3 transitions.py faults/results/faults-rf1.jsonl   # 把取樣轉成「故障後第幾秒什麼改變」
 ```
@@ -112,7 +114,7 @@ python3 transitions.py faults/results/faults-rf1.jsonl   # 把取樣轉成「故
 | 寫入不帶 Content-Type | 200，`vl_rows_ingested_total` +5，查得到 5 筆 |
 | 寫入帶 `Content-Type: application/x-www-form-urlencoded`（Python urllib 的預設） | **200，`vl_rows_ingested_total` +0，查不到** |
 | 寫入帶 `application/stream+json` | 200，+5，查得到 |
-| Cluster 停 1 台 vlstorage（240s） | 查詢 +7s 起回 502；cluster 的 log rule +32s 變 ERR；+122s Alertmanager 把 canary 標成 resolved（假 resolved），vmalert 裡仍是 firing；寫入仍回 200；`vl_insert_remote_is_reachable` 沒有變化 |
+| Cluster 停 1 台 vlstorage（240s） | 查詢 +7s 起回 502；cluster 的 log rule +32s 變 ERR；+122s Alertmanager 把 canary 標成 resolved（假 resolved），vmalert 裡仍是 firing；寫入仍回 200；`vl_insert_remote_is_reachable` 沒有變化（原因見下方重測：這一輪只寫 1 條 stream，剛好不在停掉的那台） |
 | Single 唯讀（`-storage.minFreeDiskSpaceBytes` 調高，150s） | `vl_storage_is_read_only` = 1；寫入回 **429**（`cannot add rows into storage in read-only mode`）；rule 沒有錯誤 |
 
 Log rule 視窗（`vl-logdelay.json`，唯讀前 11.7 分鐘）：
@@ -129,3 +131,29 @@ Log rule 視窗（`vl-logdelay.json`，唯讀前 11.7 分鐘）：
 - L = 45s 介於 D 與 D + E 之間，理論上要看相位；這台機器實際延遲 50–77 秒，所以和 L ≤ D 一樣都觸發。
 - L = 0、20、45 都漏了同一筆事件（第 4 筆），原因沒有找到；VL 的 `start`／`end` 邊界另外測過是包含的。
 - 第一次跑的唯讀階段因容器重建遺失資料而作廢（`vl.jsonl` 的 readonly 段），改用具名 volume 重跑（`vl-readonly.jsonl`）。
+
+### 重測：停 1 台 vlstorage 時哪個 metric 會變（`vl/reachable.py`）
+
+上表 `vl_insert_remote_is_reachable` 沒有變化，但 `victorialogs#storage-reachable` 原本用它當第 1 級訊號，所以單獨重測。只起 2 台 vlstorage 與 vlfront（兼 vlinsert／vlselect），driver 每 5 秒寫一批 log、查一次 `_time:5m | stats count() c`，停 vlstorage-2 各 60 秒。原始資料：`vl/results/vl-reachable.jsonl`，摘要：`vl/results/vl-reachable-summary.json`。
+
+| 段落 | Stream 分佈 | 寫入 | 查詢 | `vl_insert_remote_is_reachable{addr=vlstorage-2}` | `vl_insert_remote_send_errors_total{addr=vlstorage-2}` | `vl_select_remote_send_errors_total{addr=vlstorage-2}` |
+|---|---|---|---|---|---|---|
+| A：只寫 1 條 stream（在 vlstorage-1） | 停掉的那台沒有這條 stream | 12／12 回 200 | 12／12 回 502 | **一直是 1** | 0 | +12（第一筆取樣 +4s） |
+| B：寫 9 條 stream（7 條在 vlstorage-2） | 停掉的那台有 7 條 | 12／12 回 200（轉送到 vlstorage-1） | 12／12 回 502 | **0**（第一筆取樣 +4s），vlstorage-2 回來後 +16s 回到 1 | +12 | +12 |
+
+- `vl_insert_remote_is_reachable` 是被動的：只有 vlinsert 真的送資料到那台、而且失敗時才設成 0（[netinsert.go#L311](https://github.com/VictoriaMetrics/VictoriaLogs/blob/v1.53.0/app/vlstorage/netinsert/netinsert.go#L311)）。一條 stream 的前 1000 行固定寫到 `streamHash % 節點數` 那台（[netinsert.go#L457](https://github.com/VictoriaMetrics/VictoriaLogs/blob/v1.53.0/app/vlstorage/netinsert/netinsert.go#L457)），stream 少的時候停掉的那台可能根本沒有要寫的資料。
+- 回來後要等 10 秒的停用期過了、再成功寫一次才變回 1，所以 B 段晚了 16 秒。
+- 查詢端每次查詢都會對停掉的那台累加 `vl_select_remote_send_errors_total`（[netselect.go#L776](https://github.com/VictoriaMetrics/VictoriaLogs/blob/v1.53.0/app/vlstorage/netselect/netselect.go#L776)），只要有 log rule 在跑就會變。所以 `MetaVLStorageUnreachable` 改成「select 錯誤增加，或 reachable == 0」。
+- 兩段寫入都回 200：vlinsert 把資料轉送到剩下的節點，shipper 看不到錯誤。
+
+### 寫入請求數與收進筆數（`vl/ingested.py`）
+
+給 `victorialogs#ingested` 的規則用。VL single，每種 Content-Type 送 5 行。原始資料：`vl/results/vl-ingested.json`。
+
+| Content-Type | HTTP | `vl_http_requests_total{path="/insert/jsonline"}` | `vl_rows_ingested_total` | 查得到 |
+|---|---|---|---|---|
+| 不帶 | 200 | +1 | +5 | 5 |
+| `application/x-www-form-urlencoded` | 200 | +1 | **+0** | 0 |
+| `application/stream+json` | 200 | +1 | +5 | 5 |
+
+`vl_http_errors_total` 三次都是 +0。請求數在讀 body 之前就累加（[jsonline.go#L29](https://github.com/VictoriaMetrics/VictoriaLogs/blob/v1.53.0/app/vlinsert/jsonline/jsonline.go#L29)），所以「有請求、沒收進」可以當規則（`MetaVLRowsNotIngested`）。

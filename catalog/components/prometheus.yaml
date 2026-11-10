@@ -147,6 +147,27 @@ signals:
       - rules/prometheus/meta.yml#NotificationsFailing
       - rules/prometheus/meta.yml#NotificationsDropped
       - rules/prometheus/meta.yml#NoAlertmanagerDiscovered
+
+  - id: notify-early-warning
+    tier: 2
+    question: 通知在丟之前有沒有先變慢、堆積
+    signal: "queue_length ÷ queue_capacity > 0.5、errors ÷ sent > 1%、latency p99 > 5s；丟棄看 dropped_total（第 1 級）"
+    metrics:
+      - prometheus_notifications_queue_length
+      - prometheus_notifications_queue_capacity
+      - prometheus_notifications_errors_total
+      - prometheus_notifications_sent_total
+      - prometheus_notifications_latency_seconds
+      - prometheus_notifications_dropped_total
+    evaluate_on: observer
+    evidence: code
+    source: art-prom
+    refs: [p3-mixin-queue-full, p3-mixin-errors-some, p3-notifier-metrics, p3-notifier-capacity, p3-notifier-latency, p3-notifier-drop, p251-notifier-drop, p-notifier-sendall]
+    upstream: { status: partial, note: "mixin 有 queue 快滿與部分 Alertmanager 錯誤率，沒有延遲" }
+    rules:
+      - rules/prometheus/meta.yml#NotificationQueueFilling
+      - rules/prometheus/meta.yml#NotificationErrorRatio
+      - rules/prometheus/meta.yml#NotificationLatencyHigh
     contract: resend-endsat
 
   - id: wal-write-failed
@@ -226,18 +247,60 @@ signals:
       - prometheus_tsdb_compactions_failed_total
       - prometheus_tsdb_checkpoint_creations_failed_total
       - prometheus_tsdb_reloads_total
+      - prometheus_tsdb_reloads_failures_total
+      - prometheus_tsdb_wal_truncations_total
+      - prometheus_tsdb_wal_truncations_failed_total
+      - prometheus_tsdb_head_truncations_total
       - prometheus_tsdb_head_max_time_seconds
       - prometheus_tsdb_head_min_time_seconds
     evaluate_on: observer
     evidence: tested
     source: art-prom
-    refs: [exp-prom-storage, p-db-run]
-    upstream: { status: partial, note: "mixin 只有「失敗」，沒有「停止」" }
+    refs: [exp-prom-storage, p-db-run, p3-mixin-reloads-failing, p3-db-run, p3-compact-failed, p3-reload-failed, p3-reload-corrupted, p3-checkpoint-fail, p3-wal-truncate-call, p3-wal-truncate-metrics, p3-head-truncations, p3-blocks-bytes]
+    upstream: { status: partial, note: "mixin 有 reload 與 compaction 失敗（PrometheusTSDBReloadsFailing），沒有「停止」與 WAL 截斷" }
     rules:
       - rules/prometheus/meta.yml#WALCheckpointFailing
       - rules/prometheus/meta.yml#CompactionFailing
       - rules/prometheus/meta.yml#BlockReloadStalled
       - rules/prometheus/meta.yml#HeadNotCompacting
+      - rules/prometheus/meta.yml#BlockReloadFailing
+      - rules/prometheus/meta.yml#RetentionBlockedByCompaction
+      - rules/prometheus/meta.yml#WALNotTruncated
+      - rules/prometheus/meta.yml#WALTruncationFailing
+
+  - id: size-retention
+    tier: 2
+    question: Size retention 有在作用、而且沒有刪太多嗎
+    signal: "blocks＋WAL＋Head chunk 用量超過 `prometheus_tsdb_retention_limit_bytes`（retention 沒在作用）；`size_retentions_total` 增加（保留期比 time retention 短）"
+    metrics:
+      - prometheus_tsdb_storage_blocks_bytes
+      - prometheus_tsdb_wal_storage_size_bytes
+      - prometheus_tsdb_head_chunks_storage_size_bytes
+      - prometheus_tsdb_retention_limit_bytes
+      - prometheus_tsdb_size_retentions_total
+    evaluate_on: observer
+    evidence: code
+    source: art-prom
+    refs: [p3-size-retention-wal, p3-head-size, p3-size-retention-count, p3-retention-limit-bytes, p3-blocks-bytes, p3-retention-size-flag]
+    upstream: { status: no }
+    applies_when: "有設 storage.tsdb.retention.size"
+    rules:
+      - rules/prometheus/meta.yml#PrometheusStorageOverSizeLimit
+      - rules/prometheus/meta.yml#PrometheusSizeRetentionDeleting
+
+  - id: disk-free
+    tier: 2
+    question: 資料目錄還有空間嗎
+    signal: "node_exporter 的 `node_filesystem_avail_bytes`（K8s 用 `kubelet_volume_stats_available_bytes`）低於 15% 或 24 小時內用完；Prometheus 自己的 metric 沒有磁碟剩餘空間"
+    metrics: [node_filesystem_avail_bytes, node_filesystem_size_bytes, kubelet_volume_stats_available_bytes, kubelet_volume_stats_capacity_bytes]
+    evaluate_on: observer
+    evidence: inferred
+    source: art-prom
+    refs: [exp-prom-storage]
+    upstream: { status: partial, note: "node_exporter mixin 有通用的磁碟規則，沒有綁 Prometheus 資料目錄" }
+    rules:
+      - rules/prometheus/meta.yml#PrometheusDiskLow
+      - rules/prometheus/meta.yml#PrometheusPVCLow
 
   - id: memory-limit
     tier: 2

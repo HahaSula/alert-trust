@@ -118,6 +118,29 @@ Reload、retention、head compaction、block compaction、WAL 截斷都在**同�
 - Compaction 慢或失敗，retention 跟著延後或停止。
 - 可用空間被 compaction 用完時 reload 會停止，retention 不再執行；磁碟突然寫滿時 reload 反而正常，但沒有新 block，time retention 凍結。<span class="at-chip at-ev-tested">實測</span>[^exp-prom-storage]
 - Reload timer 會被 compaction 訊號重置的問題到 3.13.5 仍在。<span class="at-chip at-ev-tested">實測</span>[^exp-prom-storage]
+- 長查詢可能讓 compaction 與 reload 一起停住：`Compact` 全程持有 `cmtx`[^p3-compact-lock]，Head 落成 block 後要等重疊的查詢結束[^p3-head-wait-readers]，刪舊 block 時 `Block.Close` 要等所有 reader 釋放[^p3-delete-close][^p3-block-close-wait]。這段期間同一條 goroutine 不會再 reload。上限是 `--query.timeout`（預設 2m）[^p3-query-timeout]。<span class="at-chip at-ev-code">讀碼</span>，lab 沒有重現。
+
+### Retention 不前進時怎麼判斷 {#retention-diagnosis}
+
+Time retention 以**最新 block 的 MaxTime** 為基準，不是牆上時間[^p3-time-retention]；size retention 把 WAL 與 Head chunk 也算進用量[^p3-size-retention-wal][^p3-head-size]。兩者都只在 reload 時執行，所以 reload 停住或沒有新 block，retention 就不前進。
+
+| 症狀 | 先看的 metric | Log | 原因 | 證據 |
+|---|---|---|---|---|
+| `compactions_failed_total` 增加，幾分鐘後 `reloads_total` 不再增加 | `prometheus_tsdb_compactions_failed_total`、`prometheus_tsdb_reloads_total` | `compaction failed`[^p3-log-compaction-failed] | 可用空間被 compaction 用完，reload 被餓死；規則 `RetentionBlockedByCompaction` | <span class="at-chip at-ev-tested">實測</span>[^exp-prom-storage] |
+| `reloads_failures_total` 每分鐘增加，`reloads_total` 照常增加 | `prometheus_tsdb_reloads_failures_total` | `reloadBlocks` 加 `corrupted block`[^p3-log-reloadblocks][^p3-log-corrupted] | Block 打不開或 `meta.json` 損毀；`reloadBlocks` 在刪 block 之前就返回[^p3-reload-corrupted]，retention 不執行；規則 `BlockReloadFailing` | <span class="at-chip at-ev-code">讀碼</span>[^p3-reload-failed] |
+| `reloads_total` 不增加，也沒有任何失敗數 | `prometheus_tsdb_reloads_total` | 沒有錯誤 | 長查詢佔住 block reader 或 Head 範圍（見上一節） | <span class="at-chip at-ev-code">讀碼</span>[^p3-block-close-wait] |
+| `checkpoint_creations_failed_total` 增加，WAL 持續長大 | `prometheus_tsdb_checkpoint_creations_failed_total`、`prometheus_tsdb_wal_truncations_total` | `WAL truncation in Compact` 加 `create checkpoint`[^p3-log-wal-trunc-compact][^p3-log-checkpoint] | 磁碟滿過之後 checkpoint 失敗；失敗時不會嘗試截斷 WAL[^p3-checkpoint-fail]；規則 `WALCheckpointFailing`、`WALNotTruncated` | <span class="at-chip at-ev-tested">實測</span>[^exp-prom-storage]（截斷計數為讀碼[^p3-wal-truncate-call]） |
+| `wal_truncations_failed_total` 增加 | `prometheus_tsdb_wal_truncations_failed_total` | `truncating segments failed`[^p3-log-truncate-failed] | Checkpoint 已寫好但舊 segment 刪不掉，下一次 checkpoint 才重試；規則 `WALTruncationFailing` | <span class="at-chip at-ev-code">讀碼</span>[^p3-wal-truncate-metrics] |
+| WAL 寫入失敗，reload 正常，block 數不變 | `prometheus_tsdb_wal_writes_failed_total` | `unexpected full record`／`first record` | 磁碟突然寫滿；沒有新 block，time retention 凍結 | <span class="at-chip at-ev-tested">實測</span>[^exp-prom-storage] |
+| 最舊資料比 time retention 新很多 | `prometheus_tsdb_size_retentions_total` | 沒有錯誤 | Size retention 在刪 block；WAL 變大時刪得更多[^p3-size-retention-count]；規則 `PrometheusSizeRetentionDeleting` | <span class="at-chip at-ev-code">讀碼</span>[^p3-size-retention-wal] |
+| 用量持續超過 `--storage.tsdb.retention.size` | blocks＋WAL＋Head chunk 對照 `prometheus_tsdb_retention_limit_bytes` | — | Reload 停了，或 WAL 與 Head chunk 本身超過上限（retention 只刪 block）；規則 `PrometheusStorageOverSizeLimit` | <span class="at-chip at-ev-code">讀碼</span>[^p3-retention-limit-bytes] |
+
+**Metric 本身的陷阱：**
+
+- `prometheus_tsdb_storage_blocks_bytes` 只在 `reloadBlocks` 裡更新（3.13.5[^p3-blocks-bytes]、2.51.2[^p251-blocks-bytes]）。Reload 停住時它凍結在最後一次的值，看起來穩定，其實是沒有更新。判斷用量要加上 WAL 與 Head chunk，並同時確認 `reloads_total` 有在增加。<span class="at-chip at-ev-code">讀碼</span>
+- `prometheus_tsdb_time_retentions_total` 只在真的有 block 超過 retention 時增加[^p3-time-retention]。不增加不一定異常，可能只是還沒有夠舊的 block；要對照 `RetentionBehind`。<span class="at-chip at-ev-code">讀碼</span>
+- 3.13.5 的 `--storage.tsdb.retention.time`、`--storage.tsdb.retention.size` 已標示 deprecated，改寫在設定檔[^p3-retention-size-flag]；兩者都沒設時 time retention 才預設 15d[^p3-retention-time-flag]。檢查時看 `/api/v1/status/runtimeinfo` 的實際值。<span class="at-chip at-ev-code">讀碼</span>
+- 磁碟剩餘空間不在 Prometheus 自己的 metric 裡，要靠 node_exporter 或 kubelet（`disk-free` 訊號）。
 
 ## 升級會改變這些嗎
 

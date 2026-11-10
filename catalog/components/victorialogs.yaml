@@ -39,9 +39,8 @@ signals:
     signal: up == 0
     metrics: [up]
     evaluate_on: observer
-    evidence: tested
+    evidence: inferred
     source: art-vm
-    refs: [exp-vm-vl]
     upstream: { status: partial, note: "依 job 名稱比對" }
     rules: [rules/victoriametrics/meta.yml#MetaTargetDown]
 
@@ -74,24 +73,24 @@ signals:
   - id: ingested
     tier: 1
     question: 真的有收進去嗎
-    signal: rate(vl_rows_ingested_total[5m]) 對照 shipper 送出量
-    metrics: [vl_rows_ingested_total]
+    signal: "有寫入請求（`vl_http_requests_total{path=~\"/insert/.*\"}`）卻沒有收進任何一行（`vl_rows_ingested_total`）；也可對照 shipper 送出量"
+    metrics: [vl_http_requests_total, vl_rows_ingested_total]
     evaluate_on: observer
     evidence: tested
     source: art-vm
-    refs: [exp-vm-vl]
+    refs: [exp-vm-vl, exp-vm-vl-ingested, vl-jsonline-requests, vl-rows-ingested]
     upstream: { status: no, note: "官方只看 dropped" }
-    rules: []
+    rules: [rules/victoriametrics/meta.yml#MetaVLRowsNotIngested]
 
   - id: storage-reachable
     tier: 1
     question: vlstorage 連得到嗎
-    signal: min(vl_insert_remote_is_reachable) == 0
-    metrics: [vl_insert_remote_is_reachable]
+    signal: "vlselect 的 `vl_select_remote_send_errors_total` 增加（有查詢就會變）；`vl_insert_remote_is_reachable` == 0 只在有資料要寫到那台時才出現，不能單獨用"
+    metrics: [vl_select_remote_send_errors_total, vl_insert_remote_is_reachable, vl_insert_remote_send_errors_total]
     evaluate_on: observer
     evidence: tested
     source: art-vm
-    refs: [exp-vm-vl]
+    refs: [exp-vm-vl-reachable, vl-select-send-errors, vl-insert-reachable, vl-insert-disable, vl-insert-route]
     upstream: { status: no }
     applies_when: cluster
     rules: [rules/victoriametrics/meta.yml#MetaVLStorageUnreachable]
@@ -102,8 +101,32 @@ signals:
     signal: vlagent_remotewrite_pending_data_bytes、dropped
     metrics: [vlagent_remotewrite_pending_data_bytes]
     evaluate_on: observer
-    evidence: tested
+    evidence: code
     source: art-vm
-    refs: [exp-vm-vl]
+    refs: [vl-agent-pending, vl-rule-vlagent-drop]
     upstream: { status: yes }
     rules: [rules/victoriametrics/meta.yml#MetaVLAgentBacklog]
+
+  - id: disk-space
+    tier: 2
+    question: 磁碟夠嗎
+    signal: "vl_data_size_bytes ÷（vl_free_disk_space_bytes + vl_data_size_bytes）> 0.8；剩餘低於 -storage.minFreeDiskSpaceBytes 時切唯讀（第 1 級 read-only）"
+    metrics: [vl_data_size_bytes, vl_free_disk_space_bytes]
+    evaluate_on: observer
+    evidence: upstream
+    source: vm-rules
+    refs: [vl-rule-disk, vl-free-disk]
+    upstream: { status: yes, note: "DiskRunsOutOfSpace" }
+    rules: [rules/victoriametrics/meta.yml#MetaVLDiskRunsOutOfSpace]
+
+  - id: query-load
+    tier: 2
+    question: 查詢排隊逾時了嗎
+    signal: vl_concurrent_select_limit_timeout_total 增加；log rule 和人工查詢共用同一組上限
+    metrics: [vl_concurrent_select_limit_timeout_total, vl_concurrent_select_capacity]
+    evaluate_on: observer
+    evidence: upstream
+    source: vm-rules
+    refs: [vl-rule-queryload, vl-select-timeout]
+    upstream: { status: yes, note: "TooHighQueryLoad" }
+    rules: [rules/victoriametrics/meta.yml#MetaVLQueryTimeouts]

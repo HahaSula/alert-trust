@@ -1,0 +1,269 @@
+# Prometheus TSDB 維護、retention 與 notifier 預警缺口補齊時核對的原始碼位置（v3.13.5 為主，v2.51.2 對照）。
+# 行號已對照 tag 上的檔案。
+refs:
+  p3-db-run:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/db.go"
+    line: 1222
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/db.go#L1222"
+  p3-run-reload:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/db.go"
+    line: 1237
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/db.go#L1237"
+  p3-compact-lock:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/db.go"
+    line: 1475
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/db.go#L1475"
+  p3-compact-failed:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/db.go"
+    line: 1481
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/db.go#L1481"
+  p3-compacthead-reload:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/db.go"
+    line: 1704
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/db.go#L1704"
+  p3-reload-failed:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/db.go"
+    line: 1858
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/db.go#L1858"
+  p3-reload-corrupted:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/db.go"
+    line: 1888
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/db.go#L1888"
+  p3-blocks-bytes:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/db.go"
+    line: 1922
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/db.go#L1922"
+  p3-time-retention:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/db.go"
+    line: 2047
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/db.go#L2047"
+  p3-size-retention-wal:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/db.go"
+    line: 2087
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/db.go#L2087"
+  p3-size-retention-count:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/db.go"
+    line: 2095
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/db.go#L2095"
+  p3-delete-close:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/db.go"
+    line: 2108
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/db.go#L2108"
+  p3-retention-limit-bytes:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/db.go"
+    line: 450
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/db.go#L450"
+  p3-block-close-wait:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/block.go"
+    line: 398
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/block.go#L398"
+  p3-head-wait-readers:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/head.go"
+    line: 1249
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/head.go#L1249"
+  p3-head-truncations:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/head.go"
+    line: 1266
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/head.go#L1266"
+  p3-checkpoint-fail:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/head.go"
+    line: 1451
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/head.go#L1451"
+  p3-wal-truncate-call:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/head.go"
+    line: 1458
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/head.go#L1458"
+  p3-head-size:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/head.go"
+    line: 2818
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/head.go#L2818"
+  p3-wal-truncate-metrics:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/wlog/wlog.go"
+    line: 801
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/wlog/wlog.go#L801"
+  p3-notifier-metrics:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "notifier/metric.go"
+    line: 79
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/notifier/metric.go#L79"
+  p3-notifier-capacity:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "notifier/metric.go"
+    line: 85
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/notifier/metric.go#L85"
+  p3-notifier-latency:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "notifier/metric.go"
+    line: 35
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/notifier/metric.go#L35"
+  p3-notifier-drop:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "notifier/sendloop.go"
+    line: 111
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/notifier/sendloop.go#L111"
+  p3-retention-size-flag:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "cmd/prometheus/main.go"
+    line: 505
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/cmd/prometheus/main.go#L505"
+  p3-retention-time-flag:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "cmd/prometheus/main.go"
+    line: 502
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/cmd/prometheus/main.go#L502"
+  p3-mixin-queue-full:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "documentation/prometheus-mixin/alerts.libsonnet"
+    line: 52
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/documentation/prometheus-mixin/alerts.libsonnet#L52"
+  p3-mixin-errors-some:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "documentation/prometheus-mixin/alerts.libsonnet"
+    line: 72
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/documentation/prometheus-mixin/alerts.libsonnet#L72"
+  p3-mixin-reloads-failing:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "documentation/prometheus-mixin/alerts.libsonnet"
+    line: 108
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/documentation/prometheus-mixin/alerts.libsonnet#L108"
+  p3-log-reloadblocks:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/db.go"
+    line: 1238
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/db.go#L1238"
+  p3-log-compaction-failed:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/db.go"
+    line: 1277
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/db.go#L1277"
+  p3-log-wal-trunc-compact:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/db.go"
+    line: 1546
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/db.go#L1546"
+  p3-log-corrupted:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/db.go"
+    line: 1901
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/db.go#L1901"
+  p3-log-checkpoint:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/head.go"
+    line: 1456
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/head.go#L1456"
+  p3-log-truncate-failed:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "tsdb/head.go"
+    line: 1462
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/tsdb/head.go#L1462"
+  p3-query-timeout:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "cmd/prometheus/main.go"
+    line: 627
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/cmd/prometheus/main.go#L627"
+  p251-notifier-drop:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "notifier/notifier.go"
+    line: 364
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/notifier/notifier.go#L364"
+  p251-blocks-bytes:
+    kind: code
+    project: "Prometheus"
+    version: "v2.51.2"
+    file: "tsdb/db.go"
+    line: 1499
+    url: "https://github.com/prometheus/prometheus/blob/v2.51.2/tsdb/db.go#L1499"

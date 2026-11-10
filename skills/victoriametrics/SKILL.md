@@ -88,7 +88,7 @@ VM 的 `peaks.json` 只有在各元件的 `/metrics` 有被抓進這個 VM 時�
 
 - `EndsAt = 4 × max(E, -rule.resendDelay)`。`resendDelay` 預設 0，`E` = 30s 時只有 2 分鐘寬限：**查詢失敗超過 2 分鐘，Alertmanager 就把所有 alert 標成 resolved，連 Watchdog 也一樣**。
 - 讀 `flags.json`：`rule.resendDelay`、`rule.maxResolveDuration`、`notifier.blackhole`（設了就根本沒送）。
-- 判斷：業務 vmalert 把 `resendDelay` 設成大於預期的查詢中斷（實驗 3m 撐過 8 分鐘故障）；**Watchdog 放在不設 `resendDelay` 的獨立 vmalert**（env 檔 `role: watchdog`）。兩者在同一台時，Watchdog 會被延後才斷。
+- 判斷：業務 vmalert 把 `resendDelay` 設成大於預期的查詢中斷（lab：`-rule.resendDelay=3m` 時 vmselect 停 240 秒，Alertmanager 沒有任何 alert 消失；預設值在 +101s 全部假 resolved；見 `lab/vm/README.md`）；**Watchdog 放在不設 `resendDelay` 的獨立 vmalert**（env 檔 `role: watchdog`）。兩者在同一台時，Watchdog 會被延後才斷。
 - DMS 等待時間要大於 `4 × max(resend, E) + repeat_interval + group_interval`（`alertmanager` pack 一起算）。
 
 ## 5. 寫入與儲存

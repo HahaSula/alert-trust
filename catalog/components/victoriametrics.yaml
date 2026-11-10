@@ -22,7 +22,7 @@ silent_failures:
     evidence: tested
     source: art-vm
     refs: [exp-vm-faults, vms-denypartial]
-  - text: 磁碟突然 0 byte 時切唯讀後仍會 panic。
+  - text: 磁碟突然 0 byte 時先切唯讀，之後可能因 flush 失敗而 panic（lab 未重測）。
     evidence: inferred
     source: art-vm
 
@@ -38,7 +38,7 @@ signals:
     evidence: tested
     source: art-vm
     refs: [exp-vm-faults]
-    upstream: { status: partial, note: "實測 single 的 job 名稱不符，ServiceDown 從未觸發" }
+    upstream: { status: partial, note: "lab 的 job 名稱是 vm，官方 ServiceDown 的選擇器對到 0 條（只查選擇器，沒有讓 VM 停機）" }
     rules: [rules/victoriametrics/meta.yml#MetaTargetDown]
 
   - id: read-only
@@ -113,3 +113,17 @@ signals:
     refs: [vmi-drop]
     upstream: { status: partial }
     rules: []
+
+  - id: restarts
+    tier: 2
+    question: 一直重啟或上次沒有正常關閉嗎
+    signal: "changes(vm_app_start_timestamp[15m]) > 2；vm_app_prev_shutdown_unclean == 1（啟動 10 分鐘內）"
+    metrics: [vm_app_start_timestamp, vm_app_prev_shutdown_unclean]
+    evaluate_on: observer
+    evidence: upstream
+    source: vm-rules
+    refs: [vm-rule-restarts, vm-rule-unclean, vm-app-unclean]
+    upstream: { status: partial, note: "TooManyRestarts 依 job 名稱比對；UncleanShutdown 不依 job" }
+    rules:
+      - rules/victoriametrics/meta.yml#MetaVMTooManyRestarts
+      - rules/victoriametrics/meta.yml#MetaVMUncleanShutdown

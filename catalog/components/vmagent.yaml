@@ -54,8 +54,9 @@ signals:
     evaluate_on: observer
     evidence: upstream
     source: vm-rules
+    refs: [vmag-rule-pq-drop, vmag-rw-packets-dropped]
     upstream: { status: yes }
-    rules: []
+    rules: [rules/victoriametrics/meta.yml#MetaVMAgentDataDropped]
 
   - id: remote-write-retries
     tier: 1
@@ -65,8 +66,21 @@ signals:
     evaluate_on: observer
     evidence: upstream
     source: vm-rules
+    refs: [vmag-rule-rw-errors, vmag-rw-retries]
     upstream: { status: yes }
-    rules: []
+    rules: [rules/victoriametrics/meta.yml#MetaVMAgentRemoteWriteRetries]
+
+  - id: buffer-time-to-full
+    tier: 2
+    question: 磁碟 buffer 還能撐多久
+    signal: "vm_persistentqueue_free_disk_space_bytes ÷ deriv(vm_persistentqueue_bytes_pending[15m]) < 4h；可用空間是 -remoteWrite.maxDiskUsagePerURL 減去已堆積量，和磁碟剩餘取小者"
+    metrics: [vm_persistentqueue_free_disk_space_bytes, vm_persistentqueue_bytes_pending]
+    evaluate_on: observer
+    evidence: upstream
+    source: vm-rules
+    refs: [vmag-rule-pq-4h, vmag-pq-free, vmag-pq-pending, vmag-maxdisk]
+    upstream: { status: yes, note: "PersistentQueueRunsOutOfSpaceIn4Hours" }
+    rules: [rules/victoriametrics/meta.yml#MetaVMAgentBufferFullSoon]
 
   - id: scrape-health
     tier: 2

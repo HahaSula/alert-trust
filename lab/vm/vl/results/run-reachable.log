@@ -1,0 +1,9 @@
+[    1.0s] == A-steady 
+[   31.8s] == A-placement {'placement': {'vlstorage-1': {'canary': '{"c":"6"}'}, 'vlstorage-2': {'canary': '{"c":"0"}'}}}
+[   31.8s] == A-down {'victim': 'vlstorage-2', 'holder': 'vlstorage-1'}
+[   95.1s] == A-up 
+[  115.4s] == B-steady 
+[  146.5s] == B-placement {'placement': {'vlstorage-1': {'canary': '{"c":"28"}', 's0': '{"c":"0"}', 's1': '{"c":"0"}', 's2': '{"c":"0"}', 's3': '{"c":"0"}', 's4': '{"c":"0"}', 's5': '{"c":"0"}', 's6': '{"c":"6"}', 's7': '{"c":"0"}'}, 'vlstorage-2': {'canary': '{"c":"0"}', 's0': '{"c":"6"}', 's1': '{"c":"6"}', 's2': '{"c":"6"}', 's3': '{"c":"6"}', 's4': '{"c":"6"}', 's5': '{"c":"6"}', 's6': '{"c":"0"}', 's7': '{"c":"6"}'}}}
+[  146.5s] == B-down {'victim': 'vlstorage-2'}
+[  210.4s] == B-up 
+[  241.4s] == end 

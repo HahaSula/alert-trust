@@ -33,11 +33,13 @@ groups:
           summary: "有 vmstorage 連不到"
           runbook_url: https://hahasula.github.io/alert-trust/components/victoriametrics/#storage-reachable
       - alert: MetaVLStorageUnreachable
-        expr: min(vl_insert_remote_is_reachable) == 0
+        expr: |
+          sum by (job, instance, addr) (increase(vl_select_remote_send_errors_total[2m])) > 0
+          or min by (job, instance, addr) (vl_insert_remote_is_reachable) == 0
         for: 30s
         labels: { severity: critical, component: victorialogs, tier: "1" }
         annotations:
-          summary: "有 vlstorage 連不到；VL cluster 預設回 502，log rule 會全部 ERR"
+          summary: "vlselect 查 vlstorage 失敗，或 vlinsert 寫不進去；VL cluster 預設回 502，log rule 會全部 ERR。vl_insert_remote_is_reachable 只在有資料要寫到那台時才會變 0（lab 實測），不能單獨使用"
           runbook_url: https://hahasula.github.io/alert-trust/components/victorialogs/#storage-reachable
       - alert: MetaStorageReadOnly
         expr: max(vm_storage_is_read_only) == 1
@@ -81,3 +83,83 @@ groups:
         annotations:
           summary: "vlagent 有資料堆積，下游可能寫不進去"
           runbook_url: https://hahasula.github.io/alert-trust/components/victorialogs/#vlagent-backlog
+      - alert: MetaVLRowsNotIngested
+        expr: |
+          sum by (job, instance) (rate(vl_http_requests_total{path=~"/insert/.*"}[5m])) > 0
+          unless sum by (job, instance) (rate(vl_rows_ingested_total[5m])) > 0
+        for: 10m
+        labels: { severity: critical, component: victorialogs, tier: "1" }
+        annotations:
+          summary: "有寫入請求、HTTP 也回 200，但沒有任何一行被收進去（例如 Content-Type 是 x-www-form-urlencoded，lab 實測）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/victorialogs/#ingested
+      - alert: MetaVLDiskRunsOutOfSpace
+        expr: |
+          sum by (job, instance) (vl_data_size_bytes)
+            / (sum by (job, instance) (vl_free_disk_space_bytes) + sum by (job, instance) (vl_data_size_bytes)) > 0.8
+        for: 30m
+        labels: { severity: warning, component: victorialogs, tier: "2" }
+        annotations:
+          summary: "VL 資料已用掉 80% 的可用空間（官方 DiskRunsOutOfSpace）；剩餘低於 -storage.minFreeDiskSpaceBytes 時切成唯讀"
+          runbook_url: https://hahasula.github.io/alert-trust/components/victorialogs/#disk-space
+      - alert: MetaVLQueryTimeouts
+        expr: increase(vl_concurrent_select_limit_timeout_total[5m]) > 0
+        for: 5m
+        labels: { severity: warning, component: victorialogs, tier: "2" }
+        annotations:
+          summary: "vlselect 查詢排隊逾時（官方 TooHighQueryLoad）；log rule 會走查詢失敗路徑"
+          runbook_url: https://hahasula.github.io/alert-trust/components/victorialogs/#query-load
+
+  - name: vm-meta-vmagent
+    interval: 30s
+    rules:
+      - alert: MetaVMAgentDataDropped
+        expr: |
+          sum by (job, instance) (increase(vm_persistentqueue_bytes_dropped_total[5m])) > 0
+          or sum by (job, instance, url) (increase(vmagent_remotewrite_packets_dropped_total[5m])) > 0
+        labels: { severity: critical, component: vmagent, tier: "1" }
+        annotations:
+          summary: "vmagent 丟掉資料（磁碟 buffer 到上限丟最舊的，或遠端拒收的封包）；丟掉的資料不會回補，rule 也不會報錯"
+          runbook_url: https://hahasula.github.io/alert-trust/components/vmagent/#data-dropped
+      - alert: MetaVMAgentRemoteWriteRetries
+        expr: sum by (job, instance, url) (rate(vmagent_remotewrite_retries_count_total[5m])) > 0
+        for: 5m
+        labels: { severity: warning, component: vmagent, tier: "1" }
+        annotations:
+          summary: "vmagent 寫遠端在重試；資料先進磁碟 buffer，buffer 用完才會丟"
+          runbook_url: https://hahasula.github.io/alert-trust/components/vmagent/#remote-write-retries
+      - alert: MetaVMAgentBufferFullSoon
+        expr: |
+          (
+            sum by (job, instance, path) (vm_persistentqueue_free_disk_space_bytes)
+              / (sum by (job, instance, path) (deriv(vm_persistentqueue_bytes_pending[15m])) > 0)
+          ) < 4 * 3600
+        for: 10m
+        labels: { severity: warning, component: vmagent, tier: "2" }
+        annotations:
+          summary: "依目前堆積速度，磁碟 buffer 4 小時內會用完（上限是 -remoteWrite.maxDiskUsagePerURL 與磁碟剩餘空間較小者）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/vmagent/#buffer-time-to-full
+
+  - name: vm-meta-health
+    interval: 30s
+    rules:
+      - alert: MetaVMTooManyRestarts
+        expr: changes(vm_app_start_timestamp[15m]) > 2
+        labels: { severity: critical, component: victoriametrics, tier: "2" }
+        annotations:
+          summary: "VM 系列元件 15 分鐘內重啟超過 2 次；用 vm_app_start_timestamp，不依 job 名稱（官方 TooManyRestarts 依 job regex）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/victoriametrics/#restarts
+      - alert: MetaVMUncleanShutdown
+        expr: vm_app_prev_shutdown_unclean == 1 and (time() - vm_app_start_timestamp) < 600
+        labels: { severity: warning, component: victoriametrics, tier: "2" }
+        annotations:
+          summary: "上次是非正常關閉（OOM、kill -9），啟動後要檢查資料是否完整"
+          runbook_url: https://hahasula.github.io/alert-trust/components/victoriametrics/#restarts
+      - alert: MetaRuleNearResultsLimit
+        expr: |
+          max by (job, instance, group, file) (vmalert_alerting_rules_last_evaluation_samples)
+            / on (job, instance, group, file) (vmalert_group_rule_results_limit > 0) > 0.8
+        for: 5m
+        labels: { severity: warning, component: vmalert, tier: "3" }
+        annotations:
+          summary: "Rule 結果數接近 group limit／-rule.resultsLimit；超過時該 rule 的 active alert 全部被清空並回報錯誤"
+          runbook_url: https://hahasula.github.io/alert-trust/components/vmalert/#results-limit
