@@ -36,11 +36,18 @@ def convert(files: list[str]) -> dict:
     return {"status": "success", "data": {"groups": groups}}
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--out", required=True)
-    ap.add_argument("items", nargs="+", help="--ruler ID file... [--ruler ID file...]")
-    raw = sys.argv[1:]
+def parse_args(raw: list[str]) -> tuple[str, dict[str, list[str]]]:
+    """--out DIR anywhere; then --ruler ID file... groups. argparse cannot express the grouping, so parse by hand."""
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0], epilog=__doc__.split("\n", 2)[2],
+                                 formatter_class=argparse.RawDescriptionHelpFormatter,
+                                 usage="%(prog)s --out DIR --ruler ID file... [--ruler ID file...]")
+    ap.add_argument("--out", required=True, help="snapshot directory to write")
+    ap.add_argument("--ruler", metavar="ID", action="append", help="starts a group: the files after it belong to ID")
+    if not raw or "-h" in raw or "--help" in raw:
+        ap.print_help()
+        sys.exit(0 if raw else 2)
+    if "--out" not in raw or raw.index("--out") + 1 >= len(raw):
+        ap.error("--out DIR is required")
     out_i = raw.index("--out")
     out = raw[out_i + 1]
     rest = raw[:out_i] + raw[out_i + 2:]
@@ -49,14 +56,23 @@ def main() -> int:
     i = 0
     while i < len(rest):
         if rest[i] == "--ruler":
+            if i + 1 >= len(rest):
+                ap.error("--ruler needs an ID")
             current = rest[i + 1]
             plan.setdefault(current, [])
             i += 2
             continue
         if current is None:
-            sys.exit("give --ruler ID before rule files")
+            ap.error("give --ruler ID before rule files")
         plan[current].append(rest[i])
         i += 1
+    if not plan or not any(plan.values()):
+        ap.error("no rule files: --ruler ID file...")
+    return out, plan
+
+
+def main() -> int:
+    out, plan = parse_args(sys.argv[1:])
     for rid, files in plan.items():
         os.makedirs(os.path.join(out, rid), exist_ok=True)
         snap = convert(files)

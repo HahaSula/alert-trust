@@ -1,0 +1,21 @@
+groups:
+  - name: t
+    rules:
+      - alert: ExporterMissing
+        expr: absent(up{job="mysql"})
+      - alert: ExporterMissingOk
+        expr: absent(up{job="mysqld"})
+      - alert: ReplicationNotRunning
+        expr: min({__name__=~"mysql_slave_status_(slave|replica)_sql_running", job="mysql"}) == 0
+      - alert: ReplicationNameRegex
+        expr: min({__name__=~"mysql_slave_status_(slave|replica)_sql_running", job="mysqld"}) == 0
+      - alert: PrimaryReadOnly
+        expr: mysql_global_variables_read_only{job="mysqld", role="primary"} == 1
+      - alert: ClusterReadOnly
+        expr: mysql_global_variables_read_only{job="mysqld", cluster="c1"} == 1
+      - alert: UpRole
+        expr: up{job="mysqld", role="primary"} == 0
+      - alert: UpRoleFiles
+        expr: up{job="files", role="primary"} == 0
+      - alert: OptionalLabel
+        expr: mysql_up{job="mysqld", role=~"primary|"} == 0

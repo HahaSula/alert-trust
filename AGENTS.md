@@ -44,15 +44,17 @@ docker run --rm -u $(id -u):$(id -g) -v "$PWD":/docs squidfunk/mkdocs-material:9
 
 本機預覽：`docker run -d --name alert-trust-docs -u $(id -u):$(id -g) -p 8000:8000 -v "$PWD":/docs squidfunk/mkdocs-material:9.5.39 serve --dev-addr=0.0.0.0:8000`，網址 `http://localhost:8000/alert-trust/`。改了 `hooks/refs.py` 或 `mkdocs.yml` 要重啟容器。
 
-## 檢查使用者的 rule 檔（不走 skill 時也照這個順序）
+## 檢查使用者的 rule 檔（不走 skill 時也照這個方式）
 
-使用者給你 rule.yml、VMRule 或 PrometheusRule 要你檢查時，**不要直接從時間契約開始**。順序：
+**輸出是建議，不是判決；第一次回覆就要有建議。**拿到 rule 檔（和 `prometheus.yml`，如果有）後，先跑只需要檔案的工具，把「只看檔案就說得出的結論」連同第一組問題一起回覆，之後每輪回答都更新同一份報告。缺資料時用保守假設先跑完，寫明假設了什麼、補上哪一項會改變結論；不要一開始就要求使用者提供全部資料。每輪最多問 3 題，可以問任何一步的問題，先問會改變最多結論的。
 
-1. **確認監控體系**：評估這些 rule 的是 Prometheus 還是 vmalert（版本）、資料從哪裡來、有沒有外部觀察者、告警走哪台 Alertmanager。能從檔案判斷就判斷，否則問。寫成 `env/<name>.yaml`。
-2. **每個 metric 的來源**：**不要假定。**使用者給了 Prometheus config 就一定要讀：`python3 tools/check_metric_sources.py --rules <rule 檔...> --config prometheus.yml --out report`。來源只能是 config 的 scrape job、live 快照（`collect.py` 的 `metric_jobs.json`，用 `--live`）或使用者的回答（`--answers env/<name>.sources.yaml`）；目錄卡片只是提示。報告最後的問題逐題問使用者。job 對不上、被 `metric_relabel_configs` 丟掉的 rule 永遠不會響，先回報。
-3. **監控基礎設施的覆蓋**：`python3 tools/rules_to_snapshot.py --out snapshot --ruler <id> <rule 檔...>`，再 `python3 tools/check_coverage.py --env env/<name>.yaml --snapshot snapshot --out report`。先回報第 1 級缺口，例如 scrape 耗時、rule group 跑不完或停止評估、WAL 寫入失敗、送不到 Alertmanager、Watchdog。
-4. **每條 rule 的時間契約**：`python3 tools/fit_contracts.py --rules <rule 檔...> --stack prometheus|vmalert --scrape-interval <S> --scrape-duration <d> --eval-interval <E> --out report`。使用者還沒有基準值時先用 `--baseline` 依量到的耗時推出 S、τ、exporter 期限、E、k（`docs/tools/baseline.md`）。不合規格時不要只列 FAIL：先說目前規格哪裡不合，列出在目前規格下合格的 rule，再給兩個方向——方案 A 改 rule（最短合格視窗），方案 B 改環境（`scrape_interval` 至多多少、或加 `query_offset`），附代價，讓使用者選。
-5. **寫法問題**：presence lint、group 擺放。
+分析順序固定：
+
+1. **監控體系**：Prometheus 還是 vmalert（版本）、資料從哪裡來、有沒有外部觀察者、告警走哪台 Alertmanager。能從檔案判斷就判斷。寫成 `env/<name>.yaml`（`targets[].job` 填 config 裡的實際 job，`features` 填有哪些功能）。
+2. **每個 metric 的來源**：**不要假定。**`python3 tools/check_metric_sources.py --rules <rule 檔...> --config prometheus.yml --out report`。來源只能是 config 的 scrape job、live 快照（`--live`）或使用者的回答（`--answers`）；目錄卡片只是提示。永遠不會響（job 對不上、被丟掉、缺 label）與一直在響（`absent()` 對不上）的 rule 最先回報。
+3. **監控基礎設施的覆蓋**：`tools/rules_to_snapshot.py` → `tools/check_coverage.py`。依影響排序回報，Watchdog／dead man's switch、rule group 停止評估、WAL、送不到 Alertmanager 優先。
+4. **每條 rule 的時間契約**：`python3 tools/fit_contracts.py --rules <rule 檔...> --stack prometheus|vmalert --config prometheus.yml --eval-interval <E> --out report`。跑之前先問短視窗是不是刻意的（`--keep-range`）。沒有基準值時用 `--baseline`（`docs/tools/baseline.md`）。不成立時給：目前成立的 rule、方案 A 改 rule、方案 B 改環境、保留視窗的做法，附代價，讓使用者選。
+5. **寫法**：`python3 tools/validate.py --lint-rules <rule 檔...>`、group 擺放。
 
 完整步驟在 `skills/rule-review/SKILL.md`。
 

@@ -12,3 +12,10 @@ producers:
 # 個別 metric，例如應用程式自己的 metric 或卡片沒有列的 metric。
 metrics:
   order_latency_seconds_bucket: { jobs: [order-api], note: "order-api 自己的 /metrics" }
+
+# rule 要的非 job label（例如 role="primary"、cluster="…"），config 的 static_configs labels 與 relabel_configs 都沒有加時，
+# check_metric_sources.py 會問它從哪裡來。exporter 自己輸出就寫 exporter（或其他說明）；根本沒有就寫 none，
+# 報告會把用到它的 rule 標成 label_mismatch（回傳空、不會響）。
+labels:
+  role: none
+  cluster: "static_configs labels（在另一份 scrape_config_files 裡）"

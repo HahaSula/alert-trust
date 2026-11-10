@@ -1,0 +1,11 @@
+global: { scrape_interval: 30s, scrape_timeout: 10s, evaluation_interval: 30s }
+scrape_configs:
+  - job_name: mysqld
+    static_configs: [{ targets: [db:9104] }]
+  - job_name: fast
+    scrape_interval: 5s
+    static_configs: [{ targets: [x:1] }]
+  - job_name: slow
+    scrape_interval: 2m
+    scrape_timeout: 1m
+    static_configs: [{ targets: [y:1] }]

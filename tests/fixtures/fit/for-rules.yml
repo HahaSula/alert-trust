@@ -1,0 +1,19 @@
+groups:
+  - name: db
+    rules:
+      - alert: SlowBurst
+        expr: rate(mysql_global_status_slow_queries{job="mysqld"}[1m]) > 0.5
+        for: 2m
+      - alert: ThreadsHigh
+        expr: mysql_global_status_threads_running{job="mysqld"} > 50
+        for: 5m
+      - alert: ExporterDown
+        expr: up{job="mysqld"} == 0
+        for: 2m
+      - alert: Missing
+        expr: absent(mysql_up{job="mysqld"})
+        for: 5m
+      - alert: NoFor
+        expr: mysql_up{job="mysqld"} == 0
+      - alert: WrongJob
+        expr: rate(mysql_global_status_questions{job="mysql"}[5m]) > 1000

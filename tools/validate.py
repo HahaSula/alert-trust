@@ -3,6 +3,7 @@
 
   python3 tools/validate.py            # errors exit 1, warnings are printed
   python3 tools/validate.py --strict   # warnings also exit 1
+  python3 tools/validate.py --lint-rules user/*.yml   # presence lint on someone's own rule files (advice only)
 
 Checks: required fields and enums, unique ids, every source/contract/rule reference resolves,
 every alerting rule has a runbook_url that points at an existing signal, every contract has an
@@ -301,11 +302,60 @@ def check_presence(rules: dict[str, dict]) -> tuple[list[str], list[str]]:
     return errors, warnings
 
 
+def load_rule_files(paths: list[str]) -> dict[str, dict]:
+    """{"path#Alert": rule} for arbitrary Prometheus / vmalert rule files (not only the repo's rules/)."""
+    out = {}
+    for path in paths:
+        for group in (C._load(path) or {}).get("groups", []) or []:
+            for rule in group.get("rules", []) or []:
+                if "alert" in rule:
+                    out[f"{path}#{rule['alert']}"] = rule
+    return out
+
+
+def lint_rules(rules: dict[str, dict]) -> tuple[list[str], list[str]]:
+    """(errors, advice) for a user's rule set: the presence lint, plus jobs that no `up == 0` / `absent(up)`
+    rule watches (when that exporter is down, every rule on the job returns nothing at once)."""
+    import check_metric_sources as MS
+    errors, advice = check_presence(rules)
+    advice = [f"{w}" for w in advice]
+    used: dict[str, list[str]] = {}
+    guarded: set[str] = set()
+    for ref, rule in rules.items():
+        expr = str(rule.get("expr", ""))
+        for sel in MS.selectors(expr):
+            jobs = [v for (l, op, v) in sel["matchers"] if l == "job" and op == "="]
+            if sel["metric"] == "up":
+                if re.search(r"==\s*0|\babsent\s*\(|\bunless\b", expr):
+                    guarded.update(jobs)
+            elif sel["metric"] and not sel["metric"].startswith(("ALERTS", "scrape_")):
+                for j in jobs:
+                    used.setdefault(j, []).append(ref.split("#", 1)[1])
+    for job, names in sorted(used.items()):
+        if job not in guarded:
+            names = list(dict.fromkeys(names))
+            advice.append(f"job {job}：{len(names)} 條規則（{', '.join(names[:5])}{' 等' if len(names) > 5 else ''}）讀它的 metric，"
+                          f"但沒有 `up{{job=\"{job}\"}} == 0` 或 `absent(up{{job=\"{job}\"}})` 規則；exporter 掛掉時這些規則一起回傳空、"
+                          f"沒有人知道。建議加上這兩條（範本見 rules/targets/）；代價：多兩條規則")
+    return errors, advice
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--strict", action="store_true", help="警告也視為失敗")
     ap.add_argument("--refs", action="store_true", help="列出還沒有 refs 的項目")
+    ap.add_argument("--lint-rules", nargs="+", metavar="FILE",
+                    help="只對這些 rule 檔做 presence lint（使用者自己的檔案）；印出建議，不檢查目錄")
     a = ap.parse_args()
+    if a.lint_rules:
+        rules = load_rule_files(a.lint_rules)
+        errors, advice = lint_rules(rules)
+        for w in advice:
+            print(f"建議  {w}")
+        for e in errors:
+            print(f"錯誤  {e}")
+        print(f"\n{len(rules)} 條 alert；{len(advice)} 項建議、{len(errors)} 個引用錯誤")
+        return 1 if errors else 0
     errors, warnings = validate()
     for w in warnings:
         print(f"WARN  {w}")

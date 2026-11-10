@@ -9,13 +9,22 @@ Inputs
                                written by tools/collect.py
   --live                       also query each ruler's URL from env.yaml to check that rule selectors
                                match any series (otherwise data presence is reported as unchecked)
+  --config prometheus.yml      scrape jobs of the Prometheus that scrapes the components: a component no job
+                               scrapes (e.g. Alertmanager) is called out instead of only "missing rule"
 
 Statuses
   covered         a rule watches the signal, is evaluated where the catalog says, and (with --live) has data
   self_only       only the monitored component evaluates it, so it stops when the component dies
-  rule_no_data    a rule exists but its selector matches no series (e.g. a job-name regex that does not match)
+  rule_job_mismatch a rule with the template's name (or reading the signal's metric) exists, but its job matcher
+                  cannot select the job env.yaml gives (targets[].job / components[].job); checked offline with
+                  the same selector parser as check_metric_sources.py
+  rule_no_data    a rule exists but its selector matches no series (--live), or (--config) no scrape job has
+                  the component's job
   missing         no rule references the signal
-  not_applicable  the signal's applies_when does not hold for this component
+  not_applicable  the signal's applies_when does not hold for this component: cluster / replicas / kubernetes,
+                  or env.yaml lists `features:` for it and the needed feature is not there (vocabulary: FEATURES,
+                  documented in env/env.example.yaml). Without a features list the signal stays and the note
+                  says 「需要回答：有沒有 X」.
   needs_input     only an interview or inventory can answer it (e.g. the observer's failure domain)
 
 Outputs <out>/coverage.json (for AI) and <out>/coverage.md (for people).
@@ -34,6 +43,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import catalog as C  # noqa: E402
+import check_metric_sources as MS  # noqa: E402 - same selector parser and matcher as the metric-source check
 
 # env.yaml `type` is normally the card id itself (ls catalog/components catalog/targets); these are accepted aliases.
 TYPE_ALIASES = {
@@ -53,10 +63,13 @@ def card_for(type_: str | None, card_ids: set[str]) -> str | None:
 # components that evaluate alerting rules and expose a Prometheus-style /api/v1/rules
 # (Thanos Ruler: /api/v1/rules; Grafana: /api/prometheus/grafana/api/v1/rules, save it as <id>/rules.json)
 RULER_TYPES = {"prometheus", "vmalert", "thanos", "thanos-ruler", "thanos_ruler", "grafana_alerting", "grafana"}
-STATUS_ORDER = ["missing", "rule_no_data", "self_only", "needs_input", "covered", "not_applicable"]
+STATUS_ORDER = ["missing", "rule_job_mismatch", "rule_no_data", "self_only", "needs_input", "covered", "not_applicable"]
 STATUS_TEXT = {"covered": "涵蓋", "self_only": "只在自己身上", "rule_no_data": "規則在但沒資料", "missing": "缺少",
-               "not_applicable": "不適用", "needs_input": "需要回答"}
-SELECTOR = r"(?<![\w:]){m}(\{{[^}}]*\}})?"
+               "rule_job_mismatch": "規則在但 job 對不上", "not_applicable": "不適用", "needs_input": "需要回答"}
+ACTION = ("missing", "rule_job_mismatch", "rule_no_data", "self_only")
+# signals whose rules watch other jobs (the data the component scrapes), not the component's own job
+OTHER_JOB_SIGNALS = {"job-freshness", "known-true-canary", "watchdog", "data-watchdog", "scrapes-all-infra",
+                     "log-freshness", "health-second-path"}
 
 
 # ---------- inputs ----------
@@ -95,34 +108,53 @@ def job_of(comp: dict) -> str:
     return str(comp.get("job") or comp["id"])
 
 
+def _sel_job_ok(sel: dict, job: str) -> bool:
+    return all(MS.matches(op, v, job) for (l, op, v) in sel["matchers"] if l == "job")
+
+
+def _has_job(sel: dict) -> bool:
+    return any(l == "job" for (l, _, _) in sel["matchers"])
+
+
 def job_matches(expr: str, job: str) -> bool:
-    """True if the expression has no job matcher, or one that matches this job."""
-    found = False
-    for op, val in re.findall(r'\bjob\s*(=~|=|!=|!~)\s*"([^"]*)"', expr):
-        found = True
-        if op == "=" and val == job:
-            return True
-        if op == "=~" and re.fullmatch(val, job):
-            return True
-    return not found
+    """True if the expression has no job matcher, or a selector whose job matchers all match this job."""
+    sels = [x for x in MS.selectors(expr) if _has_job(x)]
+    return not sels or any(_sel_job_ok(x, job) for x in sels)
+
+
+def rule_match(signal: dict, rule: dict, comp: dict) -> str | None:
+    """None: the rule is not about this signal. "ok": it watches it. "job_mismatch": it is about this signal
+    (same alert name as the template, or reads the signal's metric) but its job matcher cannot select the
+    component's job from env.yaml (targets[].job / components[].job), so it returns nothing."""
+    expr = str(rule.get("query", ""))
+    names = {r.split("#", 1)[1] for r in signal.get("rules", [])}
+    metrics = set(signal.get("metrics", [])) - {"probe_success"}  # probes run in the blackbox job
+    sels = MS.selectors(expr)
+    rel = [x for x in sels if x["metric"] in metrics]
+    by_name = rule.get("name") in names
+    job_known = comp.get("job") is not None and signal["id"] not in OTHER_JOB_SIGNALS
+    job = job_of(comp)
+    if by_name:
+        if not job_known:
+            return "ok"
+        check = [x for x in (rel or sels) if _has_job(x)]
+        if not check or any(_sel_job_ok(x, job) for x in (rel or sels)):
+            return "ok"
+        return "job_mismatch"
+    if not rel:
+        return None
+    if all(x["metric"] == "up" for x in rel):
+        # up is shared by every job: only count rules whose job matcher selects this component
+        if any(_has_job(x) and _sel_job_ok(x, job) for x in rel):
+            return "ok"
+        return None
+    if any(_sel_job_ok(x, job) for x in rel):
+        return "ok"
+    return "job_mismatch" if job_known else None
 
 
 def rule_matches(signal: dict, rule: dict, comp: dict) -> bool:
-    expr = str(rule.get("query", ""))
-    names = {r.split("#", 1)[1] for r in signal.get("rules", [])}
-    if rule.get("name") in names:
-        return True
-    for m in signal.get("metrics", []):
-        if not re.search(SELECTOR.format(m=re.escape(m)), expr):
-            continue
-        if m == "up":
-            # up is shared by every job: only count rules whose job matcher selects this component
-            if re.search(r'\bjob\s*(=~|=)', expr) and job_matches(expr, job_of(comp)):
-                return True
-            continue
-        if job_matches(expr, job_of(comp)):
-            return True
-    return False
+    return rule_match(signal, rule, comp) == "ok"
 
 
 def placement(ruler_id: str, ruler: dict, comp: dict) -> str:
@@ -153,15 +185,104 @@ def count_series(url: str, selector: str) -> int | None:
 
 def selectors(signal: dict, expr: str) -> list[str]:
     out = []
-    for m in signal.get("metrics", []):
-        for sel in re.finditer(SELECTOR.format(m=re.escape(m)), expr):
-            out.append(sel.group(0))
+    for x in MS.selectors(expr):
+        if x["metric"] in signal.get("metrics", []):
+            out.append(expr[x["pos"]:x["end"]])
     return out
 
 
 # ---------- applies_when ----------
 
-def applies(signal: dict, comp: dict, env: dict) -> tuple[bool, str]:
+# env.yaml `features:` vocabulary (components[] and targets[]). A signal's free-text applies_when is mapped
+# to the features it needs (all groups must hold; any feature inside a group is enough). Documented in
+# env/env.example.yaml; tests/test_coverage.py checks that every applies_when in the catalog is mapped or
+# listed in APPLIES_UNMAPPED.
+FEATURES = {
+    "replication": "有複寫，不分主從（知道是哪一邊就改寫 replication-primary 或 replication-replica）",
+    "replication-primary": "有複本的主庫（MySQL source、PostgreSQL primary、Redis master）",
+    "replication-replica": "複本（MySQL replica、PostgreSQL standby、Redis replica）",
+    "gtid": "MySQL GTID replication", "semi-sync": "MySQL semi-sync replication", "galera": "MariaDB Galera",
+    "group-replication": "MySQL Group Replication／InnoDB Cluster", "heartbeat": "pt-heartbeat 之類的 heartbeat 表",
+    "multi-target-probe": "一個 exporter 帶多個 target（/probe、/scrape、多個 --mongodb.uri）",
+    "query-exporter": "有部署 query-exporter 補自訂查詢", "patroni": "PostgreSQL Patroni",
+    "replication-slot": "PostgreSQL replication slot", "sync-replication": "PostgreSQL synchronous_standby_names",
+    "archive-mode": "PostgreSQL archive_mode=on", "pgbackrest": "pgBackRest（pgbackrest_exporter）",
+    "pg-stat-statements": "PostgreSQL pg_stat_statements", "node-exporter": "同一台主機有 node_exporter",
+    "replica-set": "MongoDB replica set", "sharded": "MongoDB sharded cluster（exporter 連 mongos）",
+    "sentinel": "Redis Sentinel", "redis-cluster": "Redis cluster_enabled yes", "rdb": "Redis 有設 save",
+    "aof": "Redis appendonly yes", "check-keys": "redis_exporter 有用 --check-keys／--count-keys／--check-key-groups",
+    "retention-size": "Prometheus 有設 storage.tsdb.retention.size", "results-limit": "vmalert group limit 或 -rule.resultsLimit > 0",
+}
+IMPLIES = {"replication-primary": {"replication"}, "replication-replica": {"replication"}, "gtid": {"replication"},
+           "semi-sync": {"replication"}}
+SIDES = {"replication-primary", "replication-replica"}
+_REPL = {"replication", "replication-primary", "replication-replica"}
+APPLIES_FEATURES = [  # (regex on applies_when, [any-of groups]); first match wins
+    (r"query-exporter", [{"query-exporter"}]),
+    (r"multi-target|--mongodb\.uri", [{"multi-target-probe"}]),
+    (r"semi-sync", [{"semi-sync"}]),
+    (r"galera", [{"galera"}]),
+    (r"group replication|innodb cluster", [{"group-replication"}]),
+    (r"gtid", [{"gtid"}]),
+    (r"patroni", [{"patroni"}]),
+    (r"sentinel", [{"sentinel"}]),
+    (r"cluster_enabled", [{"redis-cluster"}]),
+    (r"sharded", [{"sharded"}]),
+    (r"replica set", [{"replica-set"}]),
+    (r"appendonly", [{"aof"}]),
+    (r"有設 save", [{"rdb"}]),
+    (r"check-keys|count-keys|check-key-groups", [{"check-keys"}]),
+    (r"pg_stat_statements", [{"pg-stat-statements"}]),
+    (r"synchronous_standby_names", [{"sync-replication"}]),
+    (r"primary_slot_name", [{"replication-replica"}]),
+    (r"replication slot", [{"replication-slot"}]),
+    (r"archive_mode", [{"archive-mode"}]),
+    (r"pgbackrest", [{"pgbackrest"}]),
+    (r"node_exporter", [{"node-exporter"}]),
+    (r"retention\.size", [{"retention-size"}]),
+    (r"resultslimit|group limit", [{"results-limit"}]),
+    (r"有複本的主庫", [{"replication-primary"}]),
+    (r"hot standby|^複本$|^replica$|的複本", [{"replication-replica"}]),
+    (r"replication|主從複寫|複寫", [_REPL]),
+]
+# conditions that are not features (flavour / version / flag notes): stay "需要回答" when they matter
+APPLIES_UNMAPPED = {"MySQL；MariaDB 要先開 performance_schema", "MySQL；MariaDB 要先開 performance_schema（預設 OFF，要重啟）",
+                    "MySQL（performance_schema 預設開）；MariaDB 要先開 performance_schema",
+                    "MariaDB 預設可用；MySQL 要 --collect.info_schema.innodb_metrics",
+                    "PostgreSQL 17 以上要打開 --collector.stat_checkpointer"}
+# replication signals that only make sense on one side, although the card says just "replication"
+SIGNAL_SIDE = {
+    ("mysqld_exporter", "replication-running"): "replication-replica",
+    ("mysqld_exporter", "replication-error"): "replication-replica",
+    ("mysqld_exporter", "replica-status-present"): "replication-replica",
+    ("mysqld_exporter", "replication-lag"): "replication-replica",
+    ("mysqld_exporter", "replica-read-only"): "replication-replica",
+    ("mysqld_exporter", "primary-writable"): "replication-primary",
+}
+
+
+def feature_requirement(cond: str, card_id: str | None = None, signal_id: str | None = None) -> list[set] | None:
+    side = SIGNAL_SIDE.get((card_id, signal_id))
+    for rx, req in APPLIES_FEATURES:
+        if re.search(rx, cond, re.I):
+            if side and req == [_REPL]:
+                return [{side}]
+            return [set(g) for g in req]
+    return None
+
+
+def expand(features) -> set[str]:
+    out = set()
+    for f in features or []:
+        f = str(f).strip().lower()
+        out.add(f)
+        out |= IMPLIES.get(f, set())
+    return out
+
+
+def applies(signal: dict, comp: dict, env: dict, card_id: str | None = None) -> tuple[bool, str]:
+    """(applies, note). not applicable only when env.yaml lists features for this component and the needed
+    one is not there; without a features list the signal is kept and the note asks the question."""
     cond = str(signal.get("applies_when") or "").strip()
     if not cond:
         return True, ""
@@ -177,10 +298,22 @@ def applies(signal: dict, comp: dict, env: dict) -> tuple[bool, str]:
     if cond == "prometheus in env":
         ok = any(c.get("type") == "prometheus" for c in env["components"])
         return ok, ""
-    flags = {str(x) for x in comp.get("features", [])}
-    if cond in flags:
-        return True, ""
-    return True, f"適用條件「{cond}」未確認，請在 env.yaml 的 features 標明"
+    req = feature_requirement(cond, card_id, signal.get("id"))
+    words = "、".join(sorted({f for g in req for f in g})) if req else ""
+    raw = comp.get("features")
+    if raw is None:
+        hint = f"（在 env.yaml 的 features 寫 {words}，或列出有的功能）" if words else "（在 env.yaml 的 features 標明）"
+        return True, f"需要回答：有沒有「{cond}」{hint}"
+    have = expand(raw)
+    if req is None:
+        return True, f"需要回答：「{cond}」成立嗎？（features 沒有對應的詞）"
+    for group in req:
+        if group & have:
+            continue
+        if group <= SIDES and "replication" in have and not (have & SIDES):
+            return True, "需要回答：這台是 primary 還是 replica？（features 寫 replication-primary 或 replication-replica）"
+        return False, f"env.yaml 的 features 沒有 {'／'.join(sorted(group))}（{cond}）"
+    return True, ""
 
 
 # ---------- observer card (architecture questions answered from env.yaml) ----------
@@ -215,7 +348,21 @@ def observer_item(signal: dict, env: dict) -> tuple[str, str]:
 
 # ---------- main evaluation ----------
 
-def evaluate(env: dict, snapshot: str, tiers: set[int], live: bool) -> list[dict]:
+def scrape_note(comp: dict, card_id: str, scrape_jobs: set[str] | None) -> str:
+    """With --config: is this component scraped at all? (rules copied from templates have no data otherwise)"""
+    if scrape_jobs is None or card_id == "observer":
+        return ""
+    job = comp.get("job")
+    if job is not None:
+        return "" if job in scrape_jobs else f"config 沒有 job `{job}`：這個元件沒有被 scrape，先加 scrape job 再加規則"
+    words = {str(comp.get("type") or "").lower(), str(card_id).lower().replace("_exporter", ""), str(comp["id"]).lower()}
+    if any(w and w in j.lower() for j in scrape_jobs for w in words):
+        return ""
+    return (f"config 裡找不到像是 {comp.get('type')} 的 scrape job（有：{', '.join(sorted(scrape_jobs))}）："
+            f"可能沒有被 scrape；有的話在 env.yaml 填 job")
+
+
+def evaluate(env: dict, snapshot: str, tiers: set[int], live: bool, scrape_jobs: set[str] | None = None) -> list[dict]:
     cards = {c["id"]: c for c in C.load_components()}
     rl = rulers(env)
     rules_by_ruler = {rid: load_rules(snapshot, rid) for rid in rl}
@@ -230,44 +377,57 @@ def evaluate(env: dict, snapshot: str, tiers: set[int], live: bool) -> list[dict
                           "note": f"元件類型 {comp.get('type')!r} 沒有對應的元件卡"})
             continue
         card = cards[card_id]
+        unscraped = scrape_note(comp, card_id, scrape_jobs)
         for s in card["signals"]:
             if s["tier"] not in tiers:
                 continue
             item = {"component": comp["id"], "card": card_id, "signal": s["id"], "tier": s["tier"],
                     "question": s["question"], "evaluate_on": s["evaluate_on"], "rules": [], "note": "",
                     "suggested_rules": s.get("rules", []), "runbook": C.runbook_url(card_id, s["id"])}
-            ok, why = applies(s, comp, env)
+            ok, why = applies(s, comp, env, card_id)
             if not ok:
                 item.update(status="not_applicable", note=why)
                 items.append(item)
                 continue
-            if card_id == "observer":
-                status, note = observer_item(s, env)
-                item.update(status=status, note=note)
+            extra = [x for x in (why, unscraped if s.get("metrics") else "") if x]
+
+            def push(status: str, note: str = "") -> None:
+                item.update(status=status, note="；".join([n for n in (note, *extra) if n]))
                 items.append(item)
+
+            if card_id == "observer":
+                push(*observer_item(s, env))
                 continue
             if s["evaluate_on"] in ("interview", "inventory", "external"):
-                item.update(status="needs_input",
-                            note={"interview": "要問架構", "inventory": "盤點時檢查（/api/v1/rules、/flags）",
-                                  "external": "由外部服務判斷，例如 dead man's switch 是否收到"}[s["evaluate_on"]])
-                items.append(item)
+                push("needs_input", {"interview": "要問架構", "inventory": "盤點時檢查（/api/v1/rules、/flags）",
+                                     "external": "由外部服務判斷，例如 dead man's switch 是否收到"}[s["evaluate_on"]])
                 continue
+            mismatched = []
             for rid, rules in rules_by_ruler.items():
                 for r in rules:
-                    if rule_matches(s, r, comp):
-                        item["rules"].append({"ruler": rid, "alert": r.get("name"), "placement": placement(rid, rl[rid], comp),
-                                              "query": r.get("query", "")})
+                    m = rule_match(s, r, comp)
+                    if m is None:
+                        continue
+                    entry = {"ruler": rid, "alert": r.get("name"), "placement": placement(rid, rl[rid], comp),
+                             "query": r.get("query", "")}
+                    (item["rules"] if m == "ok" else mismatched).append(entry)
+            item["mismatched_rules"] = mismatched
             if not item["rules"]:
-                item["status"] = "missing"
-                items.append(item)
+                if mismatched:
+                    names = "、".join(f"`{r['alert']}`" for r in mismatched[:4])
+                    push("rule_job_mismatch", f"{names} 的 job 條件選不到 env.yaml 的 job `{job_of(comp)}`，回傳空、不會響"
+                                              "（包在 absent() 裡的則一直在響）；把 job 條件改成實際的 job")
+                else:
+                    push("missing")
                 continue
             wants_self = s["evaluate_on"] in ("self", "dedicated")
             good = [r for r in item["rules"]
                     if r["placement"] in (("self", "scraper", "independent") if wants_self else ("independent",))]
             if not good:
-                item.update(status="self_only",
-                            note="只有被監控的元件（或同一故障域的 ruler）在評估，它掛掉時這條規則也停")
-                items.append(item)
+                push("self_only", "只有被監控的元件（或同一故障域的 ruler）在評估，它掛掉時這條規則也停")
+                continue
+            if unscraped and s.get("metrics") and scrape_jobs is not None and comp.get("job") is not None:
+                push("rule_no_data")
                 continue
             if live:
                 has_data = False
@@ -277,25 +437,51 @@ def evaluate(env: dict, snapshot: str, tiers: set[int], live: bool) -> list[dict
                     r["series"] = counts
                     if any(c for c in counts) or not counts:
                         has_data = True
-                item["status"] = "covered" if has_data else "rule_no_data"
-                if not has_data:
-                    item["note"] = "規則的 selector 查不到任何 series：檢查 job 名稱、label 或這個 metric 是否存在"
+                push("covered" if has_data else "rule_no_data",
+                     "" if has_data else "規則的 selector 查不到任何 series：檢查 job 名稱、label 或這個 metric 是否存在")
             else:
-                item.update(status="covered", note="未用 --live 檢查資料是否存在")
-            items.append(item)
+                push("covered", "未用 --live 檢查資料是否存在" if comp.get("job") is None or s["id"] in OTHER_JOB_SIGNALS
+                     else f"job `{comp['job']}` 對得上；未用 --live 檢查資料是否存在")
     return items
+
+
+ADVICE = {
+    "missing": ("沒有規則", "從建議規則複製，改成這個環境的 job", "多一條規則要維護；照範本加之前先確認 metric 有被 scrape"),
+    "rule_job_mismatch": ("規則在，但 job 條件選不到這個元件", "把 rule 的 job 條件改成 env.yaml／config 裡的 job",
+                          "要一起改用到同一個 job 的 dashboard"),
+    "rule_no_data": ("規則在，但沒有資料", "先讓 metric 有資料（加 scrape job、開 collector），再看規則",
+                     "多一個 scrape job 的負載"),
+    "self_only": ("只有被監控的元件自己在評估", "把規則放到外部觀察者（或另一個故障域的 ruler）",
+                  "要多維護一台觀察者"),
+}
 
 
 def render_md(env: dict, items: list[dict], tiers: set[int]) -> str:
     counts = {k: sum(1 for i in items if i["status"] == k) for k in STATUS_ORDER}
     out = [f"# Monitor of monitor 覆蓋：{env.get('name', '')}", "",
-           f"產生時間 {time.strftime('%Y-%m-%d %H:%M')}，檢查第 {'、'.join(map(str, sorted(tiers)))} 級訊號。", "",
-           "| " + " | ".join(STATUS_TEXT[k] for k in STATUS_ORDER) + " |",
-           "|" + "---|" * len(STATUS_ORDER),
-           "| " + " | ".join(str(counts[k]) for k in STATUS_ORDER) + " |", ""]
+           f"產生時間 {time.strftime('%Y-%m-%d %H:%M')}，檢查第 {'、'.join(map(str, sorted(tiers)))} 級訊號。", ""]
+    act = [i for i in items if i["status"] in ACTION]
+    out += ["## 建議先做", ""]
+    if not act:
+        out.append("- 檢查的訊號都有規則在看，沒有要先處理的項目。")
+    for st in ACTION:
+        group = [i for i in act if i["status"] == st]
+        if not group:
+            continue
+        what, todo, cost = ADVICE[st]
+        comps = list(dict.fromkeys(i["component"] for i in group))
+        out.append(f"- **{what}**：{len(group)} 個訊號（{'、'.join(comps)}）。**建議**：{todo}。**代價**：{cost}。")
+    ask = [i for i in items if i["status"] != "not_applicable" and "需要回答" in (i.get("note") or "")]
+    if ask:
+        qs = list(dict.fromkeys(n for i in ask for n in i["note"].split("；") if n.startswith("需要回答")))
+        out.append(f"- **要先確認的條件**（決定訊號適不適用）：{'；'.join(q.removeprefix('需要回答：') for q in qs[:6])}"
+                   f"{' 等' if len(qs) > 6 else ''}")
+    out += ["", "| " + " | ".join(STATUS_TEXT[k] for k in STATUS_ORDER) + " |",
+            "|" + "---|" * len(STATUS_ORDER),
+            "| " + " | ".join(str(counts[k]) for k in STATUS_ORDER) + " |", ""]
     out += ["## 要先處理", "", "| 元件 | 訊號 | 狀態 | 說明 | 建議規則 |", "|---|---|---|---|---|"]
     for i in sorted(items, key=lambda x: (STATUS_ORDER.index(x["status"]), x["component"])):
-        if i["status"] in ("missing", "rule_no_data", "self_only"):
+        if i["status"] in ACTION:
             sug = "、".join(f"`{r.split('#')[1]}`" for r in i.get("suggested_rules", [])) or "—"
             out.append(f"| {i['component']} | [{i.get('question') or i['signal']}]({i.get('runbook', '')}) | "
                        f"{STATUS_TEXT[i['status']]} | {i.get('note', '')} | {sug} |")
@@ -303,7 +489,8 @@ def render_md(env: dict, items: list[dict], tiers: set[int]) -> str:
     for comp in dict.fromkeys(i["component"] for i in items):
         out += [f"## {comp}", "", "| 級 | 訊號 | 狀態 | 規則（ruler：alert，位置） | 說明 |", "|---|---|---|---|---|"]
         for i in [x for x in items if x["component"] == comp]:
-            rules = "<br>".join(f"{r['ruler']}：{r['alert']}（{r['placement']}）" for r in i.get("rules", [])[:4]) or "—"
+            rules = "<br>".join(f"{r['ruler']}：{r['alert']}（{r['placement']}）" for r in i.get("rules", [])[:4]) or \
+                "<br>".join(f"{r['ruler']}：{r['alert']}（job 對不上）" for r in i.get("mismatched_rules", [])[:4]) or "—"
             out.append(f"| {i.get('tier') or ''} | {i.get('question') or i.get('signal') or ''} | {STATUS_TEXT[i['status']]} | "
                        f"{rules} | {i.get('note', '')} |")
         out.append("")
@@ -317,18 +504,21 @@ def main() -> int:
     ap.add_argument("--out", required=True)
     ap.add_argument("--live", action="store_true", help="query each ruler to check rule selectors match series")
     ap.add_argument("--tiers", default="1", help="comma-separated tiers, default 1")
+    ap.add_argument("--config", action="append", default=[],
+                    help="prometheus.yml of the scraping Prometheus (repeatable): flags components no job scrapes")
     a = ap.parse_args()
     env = load_env(a.env)
     tiers = {int(t) for t in a.tiers.split(",")}
-    items = evaluate(env, a.snapshot, tiers, a.live)
+    scrape_jobs = {j["job"] for c in a.config for j in MS.load_config(c)} if a.config else None
+    items = evaluate(env, a.snapshot, tiers, a.live, scrape_jobs)
     os.makedirs(a.out, exist_ok=True)
     with open(os.path.join(a.out, "coverage.json"), "w", encoding="utf-8") as f:
         json.dump({"env": env.get("name"), "generated": time.strftime("%Y-%m-%dT%H:%M:%S"), "tiers": sorted(tiers),
                    "live": a.live, "items": items}, f, indent=1, ensure_ascii=False)
     with open(os.path.join(a.out, "coverage.md"), "w", encoding="utf-8") as f:
         f.write(render_md(env, items, tiers))
-    bad = sum(1 for i in items if i["status"] in ("missing", "rule_no_data", "self_only"))
-    print(f"{len(items)} items, {bad} need action → {a.out}/coverage.md")
+    bad = sum(1 for i in items if i["status"] in ACTION)
+    print(f"{len(items)} 個訊號，建議先處理 {bad} 個 → {a.out}/coverage.md（「建議先做」）")
     return 0
 
 

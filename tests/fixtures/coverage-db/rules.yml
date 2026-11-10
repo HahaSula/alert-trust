@@ -1,0 +1,12 @@
+groups:
+  - name: mysqld
+    rules:
+      - alert: MySQLExporterDown
+        expr: up{job="mysqld"} == 0
+        for: 2m
+      - alert: MySQLNotReachable
+        expr: mysql_up{job=~"mysqld|mysql-staging"} == 0
+        for: 1m
+      - alert: MySQLReplicationNotRunning
+        expr: min({__name__=~"mysql_slave_status_(slave|replica)_(io|sql)_running", job="mysqld"}) == 0
+        for: 2m

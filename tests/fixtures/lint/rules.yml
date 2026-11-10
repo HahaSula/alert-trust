@@ -1,0 +1,15 @@
+groups:
+  - name: t
+    rules:
+      - alert: DbDown
+        expr: mysql_up{job="mysqld"} == 0
+      - alert: DbDownCovered
+        expr: mysql_up{job="mysqld"} == 0
+        annotations: { absence_covered_by: "ExporterDown" }
+      - alert: DbDownBadRef
+        expr: mysql_up{job="mysqld"} == 0
+        annotations: { absence_covered_by: "NoSuchAlert" }
+      - alert: ExporterDown
+        expr: up{job="mysqld"} == 0
+      - alert: ThreadsHigh
+        expr: mysql_global_status_threads_running{job="other"} > 50
