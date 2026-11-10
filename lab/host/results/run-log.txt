@@ -1,0 +1,3 @@
+2026-11-11T01:04:23+08:00 lab start (memhog started; oomhog started ~30s later)
+2026-11-11T01:09:02+08:00 rules/host/meta.yml fixed (container-resources selectors) and Prometheus reloaded with SIGHUP
+2026-11-11T01:11:53+08:00 memhog stopped; memhog2 (MEASURE=anon, 61 MiB) started

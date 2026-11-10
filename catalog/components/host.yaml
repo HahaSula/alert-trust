@@ -11,7 +11,7 @@ role: >-
   看不到 CPU 排隊、page cache、swap、磁碟延遲、檔案系統唯讀、cgroup 記憶體上限與 OOM kill。這張卡把這一層的訊號集中在一處，
   target 卡的 blind_spots 用 covered_by 指過來。資料來源是 node_exporter（主機）、cAdvisor 或 kubelet 的 /metrics/cadvisor（容器）、
   kube-state-metrics（OOMKilled 原因），process-exporter 選用（沒有 process_* metric 的 mysqld、postgres 的 fd 與 thread）。
-  全部只讀碼，沒有在 lab 觸發過；門檻是例子。資料庫內部資源和這一層的對照見[資料庫的資源](../architecture/db-resources.md)。
+  container-memory-limit、oom-kills（主機部分）、filesystem-readonly 在 lab/host 觸發過（WSL2、Docker Desktop、獨立 cAdvisor），其餘只讀碼；門檻是例子。資料庫內部資源和這一層的對照見[資料庫的資源](../architecture/db-resources.md)。
 
 silent_failures:
   - text: "node-mixin 的 NodeFilesystemSpaceFillingUp／AlmostOutOfSpace 只算 `node_filesystem_readonly == 0` 的檔案系統。ext4 因錯誤 remount 成唯讀時，空間規則反而排除它，mixin 也沒有唯讀規則。"
@@ -38,6 +38,15 @@ silent_failures:
     evidence: code
     source: res-cadvisor
     refs: [res-cadv-ignore-process, res-kubelet-included, res-kubelet-psi]
+
+  - text: "獨立執行的 cAdvisor 沒有 `container` label，只有 `id`、`name`（第一個 alias）、`image`；`container` 是 kubelet 的 /metrics/cadvisor 才有。用 `container!=\"\"` 過濾的容器規則在獨立 cAdvisor 上回傳空，不會報錯（lab/host：working set／limit 0.90 時原式仍是 inactive）。"
+    evidence: tested
+    source: res-cadvisor
+    refs: [exp-host-memlimit, res-cadv-labels]
+  - text: "cAdvisor 的 `container_oom_events_total` 以核心 OOM 訊息裡的 cgroup 路徑累加，再用 cAdvisor 自己看到的容器名稱查；兩者不同時 counter 永遠是 0。lab/host（WSL2 上的 Docker Desktop）核心寫 `/wsl-user/distro-…/docker/<id>`，cAdvisor 看到 `/docker/<id>`，事件 API 收到 3 次 oomKill，counter 仍是 0。被 OOM kill 後沒有重啟的容器，series 也會跟著消失。"
+    evidence: tested
+    source: res-cadvisor
+    refs: [exp-host-oom, res-cadv-oom-parse, res-cadv-oom-key]
 
 contracts: []
 
@@ -86,13 +95,13 @@ signals:
     tier: 1
     aspect: availability
     question: 資料目錄的檔案系統變成唯讀或讀不到了嗎
-    signal: '`node_filesystem_readonly == 1` 或 `node_filesystem_device_error == 1`（限 ext4／xfs／btrfs／zfs）'
+    signal: '`node_filesystem_readonly == 1` 或 `node_filesystem_device_error == 1`（限 ext4／xfs／btrfs／zfs）。lab 實測：以唯讀掛載的 ext4 為 1、讀寫的為 0，HostFilesystemReadOnly firing；錯誤後 remount 唯讀與 device_error 沒有測（要 privileged），仍是讀碼'
     metrics: [node_filesystem_readonly, node_filesystem_device_error]
     evaluate_on: observer
     silent_failure: 唯讀時 node-mixin 的空間規則排除這個檔案系統；資料庫寫入失敗，但空間看起來正常
-    evidence: code
+    evidence: tested
     source: res-node-exporter
-    refs: [res-ne-fs-readonly, res-ne-fs-deverr, res-nm-fs-readonly]
+    refs: [exp-host-readonly, res-ne-fs-readonly, res-ne-fs-deverr, res-nm-fs-readonly]
     upstream: { status: no }
     rules: [rules/host/meta.yml#HostFilesystemReadOnly, rules/host/meta.yml#HostFilesystemDeviceError]
 
@@ -100,13 +109,13 @@ signals:
     tier: 1
     aspect: availability
     question: 資料庫行程被 OOM kill 了嗎
-    signal: 主機 `node_vmstat_oom_kill` 增加；容器 `container_oom_events_total` 增加；K8s 上次結束原因 OOMKilled 且剛重啟
+    signal: 主機 `node_vmstat_oom_kill` 增加；容器 `container_oom_events_total` 增加；K8s 上次結束原因 OOMKilled 且剛重啟。lab 實測只有主機這條（cgroup OOM kill 3 次，25 → 28，HostOOMKill firing）；容器 counter 在 WSL2 上維持 0（見 silent_failures），K8s 沒測
     metrics: [node_vmstat_oom_kill, container_oom_events_total, kube_pod_container_status_last_terminated_reason, kube_pod_container_status_restarts_total]
     evaluate_on: observer
     silent_failure: 資料庫卡片只看得到 uptime 歸零或 up 掉一下，分不出是 OOM、crash 還是人為重啟
-    evidence: code
+    evidence: tested
     source: res-node-exporter
-    refs: [res-ne-vmstat-fields, res-cadv-oom, res-ksm-terminated, res-ksm-restarts]
+    refs: [exp-host-oom, res-ne-vmstat-fields, res-cadv-oom, res-cadv-oom-parse, res-cadv-oom-key, res-ksm-terminated, res-ksm-restarts]
     upstream: { status: no, note: "node-mixin 與 kubernetes-mixin 都沒有 OOM kill 規則" }
     rules: [rules/host/meta.yml#HostOOMKill, rules/host/meta.yml#ContainerOOMEvent, rules/host/meta.yml#ContainerOOMKilled]
 
@@ -114,14 +123,14 @@ signals:
     tier: 1
     aspect: saturation
     question: 容器的記憶體快碰到 cgroup limit 了嗎
-    signal: '`container_memory_working_set_bytes / container_spec_memory_limit_bytes > 0.9`（limit 為 0 表示沒設，排除）'
+    signal: '`container_memory_working_set_bytes / container_spec_memory_limit_bytes > 0.9`（limit 為 0 表示沒設，排除）。kubelet 用 `container` label 選，獨立 cAdvisor 沒有這個 label，要用 `id`（或 `name`）選。lab 實測 64 MiB limit：0.83、0.90、0.97；page cache 會把用量推到 limit，working set 在 0.9 附近上下，門檻離 limit 太近會反覆 pending'
     metrics: [container_memory_working_set_bytes, container_spec_memory_limit_bytes]
     evaluate_on: observer
     applies_when: 資料庫跑在容器裡（Kubernetes、Docker）
     silent_failure: 主機 MemAvailable 還很多時，容器照樣被自己的 limit OOM kill
-    evidence: code
+    evidence: tested
     source: res-cadvisor
-    refs: [res-cadv-wss, res-cadv-wss-calc, res-cadv-memlimit, res-kubelet-included]
+    refs: [exp-host-memlimit, res-cadv-wss, res-cadv-wss-calc, res-cadv-memlimit, res-cadv-labels, res-kubelet-included]
     upstream: { status: no, note: "kubernetes-mixin 沒有這條" }
     rules: [rules/host/meta.yml#ContainerMemoryNearLimit]
 

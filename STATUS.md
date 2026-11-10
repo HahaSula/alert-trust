@@ -50,7 +50,6 @@
 ## 進行中
 
 - 之後：打 v0.3.0
-- 排定 2026-11-11 01:00：主機卡小實驗（OOM、記憶體接近 limit、唯讀掛載；不用特權容器）
 
 使用者同意的資料庫順序已全部完成；CockroachDB（專有授權）不做。資料庫架構頁依類型分頁：關聯式、記憶體 KV、共識（Raft）、分散式 SQL、分析型、文件型。
 
@@ -77,7 +76,7 @@
 19. **artifact 對照的後續輕量 lab**：429 與 `iteration_missed`、帶 `for` 的 log rule、損毀 block（`reloads_failures_total`）、長查詢卡住 Compact（目前讀碼）。新增的 Prometheus／VM 規則只過 promtool／dryRun，沒有在 lab 觸發過。
 20. **MongoDB 待補**：sharded cluster、WiredTiger cache／eviction 壓力、ticket 排隊、連線打滿、collStats 成本只讀碼；oplog 被釘住只讀碼。`docs/targets/models.md` 說「8.0、8.2 的 tag 沒有 OTel 程式碼」，MongoDB agent 回報 8.2.12 有 OTLP 檔案／HTTP 推送（沒有 Prometheus 檔案輸出），要附原始碼行號後修正。
 21. **契約複查的後續**：`resend-endsat` 最差情況（`− P`）與 `d > S` 時 `I ≈ d` 只讀碼，要輕量 lab；Grafana Alerting 的續送是否同樣「嚴格大於」才送未查。
-22. **資源調查的後續**：各 target 卡的 blind_spots 改成 `covered_by` 主機卡；`#proposed` 表的 10 個飽和訊號；host 卡要不要新的 family；target-pattern 要不要加「主機層存在」；OOM、唯讀 remount、記憶體上限的小 lab。
+22. **資源調查的後續**：各 target 卡的 blind_spots 改成 `covered_by` 主機卡；`#proposed` 表的 10 個飽和訊號；host 卡要不要新的 family；target-pattern 要不要加「主機層存在」。（主機卡小 lab 已完成：記憶體接近 limit、OOM 的主機部分、唯讀掛載實測；容器 OOM 計數在 WSL2 不增加、唯讀 remount 未測。）
 23. **拆卡後續**：MySQL／MariaDB lab 的 compose 仍掛 `rules/targets/mysql.yml`，重跑 MariaDB 要改掛 `mariadb.yml`；新規則 `MariaDBBinlogNotPurged` 與 thread-cache、pending-fsyncs 訊號沒有 lab；MySQL 側多數參考仍釘在 8.4.7。
 
 ## 已做的決定

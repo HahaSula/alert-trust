@@ -1,0 +1,7 @@
+# 2026-11-11T01:19:07+08:00 container_memory_working_set_bytes{job=~".*(cadvisor|kubelet).*", container!=""}
+[]
+# 2026-11-11T01:19:07+08:00 count by (__name__) ({job="cadvisor", container!=""})
+[]
+# 2026-11-11T01:19:07+08:00 count by (__name__) ({job="cadvisor", name!=""})
+[]
+container_memory_working_set_bytes{id="/docker/<memhog2-id>"} 6.5052672e+07 1794331142534

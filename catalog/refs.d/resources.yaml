@@ -1153,3 +1153,40 @@ refs:
     file: "src/backend/storage/smgr/md.c"
     line: 1184
     url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/storage/smgr/md.c#L1184"
+  # lab/host 的實驗結果與實驗中核對的 cAdvisor 原始碼（2026-11-11）
+  res-cadv-labels:
+    kind: code
+    title: "獨立 cAdvisor 的 series label：id、name（第一個 alias）、image、container_label_*；沒有 container"
+    project: "cAdvisor"
+    version: "v0.60.6"
+    file: "lib/metrics/prometheus.go"
+    line: 2215
+    url: "https://github.com/google/cadvisor/blob/v0.60.6/lib/metrics/prometheus.go#L2215"
+  res-cadv-oom-parse:
+    kind: code
+    title: "oomparser 以核心 oom-kill 訊息裡的 task_memcg 路徑當 ContainerName"
+    project: "cAdvisor"
+    version: "v0.60.6"
+    file: "utils/oomparser/oomparser.go"
+    line: 81
+    url: "https://github.com/google/cadvisor/blob/v0.60.6/utils/oomparser/oomparser.go#L81"
+  res-cadv-oom-key:
+    kind: code
+    title: "container_oom_events_total 的 counter 以 OOM 訊息的路徑累加、以 cAdvisor 的容器名稱查"
+    project: "cAdvisor"
+    version: "v0.60.6"
+    file: "cmd/internal/api/oom.go"
+    line: 72
+    url: "https://github.com/google/cadvisor/blob/v0.60.6/cmd/internal/api/oom.go#L72"
+  exp-host-memlimit:
+    kind: experiment
+    title: "主機層實驗：cAdvisor v0.60.6 working set／limit 0.83、0.90、0.97，ContainerMemoryNearLimit 原式選不到 series、修正後 firing"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/host/results/summary.md#memory"
+  exp-host-oom:
+    kind: experiment
+    title: "主機層實驗：cgroup OOM kill 3 次，node_vmstat_oom_kill 25 → 28 與 HostOOMKill firing；container_oom_events_total 在 WSL2 上維持 0"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/host/results/summary.md#oom"
+  exp-host-readonly:
+    kind: experiment
+    title: "主機層實驗：唯讀掛載的 ext4 node_filesystem_readonly = 1，HostFilesystemReadOnly firing"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/host/results/summary.md#readonly"

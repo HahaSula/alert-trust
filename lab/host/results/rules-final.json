@@ -1,0 +1,61 @@
+{
+ "wall": "2026-11-11T01:19:07+0800",
+ "rules": [
+  {
+   "alert": "ContainerMemoryNearLimit",
+   "state": "firing",
+   "health": "ok",
+   "query": "(container_memory_working_set_bytes{container!=\"\",job=~\".*(cadvisor|kubelet).*\"} / (container_spec_memory_limit_bytes{container!=\"\",job=~\".*(cadvisor|kubelet).*\"} > 0) or container_memory_working_set_bytes{container=\"\",id=~\"/docker/.+|/system.slice/docker-.+\",job=~\".*cadvisor.*\"} / (container_spec_memory_limit_bytes{container=\"\",id=~\"/docker/.+|/system.slice/docker-.+\",job=~\".*cadvisor.*\"} > 0)) > 0.9",
+   "alerts": [
+    {
+     "labels": {
+      "id": "/docker/dbc3a9e861d9429b474b932a9a33de840599b4c5917cd78ff6cd7c4943bace50",
+      "instance": "cadvisor:8080"
+     },
+     "state": "firing",
+     "activeAt": "2026-11-10T17:12:32.453425963Z",
+     "value": "9.693603515625e-01"
+    }
+   ]
+  },
+  {
+   "alert": "ContainerOOMEvent",
+   "state": "inactive",
+   "health": "ok",
+   "query": "increase(container_oom_events_total{container!=\"\",job=~\".*(cadvisor|kubelet).*\"}[10m]) > 0 or increase(container_oom_events_total{container=\"\",id=~\"/docker/.+|/system.slice/docker-.+\",job=~\".*cadvisor.*\"}[10m]) > 0",
+   "alerts": []
+  },
+  {
+   "alert": "ContainerOOMKilled",
+   "state": "inactive",
+   "health": "ok",
+   "query": "kube_pod_container_status_last_terminated_reason{reason=\"OOMKilled\"} == 1 and on (namespace, pod, container) increase(kube_pod_container_status_restarts_total[10m]) > 0",
+   "alerts": []
+  },
+  {
+   "alert": "HostFilesystemReadOnly",
+   "state": "firing",
+   "health": "ok",
+   "query": "node_filesystem_readonly{fstype=~\"ext4|xfs|btrfs|zfs\",job=~\".*node.*\"} == 1",
+   "alerts": [
+    {
+     "labels": {
+      "fstype": "ext4",
+      "instance": "node-exporter:9100",
+      "mountpoint": "/data-ro"
+     },
+     "state": "firing",
+     "activeAt": "2026-11-10T17:02:37.014629898Z",
+     "value": "1e+00"
+    }
+   ]
+  },
+  {
+   "alert": "HostOOMKill",
+   "state": "inactive",
+   "health": "ok",
+   "query": "increase(node_vmstat_oom_kill{job=~\".*node.*\"}[10m]) > 0",
+   "alerts": []
+  }
+ ]
+}

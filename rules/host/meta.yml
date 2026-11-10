@@ -1,6 +1,8 @@
 # 主機與容器層的規則範本（草稿）。每個資料庫 target 都跑在這一層上，這些規則補上 target 卡裡「要靠其他元件」的盲點。
 # 資料來源：node_exporter v1.12.1、cAdvisor v0.60.6（或 kubelet /metrics/cadvisor）、kube-state-metrics v2.20.0、
-# 選用 process-exporter v0.8.7。只讀碼，沒有在 lab 觸發過。
+# 選用 process-exporter v0.8.7。ContainerMemoryNearLimit、HostOOMKill、HostFilesystemReadOnly 在 lab/host 觸發過；
+# ContainerOOMEvent 在 lab/host 沒有觸發（WSL2 上 cAdvisor 的 cgroup 路徑對不上，見 lab/host/README.md）；其餘只讀碼。
+# 獨立執行的 cAdvisor 沒有 container label（只有 id、name、image），container-resources 的規則因此各有第二段用 id 選。
 # 一定要改的：job=~".*node.*"、job=~".*(cadvisor|kubelet).*" 換成實際 job；fstype 與 mountpoint 依資料目錄調整；
 # 門檻（10%、50ms、0.1、0.25 …）都是例子。node-mixin 的預設 selector 是 job="node"，job 名稱不同時它的規則全部回傳空。
 groups:
@@ -179,19 +181,28 @@ groups:
   - name: container-resources
     rules:
       - alert: ContainerMemoryNearLimit
+        # kubelet 的 /metrics/cadvisor 有 container label；獨立 cAdvisor 沒有，只有 id（與 docker factory 能用時的 name），
+        # 所以第二段用 id 選 Docker 容器的 cgroup（lab/host 實測）。
         expr: |
-          container_memory_working_set_bytes{job=~".*(cadvisor|kubelet).*", container!=""}
-          / (container_spec_memory_limit_bytes{job=~".*(cadvisor|kubelet).*", container!=""} > 0) > 0.9
+          (
+            container_memory_working_set_bytes{job=~".*(cadvisor|kubelet).*", container!=""}
+            / (container_spec_memory_limit_bytes{job=~".*(cadvisor|kubelet).*", container!=""} > 0)
+          or
+            container_memory_working_set_bytes{job=~".*cadvisor.*", container="", id=~"/docker/.+|/system.slice/docker-.+"}
+            / (container_spec_memory_limit_bytes{job=~".*cadvisor.*", container="", id=~"/docker/.+|/system.slice/docker-.+"} > 0)
+          ) > 0.9
         for: 5m
         labels: { severity: warning, component: host, tier: "1", scope: container }
         annotations:
-          summary: "{{ $labels.container }} 的 working set 到 memory limit 的 90%；到 100% 會被 cgroup OOM kill"
+          summary: "{{ or $labels.container $labels.name $labels.id }} 的 working set 到 memory limit 的 90%；到 100% 會被 cgroup OOM kill"
           runbook_url: https://hahasula.github.io/alert-trust/components/host/#container-memory-limit
       - alert: ContainerOOMEvent
-        expr: increase(container_oom_events_total{job=~".*(cadvisor|kubelet).*", container!=""}[10m]) > 0
+        expr: |
+          increase(container_oom_events_total{job=~".*(cadvisor|kubelet).*", container!=""}[10m]) > 0
+          or increase(container_oom_events_total{job=~".*cadvisor.*", container="", id=~"/docker/.+|/system.slice/docker-.+"}[10m]) > 0
         labels: { severity: warning, component: host, tier: "1", scope: container }
         annotations:
-          summary: "{{ $labels.container }} 在 10 分鐘內發生 OOM"
+          summary: "{{ or $labels.container $labels.name $labels.id }} 在 10 分鐘內發生 OOM"
           runbook_url: https://hahasula.github.io/alert-trust/components/host/#oom-kills
       - alert: ContainerOOMKilled
         expr: |
@@ -203,10 +214,15 @@ groups:
           runbook_url: https://hahasula.github.io/alert-trust/components/host/#oom-kills
       - alert: ContainerCPUThrottled
         expr: |
-          rate(container_cpu_cfs_throttled_periods_total{job=~".*(cadvisor|kubelet).*", container!=""}[5m])
-          / rate(container_cpu_cfs_periods_total{job=~".*(cadvisor|kubelet).*", container!=""}[5m]) > 0.25
+          (
+            rate(container_cpu_cfs_throttled_periods_total{job=~".*(cadvisor|kubelet).*", container!=""}[5m])
+            / rate(container_cpu_cfs_periods_total{job=~".*(cadvisor|kubelet).*", container!=""}[5m])
+          or
+            rate(container_cpu_cfs_throttled_periods_total{job=~".*cadvisor.*", container="", id=~"/docker/.+|/system.slice/docker-.+"}[5m])
+            / rate(container_cpu_cfs_periods_total{job=~".*cadvisor.*", container="", id=~"/docker/.+|/system.slice/docker-.+"}[5m])
+          ) > 0.25
         for: 15m
         labels: { severity: warning, component: host, tier: "2", scope: container }
         annotations:
-          summary: "{{ $labels.container }} 超過 25% 的 CFS 週期被節流；平均 CPU 用量看起來不高也會發生"
+          summary: "{{ or $labels.container $labels.name $labels.id }} 超過 25% 的 CFS 週期被節流；平均 CPU 用量看起來不高也會發生"
           runbook_url: https://hahasula.github.io/alert-trust/components/host/#container-cpu-throttling

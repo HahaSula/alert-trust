@@ -1,0 +1,86 @@
+# alert-trust host card lab: cAdvisor + node_exporter + Prometheus, no privileged containers.
+name: at-host
+services:
+  prometheus:
+    image: prom/prometheus:v3.13.5
+    container_name: at-host-prometheus
+    ports: ["34090:9090"]
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../../rules/host/meta.yml:/etc/prometheus/rules/meta.yml:ro
+    mem_limit: 200m
+
+  node-exporter:
+    image: prom/node-exporter:v1.12.1
+    container_name: at-host-node-exporter
+    # No host /proc or rootfs: the filesystem collector reads this container's own mount table,
+    # /proc/vmstat (oom_kill) is not namespaced, so it shows the (Docker VM) kernel counter.
+    ports: ["34091:9100"]
+    volumes:
+      - rodata:/data-ro:ro     # scenario 3: read-only at mount time
+      - rwdata:/data-rw        # control: same fs type, read-write
+    mem_limit: 64m
+
+  cadvisor:
+    image: ghcr.io/google/cadvisor:v0.60.6
+    container_name: at-host-cadvisor
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=5s
+      - --store_container_labels=false
+      # Docker Desktop (WSL2): the docker factory needs containerd's socket, which is not reachable
+      # from a container, so cgroups under /docker/ are collected by the raw factory (label id only).
+      - --raw_cgroup_prefix_whitelist=/docker/
+    ports: ["34092:8080"]
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    # Host cgroup namespace (not privileged): /sys/fs/cgroup then shows /docker/<id> for every container.
+    # Bind-mounting /sys on Docker Desktop shows the WSL distro's cgroup tree, without the containers.
+    cgroup: host
+    devices:
+      - /dev/kmsg   # oomparser reads OOM kills from the kernel log; device only, not privileged
+    mem_limit: 150m
+
+  memhog:
+    image: python:3.12.7-alpine
+    container_name: at-host-memhog
+    mem_limit: 64m
+    memswap_limit: 64m
+    environment:
+      STEPS: "55:150,60:480"
+    volumes: ["./memhog.py:/memhog.py:ro"]
+    command: ["python3", "-u", "/memhog.py"]
+    profiles: ["mem"]
+
+  memhog2:
+    # second run: hold anon memory at 61 MiB (0.95 of the limit), see README "scenario 1"
+    image: python:3.12.7-alpine
+    container_name: at-host-memhog2
+    mem_limit: 64m
+    memswap_limit: 64m
+    environment:
+      STEPS: "61:420"
+      MEASURE: anon
+    volumes: ["./memhog.py:/memhog.py:ro"]
+    command: ["python3", "-u", "/memhog.py"]
+    profiles: ["mem2"]
+
+  oomhog:
+    image: python:3.12.7-alpine
+    container_name: at-host-oomhog
+    mem_limit: 64m
+    memswap_limit: 64m
+    environment:
+      STEPS: "100:60"
+      CHUNK_MB: "2"
+      SLEEP: "0.2"
+    volumes: ["./memhog.py:/memhog.py:ro"]
+    command: ["python3", "-u", "/memhog.py"]
+    restart: "on-failure:2"
+    profiles: ["oom"]
+
+volumes:
+  rodata:
+  rwdata:
