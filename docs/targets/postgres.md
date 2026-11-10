@@ -183,6 +183,10 @@ slot 一旦 lost，`restart_lsn` 變 NULL，保留量相關的 series 跟著消�
 | cache hit | `pg_stat_database.blks_hit／blks_read` | `pg_stat_database_blks_*` | 開 | 只算 shared_buffers | <span class="at-chip at-ev-tested">實測</span> |
 | temp file | `pg_stat_database.temp_files／temp_bytes` | `pg_stat_database_temp_*` | 開 | 暫存檔刪除時才計入[^pg-trace-pg17-temp-call] | <span class="at-chip at-ev-tested">實測</span> |
 | checkpoint 壓力 | ≤16 `pg_stat_bgwriter`；17 `pg_stat_checkpointer`[^pg-src-bgwriter16][^pg-src-checkpointer-view] | ≤16 `pg_stat_bgwriter_checkpoints_*`（stat_bgwriter）；17 `pg_stat_checkpointer_num_*`（stat_checkpointer）[^pg-c-bgwriter-17][^pg-c-checkpointer-17] | 開／**關** | 17 起換 collector | <span class="at-chip at-ev-tested">實測</span> |
+| autovacuum worker 全滿 | `pg_stat_activity.backend_type`、`autovacuum_max_workers` | `pg_stat_activity_count{backend_type="autovacuum worker"}`、`pg_settings_autovacuum_max_workers`[^res-pe-activity-labels][^res-pg-av-report-activity]；1 小時平均 ≥ 90%（例子，PostgresAutovacuumWorkersFull） | 開 | 要看得到其他角色的行程 | <span class="at-chip at-ev-code">讀碼</span> |
+| backend 自己 fsync、checkpoint sync 時間 | ≤16 `pg_stat_bgwriter.buffers_backend_fsync`、`checkpoint_sync_time`；17 `pg_stat_checkpointer.sync_time` | `pg_stat_bgwriter_buffers_backend_fsync_total`[^res-pe-backend-fsync][^res-pg16-backend-fsync]、`pg_stat_bgwriter_checkpoint_sync_time_total`[^res-pe-ckpt-sync]、`pg_stat_checkpointer_sync_time_total`[^res-pe-checkpointer-sync]（PostgresBackendFsync、PostgresCheckpointSyncSlow） | 開／**關** | backend fsync 17 起移除[^res-pe-bgwriter-17] | <span class="at-chip at-ev-code">讀碼</span> |
+
+CPU、記憶體、OOM kill 與磁碟延遲 postgres_exporter 都沒有，已由 [主機與容器資源](../components/host.md) 補上（規則只讀碼，host lab 之後排程）。
 
 重點：
 
@@ -456,7 +460,8 @@ postgres_exporter v0.20.1。「預設」指沒有加 `--collector.<name>` 或 `-
 | `last_failed_wal`、`.ready` 檔數 | archive 卡在哪個檔、積了多少 | 自訂查詢 `pg_stat_archiver`；或看 log |
 | 失效索引、checksum 失敗 | 查詢計畫錯誤、資料損毀 | 自訂查詢 `pg_index WHERE NOT indisvalid`、`pg_stat_database.checksum_failures`；排程 amcheck |
 | timeline | 判斷誰是新主庫、是否分岔 | 自訂查詢 `pg_control_checkpoint()` |
-| 磁碟剩餘空間 | WAL 寫滿就停機 | node_exporter 的 `node_filesystem_avail_bytes`（`PostgresDataDiskFullSoon`） |
+| 磁碟剩餘空間、唯讀 | WAL 寫滿就停機 | node_exporter 的 `node_filesystem_avail_bytes`（`PostgresDataDiskFullSoon`）；已由 [主機與容器資源](../components/host.md) 補上（規則只讀碼，host lab 之後排程） |
+| 行程 CPU、記憶體、OOM kill、fsync 延遲 | exporter 都沒有；17 起連 backend fsync 也沒有 | 已由 [主機與容器資源](../components/host.md) 補上（規則只讀碼，host lab 之後排程）；OOM 的原因（哪個查詢）只在 server log |
 | `archive_mode`、`archive_command` | 關掉 archive 時看起來和剛啟動一樣 | 盤點時 `SHOW archive_mode`；或自訂查詢輸出 0／1 |
 | `sessions_fatal`／`sessions_killed`／`sessions_abandoned` | 連線被斷、認證後失敗的次數 | 自訂查詢 `pg_stat_database`（14 起） |
 | SQL 錯誤數 | 沒有任何 view 計數 | log 管線計數（VictoriaLogs、mtail） |

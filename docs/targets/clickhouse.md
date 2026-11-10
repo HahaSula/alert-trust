@@ -181,6 +181,7 @@ lab：每個使用者上限 2 時同時送 3 個 `sleep(2)`，第 3 個 0.02 秒
 |---|---|---|
 | part 數 {#parts-pressure} | `MaxPartCountForPartition / parts_to_delay_insert` > 0.5（設定值用 SQL 查）；備援 `MaxPartCountForPartition` > 300；`DelayedInserts` 增加 | <span class="at-chip at-ev-tested">實測</span>[^ch-sam-maxparts][^ch-mt-delay] |
 | 記憶體 {#memory} | `MemoryTracking / (CGroupMemoryTotal 或 OSMemoryTotal)` > 0.8；`MEMORY_LIMIT_EXCEEDED` 增加 | <span class="at-chip at-ev-tested">實測</span>[^ch-cm-memtracking][^ch-mem-exceeded] |
+| global thread pool | `GlobalThreadActive` / `max_thread_pool_size` 或 `GlobalThreadScheduled` / `thread_pool_queue_size` > 0.9（預設都是 10000，寫在 clickhouse-params）；`CANNOT_SCHEDULE_TASK` 增加（CHGlobalThreadPoolNearMax、CHThreadPoolScheduleFailed） | <span class="at-chip at-ev-code">讀碼</span>[^res-ch-global-pool-metrics][^res-ch-pool-queue-wait][^res-ch-cannot-schedule] |
 
 **Too many parts。**lab 把門檻調成 20／40、兩台 `SYSTEM STOP MERGES`，逐筆 insert 45 次（`async_insert=0`），用了 14 秒（主機）：第 21–39 筆被延遲（`DelayedInserts` 20、`DelayedInsertsMilliseconds` 10,500，每筆最多 `max_delay_to_insert` 1 秒），第 40 筆起被拒（`Too many parts (40 ...)`，`RejectedInserts` 6、`TOO_MANY_PARTS` 6）。`MaxPartCountForPartition` 兩台都是 40（ch2 是複寫過去的）。CHInsertsDelayed、CHInsertsRejected 在 25 秒內 firing。<span class="at-chip at-ev-tested">實測</span>[^ch-exp-raw][^ch-mt-max-delay]
 
@@ -240,7 +241,8 @@ lab 的 `background_pool_size` 是 1（容器 CPU 少），正式環境預設是
 | 端到端能不能寫入 | 資料庫本身沒提供 | 外部 SQL probe 定期寫一列到測試用的 Replicated 表並讀回 |
 | 哪一條查詢造成負載 | 資料庫有、`/metrics` 沒輸出 | `system.query_log`、`system.processes`（未實測） |
 | TLS 憑證到期 | 資料庫本身沒提供 | blackbox 的 `probe_ssl_earliest_cert_expiry` |
-| 慢磁碟、磁碟滿、Keeper 慢 | 沒有實驗 | 規則只讀碼；node_exporter 看磁碟延遲 |
+| 慢磁碟、磁碟滿、唯讀 | 要靠其他元件 | CHDiskSpaceLow；已由 [主機與容器資源](../components/host.md) 補上（規則只讀碼，host lab 之後排程） |
+| Keeper 慢、ON CLUSTER DDL 佇列卡住 | 沒有實驗；主機層補不了 | CHKeeperRequestsBacklog；`system.distributed_ddl_queue`（未實測） |
 
 ## 實驗 {#lab}
 

@@ -392,6 +392,23 @@ signals:
     upstream: { status: no, note: "Altinity 沒有記憶體上限的規則" }
     rules: [rules/targets/clickhouse.yml#CHMemoryNearLimit, rules/targets/clickhouse.yml#CHQueriesHitMemoryLimit]
 
+  - id: global-thread-pool
+    aspect: saturation
+    tier: 2
+    question: global thread pool 接近上限、有 task 排不進去嗎
+    signal: >-
+      GlobalThreadActive / max_thread_pool_size > 0.9 或 GlobalThreadScheduled / thread_pool_queue_size > 0.9（兩個預設都是 10000，例子）；
+      CANNOT_SCHEDULE_TASK 增加。排程的 job 數到 queue size 時新 task 等待或逾時，排不進去或開不了 thread 時丟 CANNOT_SCHEDULE_TASK。
+      /metrics 沒有設定值，規則用 clickhouse-params 的 recording rule 寫死預設值；設了 max_thread_pool_size 時要改
+    metrics: [ClickHouseMetrics_GlobalThreadActive, ClickHouseMetrics_GlobalThreadScheduled, ClickHouseMetrics_GlobalThread, ClickHouseErrorMetric_CANNOT_SCHEDULE_TASK]
+    evaluate_on: self
+    silent_failure: CANNOT_SCHEDULE_TASK 也包含 local pool 與開 thread 失敗（例如 pids cgroup 上限），不全是 global pool 滿
+    evidence: code
+    source: ch-core
+    refs: [res-ch-globalthread, res-ch-globalthread-active, res-ch-globalthread-scheduled, res-ch-global-pool-metrics, res-ch-max-thread-pool, res-ch-thread-pool-queue-size, res-ch-pool-queue-wait, res-ch-cannot-schedule, ch-exp-names]
+    upstream: { status: no, note: "Altinity release-0.27.4 的 ClickHouse 規則沒有 global thread pool 的規則" }
+    rules: [rules/targets/clickhouse.yml#CHGlobalThreadPoolNearMax, rules/targets/clickhouse.yml#CHThreadPoolScheduleFailed]
+
   # ---------- 工作量 ----------
   - id: failed-queries
     aspect: workload
@@ -598,8 +615,19 @@ blind_spots:
     why: /metrics 沒有憑證到期的 metric
     workaround: blackbox 的 tls module 探 https_port、tcp_port_secure 的 probe_ssl_earliest_cert_expiry
     section: targets/clickhouse.md#blind-spots
-  - what: 慢磁碟、磁碟滿、Keeper 慢、ON CLUSTER DDL 佇列卡住
+  - what: 慢磁碟、磁碟滿、檔案系統唯讀
     category: other
-    why: lab 沒有重現；規則只讀碼
-    workaround: CHDataErrors、CHDiskSpaceLow、CHKeeperRequestsBacklog；node_exporter 的磁碟延遲；ON CLUSTER DDL 看 system.distributed_ddl_queue（未實測）
+    why: /metrics 沒有 fsync 或每次 IO 的延遲，只有 OSIOWaitTimeNormalized；lab 沒有重現
+    workaround: 原生的 CHDiskSpaceLow 看 ClickHouse 自己的磁碟；node_exporter 的磁碟延遲與唯讀。主機層規則只讀碼，host lab 之後排程
+    section: targets/clickhouse.md#blind-spots
+    covered_by:
+      tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"
+      config: rules/host/meta.yml
+      metrics: [node_filesystem_avail_bytes, node_filesystem_size_bytes, node_filesystem_files_free, node_filesystem_readonly, node_disk_write_time_seconds_total, node_disk_writes_completed_total, node_disk_read_time_seconds_total, node_disk_reads_completed_total, node_pressure_io_stalled_seconds_total]
+      rules: [HostFilesystemAlmostFull, HostFilesystemFillingUp, HostInodesAlmostFull, HostFilesystemReadOnly, HostDiskWriteLatencyHigh, HostDiskReadLatencyHigh, HostIOPressure, CHDiskSpaceLow]
+      refs: [res-nm-fs-filling, res-nm-fs-almost, res-nm-files, res-ne-fs-readonly, res-nm-fs-readonly, pg-asp-ne-avail, pg-asp-ne-size, res-ne-disk-writetime, res-ne-disk-writes, res-ne-disk-readtime, res-ne-disk-reads, res-ne-psi-io, res-ch-iowait]
+  - what: Keeper 慢、ON CLUSTER DDL 佇列卡住
+    category: other
+    why: 主機層補不了：Keeper 慢要看 Keeper 自己的 metric（CHKeeperRequestsBacklog 只看排隊數），DDL 佇列在 system.distributed_ddl_queue，本卡沒有對應的 metric。lab 沒有重現，規則只讀碼
+    workaround: CHKeeperRequestsBacklog、CHDataErrors；ON CLUSTER DDL 看 system.distributed_ddl_queue（未實測）
     section: targets/clickhouse.md#blind-spots

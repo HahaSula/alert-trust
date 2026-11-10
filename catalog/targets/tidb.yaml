@@ -373,6 +373,54 @@ signals:
     upstream: { status: yes, note: "PD_tidb_handle_requests_duration（在 pd.rules.yml，評估的是 TiDB 的 metric）" }
     rules: [rules/targets/tidb.yml#TiDBTsoWaitSlow]
 
+  - id: pending-compaction
+    aspect: saturation
+    tier: 2
+    question: TiKV 待 compaction 的量接近 soft limit 了嗎
+    signal: >-
+      tikv_engine_pending_compaction_bytes{db="kv"} / tikv_config_rocksdb{name="soft_pending_compaction_bytes_limit"}（依 cf 對齊）> 0.5，for 15m（例子）。
+      soft limit 預設 192GiB；flow control 開著（預設）時 CF 的值會被壓到不超過 storage.flow-control 的 soft limit，
+      所以這個比例是到「開始限流」為止的保守估計。write-stall 是到了之後的結果，這條在之前先響
+    metrics: [tikv_engine_pending_compaction_bytes, tikv_config_rocksdb]
+    evaluate_on: self
+    evidence: code
+    source: tidb-tikv
+    refs: [res-tikv-pending-compaction, res-tikv-pending-compaction-labels, res-tikv-kv-db-label, res-tikv-config-rocksdb, res-tikv-soft-pending, res-tikv-soft-pending-clamp]
+    upstream: { status: no, note: "TiKV 官方規則（v8.5.8 tikv.rules.yml）沒有 pending compaction 的規則，只有事後的 TiKV_write_stall" }
+    rules: [rules/targets/tidb.yml#TiKVPendingCompactionNearSoftLimit]
+
+  - id: cpu-quota
+    aspect: saturation
+    tier: 2
+    question: TiKV 的 CPU 用量接近 quota 了嗎
+    signal: >-
+      rate(process_cpu_seconds_total{job="tikv"}[5m]) / tikv_server_cpu_cores_quota > 0.8，for 10m（例子）。quota 是主機核數、cpuset 與 cgroup CPU quota 的最小值，
+      quota 改變時會更新。TiKV 的 process_cpu_seconds_total 是整數秒，視窗要夠長；官方規則用 irate[30s]。
+      容器內被節流的時間要另看主機層的 container-cpu-throttling
+    metrics: [process_cpu_seconds_total, tikv_server_cpu_cores_quota]
+    evaluate_on: self
+    evidence: code
+    source: tidb-tikv
+    refs: [res-tikv-process-cpu, res-tikv-process-cpu-int, res-tikv-cpu-quota, res-tikv-cpu-quota-cgroup, res-tikv-cpu-quota-refresh, res-tikv-rule-cpu-quota]
+    upstream: { status: yes, note: "TiKV_cpu_quota：irate(process_cpu_seconds_total{job=\"tikv\"}[30s]) / tikv_server_cpu_cores_quota > 0.8，for 45s" }
+    rules: [rules/targets/tidb.yml#TiKVCPUNearQuota]
+
+  - id: channel-full
+    aspect: saturation
+    tier: 2
+    question: raftstore／apply 的 FSM mailbox 滿了嗎
+    signal: >-
+      sum by (instance, type) (rate(tikv_channel_full_total[10m])) > 0。訊息送不進 FSM mailbox（type="normal" 是 region 的 FSM，"control" 是 store 的）；
+      raftstore 與 apply 共用同一個 batch-system，label 分不出是哪一個
+    metrics: [tikv_channel_full_total]
+    evaluate_on: self
+    silent_failure: counter 第一次增加前不會出現在 /metrics（lab 的名稱清單沒有它），所以不能用 absent 判斷 metric 是否正常
+    evidence: code
+    source: tidb-tikv
+    refs: [res-tikv-channel-full, res-tikv-channel-full-normal, res-tikv-rule-channel-full, tidb-exp-names]
+    upstream: { status: yes, note: "TiKV_channel_full_total：sum(rate(tikv_channel_full_total[10m])) by (type, instance) > 0，for 1m" }
+    rules: [rules/targets/tidb.yml#TiKVChannelFull]
+
   # ---------- 工作量 ----------
   - id: query-errors
     aspect: workload
@@ -559,7 +607,13 @@ blind_spots:
     workaround: TiDBPDLeaderMetricsMissing 讓「看不到」本身會響；必要時用 pd-ctl 或 /pd/api/v1/stores 查
     section: targets/tidb.md#cluster
   - what: 時鐘偏移
-    category: database
+    category: other
     why: PD 只在 leader 的系統時間往回跳時記 pd_tso_events{type="system_time_slow"}；TiKV、TiDB 之間的時鐘差沒有 metric
-    workaround: node_exporter 的 node_timex_offset_seconds
+    workaround: node_exporter 的 node_timex_offset_seconds、node_timex_sync_status（每台對自己的時間來源；兩台之間的差最多是兩台 offset 相加）。主機層規則只讀碼，host lab 之後排程
     section: targets/tidb.md#blind-spots
+    covered_by:
+      tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"
+      config: rules/host/meta.yml
+      metrics: [node_timex_sync_status, node_timex_maxerror_seconds, node_timex_offset_seconds]
+      rules: [HostClockNotSynchronised, HostClockOffsetHigh]
+      refs: [res-ne-timex-sync, res-ne-timex-offset, res-nm-clock]

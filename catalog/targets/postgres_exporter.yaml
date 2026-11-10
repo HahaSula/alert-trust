@@ -430,6 +430,43 @@ signals:
     upstream: { status: partial, note: "mixin 與 awesome 的 TooManyCheckpointsRequested 只用 bgwriter 名稱，17 以上回傳空" }
     rules: [rules/targets/postgres.yml#PostgresCheckpointsMostlyRequested, rules/targets/postgres.yml#PostgresCheckpointMetricsMissing]
 
+  - id: autovacuum-workers-full
+    aspect: saturation
+    tier: 3
+    question: autovacuum worker 是不是一直全部在忙
+    signal: >-
+      sum(pg_stat_activity_count{backend_type="autovacuum worker"}) 對 pg_settings_autovacuum_max_workers（預設 3）的比例，1 小時平均 ≥ 0.9（例子）。
+      全滿時其他需要 vacuum 的表要排隊，結果在 autovacuum 與 wraparound 訊號慢慢出現；這條在結果之前先響。
+      pg_stat_activity_count 只算有 datname 與 state 的行程，autovacuum worker 處理每張表時回報 active，所以算得到。
+      exporter 帳號要能看到其他角色的行程（pg_monitor／pg_read_all_stats），否則數字偏低
+    metrics: [pg_stat_activity_count, pg_settings_autovacuum_max_workers]
+    evaluate_on: self
+    silent_failure: worker 在兩張表或兩個資料庫之間有空檔，scrape 剛好落在空檔時數字會掉；用 1 小時平均而不是 for
+    evidence: code
+    source: pg-exporter-collectors
+    refs: [res-pe-activity-labels, res-pe-activity-join, res-pg-av-report-activity, res-pg-av-workers]
+    upstream: { status: no, note: "postgres_mixin v0.20.1 沒有 worker 數的規則；TablesNotVaccumed 只看結果" }
+    rules: [rules/targets/postgres.yml#PostgresAutovacuumWorkersFull]
+
+  - id: backend-fsync
+    aspect: saturation
+    tier: 3
+    question: checkpoint 的 fsync 慢、或 backend 被迫自己 fsync 嗎
+    signal: >-
+      PostgreSQL 16 以下：increase(pg_stat_bgwriter_buffers_backend_fsync_total[10m]) > 0。checkpointer 的 fsync request 佇列滿時，
+      寫出資料頁的 backend 自己做 fsync，查詢延遲直接受磁碟影響。17 起這個欄位移除，只剩 checkpoint 的 sync 階段時間：
+      rate(pg_stat_bgwriter_checkpoint_sync_time_total) 或 rate(pg_stat_checkpointer_sync_time_total)（毫秒）換成秒後 > 0.1，
+      也就是 sync 階段佔掉 10% 以上的時間（例子）。磁碟本身的延遲看主機層的 disk-latency
+    metrics: [pg_stat_bgwriter_buffers_backend_fsync_total, pg_stat_bgwriter_checkpoint_sync_time_total, pg_stat_checkpointer_sync_time_total]
+    evaluate_on: self
+    applies_when: "PostgreSQL 17 以上要打開 --collector.stat_checkpointer"
+    silent_failure: 17 以上沒開 stat_checkpointer 時兩個 sync 時間都不存在，規則回傳空（由 PostgresCheckpointMetricsMissing 補位）；backend fsync 在 17 以上永遠不存在
+    evidence: code
+    source: pg-exporter-collectors
+    refs: [res-pe-backend-fsync, res-pe-bgwriter-17, res-pe-ckpt-sync, res-pe-checkpointer-sync, res-pe-checkpointer-off, res-pg16-backend-fsync]
+    upstream: { status: no, note: "postgres_mixin v0.20.1 只有 TooManyCheckpointsRequested，沒有 fsync 或 sync time 的規則" }
+    rules: [rules/targets/postgres.yml#PostgresBackendFsync, rules/targets/postgres.yml#PostgresCheckpointSyncSlow]
+
   - id: autovacuum
     aspect: maintenance
     tier: 3
@@ -1106,11 +1143,33 @@ blind_spots:
     why: 核心 PostgreSQL 沒有共識機制
     workaround: Patroni 的 `/metrics`（`patroni-cluster` 規則組）
     section: targets/postgres.md#cluster
-  - what: 磁碟剩餘空間
+  - what: 磁碟剩餘空間、檔案系統唯讀
     category: other
-    why: 不在資料庫裡；WAL 寫滿就停機
-    workaround: node_exporter 的 `node_filesystem_avail_bytes`
+    why: 不在資料庫裡；WAL 寫滿就停機，唯讀時寫入失敗但空間看起來正常
+    workaround: node_exporter 的 `node_filesystem_avail_bytes`、`node_filesystem_readonly`；本卡的 PostgresDataDiskFullSoon 指定資料目錄的 mountpoint。主機層規則只讀碼，host lab 之後排程
     section: targets/postgres.md#capacity
+    covered_by:
+      tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"
+      config: rules/host/meta.yml
+      metrics: [node_filesystem_avail_bytes, node_filesystem_size_bytes, node_filesystem_files_free, node_filesystem_readonly]
+      rules: [HostFilesystemAlmostFull, HostFilesystemFillingUp, HostInodesAlmostFull, HostFilesystemReadOnly, PostgresDataDiskFullSoon, PostgresDataDiskNotMonitored]
+      refs: [res-nm-fs-filling, res-nm-fs-almost, res-nm-files, res-ne-fs-readonly, res-nm-fs-readonly, pg-asp-ne-avail, pg-asp-ne-size]
+  - what: 行程 CPU、記憶體與 swap、OOM kill、fsync／磁碟延遲
+    category: other
+    why: postgres_exporter 沒有行程 CPU，也沒有 fsync 延遲（PG 17 起連 buffers_backend_fsync 都沒有）；OOM kill 在資料庫裡只看得到 postmaster 重啟所有 backend
+    workaround: node_exporter 的 PSI、MemAvailable、vmstat 與磁碟時間；容器用 cAdvisor 的節流、working set 與 OOM 事件。主機層規則只讀碼，host lab 之後排程
+    section: targets/postgres.md#saturation
+    covered_by:
+      tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"
+      config: rules/host/meta.yml
+      metrics: [node_pressure_cpu_waiting_seconds_total, container_cpu_cfs_throttled_periods_total, container_cpu_cfs_periods_total, node_memory_MemAvailable_bytes, node_pressure_memory_stalled_seconds_total, node_vmstat_pswpin, node_vmstat_oom_kill, node_disk_write_time_seconds_total, node_disk_writes_completed_total]
+      rules: [HostCPUPressure, ContainerCPUThrottled, HostMemoryLow, HostMemoryPressure, HostSwapping, ContainerMemoryNearLimit, HostOOMKill, ContainerOOMEvent, ContainerOOMKilled, HostDiskWriteLatencyHigh, HostDiskReadLatencyHigh, HostIOPressure]
+      refs: [res-ne-psi-cpu, res-cadv-throttled, res-cadv-periods, res-km-throttling, res-ne-mem-avail, res-ne-psi-mem, res-ne-vmstat-fields, res-cadv-wss, res-cadv-wss-calc, res-cadv-memlimit, res-ne-vmstat-fields, res-cadv-oom, res-ksm-terminated, res-ksm-restarts, res-ne-disk-writetime, res-ne-disk-writes, res-ne-disk-readtime, res-ne-disk-reads, res-ne-psi-io]
+  - what: OOM kill 的原因（哪一條連線的 work_mem、哪個查詢）
+    category: database
+    why: 主機層只知道「被 kill 了」；每條連線的 work_mem、hash 與 sort 用量沒有加總上限，被 kill 的 PID 與當時的查詢只在 server log，metric 沒有
+    workaround: log 管線抓 postmaster 的 "terminated by signal 9" 那一行與後面的查詢文字；cgroup 上限要留給 shared_buffers 以外的記憶體
+    section: targets/postgres.md#saturation
   - what: base backup 的新鮮度
     category: other
     why: 沒有備份時 archive 再正常也還原不了

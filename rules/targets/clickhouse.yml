@@ -28,6 +28,11 @@ groups:
       - record: clickhouse_expected_members
         expr: vector(3)
         labels: { role: keeper }
+      # max_thread_pool_size 與 thread_pool_queue_size 不在 /metrics；這裡寫預設值，有改設定時一起改
+      - record: clickhouse_max_thread_pool_size
+        expr: vector(10000)
+      - record: clickhouse_thread_pool_queue_size
+        expr: vector(10000)
 
   - name: clickhouse-endpoint
     rules:
@@ -355,6 +360,21 @@ groups:
         annotations:
           summary: "{{ $labels.instance }} 的 merge／mutation 背景池 30 分鐘都是滿的；merge 跟不上時 part 數會一直增加"
           runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#merge-pool
+      - alert: CHGlobalThreadPoolNearMax
+        expr: |
+          ClickHouseMetrics_GlobalThreadActive{job="clickhouse-server"} / on () group_left clickhouse_max_thread_pool_size > 0.9
+            or ClickHouseMetrics_GlobalThreadScheduled{job="clickhouse-server"} / on () group_left clickhouse_thread_pool_queue_size > 0.9
+        for: 5m
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: saturation }
+        annotations:
+          summary: "{{ $labels.instance }} 的 global thread pool 用到上限的 {{ $value | humanizePercentage }}（例子：90%；上限取 clickhouse-params 的預設值）；滿了之後新 task 等待或 CANNOT_SCHEDULE_TASK"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#global-thread-pool
+      - alert: CHThreadPoolScheduleFailed
+        expr: increase(ClickHouseErrorMetric_CANNOT_SCHEDULE_TASK{job="clickhouse-server"}[10m]) > 0
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: saturation }
+        annotations:
+          summary: "{{ $labels.instance }} 10 分鐘內有 {{ $value }} 次 CANNOT_SCHEDULE_TASK（thread pool 排不進去或開不了 thread，含 local pool 與 pids 上限）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#global-thread-pool
 
   - name: clickhouse-workload
     rules:

@@ -364,6 +364,21 @@ signals:
     upstream: { status: no }
     rules: [rules/targets/yugabytedb.yml#YBWalSyncSlow]
 
+  - id: rpc-queue-overflow
+    aspect: saturation
+    tier: 2
+    question: RPC 請求因為 service 佇列滿被丟掉了嗎
+    signal: >-
+      sum by (instance) (increase(rpcs_queue_overflow[10m])) > 0。佇列滿時請求直接回 SERVER_TOO_BUSY，client 端重試或失敗。
+      所有 service 共用一個計數；哪一個 service 的佇列長要看 rpcs_in_queue_<service>
+    metrics: [rpcs_queue_overflow, rpcs_timed_out_in_queue]
+    evaluate_on: self
+    evidence: code
+    source: yb-core
+    refs: [res-yb-queue-overflow, res-yb-overflow-shared, res-yb-overflow-incr, res-yb-svc-queue, yb-exp-names, res-yba-queues-overflow-deleted, res-yba-rpc-queue-size]
+    upstream: { status: no, note: "YBA 原本有 DB_QUEUES_OVERFLOW（rpcs_queue_overflow＋rpcs_timed_out_in_queue），已由 migration 刪除；現在只有 RPC_QUEUE_SIZE（佇列長度 > 30，預設不建立）" }
+    rules: [rules/targets/yugabytedb.yml#YBRpcQueueOverflow]
+
   # ---------- 工作量 ----------
   - id: connections
     aspect: workload
@@ -460,11 +475,17 @@ blind_spots:
     why: 要兩個叢集；YBA 的 REPLICATION_LAG、SAFETIME_LAG 用 tserver 的 xCluster metric（consumer_safe_time_lag），這次沒有實測
     workaround: 用到 xCluster 時另做訊號，至少抓 consumer 端的 safe time lag
     section: targets/yugabytedb.md#blind-spots
-  - what: 磁碟空間
+  - what: 磁碟空間、檔案系統唯讀
     category: other
     why: /prometheus-metrics 的 drive 類 metric 只有寫入量與 fsync 時間，沒有剩餘空間（lab 名稱清單）
-    workaround: node_exporter 的 node_filesystem_avail_bytes（YBA 的 NODE_DISK_USAGE 也是）
+    workaround: node_exporter 的 node_filesystem_avail_bytes（YBA 的 NODE_DISK_USAGE 也是）；mountpoint 要改成 fs_data_dirs。主機層規則只讀碼，host lab 之後排程
     section: targets/yugabytedb.md#capacity
+    covered_by:
+      tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"
+      config: rules/host/meta.yml
+      metrics: [node_filesystem_avail_bytes, node_filesystem_size_bytes, node_filesystem_files_free, node_filesystem_readonly]
+      rules: [HostFilesystemAlmostFull, HostFilesystemFillingUp, HostInodesAlmostFull, HostFilesystemReadOnly]
+      refs: [res-nm-fs-filling, res-nm-fs-almost, res-nm-files, res-ne-fs-readonly, res-nm-fs-readonly, pg-asp-ne-avail, pg-asp-ne-size]
   - what: SQL 層是否真的能執行交易（端到端）
     category: database
     why: /status 永遠 {}；tcp probe 在連線用完時仍成功；tablet leaderless 時 YSQL 照常接受連線，讀取 20 秒逾時（lab）
@@ -478,8 +499,14 @@ blind_spots:
   - what: 時鐘同步本身
     category: other
     why: hybrid_clock_skew 只在別台的 hybrid time 比我快時才有值；本機時鐘跳太多時 process 直接 FATAL，metric 來不及抓
-    workaround: node_exporter 的 node_timex_offset_seconds、node_timex_sync_status
+    workaround: node_exporter 的 node_timex_offset_seconds、node_timex_sync_status。主機層規則只讀碼，host lab 之後排程
     section: targets/yugabytedb.md#clock-skew
+    covered_by:
+      tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"
+      config: rules/host/meta.yml
+      metrics: [node_timex_sync_status, node_timex_maxerror_seconds, node_timex_offset_seconds]
+      rules: [HostClockNotSynchronised, HostClockOffsetHigh]
+      refs: [res-ne-timex-sync, res-ne-timex-offset, res-nm-clock]
   - what: TLS 憑證到期
     category: database
     why: /prometheus-metrics 沒有憑證到期的 metric；YBA 的 *_CERT_EXPIRY 用 YBA 健康檢查的 ybp_health_check_* metric

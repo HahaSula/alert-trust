@@ -556,11 +556,17 @@ blind_spots:
     why: 只有 warning log（apply request took too long），沒有依 key 或 client 的 metric
     workaround: log 管線（VictoriaLogs 等）計數 "apply request took too long"；Kubernetes 的 apiserver 端 metric
     section: targets/etcd.md#workload
-  - what: 磁碟剩餘空間
+  - what: 磁碟剩餘空間、檔案系統唯讀
     category: other
-    why: quota 只限制 DB 檔案；WAL 與 snapshot 檔也在 data-dir，磁碟滿的情況 quota 管不到（磁碟滿時的行為未驗證）
-    workaround: node_exporter 的 node_filesystem_avail_bytes
+    why: quota 只限制 DB 檔案；WAL 與 snapshot 檔也在 data-dir，磁碟滿的情況 quota 管不到（磁碟滿時 etcd 的行為未驗證）
+    workaround: node_exporter 的 node_filesystem_avail_bytes、node_filesystem_readonly；mountpoint 要改成 data-dir。主機層規則只讀碼，host lab 之後排程
     section: targets/etcd.md#capacity
+    covered_by:
+      tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"
+      config: rules/host/meta.yml
+      metrics: [node_filesystem_avail_bytes, node_filesystem_size_bytes, node_filesystem_files_free, node_filesystem_readonly]
+      rules: [HostFilesystemAlmostFull, HostFilesystemFillingUp, HostInodesAlmostFull, HostFilesystemReadOnly]
+      refs: [res-nm-fs-filling, res-nm-fs-almost, res-nm-files, res-ne-fs-readonly, res-nm-fs-readonly, pg-asp-ne-avail, pg-asp-ne-size]
   - what: 資料損毀
     category: database
     why: CompactHashCheck、InitialCorruptCheck 預設關，--corrupt-check-time 預設 0；不開就沒有任何檢查

@@ -129,6 +129,9 @@ exporter 在 INFO 有 `cluster_enabled:1` 時送 `CLUSTER INFO`，`cluster_` 開
 | 連線 | `redis_connected_clients` ／ `redis_config_maxclients`、`redis_rejected_connections_total` | 額滿時 exporter 也被拒；實測額滿 15 秒期間兩個 metric 都沒有資料，結束後 rejected 一次跳到 21 | <span class="at-chip at-ev-tested">實測</span>[^vk-exp][^vk-maxclients-reject] |
 | 阻塞 | `redis_blocked_clients`、`redis_total_blocking_keys` | 一個 BLPOP：兩者都是 1；佇列型應用平常就有 | <span class="at-chip at-ev-tested">實測</span>[^vk-exp] |
 | 主執行緒 | `rate(redis_cpu_user_main_thread_seconds_total + …sys…)` | 接近 1 核就是上限；io-threads 只分擔網路 | <span class="at-chip at-ev-code">讀碼</span>[^vk-cfg-io-threads] |
+| output buffer 斷線 | `increase(redis_client_output_buffer_limit_disconnections_total[10m]) > 0`（ValkeyOutputBufferDisconnects） | 不分 client 類型，對照 `redis_mem_clients_slaves`；Redis 7.2 沒有這個欄位 | <span class="at-chip at-ev-code">讀碼</span>[^res-vk-cobl-incr][^res-rx-cobl] |
+
+swap、RSS 對 cgroup 上限與 OOM kill 不在 INFO 裡，已由 [主機與容器資源](../components/host.md) 補上（規則只讀碼，host lab 之後排程）；overcommit 與 THP 設定仍要盤點。
 
 ## 工作量 {#workload}
 
@@ -216,4 +219,5 @@ exporter 本身的訊號都在[元件卡](../components/redis_exporter.md)。和
 | Cluster 每個節點的 flags | exporter 沒輸出 | 每個節點都抓；或 script 跑 CLUSTER NODES | 未補，未實測 |
 | 熱 key | 資料庫沒提供 | `valkey-cli --hotkeys` 離峰時跑 | 未補 |
 | 主節點沒持久化又自動重啟 | 字串設定不輸出 | 盤點；`--include-config-metrics` | 盤點 |
-| overcommit、THP、swap、磁碟、備份 | 要靠其他元件 | node_exporter、cAdvisor、備份工具 | 其他元件 |
+| swap、RSS、OOM kill、磁碟空間 | 要靠其他元件 | node_exporter、cAdvisor | 已由 [主機與容器資源](../components/host.md) 補上（規則只讀碼，host lab 之後排程） |
+| overcommit、THP 設定、OOM 的原因、備份 | 要靠其他元件 | 盤點；備份工具 | 未補 |

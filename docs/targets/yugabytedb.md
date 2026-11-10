@@ -146,6 +146,7 @@ YSQL 連線上限 `ysql_max_connections` 是每台 tserver 各自的。lab（上
 | 記憶體 {#memory} | `mem_tracker_server / server_memory_soft_limit` > 0.9（例子）；記憶體壓力拒絕的增加量 | <span class="at-chip at-ev-tested">實測</span>（沒有觸發）[^yb-mem-soft][^yb-mem-leader-rej] |
 | write stall {#write-stall} | `majority_sst_files_rejections` 增加（`sst_files_hard_limit` 48）；`rocksdb_stall_micros` 的 rate | <span class="at-chip at-ev-code">讀碼</span>[^yb-sst-rej][^yb-sst-hard] |
 | WAL fsync {#wal-fsync} | `log_sync_latency` 平均 > 50ms（例子）；只有 sum／count | <span class="at-chip at-ev-code">讀碼</span>[^yb-log-sync][^yb-log-durable] |
+| RPC 佇列溢出 | `increase(rpcs_queue_overflow[10m])` > 0（YBRpcQueueOverflow）；所有 service 共用一個計數，請求回 SERVER_TOO_BUSY；YBA 已刪掉對應的 DB_QUEUES_OVERFLOW | <span class="at-chip at-ev-code">讀碼</span>[^res-yb-overflow-incr][^res-yba-queues-overflow-deleted] |
 
 **時鐘。**`hybrid_clock_skew` 是「最後的 hybrid time 比本機實體時鐘快多少」。超過 `max_clock_skew_usec`（500ms）而且有交易表的 tablet 已開啟時 `LOG(FATAL)`；關掉 `fail_on_out_of_range_clock_skew` 後只每秒寫 ERROR，超過 60 秒仍 FATAL。[^yb-clk-fatal][^yb-clk-fail-flag][^yb-clk-crash-bound][^yb-clk-enable]lab：第一次啟動用預設值，三台 tserver 同時 crash（skew 7 秒）；之後關掉 crash，每台有 2–26 行 ERROR，`max_over_time(hybrid_clock_skew[1h])` 全是 0。瞬間的 skew 在兩次 scrape 之間就被吸收，所以 YBClockSkew 只抓得到持續的偏移；時鐘同步本身要看 node_exporter 的 `node_timex_offset_seconds`。<span class="at-chip at-ev-tested">實測</span>[^yb-exp-clock][^yb-exp-raw]
 
@@ -203,8 +204,8 @@ YSQL 是 PostgreSQL 15 的查詢層（`PostgreSQL 15.12-YB-2026.1.3.0`），資�
 |---|---|---|
 | SQL 層是否真的能執行交易 | 資料庫本身沒提供 | 外部 SQL probe 定期讀寫測試表（YBA 的 DB_WRITE_READ_TEST_ERROR 就是這個做法）；tcp probe 在連線用完時仍成功 |
 | master leader 抓不到時的叢集狀態 | 元件有、只有 leader 輸出 | YBMasterLeaderMetricsMissing；`yb-admin` 或 `/api/v1/tablet-servers` |
-| 時鐘同步 | 要靠其他元件 | node_exporter 的 `node_timex_offset_seconds`、`node_timex_sync_status` |
-| 磁碟空間 | 要靠其他元件 | node_exporter 的 `node_filesystem_avail_bytes` |
+| 時鐘同步 | 要靠其他元件 | node_exporter 的 `node_timex_offset_seconds`、`node_timex_sync_status`；已由 [主機與容器資源](../components/host.md) 補上（規則只讀碼，host lab 之後排程） |
+| 磁碟空間、唯讀 | 要靠其他元件 | node_exporter 的 `node_filesystem_avail_bytes`；已由 [主機與容器資源](../components/host.md) 補上（規則只讀碼，host lab 之後排程） |
 | 備份與 PITR | 要靠其他元件 | 備份工作寫 textfile metric；定期還原 |
 | xCluster 延遲 | 要靠其他元件 | 沒有實測；用到時至少抓 consumer 端的 safe time lag |
 | 哪一條 SQL 造成負載 | 元件有、`/prometheus-metrics` 沒輸出 | pg_stat_statements、ASH 經 query-exporter 彙總（未實測） |

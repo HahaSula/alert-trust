@@ -194,7 +194,7 @@ etcd 的「複寫」是 raft log：leader 送 entry、過半寫入 WAL 才 commi
 | 每個 follower 的 raft 進度 | etcd 有、`/metrics` 沒輸出 | 比較各 member 的 applied（replication-lag） |
 | member 重啟後的 alarm 狀態 | etcd 有、`/metrics` 沒輸出（gauge 不重建） | 探 `/health`；定期 `etcdctl alarm list` |
 | 慢請求的 key 與 client | 資料庫本身沒提供 | log 管線計數 "apply request took too long" |
-| 磁碟剩餘空間 | 要靠其他元件 | node_exporter |
+| 磁碟剩餘空間、唯讀 | 要靠其他元件 | node_exporter；已由 [主機與容器資源](../components/host.md) 補上（規則只讀碼，host lab 之後排程）（磁碟滿時 etcd 的行為未驗證） |
 | 資料損毀 | 資料庫本身沒提供（檢查預設關） | 打開 CompactHashCheck |
 
 ## 實驗 {#lab}

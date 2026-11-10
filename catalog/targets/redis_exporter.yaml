@@ -386,6 +386,23 @@ signals:
     upstream: { status: no }
     rules: [rules/targets/valkey.yml#ValkeyMainThreadBusy]
 
+  - id: output-buffer-disconnects
+    aspect: saturation
+    tier: 2
+    question: 有 client 或複本因為 output buffer 超過上限被斷線嗎
+    signal: >-
+      increase(redis_client_output_buffer_limit_disconnections_total[10m]) > 0。超過 client-output-buffer-limit 的 client 被關閉；
+      複本被斷線後重新同步，buffer 太小時會一直全量同步。計數不分 client 類型（normal、replica、pubsub），
+      要對照 redis_mem_clients_slaves（複本的 buffer）與 redis_mem_clients_normal 判斷是哪一種
+    metrics: [redis_client_output_buffer_limit_disconnections_total, redis_mem_clients_slaves, redis_mem_clients_normal]
+    evaluate_on: self
+    silent_failure: Redis 7.2 的 INFO 沒有這個欄位，規則回傳空；7.2 只能看 full-resync 訊號
+    evidence: code
+    source: vk-valkey-src
+    refs: [res-vk-cobl-stat, res-vk-cobl-incr, res-vk-cfg-cobl, res-rx-cobl, res-rx-mem-replicas]
+    upstream: { status: no, note: "redis-mixin 的 6 條規則沒有 output buffer" }
+    rules: [rules/targets/valkey.yml#ValkeyOutputBufferDisconnects]
+
   # ---------- replication ----------
   - id: replication-link
     aspect: replication
@@ -657,16 +674,33 @@ blind_spots:
     why: save 與 appendonly 是設定字串，exporter 只輸出數字型設定；重啟後空資料會同步到所有複本
     workaround: 盤點時檢查；`--include-config-metrics` 會輸出 redis_config_key_value（含所有設定，基數高）
     section: targets/valkey.md#protection
-  - what: 記憶體 overcommit、THP、swap、RSS 上限
+  - what: swap、RSS 接近主機或 cgroup 上限、OOM kill
     category: other
-    why: 不在 INFO 裡；fork 失敗與延遲尖峰常來自這些
-    workaround: node_exporter（`node_memory_*`、`node_vmstat_*`）與 cAdvisor 的容器記憶體
+    why: 不在 INFO 裡；maxmemory 只限制資料，RSS 還有 fragmentation、client buffer 與 fork 的 copy-on-write
+    workaround: node_exporter（`node_memory_*`、`node_vmstat_*`）與 cAdvisor 的容器記憶體。主機層規則只讀碼，host lab 之後排程
     section: targets/valkey.md#saturation
-  - what: RDB／AOF 所在磁碟的剩餘空間
+    covered_by:
+      tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"
+      config: rules/host/meta.yml
+      metrics: [node_memory_MemAvailable_bytes, node_pressure_memory_stalled_seconds_total, node_vmstat_pswpin, node_vmstat_pswpout, container_memory_working_set_bytes, container_spec_memory_limit_bytes, node_vmstat_oom_kill, container_oom_events_total]
+      rules: [HostMemoryLow, HostMemoryPressure, HostSwapping, ContainerMemoryNearLimit, HostOOMKill, ContainerOOMEvent, ContainerOOMKilled]
+      refs: [res-ne-mem-avail, res-ne-psi-mem, res-ne-vmstat-fields, res-cadv-wss, res-cadv-wss-calc, res-cadv-memlimit, res-ne-vmstat-fields, res-cadv-oom, res-ksm-terminated, res-ksm-restarts]
+  - what: 記憶體 overcommit、THP 設定，以及 OOM 是誰造成的
+    category: other
+    why: vm.overcommit_memory 與 transparent_hugepage 不在 INFO 裡，主機層規則也沒有；fork 失敗與延遲尖峰常來自這些。主機層只知道行程被 kill，分不出是資料、client buffer 還是 fork 的 copy-on-write
+    workaround: 盤點時檢查 /proc/sys/vm/overcommit_memory 與 /sys/kernel/mm/transparent_hugepage/enabled；事後對照 redis_mem_clients_normal、redis_mem_clients_slaves 與 fork-latency 訊號
+    section: targets/valkey.md#saturation
+  - what: RDB／AOF 所在磁碟的剩餘空間、檔案系統唯讀
     category: other
     why: 不在 INFO 裡；寫滿時 BGSAVE 失敗、寫入被拒
-    workaround: node_exporter 的 `node_filesystem_avail_bytes`
+    workaround: node_exporter 的 `node_filesystem_avail_bytes`、`node_filesystem_readonly`；mountpoint 要改成資料目錄。主機層規則只讀碼，host lab 之後排程
     section: targets/valkey.md#protection
+    covered_by:
+      tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"
+      config: rules/host/meta.yml
+      metrics: [node_filesystem_avail_bytes, node_filesystem_size_bytes, node_filesystem_files_free, node_filesystem_readonly]
+      rules: [HostFilesystemAlmostFull, HostFilesystemFillingUp, HostInodesAlmostFull, HostFilesystemReadOnly]
+      refs: [res-nm-fs-filling, res-nm-fs-almost, res-nm-files, res-ne-fs-readonly, res-nm-fs-readonly, pg-asp-ne-avail, pg-asp-ne-size]
   - what: RDB 檔案有沒有被送到別處（備份）
     category: other
     why: rdb_last_save_time 只代表本機寫了檔案

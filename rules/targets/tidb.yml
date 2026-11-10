@@ -370,6 +370,33 @@ groups:
         annotations:
           summary: "TiDB {{ $labels.instance }} 等 TSO 的 p99 {{ $value }} 秒（例子）；PD leader 忙、網路慢，或 PD 正在換 leader"
           runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#tso-wait
+      - alert: TiKVPendingCompactionNearSoftLimit
+        expr: |
+          max by (job, instance, cf) (tikv_engine_pending_compaction_bytes{job="tikv", db="kv"})
+            / on (job, instance, cf)
+          (max by (job, instance, cf) (tikv_config_rocksdb{job="tikv", name="soft_pending_compaction_bytes_limit"}) > 0)
+            > 0.5
+        for: 15m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: saturation }
+        annotations:
+          summary: "TiKV {{ $labels.instance }} cf={{ $labels.cf }} 待 compaction 的量是 soft_pending_compaction_bytes_limit 的 {{ $value | humanizePercentage }}（例子：50%）；到上限時 flow control 開始限制寫入"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#pending-compaction
+      - alert: TiKVCPUNearQuota
+        expr: |
+          rate(process_cpu_seconds_total{job="tikv"}[5m])
+            / on (job, instance) tikv_server_cpu_cores_quota{job="tikv"} > 0.8
+        for: 10m
+        labels: { severity: warning, component: tidb, tier: "2", aspect: saturation }
+        annotations:
+          summary: "TiKV {{ $labels.instance }} 用掉 CPU quota 的 {{ $value | humanizePercentage }}（官方 TiKV_cpu_quota 的門檻 80%）；容器的節流另看主機層"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#cpu-quota
+      - alert: TiKVChannelFull
+        expr: sum by (job, instance, type) (rate(tikv_channel_full_total{job="tikv"}[10m])) > 0
+        for: 1m
+        labels: { severity: critical, component: tidb, tier: "2", aspect: saturation }
+        annotations:
+          summary: "TiKV {{ $labels.instance }} 的 {{ $labels.type }} FSM mailbox 滿了，訊息送不進 raftstore／apply（同官方 TiKV_channel_full_total）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#channel-full
 
   - name: tidb-workload
     rules:

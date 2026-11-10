@@ -216,6 +216,12 @@ groups:
         annotations:
           summary: "主執行緒用掉超過 0.9 核；指令都在這一條執行緒上跑，加 CPU 核心數不會變快（io-threads 只分擔網路讀寫）"
           runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#main-thread
+      - alert: ValkeyOutputBufferDisconnects
+        expr: increase(redis_client_output_buffer_limit_disconnections_total{job="valkey"}[10m]) > 0
+        labels: { severity: warning, component: redis_exporter, tier: "2", aspect: saturation }
+        annotations:
+          summary: "{{ $labels.instance }} 10 分鐘內有 {{ $value }} 個 client 因 output buffer 超過 client-output-buffer-limit 被斷線；是複本時會重新同步，對照 redis_mem_clients_slaves 與 full resync（Redis 7.2 沒有這個 metric）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#output-buffer-disconnects
 
   - name: valkey-replication
     rules:

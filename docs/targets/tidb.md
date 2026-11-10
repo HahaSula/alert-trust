@@ -140,6 +140,9 @@ TiKV 的複寫是每個 Region 一組 Raft（見[共識架構](../architecture/d
 | ServerIsBusy | TiDB 端 `tidb_tikvclient_region_err_total{type="server_is_busy"}`；TiKV latch 等待 p99 > 1 秒 | <span class="at-chip at-ev-code">讀碼</span>[^tikv-sched-too-busy][^cg-server-busy-label] |
 | 記憶體 | RSS / `tikv_server_memory_quota_bytes`（或 `tidb_server_memory_quota_bytes`）> 0.8；TiDB 超過 `tidb_server_memory_limit` 時取消最耗記憶體的 SQL，只寫 log | <span class="at-chip at-ev-tested">實測</span>（TiKV 映像）／<span class="at-chip at-ev-code">讀碼</span>[^tidb-memlimit-kill] |
 | TSO 等待 | `pd_client_cmd_handle_cmds_duration_seconds{type="wait"}` p99 > 0.1 秒（例子） | <span class="at-chip at-ev-tested">實測</span>：PD 恢復後 pending[^pdc-m-wait] |
+| compaction 待處理量 | `tikv_engine_pending_compaction_bytes{db="kv"}` / `tikv_config_rocksdb{name="soft_pending_compaction_bytes_limit"}` > 0.5（例子，TiKVPendingCompactionNearSoftLimit）；flow control 開著時 CF 的值不超過 flow control 的 soft limit | <span class="at-chip at-ev-code">讀碼</span>[^res-tikv-pending-compaction][^res-tikv-soft-pending-clamp] |
+| CPU quota | `rate(process_cpu_seconds_total[5m])` / `tikv_server_cpu_cores_quota` > 0.8（官方門檻，TiKVCPUNearQuota）；TiKV 的 CPU counter 是整數秒 | <span class="at-chip at-ev-code">讀碼</span>[^res-tikv-cpu-quota-cgroup][^res-tikv-process-cpu-int][^res-tikv-rule-cpu-quota] |
+| FSM mailbox 滿 | `rate(tikv_channel_full_total[10m])` > 0（同官方，TiKVChannelFull）；第一次發生前 metric 不存在 | <span class="at-chip at-ev-code">讀碼</span>[^res-tikv-channel-full-normal][^res-tikv-rule-channel-full] |
 
 **慢磁碟、write stall、熱點沒有實驗。**這台機器做不了輕量的慢磁碟或寫入壓力；這一節的門檻取自官方規則。熱點 region（PD 的 `pd_hotspot_*`）沒有做成規則，用 ServerIsBusy 與 raftstore 延遲當下游訊號。
 
@@ -187,7 +190,7 @@ log backup（PITR）的 checkpoint 是 `tidb_log_backup_last_checkpoint{task}`�
 | 熱點 region | 元件有、沒做成規則 | ServerIsBusy、raftstore 延遲；PD hot region API |
 | TiFlash、TiCDC、TiProxy | 要靠其他元件 | 不在這次範圍；至少加上它們的 `up` 與 absent。TiCDC 停住的 changefeed 也會擋住 GC safe point |
 | TLS 憑證到期 | 資料庫本身沒提供 | blackbox 的 `probe_ssl_earliest_cert_expiry` |
-| 時鐘偏移 | 資料庫本身沒提供（只有 PD leader 的 `system_time_slow`） | node_exporter 的 `node_timex_offset_seconds` |
+| 時鐘偏移 | 要靠其他元件（資料庫只有 PD leader 的 `system_time_slow`） | node_exporter 的 `node_timex_offset_seconds`；已由 [主機與容器資源](../components/host.md) 補上（規則只讀碼，host lab 之後排程） |
 
 ## 實驗 {#lab}
 

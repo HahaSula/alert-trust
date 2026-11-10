@@ -338,6 +338,12 @@ groups:
         annotations:
           summary: "{{ $labels.instance }} 的 Raft WAL fsync 平均 {{ $value }} 微秒（例子：50ms）；只是平均值（event_stats 沒有 bucket）。durable_wal_write 預設 false，WAL 依 interval_durable_wal_write_ms（1 秒）或 bytes_durable_wal_write_mb（1MB）才 fsync"
           runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#wal-fsync
+      - alert: YBRpcQueueOverflow
+        expr: sum by (job, instance) (increase(rpcs_queue_overflow{job=~"yb-master|yb-tserver|yb-ycql"}[10m])) > 0
+        labels: { severity: warning, component: yugabytedb, tier: "2", aspect: saturation }
+        annotations:
+          summary: "{{ $labels.job }} {{ $labels.instance }} 10 分鐘內有 {{ $value }} 個 RPC 因為 service 佇列滿被丟掉（回 SERVER_TOO_BUSY）；哪個 service 看 rpcs_in_queue_*"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#rpc-queue-overflow
 
   - name: yb-workload
     rules:

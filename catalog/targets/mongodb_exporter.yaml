@@ -550,10 +550,21 @@ blind_spots:
     why: MongoDB 沒有內建排程備份；Percona Backup for MongoDB 要 `--collector.pbm`，mongodump／檔案快照要自己的 metric
     workaround: "`--collector.pbm`（PMM 的 PBM 範本）或備份工具的 textfile"
     section: targets/mongodb.md#protection
-  - what: 主機記憶體、swap、磁碟 IOPS 與延遲
+  - what: 主機記憶體、swap、磁碟延遲、CPU、OOM kill
     category: other
     why: 不在 serverStatus 裡（`systemMetrics` 只在 Linux 的 FTDC 有一部分）；Atlas 的 IOPS、swap、steal 建議都是主機層
-    workaround: node_exporter 與 cAdvisor
+    workaround: node_exporter 與 cAdvisor。主機層規則只讀碼，host lab 之後排程
+    section: targets/mongodb.md#saturation
+    covered_by:
+      tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"
+      config: rules/host/meta.yml
+      metrics: [node_memory_MemAvailable_bytes, node_pressure_memory_stalled_seconds_total, node_vmstat_pswpin, node_vmstat_pswpout, container_memory_working_set_bytes, container_spec_memory_limit_bytes, node_disk_write_time_seconds_total, node_disk_writes_completed_total, node_disk_read_time_seconds_total, node_disk_reads_completed_total, node_pressure_io_stalled_seconds_total, node_pressure_cpu_waiting_seconds_total, node_vmstat_oom_kill, container_oom_events_total]
+      rules: [HostMemoryLow, HostMemoryPressure, HostSwapping, ContainerMemoryNearLimit, HostDiskWriteLatencyHigh, HostDiskReadLatencyHigh, HostIOPressure, HostCPUPressure, ContainerCPUThrottled, HostOOMKill, ContainerOOMEvent, ContainerOOMKilled]
+      refs: [res-ne-mem-avail, res-ne-psi-mem, res-ne-vmstat-fields, res-cadv-wss, res-cadv-wss-calc, res-cadv-memlimit, res-ne-disk-writetime, res-ne-disk-writes, res-ne-disk-readtime, res-ne-disk-reads, res-ne-psi-io, res-ne-psi-cpu, res-cadv-throttled, res-cadv-periods, res-km-throttling, res-ne-vmstat-fields, res-cadv-oom, res-ksm-terminated, res-ksm-restarts]
+  - what: 磁碟 IOPS 是否到雲端磁碟的配額、CPU steal
+    category: other
+    why: node_exporter 只看得到完成的 IO 數與時間，不知道雲端磁碟的 IOPS 上限；steal 有 node_cpu_seconds_total{mode="steal"}，主機層卡片沒有規則
+    workaround: 雲端供應商的磁碟 metric；steal 用 rate(node_cpu_seconds_total{mode="steal"}) 畫圖
     section: targets/mongodb.md#saturation
   - what: 憑證到期、版本漏洞
     category: other

@@ -168,5 +168,6 @@ TTL monitor 預設每 60 秒一輪（`ttlMonitorSleepSecs`），`mongodb_ss_metr
 | sharded cluster（mongos、balancer、chunk） | 要靠其他元件／未驗證 | 每個 shard member 與 mongos 各一個 exporter | 只讀碼 |
 | FTDC 涵蓋多久、在不在持久磁碟 | 資料庫沒提供 | 盤點 | 盤點 |
 | 備份成敗 | 要靠其他元件 | `--collector.pbm` 或備份工具 | 未補 |
-| 主機記憶體、swap、IOPS | 要靠其他元件 | node_exporter、cAdvisor | 其他元件 |
+| 主機記憶體、swap、磁碟延遲、CPU、OOM kill | 要靠其他元件 | node_exporter、cAdvisor | 已由 [主機與容器資源](../components/host.md) 補上（規則只讀碼，host lab 之後排程） |
+| 雲端磁碟的 IOPS 配額、CPU steal | 要靠其他元件 | 雲端供應商的 metric；steal 只畫圖 | 未補 |
 | 憑證到期、版本漏洞 | 要靠其他元件 | blackbox TLS、版本盤點 | 其他元件 |
