@@ -1,0 +1,14 @@
+# metric 來源確認（rule-review 第 2 步的產出；使用者回答 check_metric_sources.py 的問題後填寫）。
+# 複製成 env/<名稱>.sources.yaml；env/*.yaml 已在 .gitignore，不要 commit。下面的 job 名稱都是虛構的。
+
+# relabel_configs 或 honor_labels 會改寫 job 時：改寫之後實際存在的 job 名稱（完整列出）。
+job_names: [order-api, payment-api]
+
+# 一次回答一整個 exporter：目錄卡片 id → 產生它的 scrape job。
+producers:
+  mysqld_exporter: [mysql]
+  node_exporter: [node]
+
+# 個別 metric，例如應用程式自己的 metric 或卡片沒有列的 metric。
+metrics:
+  order_latency_seconds_bucket: { jobs: [order-api], note: "order-api 自己的 /metrics" }

@@ -1,58 +1,79 @@
-<svg viewBox="0 0 960 470" role="img" aria-label="rule-review 的四個步驟：確認監控體系、監控基礎設施的覆蓋、每條 rule 的時間契約、規則寫法；第二步和第三步之間有一道關卡：基礎設施的第一級缺口沒有處理時，時間契約的結論要加註">
+<svg viewBox="0 0 960 490" role="img" aria-label="rule-review 的五個步驟：確認監控體系、每個 metric 的來源、監控基礎設施的覆蓋、每條 rule 的時間契約、規則寫法；第三步和第四步之間有一道關卡：基礎設施的第一級缺口沒有處理時，時間契約的結論要加註">
 <defs><marker id="rr-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker></defs>
 <rect x="20" y="20" width="920" height="54" rx="8" class="b-node"/>
 <text x="40" y="43" class="lbl-b">輸入</text>
-<text x="40" y="62" class="lbl-s">使用者的 rule 檔（rule.yml、VMRule、PrometheusRule）；能連線時加上 ruler 的 URL；有外部觀察者時加上它的 rule 檔</text>
-<path d="M120 74 V100" class="arrow" marker-end="url(#rr-ah)"/>
-<rect x="20" y="104" width="210" height="250" rx="8" class="b-node-acc"/>
-<text x="36" y="130" class="lbl-b">1 · 確認監控體系</text>
-<text x="36" y="156" class="lbl-s">評估 rule 的是 Prometheus</text>
-<text x="36" y="174" class="lbl-s">還是 vmalert？版本？</text>
-<text x="36" y="198" class="lbl-s">資料來源：Prometheus scrape，</text>
-<text x="36" y="216" class="lbl-s">或 vmagent → VM／VL</text>
-<text x="36" y="240" class="lbl-s">有沒有外部觀察者？</text>
-<text x="36" y="258" class="lbl-s">告警走哪台 Alertmanager？</text>
-<text x="36" y="290" class="tk">先從檔案判斷，不行才問</text>
-<text x="36" y="330" class="t-ok">→ env/&lt;name&gt;.yaml</text>
-<path d="M230 229 H254" class="arrow" marker-end="url(#rr-ah)"/>
-<rect x="258" y="104" width="230" height="250" rx="8" class="b-node-acc"/>
-<text x="274" y="130" class="lbl-b">2 · 基礎設施的覆蓋</text>
-<text x="274" y="156" class="tk">rules_to_snapshot.py（離線）</text>
-<text x="274" y="174" class="tk">或 collect.py（連線，加 --live）</text>
-<text x="274" y="192" class="tk">→ check_coverage.py</text>
-<text x="274" y="220" class="lbl-s">先報第 1 級缺口，例如：</text>
-<text x="274" y="240" class="lbl-s">· scrape 耗時接近 scrape_interval</text>
-<text x="274" y="258" class="lbl-s">· rule group 跑不完／停止評估</text>
-<text x="274" y="276" class="lbl-s">· WAL 寫入失敗、送不到 AM</text>
-<text x="274" y="294" class="lbl-s">· Watchdog 與外部 DMS</text>
-<text x="274" y="312" class="lbl-s">· VM：查詢錯誤、partial、唯讀</text>
-<text x="274" y="340" class="t-ok">→ coverage.md／.json</text>
-<rect x="500" y="104" width="22" height="250" rx="4" class="b-node-bad"/>
-<text x="511" y="222" text-anchor="middle" class="t-bad">關</text>
-<text x="511" y="242" text-anchor="middle" class="t-bad">卡</text>
-<path d="M488 229 H498" class="arrow"/>
-<path d="M522 229 H542" class="arrow" marker-end="url(#rr-ah)"/>
-<rect x="546" y="104" width="200" height="250" rx="8" class="b-node"/>
-<text x="562" y="130" class="lbl-b">3 · 每條 rule 的時間契約</text>
-<text x="562" y="156" class="lbl-s">依第 1 步選公式：</text>
-<text x="562" y="180" class="tk">Prometheus</text>
-<text x="562" y="198" class="tk">R ≥ (2+k)·I + d</text>
-<text x="562" y="222" class="tk">vmalert</text>
-<text x="562" y="240" class="tk">R ≥ I + L − D</text>
-<text x="562" y="264" class="tk">Alertmanager 告警視窗</text>
-<text x="562" y="282" class="tk">≥ 2 × group_interval</text>
-<text x="562" y="312" class="lbl-s">數字拿不到就問或標未知</text>
-<path d="M746 229 H770" class="arrow" marker-end="url(#rr-ah)"/>
-<rect x="774" y="104" width="166" height="250" rx="8" class="b-node"/>
-<text x="790" y="130" class="lbl-b">4 · 規則寫法</text>
-<text x="790" y="156" class="lbl-s">x == 0 資料消失時</text>
-<text x="790" y="174" class="lbl-s">回傳空（presence）</text>
-<text x="790" y="198" class="lbl-s">job=~ 對不對得上</text>
-<text x="790" y="216" class="lbl-s">實際 job 名稱</text>
-<text x="790" y="240" class="lbl-s">關鍵 alert 與昂貴</text>
-<text x="790" y="258" class="lbl-s">recording rule 分開</text>
-<rect x="20" y="376" width="920" height="74" rx="8" class="b-pend"/>
-<text x="40" y="400" class="lbl-b">關卡規則</text>
-<text x="40" y="420" class="lbl-s">第 2 步找到的第 1 級缺口沒有處理前，第 3、4 步的結論都要加註：「評估這些 rule 的 ruler 本身沒有被監控，它變慢或掛掉時以下結論不成立。」</text>
-<text x="40" y="438" class="lbl-s">報告順序固定：監控體系 → 基礎設施缺口（第 1 級優先）→ 時間契約不成立的 rule → 寫法問題 → 沒有確認的部分</text>
+<text x="40" y="62" class="lbl-s">rule 檔（rule.yml、VMRule、PrometheusRule）＋ Prometheus config（prometheus.yml）；能連線時加上 ruler 的 URL；有外部觀察者時加上它的 rule 檔</text>
+<path d="M100 74 V100" class="arrow" marker-end="url(#rr-ah)"/>
+
+<rect x="20" y="104" width="162" height="270" rx="8" class="b-node-acc"/>
+<text x="34" y="130" class="lbl-b">1 · 監控體系</text>
+<text x="34" y="156" class="lbl-s">Prometheus 還是</text>
+<text x="34" y="174" class="lbl-s">vmalert？版本？</text>
+<text x="34" y="198" class="lbl-s">資料走 scrape，</text>
+<text x="34" y="216" class="lbl-s">還是 vmagent → VM？</text>
+<text x="34" y="240" class="lbl-s">外部觀察者？</text>
+<text x="34" y="258" class="lbl-s">哪台 Alertmanager？</text>
+<text x="34" y="290" class="tk">先從檔案判斷</text>
+<text x="34" y="306" class="tk">不行才問</text>
+<text x="34" y="352" class="t-ok">→ env/&lt;name&gt;.yaml</text>
+<path d="M182 239 H200" class="arrow" marker-end="url(#rr-ah)"/>
+
+<rect x="202" y="104" width="162" height="270" rx="8" class="b-node-acc"/>
+<text x="216" y="130" class="lbl-b">2 · metric 來源</text>
+<text x="216" y="154" class="tk">check_metric_sources.py</text>
+<text x="216" y="180" class="lbl-s">每個 metric 對到：</text>
+<text x="216" y="198" class="lbl-s">· config 的 scrape job</text>
+<text x="216" y="216" class="lbl-s">· live 快照</text>
+<text x="216" y="234" class="lbl-s">· 使用者的回答</text>
+<text x="216" y="260" class="lbl-s">卡片只是提示，</text>
+<text x="216" y="278" class="lbl-s">不能當來源</text>
+<text x="216" y="302" class="t-bad">job 對不上、被 relabel</text>
+<text x="216" y="320" class="t-bad">丟掉 → 永遠不會響</text>
+<text x="216" y="352" class="t-ok">→ sources.yaml</text>
+<path d="M364 239 H382" class="arrow" marker-end="url(#rr-ah)"/>
+
+<rect x="384" y="104" width="162" height="270" rx="8" class="b-node-acc"/>
+<text x="398" y="130" class="lbl-b">3 · 基礎設施覆蓋</text>
+<text x="398" y="154" class="tk">rules_to_snapshot.py</text>
+<text x="398" y="170" class="tk">或 collect.py --live</text>
+<text x="398" y="186" class="tk">→ check_coverage.py</text>
+<text x="398" y="212" class="lbl-s">先報第 1 級缺口：</text>
+<text x="398" y="232" class="lbl-s">· scrape 耗時</text>
+<text x="398" y="250" class="lbl-s">· group 跑不完、停止</text>
+<text x="398" y="268" class="lbl-s">· WAL、送不到 AM</text>
+<text x="398" y="286" class="lbl-s">· Watchdog 與 DMS</text>
+<text x="398" y="304" class="lbl-s">· VM：查詢錯誤、唯讀</text>
+<text x="398" y="352" class="t-ok">→ coverage.md</text>
+<path d="M546 239 H554" class="arrow"/>
+
+<rect x="556" y="104" width="20" height="270" rx="4" class="b-node-bad"/>
+<text x="566" y="232" text-anchor="middle" class="t-bad">關</text>
+<text x="566" y="252" text-anchor="middle" class="t-bad">卡</text>
+<path d="M576 239 H594" class="arrow" marker-end="url(#rr-ah)"/>
+
+<rect x="596" y="104" width="162" height="270" rx="8" class="b-node"/>
+<text x="610" y="130" class="lbl-b">4 · 時間契約</text>
+<text x="610" y="154" class="lbl-s">依第 1 步選公式：</text>
+<text x="610" y="178" class="tk">Prometheus</text>
+<text x="610" y="194" class="tk">R ≥ (2+k)·I + d</text>
+<text x="610" y="218" class="tk">vmalert</text>
+<text x="610" y="234" class="tk">R ≥ I + L − D</text>
+<text x="610" y="258" class="tk">Alertmanager 視窗</text>
+<text x="610" y="274" class="tk">≥ 2 × group_interval</text>
+<text x="610" y="304" class="lbl-s">數字拿不到就問</text>
+<text x="610" y="322" class="lbl-s">或標未知</text>
+<path d="M758 239 H776" class="arrow" marker-end="url(#rr-ah)"/>
+
+<rect x="778" y="104" width="162" height="270" rx="8" class="b-node"/>
+<text x="792" y="130" class="lbl-b">5 · 規則寫法</text>
+<text x="792" y="156" class="lbl-s">x == 0 資料消失時</text>
+<text x="792" y="174" class="lbl-s">回傳空（presence）</text>
+<text x="792" y="198" class="lbl-s">關鍵 alert 與昂貴</text>
+<text x="792" y="216" class="lbl-s">recording rule</text>
+<text x="792" y="234" class="lbl-s">分開 group</text>
+
+<rect x="20" y="396" width="920" height="74" rx="8" class="b-pend"/>
+<text x="40" y="420" class="lbl-b">關卡規則</text>
+<text x="40" y="440" class="lbl-s">第 3 步找到的第 1 級缺口沒有處理前，第 4、5 步的結論都要加註：「評估這些 rule 的 ruler 本身沒有被監控，它變慢或掛掉時以下結論不成立。」</text>
+<text x="40" y="458" class="lbl-s">報告順序：監控體系 → 讀不到資料的 rule → 基礎設施缺口（第 1 級優先）→ 時間契約不成立的 rule → 寫法問題 → 沒有確認的部分</text>
 </svg>

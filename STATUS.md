@@ -29,6 +29,7 @@
 | Valkey 9.1／Redis 7.2、8 target（redis_exporter v1.97.0）與「記憶體 KV」架構頁，lab 實測 | `catalog/targets/redis_exporter.yaml`、`docs/targets/valkey*.md`、`lab/targets/valkey/` |
 | etcd v3.7.3 target（第一張 `model: native`）與「共識（Raft）」架構頁，3 節點 lab 實測三方交叉判斷 | `catalog/targets/etcd.yaml`、`docs/targets/etcd*.md`、`lab/targets/etcd/` |
 | TiDB v8.5.8 target（`model: native`，TiDB／TiKV／PD）與「分散式 SQL」架構頁；官方規則 5 類失效實測 | `catalog/targets/tidb.yaml`、`docs/targets/tidb*.md`、`lab/targets/tidb/` |
+| metric 來源檢查：每個 metric 要對到 config 的 scrape job、live 快照或使用者回答，不假定（使用者在 v0.1.0 用 opencode 時回報 AI 直接假定來源） | `tools/check_metric_sources.py`、`env/sources.example.yaml` |
 | `rule-review` skill 與流程圖：先確認體系與基礎設施覆蓋，再看時間契約；離線用 `tools/rules_to_snapshot.py` | `skills/rule-review/`、`docs/tools/rule-review.md` |
 
 ## 進行中
@@ -61,6 +62,6 @@
 - Alertmanager 的長週期例子用 `group_interval` 1h、失敗告警視窗 `[2h]`。
 - Plugin 以 repo 根目錄為來源，skill 才能讀目錄（代價是安裝時帶著 `lab/` 與 `docs/`）。
 - 卡片依 `family` 分組（prometheus、victoriametrics、shared、database）；target 卡的訊號依 9 個 `aspect` 分組：exporter、availability、workload、saturation、replication、cluster、maintenance、protection、capacity。不適用的面向要寫 `not_applicable_aspects` 並附 why 與 refs（例如 PostgreSQL 核心沒有共識機制）。
-- 檢查使用者的 rule 檔時，一律先確認監控體系與基礎設施覆蓋，最後才看時間契約（`rule-review`）。
+- 檢查使用者的 rule 檔時，一律先確認監控體系、每個 metric 的來源（不假定）、基礎設施覆蓋，最後才看時間契約（`rule-review`）。
 - 網站每個分頁只放一種內容：開始使用、監控鏈（只有元件卡，依 alert 鏈順序）、資料庫（總覽＋每個 DB 的怎麼監控／監控訊號／深入頁／原始碼到 metric）、原理（契約、名詞、內部架構、來源）、實驗報告。頁內面向從大到小；深入頁先寫「要監控什麼」再寫工具與缺口。每張 target 卡必須列出 `blind_spots`（exporter 沒輸出／資料庫沒提供／要靠其他元件），資料庫總覽頁由卡片自動產生。
 - 實驗數據不準時改用原始碼佐證。

@@ -1,0 +1,17 @@
+groups:
+  - name: t
+    rules:
+      - record: job:mysql_up:min
+        expr: min by (job) (mysql_up{job="mysql"})
+      - alert: MySQLDown
+        expr: job:mysql_up:min == 0
+      - alert: PrometheusDown
+        expr: up{job=~".*prometheus-k8s.*"} == 0
+      - alert: MySQLDownWrongJob
+        expr: mysql_up{job="mysqld"} == 0
+      - alert: TableSize
+        expr: sum by (instance) (mysql_info_schema_table_size{job="mysql"}) > 1e9
+      - alert: OrderSlow
+        expr: histogram_quantile(0.99, sum by (le) (rate(order_latency_seconds_bucket[5m]))) > 1
+      - alert: Ratio
+        expr: mysql_global_status_threads_connected / on(instance) mysql_global_variables_max_connections > 0.8 and on(instance) up == 1
