@@ -1,0 +1,36 @@
+# ClickHouse 卡引用的來源。key 一律以 ch- 開頭（Altinity 的規則以 ch-altinity 開頭），避免和其他 target 衝突。
+# 授權：ClickHouse 是 Apache-2.0；Altinity clickhouse-operator 也是 Apache-2.0（lab 的 prom/altinity/chkeeper.yml 是它的 Keeper 規則原文）。
+sources:
+  ch-lab:
+    title: ClickHouse 三方交叉、Too many parts、mutation 失敗、記憶體與並行上限、Distributed 送出、備份、replica 落後與停機、Keeper quorum、<prometheus> 關閉的實驗（lab/targets/clickhouse）
+    kind: experiment
+    visibility: public
+    url: https://github.com/HahaSula/alert-trust/tree/main/lab/targets/clickhouse
+    checked: "2026-11-10, ClickHouse v26.10.2.103-stable（server ×2、Keeper ×3）, Prometheus v3.13.5, blackbox_exporter v0.27.0, query-exporter 5.2.2"
+    note: results/run-20261110.txt 是原始輸出，README.md 的結果一節是摘要
+  ch-core:
+    title: ClickHouse v26.10.2.103-stable 原始碼（src/Server 的 Prometheus、/ping、/replicas_status handler；src/Coordination 的 Keeper；MergeTree；async metrics）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/ClickHouse/ClickHouse/tree/v26.10.2.103-stable
+    checked: "2026-11-10, v26.10.2.103-stable（映像 clickhouse/clickhouse-server:26.10.2.103 的 ClickHouse_Info version_describe 相同）"
+    note: "gh api repos/ClickHouse/ClickHouse/releases/latest 回 v26.10.2.103-stable（2026-10-24）；最新 LTS 是 v26.8.34.13-lts（2026-10-22）。Apache-2.0"
+  ch-altinity-rules:
+    title: Altinity clickhouse-operator release-0.27.4 的告警規則（deploy/prometheus/prometheus-alert-rules-clickhouse.yaml、-chkeeper.yaml、-backup.yaml）與 metrics-exporter
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/Altinity/clickhouse-operator/tree/release-0.27.4/deploy/prometheus
+    checked: "2026-11-10, release-0.27.4"
+    note: "社群（廠商）規則，不是 ClickHouse 專案的。ClickHouse 規則用 operator 內 metrics-exporter 輸出的 chi_clickhouse_*；Keeper 規則用 Keeper 的原生 /metrics"
+  ch-query-exporter:
+    title: query-exporter 5.2.2（映像 adonato/query-exporter:5.2.2，內建 clickhouse-sqlalchemy 0.3.2、clickhouse-driver 0.2.11）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/albertodonato/query-exporter/tree/5.2.2
+    checked: "2026-11-10, 5.2.2（和 queries/query-exporter 同一版；映像內 sqlalchemy.dialects entry point 有 clickhouse、clickhouse.native、clickhouse.http）"
+  ch-doc-monitoring:
+    title: "ClickHouse 文件：Monitoring、Prometheus protocols、system tables"
+    kind: upstream-doc
+    visibility: public
+    url: https://clickhouse.com/docs/operations/monitoring
+    checked: "2026-11-10"

@@ -98,6 +98,10 @@ nav:
           - 怎麼監控: targets/yugabytedb.md
           - 監控訊號: components/yugabytedb.md
           - 原始碼到 metric: targets/yugabytedb-appendix.md
+      - ClickHouse:
+          - 怎麼監控: targets/clickhouse.md
+          - 監控訊號: components/clickhouse.md
+          - 原始碼到 metric: targets/clickhouse-appendix.md
   - 原理:
       - 信任契約: contracts.md
       - 名詞：設定與 metric: reference/terms.md
@@ -117,6 +121,7 @@ nav:
           - 記憶體 KV: architecture/db-kv.md
           - 共識（Raft）: architecture/db-raft.md
           - 分散式 SQL: architecture/db-distsql.md
+          - 分析型: architecture/db-olap.md
       - 來源: reference/sources.md
   - 實驗報告:
       - 總覽: reports/index.md

@@ -1,0 +1,604 @@
+id: clickhouse
+name: ClickHouse（server 與 ClickHouse Keeper；內建 <prometheus> /metrics＋SQL 查 system 表）
+kind: target
+model: native
+family: database
+status: draft
+stages: [source]
+versions_checked: ["ClickHouse v26.10.2.103-stable（最新 stable；最新 LTS 是 v26.8.34.13-lts；Apache-2.0）", "ClickHouse Keeper v26.10.2.103", "Altinity clickhouse-operator release-0.27.4 的規則與 metrics-exporter（Apache-2.0，只引用）", "query-exporter 5.2.2（clickhouse-sqlalchemy 0.3.2）"]
+architecture: architecture/db-olap.md
+role: >-
+  ClickHouse 叢集有兩種 process：server（MergeTree 表、查詢、ReplicatedMergeTree 的複寫）與 ClickHouse Keeper（Raft／NuRaft，取代 ZooKeeper，
+  存複寫 log 與 ON CLUSTER DDL 佇列）。兩者都有原生 /metrics，但**預設是關的**：要在設定裡打開 <prometheus>，沒打開時 9363 不 listen、scrape 是 connection refused。
+  打開後只輸出全伺服器的數字（system.metrics、system.events、system.asynchronous_metrics、system.errors），沒有每張表的 parts、複寫佇列、mutation 失敗、detached parts、
+  Distributed 佇列與備份；這些用 SQL 查 system 表（query-exporter 5.2.2，queries/clickhouse/clickhouse.yaml）補上。
+  /ping 是靜態的 Ok.，/replicas_status 不把唯讀的表算成失敗；Keeper 的 /ready 才看有沒有 leader，4lw 的 ruok 一律回 imok。
+  完整說明見[ClickHouse 怎麼監控](../targets/clickhouse.md)，機制見[分析型架構](../architecture/db-olap.md)與[共識（Raft）架構](../architecture/db-raft.md#clickhouse-keeper)。
+
+silent_failures:
+  - text: >-
+      /metrics 預設不存在：預設 config.xml 的 <prometheus> 在註解裡。沒打開時 Prometheus 的 target 是 connection refused（up 0），和 process 停掉一樣；
+      子項（asynchronous_metrics、events 等）被關時 up 1、一組 metric 整個不見，依賴它們的規則安靜地回傳空。
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-cfg-prom-commented, ch-prom-http-default, ch-prom-expose-defaults]
+  - text: >-
+      Keeper 失去 quorum 時，server 的 up、/ping、/replicas_status 都是 200：/ping 是靜態字串；/replicas_status 跳過唯讀的表，只在 verbose 內容寫 is readonly。
+      ReplicasMaxAbsoluteDelay 也不算唯讀的表，所以這時延遲看起來是 0。只有 ReadonlyReplica、ZooKeeperSession 與 SQL 探測反映出來。
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-ping-static, ch-rs-readonly-skip, ch-sam-skip-readonly, ch-cm-readonly]
+  - text: >-
+      Altinity 的 ClickHouseKeeperLostQuorum 寫成 KeeperSyncedFollowers < 1 and KeeperIsLeader == 1：失去 quorum 時沒有任何一台是 leader，表達式回傳空，這條永遠不會在真正失去 quorum 時響。
+      lab：停 2 台 Keeper 後它沒有 pending 或 firing。4lw 的 ruok 同時仍回 imok。
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, alt-k-lostquorum, ch-k-ruok, ch-k-synced]
+  - text: >-
+      ZooKeeperSession 在 Keeper 失去 quorum、session 過期時仍是 1；ZooKeeperSessionExpired 恢復後也不歸零（lab：Keeper 恢復 150 秒後仍是 3–4）。
+      寫成 ZooKeeperSession < 1 的規則不會響，寫成 ZooKeeperSessionExpired > 0 的規則恢復後一直響。
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-exp-extra, ch-cm-zksession]
+  - text: >-
+      mutation 失敗不會讓 ALTER 失敗：ALTER 立刻成功，背景一直重試，失敗原因只在 system.mutations.latest_fail_reason。/metrics 只看得到錯誤碼的計數
+      （lab：ClickHouseErrorMetric_FUNCTION_THROW_IF_VALUE_IS_NON_ZERO 增加），不知道是哪張表、是不是 mutation。
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-sys-mut-fail, ch-prom-errors-local]
+  - text: >-
+      heavy async metric（NumberOfDetachedParts、NumberOfPendingMutations）預設不算（asynchronous_metrics_enable_heavy_metrics=false），照文件寫的規則在預設設定下回傳空。
+      lab：ch1（預設）沒有這四個名稱，ch2（打開）有。
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-ss-heavy-enable, ch-sam-heavy-gate]
+  - text: >-
+      26.8 起帶 key 的 async metric 改成 label：DiskAvailable{disk="default"}。照舊名稱 ClickHouseAsyncMetrics_DiskAvailable_default 寫的規則回傳空（lab：0 條 series）。
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-ss-kv-mode, ch-prom-keyvalue-label]
+  - text: >-
+      用 SQL 讀 system.events 的 exporter（Altinity metrics-exporter）在事件第一次發生前沒有那條 series：system.events 預設只列非 0 的事件（lab：RejectedInserts、DelayedInserts 0 列）。
+      increase(chi_clickhouse_event_RejectedInserts[1m]) 在 series 第一次出現時算不到那次增加。原生 /metrics 每個 ProfileEvent 都輸出，沒有這個問題。
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-events-zero, ch-set-events-zero, alt-fetch-events, ch-prom-events-all]
+
+signals:
+  # ---------- 監測自檢（抓取本身） ----------
+  - id: endpoint-up
+    aspect: exporter
+    tier: 1
+    question: server 與 Keeper 的 /metrics 都抓得到嗎
+    signal: >-
+      up{job=~"clickhouse-server|clickhouse-keeper"} == 0；每個 job 各一條 absent(up{job=...})。前提是每台都打開 <prometheus>（預設關）：沒打開時是 connection refused，
+      和 process 停掉分不開，要和 /ping 一起看
+    metrics: [up]
+    evaluate_on: self
+    silent_failure: up 只代表 HTTP；Keeper 失去 quorum 時 server 與存活的 Keeper 都是 up 1
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp, ch-exp-raw, ch-cfg-prom-commented, ch-prom-http-default]
+    upstream: { status: partial, note: "Altinity 的 ClickHouseMetricsExporterDown 看 operator 的 exporter，ClickHouseServerDown 看 exporter 的 fetch_errors；ClickHouseKeeperDown 是 up == 0，沒有 absent" }
+    rules:
+      - rules/targets/clickhouse.yml#CHEndpointDown
+      - rules/targets/clickhouse.yml#CHServerEndpointMissing
+      - rules/targets/clickhouse.yml#CHKeeperEndpointMissing
+
+  - id: health-second-path
+    aspect: exporter
+    tier: 1
+    question: 抓得到 /metrics，就代表能寫入嗎
+    signal: >-
+      每種元件三方交叉，probe 的 instance relabel 成 /metrics 的 host:9363。server：up、blackbox 探 /ping（只證明 HTTP）、/replicas_status?verbose=1
+      （503 或 body 有 is readonly 就失敗）、HTTP SQL 探測（SELECT count() FROM system.replicas WHERE is_readonly，不是 0 就失敗）、ReadonlyReplica；
+      Keeper：up、/ready（沒有 leader 時 503）、KeeperIsLeader。4lw ruok 一律 imok，不能當健康檢查
+    metrics: [up, probe_success, ClickHouseMetrics_ReadonlyReplica, ClickHouseAsyncMetrics_KeeperIsLeader]
+    evaluate_on: self
+    silent_failure: /ping 與 /replicas_status 的狀態碼在 Keeper 失去 quorum 時都是 200
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-ping-static, ch-rs-readonly-skip, ch-rs-close, ch-k-ready, ch-k-ready-503, ch-k-ruok]
+    upstream: { status: no, note: "官方文件建議用 /ping 與 /replicas_status 做健康檢查，沒有規則；Altinity 沒有 probe 規則" }
+    rules:
+      - rules/targets/clickhouse.yml#CHPingFailing
+      - rules/targets/clickhouse.yml#CHSqlProbeFailing
+      - rules/targets/clickhouse.yml#CHReplicasStatusNotOk
+      - rules/targets/clickhouse.yml#CHKeeperNotReady
+      - rules/targets/clickhouse.yml#CHProbesMissing
+
+  - id: metric-families-present
+    aspect: exporter
+    tier: 1
+    question: 該有的 metric 都還在嗎
+    signal: >-
+      server：MaxPartCountForPartition（asynchronous_metrics）、ReadonlyReplica（metrics）、RejectedInserts（events）、ClickHouseErrorMetric_ALL（errors）、DiskAvailable（key-value 形式）；
+      Keeper：KeeperIsLeader、KeeperSyncedFollowers、KeeperOutstandingRequests；up == 1 unless 它們。再加 scrape_samples_scraped 比一小時前少一半。
+      lab 名稱數：server 3225、Keeper 632
+    metrics: [up, ClickHouseAsyncMetrics_MaxPartCountForPartition, ClickHouseMetrics_ReadonlyReplica, ClickHouseErrorMetric_ALL, scrape_samples_scraped]
+    evaluate_on: self
+    silent_failure: >-
+      heavy metric（NumberOfDetachedParts 等）預設就沒有，不能放進這個檢查；asynchronous_metrics_key_values_mode 改成 legacy_names 時 DiskAvailable 變名稱，這條會響
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-exp-names, ch-prom-expose-defaults, ch-ss-kv-mode, ch-ss-heavy-enable]
+    upstream: { status: no }
+    rules:
+      - rules/targets/clickhouse.yml#CHMetricFamiliesMissing
+      - rules/targets/clickhouse.yml#CHKeeperMetricFamiliesMissing
+      - rules/targets/clickhouse.yml#CHSamplesDropped
+
+  - id: scrape-budget
+    aspect: exporter
+    tier: 2
+    question: Scrape 來得及在期限內完成、內容沒有超過上限嗎
+    signal: >-
+      scrape_duration_seconds 對 scrape_timeout 80%。lab：server 約 3,900 個 sample（沒有每張表的 series，表多也不會變大；key-value 的 async metric 隨 disk、CPU、網卡數增加）、
+      Keeper 1,193、query-exporter 196；都在 0.01 秒內
+    metrics: [scrape_duration_seconds, scrape_samples_scraped]
+    evaluate_on: self
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-prom-keyvalue-label]
+    upstream: { status: no }
+    rules: [rules/targets/clickhouse.yml#CHScrapeNearTimeout]
+
+  - id: endpoint-blocking
+    aspect: exporter
+    tier: 2
+    question: 產生 /metrics 時會不會被資料庫內部的鎖或忙碌卡住
+    signal: >-
+      handler 讀 atomic 計數器與背景執行緒算好的 async 快照（共享鎖），scrape 不觸發計算，不拿表或 Keeper 的鎖；lab 在 Keeper 失去 quorum、Too many parts 時都在 0.01 秒內。
+      SQL 路徑（query-exporter）會被慢查詢卡住，所以設了 timeout 與 max_execution_time
+    metrics: [scrape_duration_seconds]
+    evaluate_on: self
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-prom-metric-atomic, ch-prom-async-snapshot, ch-async-getvalues, ch-async-swap]
+    upstream: { status: no }
+    rules: [rules/targets/clickhouse.yml#CHScrapeNearTimeout]
+
+  - id: sql-path
+    aspect: exporter
+    tier: 1
+    question: 補盲點的 SQL 路徑本身還在、資料是新的嗎
+    signal: >-
+      up{job="clickhouse-sql"} == 0 或 absent；queries_total{status!="success"} 增加；time() - query_timestamp > 600 秒。查詢失敗時 query-exporter 保留舊值，
+      所以每張表的唯讀、mutation、detached、Distributed、備份規則都要靠這三條知道資料是不是舊的。query-exporter 5.2.2 映像內建 clickhouse-sqlalchemy 0.3.2，
+      用 clickhouse+native:// 連 9000（lab 實測可用）；每台 server 一個 DSN，不要用 clusterAllReplicas 一次查全部
+    metrics: [up, queries_total, query_timestamp]
+    evaluate_on: self
+    silent_failure: >-
+      查詢失敗或逾時時 chq_* 停在舊值（lab：ch2 停掉後它的 chq_replica_absolute_delay_seconds 停在 66 直到 expiration）；
+      每個 DSN 一條連線，一個卡住的查詢讓同一個 DSN 的其他查詢一起逾時（lab：Keeper 失去 quorum 時 system.zookeeper_connection 卡住，所有 chq_* 消失）；
+      排程器在多個查詢同時到期時跳過晚了的那次（lab：1m 的查詢和 15s 的同時到期，5 分鐘內一次都沒有執行），所以 interval 要錯開
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-exp-extra, ch-exp-extra-first, ch-exp-qe, pg-q-qe-status, pg-q-qe-expire, pg-q-qe-builtin-timestamp]
+    upstream: { status: no, note: "Altinity 用 operator 內的 metrics-exporter（只在 Kubernetes 部署下），ClickHouseMetricsExporterFetchErrors 看它的查詢失敗" }
+    rules:
+      - rules/targets/clickhouse.yml#CHSqlExporterDown
+      - rules/targets/clickhouse.yml#CHSqlQueriesFailing
+      - rules/targets/clickhouse.yml#CHSqlStale
+
+  # ---------- 叢集（Keeper） ----------
+  - id: role-detection
+    aspect: cluster
+    tier: 1
+    question: Keeper 剛好有一個 leader，而且抓得到它嗎
+    signal: >-
+      absent(KeeperIsLeader == 1)：沒有任何一台以 leader 身分被抓到；count(KeeperIsLeader == 1) > 1。ClickHouse server 沒有主從（每台 replica 都可寫），
+      「可寫入的節點」就是「Keeper 有 leader 而且表不是唯讀」
+    metrics: [ClickHouseAsyncMetrics_KeeperIsLeader]
+    evaluate_on: self
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-k-isleader]
+    upstream: { status: no, note: "Altinity 沒有 leader 數的規則" }
+    rules: [rules/targets/clickhouse.yml#CHKeeperNoLeader, rules/targets/clickhouse.yml#CHKeeperLeaderCountWrong]
+
+  - id: keeper-quorum
+    aspect: cluster
+    tier: 1
+    question: Keeper 還有過半嗎、再少一台會不會失去
+    signal: >-
+      /ready 成功的 Keeper 數 < floor(預期數 / 2) + 1（預期數寫在 clickhouse-params）；leader 的 KeeperSyncedFollowers < 預期數 - 1（follower 永遠 0，取 max）。
+      lab：停 2 台後存活那台 up 1、ruok imok、mntr 回 This instance is not currently serving requests、/ready 503
+    metrics: [probe_success, ClickHouseAsyncMetrics_KeeperSyncedFollowers]
+    evaluate_on: self
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-k-ready, ch-k-ready-503, ch-k-synced, ch-k-mntr-inactive, alt-k-lostquorum]
+    upstream: { status: partial, note: "Altinity ClickHouseKeeperLostQuorum 以 KeeperIsLeader == 1 為前提，真正失去 quorum 時回傳空（lab 實測）" }
+    rules: [rules/targets/clickhouse.yml#CHKeeperQuorumLost, rules/targets/clickhouse.yml#CHKeeperFollowersMissing]
+
+  - id: component-count
+    aspect: cluster
+    tier: 2
+    question: server 與 Keeper 的台數對嗎
+    signal: >-
+      label_replace(count by (job) (up == 1)) 對 clickhouse-params 的預期數（role="server"／"keeper"）。replica 數另外用 system.replicas 的 active_replicas 對 total_replicas（見 replication-lag）
+    metrics: [up]
+    evaluate_on: self
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw]
+    upstream: { status: no }
+    rules: [rules/targets/clickhouse.yml#CHComponentCountLow]
+
+  - id: keeper-session
+    aspect: cluster
+    tier: 1
+    question: 每台 server 到 Keeper 的 session 還在嗎
+    signal: >-
+      delta(ZooKeeperSessionExpired[5m]) > 0 或 increase(ZooKeeperHardwareExceptions[5m]) > 0；現況看 ReadonlyReplica。
+      lab：Keeper 失去 quorum 時 ZooKeeperSession 一直是 1（session 物件還在，只是過期），ZooKeeperSessionExpired 從 0 變成 1、再到 3–4，
+      Keeper 恢復 150 秒後仍是 3–4、不歸零；所以「< 1」與「> 0」都不能當現況。session 過期後 Replicated 表唯讀、ON CLUSTER DDL 停。
+      system.zookeeper_connection 在這時查詢會卡住超過 30 秒，不放進 SQL 路徑
+    metrics: [ClickHouseMetrics_ZooKeeperSessionExpired, ClickHouseProfileEvents_ZooKeeperHardwareExceptions, ClickHouseMetrics_ZooKeeperSession]
+    evaluate_on: self
+    silent_failure: ZooKeeperSession 在 session 過期時仍是 1；Altinity 的 ZooKeeperSession > 1 只看「太多 session」
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-exp-extra, ch-cm-zksession, ch-rt-expired, ch-rt-setreadonly, alt-zksession]
+    upstream: { status: partial, note: "Altinity ClickHouseZooKeeperSession 是 > 1（多個 session），不看過期；ClickHouseZooKeeperHardwareExceptions 看網路錯誤" }
+    rules: [rules/targets/clickhouse.yml#CHKeeperSessionLost]
+
+  - id: keeper-latency
+    aspect: cluster
+    tier: 3
+    question: Keeper 慢或排隊嗎
+    signal: KeeperOutstandingRequests > 10 持續 10 分鐘（Altinity 的門檻）；KeeperMaxLatency、KeeperAvgLatency 看趨勢。lab 沒有慢 Keeper 的情境
+    metrics: [ClickHouseMetrics_KeeperOutstandingRequests, ClickHouseAsyncMetrics_KeeperMaxLatency]
+    evaluate_on: self
+    evidence: upstream
+    source: ch-altinity-rules
+    refs: [alt-k-outstanding, ch-exp-names]
+    upstream: { status: yes, note: "Altinity ClickHouseKeeperOutstandingRequests（> 10，10m）、ClickHouseKeeperHighLatency（MaxLatency > 500，15m）" }
+    rules: [rules/targets/clickhouse.yml#CHKeeperRequestsBacklog]
+
+  # ---------- 複寫 ----------
+  - id: replica-readonly
+    aspect: replication
+    tier: 1
+    question: 有 Replicated 表變唯讀嗎
+    signal: >-
+      ClickHouseMetrics_ReadonlyReplica > 0（唯讀表數）；每張表看 chq_replica_readonly。唯讀時讀取照常、寫入 TABLE_IS_READ_ONLY。/replicas_status 的狀態碼不反映
+    metrics: [ClickHouseMetrics_ReadonlyReplica, chq_replica_readonly]
+    evaluate_on: self
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-cm-readonly, ch-rt-setreadonly, ch-rmt-assert-ro, alt-readonly]
+    upstream: { status: yes, note: "Altinity ClickHouseReadonlyReplica：ReadonlyReplica > 0" }
+    rules: [rules/targets/clickhouse.yml#CHReplicaReadonly]
+
+  - id: replication-lag
+    aspect: replication
+    tier: 2
+    question: replica 落後多少，量的是真的嗎
+    signal: >-
+      ReplicasMaxAbsoluteDelay > 300 秒（Altinity）；每張表 chq_replica_absolute_delay_seconds > 300；chq_replica_active_replicas < total_replicas。
+      ReplicasMaxAbsoluteDelay 不算唯讀的表（Keeper 不在時顯示 0）；一台 replica 停掉時倖存那台的延遲也是 0，只有 active_replicas 少一
+    metrics: [ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay, chq_replica_absolute_delay_seconds, chq_replica_active_replicas, chq_replica_total_replicas]
+    evaluate_on: self
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-sam-absdelay, ch-sam-skip-readonly, ch-sys-rep-absdelay, ch-sys-rep-active, alt-absdelay]
+    upstream: { status: partial, note: "Altinity ClickHouseReplicasMaxAbsoluteDelay（> 300）；沒有 active_replicas 的規則" }
+    rules:
+      - rules/targets/clickhouse.yml#CHReplicaDelayHigh
+      - rules/targets/clickhouse.yml#CHReplicaDelayHighSQL
+      - rules/targets/clickhouse.yml#CHReplicaInactive
+      - rules/targets/clickhouse.yml#CHReplicasStatusNotOk
+
+  - id: replication-queue
+    aspect: replication
+    tier: 2
+    question: 複寫佇列有卡住的項目嗎
+    signal: >-
+      chq_replication_queue_failing > 0 持續 15 分鐘（system.replication_queue.last_exception 非空）；ReplicasMaxInsertsInQueue > 100（例子）。
+      lab：失敗的 mutation 讓兩台的 replication_queue 各有 1 個一直失敗的項目
+    metrics: [chq_replication_queue_failing, ClickHouseAsyncMetrics_ReplicasMaxInsertsInQueue]
+    evaluate_on: self
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-sam-inserts-queue, ch-sam-queue]
+    upstream: { status: partial, note: "Altinity 用 ReplicatedPartFailedFetches、ReplicatedPartChecksFailed 的增加量" }
+    rules: [rules/targets/clickhouse.yml#CHReplicationQueueFailing, rules/targets/clickhouse.yml#CHReplicationInsertsQueued]
+
+  - id: distributed-queue
+    aspect: replication
+    tier: 2
+    question: Distributed 表的非同步送出有積壓或失敗嗎
+    signal: >-
+      DistributedFilesToInsert > 50 持續 15 分鐘（Altinity）；DistributedAsyncInsertionFailures 增加；BrokenDistributedFilesToInsert > 0。
+      insert 端看不到錯誤（預設 distributed_foreground_insert 0）
+    metrics: [ClickHouseMetrics_DistributedFilesToInsert, ClickHouseMetrics_BrokenDistributedFilesToInsert, ClickHouseProfileEvents_DistributedAsyncInsertionFailures, chq_distribution_queue_errors]
+    evaluate_on: self
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-cm-distfiles, ch-cm-brokendist, ch-pe-dist-fail, ch-dist-broken, alt-dist-files]
+    upstream: { status: partial, note: "Altinity ClickHouseDistributedFilesToInsertHigh（> 50）、ClickHouseDistributedConnectionExceptions；沒有 broken 檔案的規則" }
+    rules:
+      - rules/targets/clickhouse.yml#CHDistributedFilesBacklog
+      - rules/targets/clickhouse.yml#CHDistributedSendFailing
+      - rules/targets/clickhouse.yml#CHDistributedBrokenFiles
+
+  # ---------- 可用性 ----------
+  - id: writes-rejected
+    aspect: availability
+    tier: 1
+    question: insert 被拒了嗎
+    signal: >-
+      RejectedInserts 增加（Too many parts）；ClickHouseErrorMetric_TABLE_IS_READ_ONLY 增加（寫入唯讀表）。lab（門檻 40）：第 40 筆起被拒，RejectedInserts 6、
+      TOO_MANY_PARTS 6，CHInsertsRejected 在 25 秒內 firing
+    metrics: [ClickHouseProfileEvents_RejectedInserts, ClickHouseErrorMetric_TOO_MANY_PARTS, ClickHouseErrorMetric_TABLE_IS_READ_ONLY]
+    evaluate_on: self
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-mtd-rejected, ch-pe-rejected, ch-rmt-assert-ro, alt-rejected]
+    upstream: { status: partial, note: "Altinity ClickHouseRejectedInsert（increase[1m] > 0，經 metrics-exporter，第一次的增加抓不到）；沒有 TABLE_IS_READ_ONLY" }
+    rules: [rules/targets/clickhouse.yml#CHInsertsRejected, rules/targets/clickhouse.yml#CHWritesToReadonlyTable]
+
+  - id: query-admission
+    aspect: availability
+    tier: 2
+    question: 查詢因為並行上限被拒了嗎
+    signal: >-
+      ClickHouseErrorMetric_TOO_MANY_SIMULTANEOUS_QUERIES 增加（max_concurrent_queries，預設 config.xml 1000；或每個使用者的上限）。
+      QueryPreempted 是 priority 設定造成的暫停，不是拒絕。lab：上限 2 時第 3 個查詢在 0.02 秒被拒
+    metrics: [ClickHouseErrorMetric_TOO_MANY_SIMULTANEOUS_QUERIES, ClickHouseMetrics_Query]
+    evaluate_on: self
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-pl-toomany, ch-ss-max-conc, ch-cfg-max-conc, ch-cm-querypreempted, alt-querypreempted, alt-running]
+    upstream: { status: partial, note: "Altinity ClickHouseTooManyRunningQueries（Query - PendingAsyncInsert > 80，固定門檻）、ClickHouseQueryPreempted（priority 暫停，不是被拒）" }
+    rules: [rules/targets/clickhouse.yml#CHQueriesRejectedConcurrency]
+
+  # ---------- 資源與飽和 ----------
+  - id: parts-pressure
+    aspect: saturation
+    tier: 1
+    question: 單一 partition 的 part 數離延遲與拒絕門檻多遠
+    signal: >-
+      MaxPartCountForPartition / parts_to_delay_insert > 0.5（設定值由 query-exporter 查 system.merge_tree_settings，不寫死）；不依賴 SQL 的備援：MaxPartCountForPartition > 300
+      （metric 說明的數字）；DelayedInserts 增加。lab（extra）：15 個 part、門檻 20 時比例 0.75，CHPartsNearInsertDelay pending。lab（門檻 20／40、停 merge）：DelayedInserts 20、DelayedInsertsMilliseconds 10,500、MaxPartCountForPartition 40，CHInsertsDelayed firing
+    metrics: [ClickHouseAsyncMetrics_MaxPartCountForPartition, chq_merge_tree_setting, ClickHouseProfileEvents_DelayedInserts, chq_parts_max_per_partition]
+    evaluate_on: self
+    silent_failure: 表層級的 SETTINGS 覆寫不在 system.merge_tree_settings；MaxPartCountForPartition 是全伺服器最大值，哪張表要看 chq_parts_max_per_partition
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-exp-extra, ch-sam-maxparts, ch-mt-delay, ch-mt-throw, ch-mtd-delay-fn, ch-mtd-delayed, alt-maxparts, alt-delayed]
+    upstream: { status: partial, note: "Altinity ClickHouseMaxPartCountForPartition（> 100，固定）、ClickHouseDelayedInsertThrottling" }
+    rules:
+      - rules/targets/clickhouse.yml#CHPartsNearInsertDelay
+      - rules/targets/clickhouse.yml#CHPartsHigh
+      - rules/targets/clickhouse.yml#CHInsertsDelayed
+
+  - id: memory
+    aspect: saturation
+    tier: 2
+    question: 記憶體離上限多遠、有查詢因此失敗嗎
+    signal: >-
+      MemoryTracking / (CGroupMemoryTotal 或 OSMemoryTotal) > 0.8（max_server_memory_usage 預設是 0.9 倍）；ClickHouseErrorMetric_MEMORY_LIMIT_EXCEEDED 增加
+      （單一查詢的 max_memory_usage 或整台的上限）。lab：max_memory_usage 30MB 的 GROUP BY 在 0.06 秒失敗
+    metrics: [ClickHouseMetrics_MemoryTracking, ClickHouseAsyncMetrics_CGroupMemoryTotal, ClickHouseErrorMetric_MEMORY_LIMIT_EXCEEDED, ClickHouseProfileEvents_QueryMemoryLimitExceeded]
+    evaluate_on: self
+    silent_failure: /metrics 沒有目前生效的 max_server_memory_usage；設了明確值時分母要改成 system.server_settings 的值
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-cm-memtracking, ch-mem-exceeded, ch-ss-max-mem, ch-ss-mem-ratio, ch-set-max-mem]
+    upstream: { status: no, note: "Altinity 沒有記憶體上限的規則" }
+    rules: [rules/targets/clickhouse.yml#CHMemoryNearLimit, rules/targets/clickhouse.yml#CHQueriesHitMemoryLimit]
+
+  # ---------- 工作量 ----------
+  - id: failed-queries
+    aspect: workload
+    tier: 3
+    question: 失敗查詢的比例高嗎
+    signal: rate(FailedQuery) / rate(Query) > 5%（例子）且每秒至少 0.1 個查詢；哪一種錯誤看 ClickHouseErrorMetric_*。lab 的 Too many parts 情境讓它 pending
+    metrics: [ClickHouseProfileEvents_FailedQuery, ClickHouseProfileEvents_Query]
+    evaluate_on: self
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-pe-failed-query]
+    upstream: { status: no }
+    rules: [rules/targets/clickhouse.yml#CHFailedQueriesHigh]
+
+  - id: error-counters
+    aspect: workload
+    tier: 2
+    question: 有資料或磁碟類的錯誤嗎
+    signal: >-
+      ClickHouseErrorMetric_{CHECKSUM_DOESNT_MATCH,CANNOT_READ_ALL_DATA,CORRUPTED_DATA,NOT_ENOUGH_SPACE,CANNOT_WRITE_TO_FILE_DESCRIPTOR,CANNOT_FSYNC} 增加。
+      /metrics 每個錯誤碼都有一條（含 0），所以 increase 抓得到第一次；lab 沒有觸發
+    metrics: [ClickHouseErrorMetric_CHECKSUM_DOESNT_MATCH, ClickHouseErrorMetric_NOT_ENOUGH_SPACE]
+    evaluate_on: self
+    evidence: code
+    source: ch-core
+    refs: [ch-prom-errors-local, ch-exp-names]
+    upstream: { status: partial, note: "Altinity 用 ReadBufferFromFileDescriptorReadFailed、WriteBufferFromFileDescriptorWriteFailed 等 ProfileEvent" }
+    rules: [rules/targets/clickhouse.yml#CHDataErrors]
+
+  # ---------- 資料維護 ----------
+  - id: merge-pool
+    aspect: maintenance
+    tier: 2
+    question: merge／mutation 背景池一直是滿的嗎
+    signal: >-
+      BackgroundMergesAndMutationsPoolTask / PoolSize >= 1 持續 30 分鐘。池滿時 merge 跟不上，part 數上升（見 parts-pressure）。lab 的 background_pool_size 是 1（容器 CPU 少）
+    metrics: [ClickHouseMetrics_BackgroundMergesAndMutationsPoolTask, ClickHouseMetrics_BackgroundMergesAndMutationsPoolSize]
+    evaluate_on: self
+    evidence: code
+    source: ch-core
+    refs: [ch-cm-pooltask, ch-cm-poolsize, ch-exp-raw]
+    upstream: { status: no }
+    rules: [rules/targets/clickhouse.yml#CHMergePoolSaturated]
+
+  - id: mutations
+    aspect: maintenance
+    tier: 2
+    question: 有 mutation 失敗或卡住嗎
+    signal: >-
+      chq_mutations_failing > 0（is_done = 0 且 latest_fail_reason 非空）；最老 mutation > 6 小時（例子）；打開 heavy metric 時 NumberOfPendingMutationsOverExecutionTime > 0。
+      lab：故意失敗的 mutation 40 秒內兩台的 latest_fail_reason 都有錯誤訊息，chq_mutations_failing 1，CHMutationFailing pending
+    metrics: [chq_mutations_failing, chq_mutation_oldest_pending_seconds, ClickHouseAsyncMetrics_NumberOfPendingMutationsOverExecutionTime]
+    evaluate_on: self
+    silent_failure: /metrics 只有錯誤碼計數（FUNCTION_THROW_IF_VALUE_IS_NON_ZERO 增加），不知道是 mutation
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-sys-mut-fail, ch-sam-mutations, ch-sam-mutations-over, ch-ss-heavy-enable, alt-mutations]
+    upstream: { status: partial, note: "Altinity ClickHouseTooManyMutations：未完成數 > 100，不看失敗" }
+    rules:
+      - rules/targets/clickhouse.yml#CHMutationFailing
+      - rules/targets/clickhouse.yml#CHMutationsStuck
+      - rules/targets/clickhouse.yml#CHMutationsOverExecutionTime
+
+  - id: detached-parts
+    aspect: maintenance
+    tier: 2
+    question: 有 part 被伺服器移到 detached 嗎
+    signal: >-
+      chq_detached_parts{reason!="detached_by_user"} > 0（broken、unexpected、ignored 等是伺服器自己移走的，可能少了資料）；打開 heavy metric 時
+      NumberOfDetachedParts - NumberOfDetachedByUserParts > 0。lab：資料檔被截短的 part 在重啟時移到 detached（broken-on-start），表的 count() 變 0 而不報錯；
+      chq_detached_parts{reason="broken-on-start"} 1，CHBrokenPartsDetached pending；使用者 DETACH 的 reason 是 detached_by_user，不響
+    metrics: [chq_detached_parts, ClickHouseAsyncMetrics_NumberOfDetachedParts, ClickHouseAsyncMetrics_NumberOfDetachedByUserParts]
+    evaluate_on: self
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-extra, ch-sam-detached, ch-sam-detached-user, ch-sam-heavy-gate, alt-detached, alt-fetch-detached]
+    upstream: { status: partial, note: "Altinity ClickHouseDetachedParts：DetachedParts > 0（含使用者 DETACH 的）" }
+    rules: [rules/targets/clickhouse.yml#CHBrokenPartsDetached, rules/targets/clickhouse.yml#CHDetachedPartsNative]
+
+  # ---------- 資料保護 ----------
+  - id: backups
+    aspect: protection
+    tier: 3
+    question: 原生 BACKUP 有失敗、最近一次成功是多久前
+    signal: >-
+      chq_backups_failed 30 分鐘內增加；time() - max(chq_backup_last_success_timestamp) > 26 小時（例子）。system.backups 存在記憶體，server 重啟後清空，
+      所以「多久前」要和 Uptime 一起看；用 clickhouse-backup 等外部工具時改用工具自己的 metric
+    metrics: [chq_backups_failed, chq_backup_last_success_timestamp]
+    evaluate_on: self
+    silent_failure: server 重啟後 chq_backup_last_success_timestamp 是 0，CHBackupTooOld 會誤報
+    evidence: tested
+    source: ch-lab
+    refs: [ch-exp-raw, ch-exp-extra, ch-sys-backups-status, ch-backups-infos, alt-backup-failed]
+    upstream: { status: partial, note: "Altinity 的備份規則用 clickhouse-backup 工具的 metric（clickhouse_backup_*），不是原生 BACKUP" }
+    rules: [rules/targets/clickhouse.yml#CHBackupFailed, rules/targets/clickhouse.yml#CHBackupTooOld]
+
+  - id: data-integrity
+    aspect: protection
+    tier: 2
+    question: 有 part 在所有 replica 上都找不到嗎
+    signal: ReplicatedDataLoss 增加（所有 replica 都沒有那個 part）。lab 沒有觸發
+    metrics: [ClickHouseProfileEvents_ReplicatedDataLoss]
+    evaluate_on: self
+    evidence: code
+    source: ch-core
+    refs: [ch-pe-datalost, alt-datalost]
+    upstream: { status: yes, note: "Altinity ClickHouseReplicatedDataLoss（increase[1m] > 0）" }
+    rules: [rules/targets/clickhouse.yml#CHReplicatedDataLoss]
+
+  # ---------- 容量 ----------
+  - id: disk-space
+    aspect: capacity
+    tier: 1
+    question: 每個 disk 還剩多少
+    signal: >-
+      DiskAvailable / DiskTotal < 10%（例子；DiskTotal 大於 1e18 的遠端 disk 排除）；predict_linear(DiskAvailable[6h], 1 天) < 0。名稱是 26.8 起的 key-value 形式
+      DiskAvailable{disk="default"}（lab 確認；舊的 DiskAvailable_default 沒有）。merge 要預留空間，空間不夠時 merge 停、part 數上升。lab 沒有填滿磁碟
+    metrics: [ClickHouseAsyncMetrics_DiskAvailable, ClickHouseAsyncMetrics_DiskTotal]
+    evaluate_on: self
+    evidence: code
+    source: ch-core
+    refs: [ch-sam-disk-available, ch-sam-disk-total, ch-ss-kv-mode, ch-exp-raw, alt-disk]
+    upstream: { status: partial, note: "Altinity ClickHouseDiskUsage：predict_linear(DiskFreeBytes[1d], 86400) < 0（exporter 查 system.disks）" }
+    rules: [rules/targets/clickhouse.yml#CHDiskSpaceLow, rules/targets/clickhouse.yml#CHDiskFillingUp]
+
+blind_spots:
+  - what: 每張表的唯讀、延遲、佇列、active replica 數（system.replicas）
+    category: exporter
+    why: /metrics 只有全伺服器的 ReadonlyReplica 數與最大延遲，最大延遲還不算唯讀的表
+    workaround: query-exporter 查 system.replicas、system.replication_queue
+    section: targets/clickhouse.md#custom-queries
+    covered_by:
+      tool: "query-exporter 5.2.2"
+      config: queries/clickhouse/clickhouse.yaml
+      metrics: [chq_replica_readonly, chq_replica_absolute_delay_seconds, chq_replica_active_replicas, chq_replica_total_replicas, chq_replication_queue_failing]
+      rules: [CHReplicaDelayHighSQL, CHReplicaInactive, CHReplicationQueueFailing]
+      refs: [ch-exp-raw, ch-exp-qe, ch-sys-rep-absdelay, ch-sys-rep-active]
+  - what: mutation 失敗與卡住（system.mutations）
+    category: exporter
+    why: /metrics 沒有 mutation 的狀態；NumberOfPendingMutations 預設不算，算了也只有數量
+    workaround: query-exporter 查 system.mutations 的 is_done、latest_fail_reason、create_time
+    section: targets/clickhouse.md#custom-queries
+    covered_by:
+      tool: "query-exporter 5.2.2"
+      config: queries/clickhouse/clickhouse.yaml
+      metrics: [chq_mutations_failing, chq_mutations_pending, chq_mutation_oldest_pending_seconds]
+      rules: [CHMutationFailing, CHMutationsStuck]
+      refs: [ch-exp-raw, ch-sys-mut-fail]
+  - what: 被伺服器移走的 part（system.detached_parts 的 reason）
+    category: exporter
+    why: NumberOfDetachedParts 是 heavy metric，預設不算；沒有 reason
+    workaround: query-exporter 查 system.detached_parts，依 reason 分
+    section: targets/clickhouse.md#custom-queries
+    covered_by:
+      tool: "query-exporter 5.2.2"
+      config: queries/clickhouse/clickhouse.yaml
+      metrics: [chq_detached_parts]
+      rules: [CHBrokenPartsDetached]
+      refs: [ch-exp-extra, ch-sam-heavy-gate]
+  - what: 哪一張表的 part 太多、目前的 parts_to_delay_insert
+    category: exporter
+    why: MaxPartCountForPartition 是全伺服器最大值；設定值不在 /metrics
+    workaround: query-exporter 查 system.parts 與 system.merge_tree_settings
+    section: targets/clickhouse.md#custom-queries
+    covered_by:
+      tool: "query-exporter 5.2.2"
+      config: queries/clickhouse/clickhouse.yaml
+      metrics: [chq_parts_max_per_partition, chq_merge_tree_setting]
+      rules: [CHPartsNearInsertDelay]
+      refs: [ch-exp-extra, ch-mt-delay]
+  - what: Distributed 送出失敗的原因與哪一張表
+    category: exporter
+    why: /metrics 只有全伺服器的檔案數與失敗次數
+    workaround: query-exporter 查 system.distribution_queue（error_count、broken_data_files；原因在 last_exception）
+    section: targets/clickhouse.md#custom-queries
+    covered_by:
+      tool: "query-exporter 5.2.2"
+      config: queries/clickhouse/clickhouse.yaml
+      metrics: [chq_distribution_queue_files, chq_distribution_queue_errors, chq_distribution_queue_broken_files]
+      refs: [ch-exp-raw]
+  - what: 原生 BACKUP 的結果與新鮮度
+    category: exporter
+    why: /metrics 沒有備份的 metric；system.backups 在記憶體，重啟後清空
+    workaround: query-exporter 查 system.backups；用 clickhouse-backup 時用它的 metric；定期還原演練
+    section: targets/clickhouse.md#protection
+    covered_by:
+      tool: "query-exporter 5.2.2"
+      config: queries/clickhouse/clickhouse.yaml
+      metrics: [chq_backups_failed, chq_backup_last_success_timestamp]
+      rules: [CHBackupFailed, CHBackupTooOld]
+      refs: [ch-exp-extra, ch-sys-backups-status, ch-backups-infos]
+  - what: 端到端能不能寫入（真的 insert 一列）
+    category: database
+    why: /ping 靜態、/replicas_status 不看唯讀；SQL 探測只查 system.replicas，不證明 insert 成功
+    workaround: 外部 SQL probe 定期寫一列到測試用的 Replicated 表並讀回
+    section: targets/clickhouse.md#health-second-path
+  - what: 哪一條查詢造成負載（system.query_log）
+    category: exporter
+    why: /metrics 只有彙總；語句層要查 system.query_log 或 system.processes
+    workaround: query-exporter 彙總 query_log（未實測）；或直接查 system.query_log
+    section: targets/clickhouse.md#workload
+  - what: TLS 憑證到期
+    category: database
+    why: /metrics 沒有憑證到期的 metric
+    workaround: blackbox 的 tls module 探 https_port、tcp_port_secure 的 probe_ssl_earliest_cert_expiry
+    section: targets/clickhouse.md#blind-spots
+  - what: 慢磁碟、磁碟滿、Keeper 慢、ON CLUSTER DDL 佇列卡住
+    category: other
+    why: lab 沒有重現；規則只讀碼
+    workaround: CHDataErrors、CHDiskSpaceLow、CHKeeperRequestsBacklog；node_exporter 的磁碟延遲；ON CLUSTER DDL 看 system.distributed_ddl_queue（未實測）
+    section: targets/clickhouse.md#blind-spots

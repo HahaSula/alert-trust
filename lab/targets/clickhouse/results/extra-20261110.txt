@@ -1,0 +1,209 @@
+環境：同 run.sh（ClickHouse v26.10.2.103-stable ×2、Keeper ×3、Prometheus v3.13.5、query-exporter 5.2.2）
+
+## J part 數對 parts_to_delay_insert（query-exporter 的 merge_tree_settings 查詢每 1 分鐘）（03:05:25Z）
+  SQL[:31001] CREATE TABLE default.events ON CLUSTER lab (ts DateTime DEFAULT now(), k UInt32, v String) → 200 4.33s ch2	9000	0		1	0 | ch1	9000	0		0	0
+  SQL[:31001] SYSTEM STOP MERGES default.events → 200 0.02s 
+  SQL[:31002] SYSTEM STOP MERGES default.events → 200 0.02s 
+  SQL[:31001] SELECT count() FROM system.parts WHERE table = 'events' AND active → 200 0.02s 15
+  > chq_merge_tree_setting  →  6 series
+    {__name__="chq_merge_tree_setting", database="ch1", instance="ch1:9363", job="clickhouse-sql", name="parts_to_delay_insert"} 20
+    {__name__="chq_merge_tree_setting", database="ch1", instance="ch1:9363", job="clickhouse-sql", name="parts_to_throw_insert"} 40
+    {__name__="chq_merge_tree_setting", database="ch1", instance="ch1:9363", job="clickhouse-sql", name="max_parts_in_total"} 100000
+    {__name__="chq_merge_tree_setting", database="ch2", instance="ch2:9363", job="clickhouse-sql", name="parts_to_delay_insert"} 20
+    {__name__="chq_merge_tree_setting", database="ch2", instance="ch2:9363", job="clickhouse-sql", name="parts_to_throw_insert"} 40
+    {__name__="chq_merge_tree_setting", database="ch2", instance="ch2:9363", job="clickhouse-sql", name="max_parts_in_total"} 100000
+  > max by (instance) (ClickHouseAsyncMetrics_MaxPartCountForPartition{job="clickhouse-server"}) / on (instance) max by (instance) (chq_merge_tree_setting{job="clickhouse-sql", name="parts_to_delay_insert"})  →  2 series
+    {instance="ch2:9363"} 0.75
+    {instance="ch1:9363"} 0.75
+  alerts（^CHParts）: 2
+    pending  CHPartsNearInsertDelay ch2:9363
+    pending  CHPartsNearInsertDelay ch1:9363
+  query-exporter log 裡被跳過的執行（Run time of job ... was missed）：5
+  SQL[:31001] SYSTEM START MERGES default.events → 200 0.02s 
+  SQL[:31002] SYSTEM START MERGES default.events → 200 0.02s 
+
+## K broken part：截短 ch2 本機 MergeTree 表的一個資料檔後重啟（03:06:45Z）
+  SQL[:31002] CREATE TABLE default.local_t (k UInt32, v String) ENGINE = MergeTree ORDER BY k → 200 0.03s 
+  SQL[:31002] INSERT INTO default.local_t SELECT number, toString(number) FROM numbers(100000) → 200 0.03s 
+  part 路徑：/var/lib/clickhouse/store/4d6/4d6b400e-b70b-4285-bca1-83f3aafebcd9/all_1_1_0/
+total 900
+-rw-r----- 1 clickhouse clickhouse    310 Nov 10 03:06 checksums.txt
+-rw-r----- 1 clickhouse clickhouse    113 Nov 10 03:06 columns_substreams.txt
+-rw-r----- 1 clickhouse clickhouse     59 Nov 10 03:06 columns.txt
+-rw-r----- 1 clickhouse clickhouse      6 Nov 10 03:06 count.txt
+-rw-r----- 1 clickhouse clickhouse 873902 Nov 10 03:06 data.bin
+-rw-r----- 1 clickhouse clickhouse    210 Nov 10 03:06 data.cmrk4
+-rw-r----- 1 clickhouse clickhouse     10 Nov 10 03:06 default_compression_codec.txt
+-rw-r----- 1 clickhouse clickhouse      1 Nov 10 03:06 metadata_version.txt
+-rw-r----- 1 clickhouse clickhouse     86 Nov 10 03:06 primary.cidx
+-rw-r----- 1 clickhouse clickhouse    313 Nov 10 03:06 serialization.json
+-rw-r----- 1 clickhouse clickhouse   6487 Nov 10 03:06 statistics.packed
+  截短 data.bin
+  SQL[:31002] SELECT count() FROM default.local_t → 200 0.02s 0
+  SQL[:31002] SELECT name, reason FROM system.detached_parts WHERE table = 'local_t' FORMAT TSV → 200 0.02s broken-on-start_all_1_1_0	broken-on-start
+ch2-1  | 2026.11.10 03:06:54.982833 [ 250 ] {} <Error> default.local_t (4d6b400e-b70b-4285-bca1-83f3aafebcd9): Part /var/lib/clickhouse/store/4d6/4d6b400e-b70b-4285-bca1-83f3aafebcd9/all_1_1_0/ is broken and needs manual correction. Reason: Code: 228. DB::Exce
+ch2-1  | 2026.11.10 03:06:54.983007 [ 250 ] {} <Error> default.local_t (4d6b400e-b70b-4285-bca1-83f3aafebcd9): Detaching broken part /var/lib/clickhouse/store/4d6/4d6b400e-b70b-4285-bca1-83f3aafebcd9/all_1_1_0 (size: 7.43 KiB). If it happened after update, it 
+  > chq_detached_parts  →  0 series
+  > ClickHouseAsyncMetrics_NumberOfDetachedParts  →  1 series
+    {__name__="ClickHouseAsyncMetrics_NumberOfDetachedParts", instance="ch2:9363", job="clickhouse-server"} 1
+  > ClickHouseAsyncMetrics_NumberOfDetachedByUserParts  →  1 series
+    {__name__="ClickHouseAsyncMetrics_NumberOfDetachedByUserParts", instance="ch2:9363", job="clickhouse-server"} 0
+  alerts（^CH(Broken|Detached)）: 1
+    pending  CHDetachedPartsNative ch2:9363
+
+## L 使用者 DETACH PARTITION（對照）（03:07:32Z）
+  SQL[:31001] CREATE TABLE default.local_u (k UInt32) ENGINE = MergeTree ORDER BY k → 200 0.03s 
+  SQL[:31001] INSERT INTO default.local_u SELECT number FROM numbers(10) → 200 0.08s 
+  SQL[:31001] ALTER TABLE default.local_u DETACH PARTITION tuple() → 200 0.02s 
+  SQL[:31001] SELECT name, reason FROM system.detached_parts WHERE table = 'local_u' FORMAT TSV → 200 0.02s all_1_1_0
+  > chq_detached_parts  →  2 series
+    {__name__="chq_detached_parts", database="ch2", instance="ch2:9363", job="clickhouse-sql", reason="broken-on-start", table="default.local_t"} 1
+    {__name__="chq_detached_parts", database="ch1", instance="ch1:9363", job="clickhouse-sql", reason="detached_by_user", table="default.local_u"} 1
+  alerts（^CH(Broken|Detached)）: 2
+    pending  CHBrokenPartsDetached ch2:9363
+    pending  CHDetachedPartsNative ch2:9363
+
+## M 備份：成功一次、同名再做一次（失敗），等 query-exporter 更新（run.sh 的 70 秒不夠：容器時鐘慢，1m 的 interval 實際更長）（03:07:57Z）
+  SQL[:31001] BACKUP TABLE default.events TO Disk('backups', 'm1.zip') → 200 0.05s 3cfe15d6-464e-4a01-9aed-0be5ee37b465	BACKUP_CREATED
+  SQL[:31001] BACKUP TABLE default.events TO Disk('backups', 'm1.zip') → 500 0.02s Code: 598. DB::Exception: Backup Disk('backups', 'm1.zip') already exists. (BACKUP_ALREADY_EXISTS) (version 26.10.2.103 (official build))
+  query-exporter 更新用了 55 秒（主機）
+  > chq_backup_last_success_timestamp  →  2 series
+    {__name__="chq_backup_last_success_timestamp", database="ch1", instance="ch1:9363", job="clickhouse-sql"} 1794280077
+    {__name__="chq_backup_last_success_timestamp", database="ch2", instance="ch2:9363", job="clickhouse-sql"} 0
+  > chq_backups_failed  →  2 series
+    {__name__="chq_backups_failed", database="ch1", instance="ch1:9363", job="clickhouse-sql"} 1
+    {__name__="chq_backups_failed", database="ch2", instance="ch2:9363", job="clickhouse-sql"} 0
+  > time() - max(chq_backup_last_success_timestamp{job="clickhouse-sql"})  →  1 series
+    {} 70.25399994850159
+  alerts（^CHBackup）: 1
+    firing   CHBackupFailed ch1:9363
+
+## N Keeper 失去 quorum 時 SQL 路徑與 ZooKeeperSession* 的變化（keeper_connection 查詢已從設定拿掉）（03:09:07Z）
+  停止：keeper2 keeper1
+  -- +30 秒（主機）
+  > ClickHouseMetrics_ZooKeeperSession{job="clickhouse-server"}  →  2 series
+    {__name__="ClickHouseMetrics_ZooKeeperSession", instance="ch2:9363", job="clickhouse-server"} 1
+    {__name__="ClickHouseMetrics_ZooKeeperSession", instance="ch1:9363", job="clickhouse-server"} 1
+  > ClickHouseMetrics_ZooKeeperSessionExpired{job="clickhouse-server"}  →  2 series
+    {__name__="ClickHouseMetrics_ZooKeeperSessionExpired", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseMetrics_ZooKeeperSessionExpired", instance="ch1:9363", job="clickhouse-server"} 1
+  > ClickHouseMetrics_ReadonlyReplica{job="clickhouse-server"}  →  2 series
+    {__name__="ClickHouseMetrics_ReadonlyReplica", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseMetrics_ReadonlyReplica", instance="ch1:9363", job="clickhouse-server"} 1
+  > chq_replica_readonly{table="default.events"}  →  2 series
+    {__name__="chq_replica_readonly", database="ch2", instance="ch2:9363", job="clickhouse-sql", table="default.events"} 0
+    {__name__="chq_replica_readonly", database="ch1", instance="ch1:9363", job="clickhouse-sql", table="default.events"} 1
+  > time() - query_timestamp{job="clickhouse-sql", query="replicas"}  →  2 series
+    {database="ch2", instance="ch2:9363", job="clickhouse-sql", query="replicas"} 37.52716684341431
+    {database="ch1", instance="ch1:9363", job="clickhouse-sql", query="replicas"} 7.542987585067749
+  > sum by (database, status) (queries_total{job="clickhouse-sql", query="replicas"})  →  5 series
+    {database="ch2", status="success"} 11
+    {database="ch1", status="success"} 12
+    {database="ch2", status="error"} 1
+    {database="ch1", status="timeout"} 1
+    {database="ch2", status="timeout"} 1
+  -- +70 秒（主機）
+  > ClickHouseMetrics_ZooKeeperSession{job="clickhouse-server"}  →  2 series
+    {__name__="ClickHouseMetrics_ZooKeeperSession", instance="ch2:9363", job="clickhouse-server"} 1
+    {__name__="ClickHouseMetrics_ZooKeeperSession", instance="ch1:9363", job="clickhouse-server"} 1
+  > ClickHouseMetrics_ZooKeeperSessionExpired{job="clickhouse-server"}  →  2 series
+    {__name__="ClickHouseMetrics_ZooKeeperSessionExpired", instance="ch2:9363", job="clickhouse-server"} 3
+    {__name__="ClickHouseMetrics_ZooKeeperSessionExpired", instance="ch1:9363", job="clickhouse-server"} 3
+  > ClickHouseMetrics_ReadonlyReplica{job="clickhouse-server"}  →  2 series
+    {__name__="ClickHouseMetrics_ReadonlyReplica", instance="ch2:9363", job="clickhouse-server"} 1
+    {__name__="ClickHouseMetrics_ReadonlyReplica", instance="ch1:9363", job="clickhouse-server"} 1
+  > chq_replica_readonly{table="default.events"}  →  2 series
+    {__name__="chq_replica_readonly", database="ch2", instance="ch2:9363", job="clickhouse-sql", table="default.events"} 1
+    {__name__="chq_replica_readonly", database="ch1", instance="ch1:9363", job="clickhouse-sql", table="default.events"} 1
+  > time() - query_timestamp{job="clickhouse-sql", query="replicas"}  →  2 series
+    {database="ch2", instance="ch2:9363", job="clickhouse-sql", query="replicas"} 21.56883406639099
+    {database="ch1", instance="ch1:9363", job="clickhouse-sql", query="replicas"} 21.568440198898315
+  > sum by (database, status) (queries_total{job="clickhouse-sql", query="replicas"})  →  5 series
+    {database="ch2", status="success"} 13
+    {database="ch1", status="success"} 15
+    {database="ch2", status="error"} 1
+    {database="ch1", status="timeout"} 1
+    {database="ch2", status="timeout"} 2
+  Keeper 啟動
+  -- +30 秒（主機）
+  > ClickHouseMetrics_ZooKeeperSession{job="clickhouse-server"}  →  2 series
+    {__name__="ClickHouseMetrics_ZooKeeperSession", instance="ch2:9363", job="clickhouse-server"} 1
+    {__name__="ClickHouseMetrics_ZooKeeperSession", instance="ch1:9363", job="clickhouse-server"} 1
+  > ClickHouseMetrics_ZooKeeperSessionExpired{job="clickhouse-server"}  →  2 series
+    {__name__="ClickHouseMetrics_ZooKeeperSessionExpired", instance="ch2:9363", job="clickhouse-server"} 3
+    {__name__="ClickHouseMetrics_ZooKeeperSessionExpired", instance="ch1:9363", job="clickhouse-server"} 3
+  > ClickHouseMetrics_ReadonlyReplica{job="clickhouse-server"}  →  2 series
+    {__name__="ClickHouseMetrics_ReadonlyReplica", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseMetrics_ReadonlyReplica", instance="ch1:9363", job="clickhouse-server"} 0
+  > chq_replica_readonly{table="default.events"}  →  2 series
+    {__name__="chq_replica_readonly", database="ch2", instance="ch2:9363", job="clickhouse-sql", table="default.events"} 0
+    {__name__="chq_replica_readonly", database="ch1", instance="ch1:9363", job="clickhouse-sql", table="default.events"} 0
+  > time() - query_timestamp{job="clickhouse-sql", query="replicas"}  →  2 series
+    {database="ch2", instance="ch2:9363", job="clickhouse-sql", query="replicas"} 25.30791401863098
+    {database="ch1", instance="ch1:9363", job="clickhouse-sql", query="replicas"} 25.308354139328003
+  > sum by (database, status) (queries_total{job="clickhouse-sql", query="replicas"})  →  5 series
+    {database="ch2", status="success"} 14
+    {database="ch1", status="success"} 16
+    {database="ch2", status="error"} 1
+    {database="ch1", status="timeout"} 1
+    {database="ch2", status="timeout"} 2
+  -- +90 秒（主機）
+  > ClickHouseMetrics_ZooKeeperSession{job="clickhouse-server"}  →  2 series
+    {__name__="ClickHouseMetrics_ZooKeeperSession", instance="ch2:9363", job="clickhouse-server"} 1
+    {__name__="ClickHouseMetrics_ZooKeeperSession", instance="ch1:9363", job="clickhouse-server"} 1
+  > ClickHouseMetrics_ZooKeeperSessionExpired{job="clickhouse-server"}  →  2 series
+    {__name__="ClickHouseMetrics_ZooKeeperSessionExpired", instance="ch2:9363", job="clickhouse-server"} 3
+    {__name__="ClickHouseMetrics_ZooKeeperSessionExpired", instance="ch1:9363", job="clickhouse-server"} 3
+  > ClickHouseMetrics_ReadonlyReplica{job="clickhouse-server"}  →  2 series
+    {__name__="ClickHouseMetrics_ReadonlyReplica", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseMetrics_ReadonlyReplica", instance="ch1:9363", job="clickhouse-server"} 0
+  > chq_replica_readonly{table="default.events"}  →  2 series
+    {__name__="chq_replica_readonly", database="ch2", instance="ch2:9363", job="clickhouse-sql", table="default.events"} 0
+    {__name__="chq_replica_readonly", database="ch1", instance="ch1:9363", job="clickhouse-sql", table="default.events"} 0
+  > time() - query_timestamp{job="clickhouse-sql", query="replicas"}  →  2 series
+    {database="ch2", instance="ch2:9363", job="clickhouse-sql", query="replicas"} 16.14599585533142
+    {database="ch1", instance="ch1:9363", job="clickhouse-sql", query="replicas"} 16.14569592475891
+  > sum by (database, status) (queries_total{job="clickhouse-sql", query="replicas"})  →  5 series
+    {database="ch2", status="success"} 17
+    {database="ch1", status="success"} 19
+    {database="ch2", status="error"} 1
+    {database="ch1", status="timeout"} 1
+    {database="ch2", status="timeout"} 2
+  -- +151 秒（主機）
+  > ClickHouseMetrics_ZooKeeperSession{job="clickhouse-server"}  →  2 series
+    {__name__="ClickHouseMetrics_ZooKeeperSession", instance="ch2:9363", job="clickhouse-server"} 1
+    {__name__="ClickHouseMetrics_ZooKeeperSession", instance="ch1:9363", job="clickhouse-server"} 1
+  > ClickHouseMetrics_ZooKeeperSessionExpired{job="clickhouse-server"}  →  2 series
+    {__name__="ClickHouseMetrics_ZooKeeperSessionExpired", instance="ch2:9363", job="clickhouse-server"} 3
+    {__name__="ClickHouseMetrics_ZooKeeperSessionExpired", instance="ch1:9363", job="clickhouse-server"} 3
+  > ClickHouseMetrics_ReadonlyReplica{job="clickhouse-server"}  →  2 series
+    {__name__="ClickHouseMetrics_ReadonlyReplica", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseMetrics_ReadonlyReplica", instance="ch1:9363", job="clickhouse-server"} 0
+  > chq_replica_readonly{table="default.events"}  →  2 series
+    {__name__="chq_replica_readonly", database="ch2", instance="ch2:9363", job="clickhouse-sql", table="default.events"} 0
+    {__name__="chq_replica_readonly", database="ch1", instance="ch1:9363", job="clickhouse-sql", table="default.events"} 0
+  > time() - query_timestamp{job="clickhouse-sql", query="replicas"}  →  2 series
+    {database="ch2", instance="ch2:9363", job="clickhouse-sql", query="replicas"} 5.005176782608032
+    {database="ch1", instance="ch1:9363", job="clickhouse-sql", query="replicas"} 5.005454778671265
+  > sum by (database, status) (queries_total{job="clickhouse-sql", query="replicas"})  →  5 series
+    {database="ch2", status="success"} 22
+    {database="ch1", status="success"} 24
+    {database="ch2", status="error"} 1
+    {database="ch1", status="timeout"} 1
+    {database="ch2", status="timeout"} 2
+  alerts（^CH(Keeper|Sql|Replica)）: 3
+    firing   CHKeeperSessionLost ch1:9363
+    firing   CHKeeperSessionLost ch2:9363
+    pending  CHSqlQueriesFailing ch2:9363
+  query-exporter log 裡被跳過的執行：15
+  > chq_merge_tree_setting  →  6 series
+    {__name__="chq_merge_tree_setting", database="ch1", instance="ch1:9363", job="clickhouse-sql", name="parts_to_delay_insert"} 20
+    {__name__="chq_merge_tree_setting", database="ch1", instance="ch1:9363", job="clickhouse-sql", name="parts_to_throw_insert"} 40
+    {__name__="chq_merge_tree_setting", database="ch1", instance="ch1:9363", job="clickhouse-sql", name="max_parts_in_total"} 100000
+    {__name__="chq_merge_tree_setting", database="ch2", instance="ch2:9363", job="clickhouse-sql", name="parts_to_delay_insert"} 20
+    {__name__="chq_merge_tree_setting", database="ch2", instance="ch2:9363", job="clickhouse-sql", name="parts_to_throw_insert"} 40
+    {__name__="chq_merge_tree_setting", database="ch2", instance="ch2:9363", job="clickhouse-sql", name="max_parts_in_total"} 100000
+
+## 結束（03:13:10Z）
+  沒有 at-ch 容器
+  沒有 at-ch volume

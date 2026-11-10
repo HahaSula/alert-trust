@@ -609,3 +609,88 @@ terms:
       - "`majority_sst_files_rejections`：過半副本超過上限而拒絕的寫入"
       - "`rocksdb_current_version_num_sst_files`（輸出時加總到表）"
     refs: [yb-sst-soft, yb-sst-hard, yb-sst-rej]
+
+  ch-parts-to-insert:
+    title: ClickHouse 的 part 數門檻（Too many parts）
+    kind: config
+    systems: [clickhouse]
+    tokens: [parts_to_delay_insert, parts_to_throw_insert, max_parts_in_total]
+    where: "MergeTree 設定：config.xml 的 `<merge_tree>`，或每張表的 `SETTINGS`；查詢層級也可覆寫 parts_to_delay_insert／parts_to_throw_insert"
+    default: "parts_to_delay_insert 1000、parts_to_throw_insert 3000（單一 partition 的 active part 數）；max_parts_in_total 100000（整張表）"
+    observe:
+      - "`ClickHouseAsyncMetrics_MaxPartCountForPartition`：全伺服器單一 partition 的最大 part 數"
+      - "`ClickHouseProfileEvents_DelayedInserts`、`ClickHouseProfileEvents_RejectedInserts`、`ClickHouseErrorMetric_TOO_MANY_PARTS`"
+      - "`system.merge_tree_settings`（伺服器層級的值）；每張表的覆寫在 `SHOW CREATE TABLE`"
+    note: "超過 parts_to_delay_insert 時 insert 被 sleep（最多 max_delay_to_insert 秒），超過 parts_to_throw_insert 時丟 TOO_MANY_PARTS。"
+    refs: [ch-mt-delay, ch-mt-throw, ch-mt-max-total, ch-mtd-delay-fn, ch-mtd-rejected, ch-sam-maxparts]
+
+  ch-delay-to-close:
+    title: ClickHouse /replicas_status 的延遲門檻
+    kind: config
+    systems: [clickhouse]
+    tokens: [min_relative_delay_to_close, min_absolute_delay_to_close]
+    where: "MergeTree 設定（`<merge_tree>` 或 `<replicated_merge_tree>`）"
+    default: "min_relative_delay_to_close 300 秒；min_absolute_delay_to_close 0（不看絕對延遲）"
+    observe:
+      - "blackbox 探 `/replicas_status`：超過門檻時 503"
+    note: "和 `max_replica_delay_for_distributed_queries`（預設 300，Distributed 查詢挑 replica 用）是不同的設定。唯讀的表不會讓 /replicas_status 失敗。"
+    refs: [ch-mt-min-rel-close, ch-mt-min-abs-close, ch-rs-close, ch-rs-readonly-skip, ch-set-max-replica-delay]
+
+  ch-heavy-metrics:
+    title: ClickHouse 的 heavy asynchronous metrics
+    kind: config
+    systems: [clickhouse]
+    tokens: [asynchronous_metrics_enable_heavy_metrics, asynchronous_heavy_metrics_update_period_s]
+    where: "伺服器設定（config.xml 頂層）"
+    default: "asynchronous_metrics_enable_heavy_metrics false；asynchronous_heavy_metrics_update_period_s 120"
+    observe:
+      - "打開後才有 `ClickHouseAsyncMetrics_NumberOfDetachedParts`、`NumberOfDetachedByUserParts`、`NumberOfPendingMutations`、`NumberOfPendingMutationsOverExecutionTime`"
+    refs: [ch-ss-heavy-enable, ch-ss-heavy-period, ch-sam-heavy-gate, ch-sam-detached, ch-sam-mutations]
+
+  ch-async-kv-mode:
+    title: ClickHouse async metric 的 key-value 形式
+    kind: config
+    systems: [clickhouse]
+    tokens: [asynchronous_metrics_key_values_mode]
+    where: "伺服器設定；SYSTEM RELOAD CONFIG 即生效"
+    default: "key_values（26.8 起）：`DiskAvailable{disk=\"default\"}`；legacy_names 是 26.8 以前的 `DiskAvailable_default`；both 兩種都輸出"
+    observe:
+      - "`ClickHouseAsyncMetrics_DiskAvailable`、`DiskTotal`、`DiskUnreserved` 等帶 disk、device、cpu label 的 series"
+    note: "照 26.8 以前寫的規則（`ClickHouseAsyncMetrics_DiskAvailable_default`）在預設設定下回傳空。"
+    refs: [ch-ss-kv-mode, ch-prom-keyvalue-label, ch-sam-disk-available]
+
+  ch-server-memory:
+    title: ClickHouse 的記憶體上限
+    kind: config
+    systems: [clickhouse]
+    tokens: [max_server_memory_usage, max_server_memory_usage_to_ram_ratio, max_memory_usage]
+    where: "max_server_memory_usage、max_server_memory_usage_to_ram_ratio：伺服器設定；max_memory_usage：查詢設定（profile 或 SETTINGS）"
+    default: "max_server_memory_usage 0（用 RAM × max_server_memory_usage_to_ram_ratio 0.9）；max_memory_usage 0（不限制單一查詢）"
+    observe:
+      - "`ClickHouseMetrics_MemoryTracking`；`ClickHouseAsyncMetrics_CGroupMemoryTotal`、`OSMemoryTotal`"
+      - "`ClickHouseErrorMetric_MEMORY_LIMIT_EXCEEDED`、`ClickHouseProfileEvents_QueryMemoryLimitExceeded`"
+    note: "/metrics 沒有「目前生效的上限」這個數字；設定值要查 system.server_settings。"
+    refs: [ch-ss-max-mem, ch-ss-mem-ratio, ch-set-max-mem, ch-cm-memtracking, ch-mem-exceeded]
+
+  ch-async-insert:
+    title: ClickHouse 的非同步 insert
+    kind: config
+    systems: [clickhouse]
+    tokens: [async_insert, wait_for_async_insert]
+    where: "查詢設定（profile 或 SETTINGS）"
+    default: "async_insert true（26.2 起）；wait_for_async_insert true"
+    observe:
+      - "`ClickHouseMetrics_PendingAsyncInsert`；`ClickHouseProfileEvents_AsyncInsertQuery`、`AsyncInsertFlush`、`FailedAsyncInsertQuery`"
+    refs: [ch-set-async-insert, ch-cm-pendingasync]
+
+  ch-system-events-zero:
+    title: system.events 是否列出 0 的事件
+    kind: config
+    systems: [clickhouse]
+    tokens: [system_events_show_zero_values]
+    where: "查詢設定"
+    default: "false：system.events 只列出發生過的事件"
+    observe:
+      - "原生 /metrics 不受影響：每個 ProfileEvent 都輸出，含 0"
+    note: "用 SQL 讀 system.events 的 exporter（Altinity metrics-exporter）在事件第一次發生前沒有這條 series；increase() 抓不到第一次的增加。"
+    refs: [ch-set-events-zero, ch-events-zero, ch-prom-events-all, alt-fetch-events]

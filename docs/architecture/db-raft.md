@@ -155,3 +155,17 @@ compaction 之後檔案不會縮小，空出來的頁面要 defrag 才還給檔�
 | TiKV（TiDB） | 每個 Region 一組；PD 內嵌 etcd | 已加在 [TiKV](#tikv)；snapshot 傳送與 Region 層級的 leader 平衡尚未補 |
 | YugabyteDB | 每個 tablet 一組；master 另一組 | 已加在 [YugabyteDB](#yugabytedb)；remote bootstrap 與 tablet leader 平衡尚未補 |
 | MongoDB | replica set 的選舉協定（Raft 變體） | term、election、oplog 落後 |
+
+## ClickHouse Keeper：一組 Raft 存複寫 log {#clickhouse-keeper}
+
+**機制。**ClickHouse Keeper 是 ZooKeeper 相容的協調服務，Raft 用 NuRaft 函式庫實作；一個 Keeper 叢集一組 Raft（通常 3 或 5 台）。leader 每 `heart_beat_interval_ms`（500ms）送 heartbeat，follower 在 election timeout（1–2 秒）內沒收到就發起選舉。[^ch-k-nuraft][^ch-k-heartbeat][^ch-k-election]ClickHouse server 把 ReplicatedMergeTree 的複寫 log、每台 replica 的 queue 與 ON CLUSTER DDL 佇列存在 Keeper 上（見[分析型架構](db-olap.md#replication)）。
+
+| etcd 的機制 | Keeper 的對應 | 什麼會壞 | 看得到的訊號 |
+|---|---|---|---|
+| [選主](#election) | `KeeperIsLeader`；follower 也輸出 0 | 沒有 leader 時所有 Keeper 請求停 | [role-detection](../components/clickhouse.md#role-detection) |
+| [quorum](#quorum) | `/ready`（`http_control`）：leader，或 follower 而且有 leader 才 200；leader 的 `KeeperSyncedFollowers` | 存活的節點照常回應 `/metrics` 與 4lw `ruok` | [keeper-quorum](../components/clickhouse.md#keeper-quorum)、[health-second-path](../components/clickhouse.md#health-second-path) |
+| client 端 | server 的 Keeper session（`ZooKeeperSession`） | session 過期後 Replicated 表唯讀 | [keeper-session](../components/clickhouse.md#keeper-session)、[replica-readonly](../components/clickhouse.md#replica-readonly) |
+
+**健康端點不一樣。**4lw 的 `ruok` 一律回 `imok`；`mntr` 在沒有服務時只回 `This instance is not currently serving requests`；只有 `/ready` 依 leader 狀態回 503。[^ch-k-ruok][^ch-k-mntr-inactive][^ch-k-ready][^ch-k-ready-503]
+
+**lab 看到的。**3 台停 2 台（leader 與一台 follower）：存活那台 `up` 1、`KeeperIsLeader` 0、`/ready` 503（`hasLeader:false`）、`ruok` `imok`。兩台 server +10 秒（主機時鐘）表已唯讀，insert 卡住超過 30 秒；`/ping` 與 `/replicas_status` 的狀態碼仍是 200。Keeper 啟動後 3 秒表恢復可寫。Altinity 的 ClickHouseKeeperLostQuorum 以 `KeeperIsLeader == 1` 為前提，這時回傳空。<span class="at-chip at-ev-tested">實測</span>[^ch-exp-raw][^alt-k-lostquorum]細節見 [ClickHouse 頁](../targets/clickhouse.md#cluster)。

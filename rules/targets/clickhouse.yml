@@ -1,0 +1,456 @@
+# ClickHouse（server 與 ClickHouse Keeper；原生 <prometheus> /metrics，model: native）的建議規則。ClickHouse v26.10.2.103-stable（Apache-2.0）。
+#
+# 前提：每台 server 與 Keeper 都要在設定裡打開 <prometheus>（預設 config.xml 這段是註解掉的）。沒打開時 9363 不 listen，
+# up == 0（connection refused）；打開但關掉 <asynchronous_metrics> 等子項時 up == 1、一批 metric 消失，由 CHMetricFamiliesMissing 抓。
+#
+# job 選擇器是佔位用的，請換成實際的名稱：
+#   job="clickhouse-server"           Prometheus 抓每台 server 的 :9363/metrics（<prometheus><port>）
+#   job="clickhouse-keeper"           Prometheus 抓每台 Keeper 的 /metrics（Keeper 設定檔自己的 <prometheus>）
+#   job="clickhouse-sql"              query-exporter 5.2.2 跑 queries/clickhouse/clickhouse.yaml（每台 server 一個 DSN）；
+#                                     metric_relabel_configs 把 database label（ch1）轉成和 /metrics 相同的 instance（ch1:9363）
+#   job="clickhouse-ping"             blackbox 探每台 server 的 HTTP /ping（靜態 "Ok."，只證明 HTTP 介面活著）
+#   job="clickhouse-replicas-status"  blackbox 探 /replicas_status?verbose=1；503 或 body 有 "is readonly" 就失敗
+#   job="clickhouse-sql-probe"        blackbox 用 HTTP 介面跑 SELECT count() FROM system.replicas WHERE is_readonly，body 不是 0 就失敗
+#   job="clickhouse-keeper-ready"     blackbox 探每台 Keeper 的 /ready（keeper_server.http_control；沒有 leader 時 503）
+# 各 probe job 都要把 instance relabel 成被探測元件 /metrics target 的 host:port（例子見 lab/targets/clickhouse/prom/prometheus.yml），
+# 三方交叉（up、probe、健康 metric）才能用 on (instance) 對上。job 名稱錯了不會安靜：每個 job 都有 absent。
+# 一組 job 代表一個叢集；多個叢集共用 job 時，把 by (job) 換成你的 cluster label。
+#
+# 預期的 server 與 Keeper 數寫在 clickhouse-params（recording rule，label role），請依叢集修改。
+# 門檻以 scrape_interval 15s、scrape_timeout 10s 為基準；標「例子」的數字沒有官方依據，請依環境調整。
+# runbook_url 指向 alert-trust 網站上對應訊號的段落。
+groups:
+  - name: clickhouse-params
+    rules:
+      - record: clickhouse_expected_members
+        expr: vector(2)
+        labels: { role: server }
+      - record: clickhouse_expected_members
+        expr: vector(3)
+        labels: { role: keeper }
+
+  - name: clickhouse-endpoint
+    rules:
+      - alert: CHEndpointDown
+        expr: up{job=~"clickhouse-server|clickhouse-keeper"} == 0
+        for: 2m
+        labels: { severity: critical, component: clickhouse, tier: "1", aspect: exporter }
+        annotations:
+          summary: "抓不到 {{ $labels.job }} {{ $labels.instance }} 的 /metrics；和同一台的 probe 一起看：兩者都失敗是 process 或主機，只有這條響是 scrape 路徑或 <prometheus> 沒打開"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#endpoint-up
+      - alert: CHServerEndpointMissing
+        expr: absent(up{job="clickhouse-server"})
+        for: 5m
+        labels: { severity: critical, component: clickhouse, tier: "1", aspect: exporter }
+        annotations:
+          summary: "完全沒有 job=\"clickhouse-server\" 的 target；服務發現或 job 名稱錯了，所有 server 規則都回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#endpoint-up
+      - alert: CHKeeperEndpointMissing
+        expr: absent(up{job="clickhouse-keeper"})
+        for: 5m
+        labels: { severity: critical, component: clickhouse, tier: "1", aspect: exporter }
+        annotations:
+          summary: "完全沒有 job=\"clickhouse-keeper\" 的 target；Keeper 的 leader 與 quorum 規則都回傳空（用 ZooKeeper 的叢集改成 zookeeper 的 job）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#endpoint-up
+      - alert: CHMetricFamiliesMissing
+        expr: |
+          up{job="clickhouse-server"} == 1
+          unless on (job, instance) (
+              ClickHouseAsyncMetrics_MaxPartCountForPartition
+            and on (job, instance) ClickHouseMetrics_ReadonlyReplica
+            and on (job, instance) ClickHouseProfileEvents_RejectedInserts
+            and on (job, instance) ClickHouseErrorMetric_ALL
+            and on (job, instance) group by (job, instance) (ClickHouseAsyncMetrics_DiskAvailable)
+          )
+        for: 10m
+        labels: { severity: warning, component: clickhouse, tier: "1", aspect: exporter }
+        annotations:
+          summary: "{{ $labels.instance }} 的 /metrics 少了一組 metric（<prometheus> 的 asynchronous_metrics／metrics／events／errors 子項被關，或 asynchronous_metrics_key_values_mode 改成 legacy_names 讓 DiskAvailable 變成 DiskAvailable_default）；依賴它們的規則回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#metric-families-present
+      - alert: CHKeeperMetricFamiliesMissing
+        expr: |
+          up{job="clickhouse-keeper"} == 1
+          unless on (job, instance) (
+              ClickHouseAsyncMetrics_KeeperIsLeader
+            and on (job, instance) ClickHouseAsyncMetrics_KeeperSyncedFollowers
+            and on (job, instance) ClickHouseMetrics_KeeperOutstandingRequests
+          )
+        for: 10m
+        labels: { severity: warning, component: clickhouse, tier: "1", aspect: exporter }
+        annotations:
+          summary: "Keeper {{ $labels.instance }} 的 /metrics 少了 KeeperIsLeader 等 metric；Keeper 的 leader 與 quorum 規則回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#metric-families-present
+      - alert: CHSamplesDropped
+        expr: scrape_samples_scraped{job=~"clickhouse-server|clickhouse-keeper"} < 0.5 * (scrape_samples_scraped{job=~"clickhouse-server|clickhouse-keeper"} offset 1h)
+        for: 10m
+        labels: { severity: warning, component: clickhouse, tier: "1", aspect: exporter }
+        annotations:
+          summary: "{{ $labels.job }} {{ $labels.instance }} 的 sample 數比一小時前少一半以上，有一批 metric 消失了"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#metric-families-present
+      - alert: CHScrapeNearTimeout
+        expr: scrape_duration_seconds{job=~"clickhouse-server|clickhouse-keeper|clickhouse-sql"} > 8
+        for: 5m
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: exporter }
+        annotations:
+          summary: "{{ $labels.job }} {{ $labels.instance }} 的 scrape 要 {{ $value }} 秒，接近 scrape_timeout（例子：10 秒）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#scrape-budget
+
+  - name: clickhouse-health
+    rules:
+      - alert: CHPingFailing
+        expr: probe_success{job="clickhouse-ping"} == 0
+        for: 1m
+        labels: { severity: critical, component: clickhouse, tier: "1", aspect: exporter }
+        annotations:
+          summary: "{{ $labels.instance }} 的 HTTP /ping 失敗；/ping 不檢查 Keeper 或表，失敗代表 HTTP 介面本身不通"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#health-second-path
+          absence_covered_by: CHProbesMissing
+      - alert: CHSqlProbeFailing
+        expr: probe_success{job="clickhouse-sql-probe"} == 0
+        for: 1m
+        labels: { severity: critical, component: clickhouse, tier: "1", aspect: exporter }
+        annotations:
+          summary: "{{ $labels.instance }} 的 HTTP SQL 探測失敗：SQL 跑不了，或有 Replicated 表是唯讀（count() FROM system.replicas WHERE is_readonly 不是 0）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#health-second-path
+          absence_covered_by: CHProbesMissing
+      - alert: CHReplicasStatusNotOk
+        expr: probe_success{job="clickhouse-replicas-status"} == 0
+        for: 2m
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: replication }
+        annotations:
+          summary: "{{ $labels.instance }} 的 /replicas_status 不 OK：延遲超過 min_relative_delay_to_close（預設 300 秒）或 min_absolute_delay_to_close，或內容有 is readonly（唯讀時狀態碼仍是 200）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#health-second-path
+          absence_covered_by: CHProbesMissing
+      - alert: CHKeeperNotReady
+        expr: probe_success{job="clickhouse-keeper-ready"} == 0
+        for: 1m
+        labels: { severity: critical, component: clickhouse, tier: "1", aspect: cluster }
+        annotations:
+          summary: "Keeper {{ $labels.instance }} 的 /ready 失敗（沒有 leader 或 process 不通）；4lw 的 ruok 這時仍回 imok"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#health-second-path
+          absence_covered_by: CHProbesMissing
+      - alert: CHProbesMissing
+        expr: |
+          absent(probe_success{job="clickhouse-ping"})
+          or absent(probe_success{job="clickhouse-sql-probe"})
+          or absent(probe_success{job="clickhouse-replicas-status"})
+          or absent(probe_success{job="clickhouse-keeper-ready"})
+        for: 5m
+        labels: { severity: warning, component: clickhouse, tier: "1", aspect: exporter }
+        annotations:
+          summary: "缺少 {{ $labels.job }} 的 probe 結果；三方交叉只剩 up 一條路徑"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#health-second-path
+
+  - name: clickhouse-sql-path
+    rules:
+      - alert: CHSqlExporterDown
+        expr: up{job="clickhouse-sql"} == 0 or absent(up{job="clickhouse-sql"})
+        for: 2m
+        labels: { severity: warning, component: clickhouse, tier: "1", aspect: exporter }
+        annotations:
+          summary: "query-exporter 抓不到或不在；每張表的唯讀、mutation 失敗、detached parts、Distributed 佇列、備份規則都回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#sql-path
+      - alert: CHSqlQueriesFailing
+        expr: increase(queries_total{job="clickhouse-sql", status!="success"}[5m]) > 0
+        for: 5m
+        labels: { severity: warning, component: clickhouse, tier: "1", aspect: exporter }
+        annotations:
+          summary: "query-exporter 對 {{ $labels.database }} 的查詢 {{ $labels.query }} 失敗或逾時（{{ $labels.status }}）；這段時間 chq_* 停在舊值"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#sql-path
+      - alert: CHSqlStale
+        expr: time() - query_timestamp{job="clickhouse-sql"} > 600
+        for: 5m
+        labels: { severity: warning, component: clickhouse, tier: "1", aspect: exporter }
+        annotations:
+          summary: "query-exporter 對 {{ $labels.database }} 的查詢 {{ $labels.query }} 已 {{ $value }} 秒沒有成功；chq_* 是舊值"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#sql-path
+
+  - name: clickhouse-cluster
+    rules:
+      - alert: CHKeeperNoLeader
+        expr: absent(ClickHouseAsyncMetrics_KeeperIsLeader{job="clickhouse-keeper"} == 1)
+        for: 1m
+        labels: { severity: critical, component: clickhouse, tier: "1", aspect: cluster }
+        annotations:
+          summary: "抓不到任何以 leader 身分回報的 Keeper：quorum 不在，或 leader 那台抓不到；Replicated 表會在 session 過期後變唯讀"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#role-detection
+      - alert: CHKeeperLeaderCountWrong
+        expr: count(ClickHouseAsyncMetrics_KeeperIsLeader{job="clickhouse-keeper"} == 1) > 1
+        for: 1m
+        labels: { severity: critical, component: clickhouse, tier: "1", aspect: cluster }
+        annotations:
+          summary: "同時有 {{ $value }} 台 Keeper 回報自己是 leader"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#role-detection
+      - alert: CHKeeperQuorumLost
+        expr: sum(probe_success{job="clickhouse-keeper-ready"}) < on () floor(sum(clickhouse_expected_members{role="keeper"}) / 2) + 1
+        for: 1m
+        labels: { severity: critical, component: clickhouse, tier: "1", aspect: cluster }
+        annotations:
+          summary: "/ready 成功的 Keeper 只有 {{ $value }} 台，不到過半"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#keeper-quorum
+      - alert: CHKeeperFollowersMissing
+        expr: max(ClickHouseAsyncMetrics_KeeperSyncedFollowers{job="clickhouse-keeper"}) < on () sum(clickhouse_expected_members{role="keeper"}) - 1
+        for: 5m
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: cluster }
+        annotations:
+          summary: "Keeper leader 同步中的 follower 只有 {{ $value }} 台；再少一台就失去 quorum（follower 永遠回報 0，所以取 max）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#keeper-quorum
+      - alert: CHComponentCountLow
+        expr: |
+          label_replace(count by (job) (up{job=~"clickhouse-server|clickhouse-keeper"} == 1), "role", "$1", "job", "clickhouse-(.*)")
+          < on (role) group_left clickhouse_expected_members
+        for: 5m
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: cluster }
+        annotations:
+          summary: "{{ $labels.role }} 抓得到的台數 {{ $value }} 少於預期（clickhouse-params）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#component-count
+      - alert: CHKeeperSessionLost
+        expr: |
+          delta(ClickHouseMetrics_ZooKeeperSessionExpired{job="clickhouse-server"}[5m]) > 0
+          or increase(ClickHouseProfileEvents_ZooKeeperHardwareExceptions{job="clickhouse-server"}[5m]) > 0
+        for: 1m
+        labels: { severity: critical, component: clickhouse, tier: "1", aspect: cluster }
+        annotations:
+          summary: "{{ $labels.instance }} 5 分鐘內有 Keeper session 過期或 Keeper 網路錯誤；Replicated 表唯讀、ON CLUSTER DDL 與複寫停止。ZooKeeperSession 在 session 過期時仍是 1，ZooKeeperSessionExpired 恢復後也不歸零，所以用變化量"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#keeper-session
+      - alert: CHKeeperRequestsBacklog
+        expr: ClickHouseMetrics_KeeperOutstandingRequests{job="clickhouse-keeper"} > 10
+        for: 10m
+        labels: { severity: warning, component: clickhouse, tier: "3", aspect: cluster }
+        annotations:
+          summary: "Keeper {{ $labels.instance }} 排隊中的請求 {{ $value }}（Altinity 的門檻 10）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#keeper-latency
+
+  - name: clickhouse-replication
+    rules:
+      - alert: CHReplicaReadonly
+        expr: ClickHouseMetrics_ReadonlyReplica{job="clickhouse-server"} > 0
+        for: 1m
+        labels: { severity: critical, component: clickhouse, tier: "1", aspect: replication }
+        annotations:
+          summary: "{{ $labels.instance }} 有 {{ $value }} 張 Replicated 表唯讀（Keeper session 遺失或重新初始化中）；寫入會失敗 TABLE_IS_READ_ONLY"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#replica-readonly
+      - alert: CHReplicaDelayHigh
+        expr: ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay{job="clickhouse-server"} > 300
+        for: 5m
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: replication }
+        annotations:
+          summary: "{{ $labels.instance }} 的 Replicated 表最大絕對延遲 {{ $value }} 秒（不含唯讀的表；Altinity 的門檻 300）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#replication-lag
+      - alert: CHReplicaDelayHighSQL
+        expr: max by (instance, table) (chq_replica_absolute_delay_seconds{job="clickhouse-sql"}) > 300
+        for: 5m
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: replication }
+        annotations:
+          summary: "{{ $labels.instance }} 的 {{ $labels.table }} 絕對延遲 {{ $value }} 秒（system.replicas，含唯讀的表）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#replication-lag
+      - alert: CHReplicaInactive
+        expr: min by (instance, table) (chq_replica_active_replicas{job="clickhouse-sql"}) < max by (instance, table) (chq_replica_total_replicas{job="clickhouse-sql"})
+        for: 5m
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: replication }
+        annotations:
+          summary: "{{ $labels.instance }} 看 {{ $labels.table }} 只有 {{ $value }} 個 active replica，少於 total_replicas；倖存那台的 absolute_delay 仍是 0"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#replication-lag
+      - alert: CHReplicationQueueFailing
+        expr: max by (instance, table) (chq_replication_queue_failing{job="clickhouse-sql"}) > 0
+        for: 15m
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: replication }
+        annotations:
+          summary: "{{ $labels.instance }} 的 {{ $labels.table }} 複寫佇列有 {{ $value }} 個項目一直失敗重試（system.replication_queue.last_exception）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#replication-queue
+      - alert: CHReplicationInsertsQueued
+        expr: ClickHouseAsyncMetrics_ReplicasMaxInsertsInQueue{job="clickhouse-server"} > 100
+        for: 15m
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: replication }
+        annotations:
+          summary: "{{ $labels.instance }} 有表還有 {{ $value }} 個 insert 沒從其他 replica 拿到（例子：100）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#replication-queue
+      - alert: CHDistributedFilesBacklog
+        expr: ClickHouseMetrics_DistributedFilesToInsert{job="clickhouse-server"} > 50
+        for: 15m
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: replication }
+        annotations:
+          summary: "{{ $labels.instance }} 有 {{ $value }} 個 Distributed 非同步檔案等著送到遠端 shard（Altinity 的門檻 50）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#distributed-queue
+      - alert: CHDistributedSendFailing
+        expr: increase(ClickHouseProfileEvents_DistributedAsyncInsertionFailures{job="clickhouse-server"}[10m]) > 0
+        for: 5m
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: replication }
+        annotations:
+          summary: "{{ $labels.instance }} 的 Distributed 非同步送出一直失敗；system.distribution_queue 的 last_exception 有原因"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#distributed-queue
+      - alert: CHDistributedBrokenFiles
+        expr: ClickHouseMetrics_BrokenDistributedFilesToInsert{job="clickhouse-server"} > 0
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: replication }
+        annotations:
+          summary: "{{ $labels.instance }} 有 {{ $value }} 個 Distributed 檔案被標成 broken（不會再送，資料沒有進遠端 shard）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#distributed-queue
+
+  - name: clickhouse-availability
+    rules:
+      - alert: CHInsertsRejected
+        expr: increase(ClickHouseProfileEvents_RejectedInserts{job="clickhouse-server"}[5m]) > 0
+        labels: { severity: critical, component: clickhouse, tier: "1", aspect: availability }
+        annotations:
+          summary: "{{ $labels.instance }} 5 分鐘內有 {{ $value }} 次 insert 被拒（Too many parts：parts_to_throw_insert 或 max_parts_in_total）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#writes-rejected
+      - alert: CHWritesToReadonlyTable
+        expr: increase(ClickHouseErrorMetric_TABLE_IS_READ_ONLY{job="clickhouse-server"}[5m]) > 0
+        labels: { severity: critical, component: clickhouse, tier: "1", aspect: availability }
+        annotations:
+          summary: "{{ $labels.instance }} 5 分鐘內有 {{ $value }} 次 TABLE_IS_READ_ONLY（寫入唯讀的 Replicated 表）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#writes-rejected
+      - alert: CHQueriesRejectedConcurrency
+        expr: increase(ClickHouseErrorMetric_TOO_MANY_SIMULTANEOUS_QUERIES{job="clickhouse-server"}[5m]) > 0
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: availability }
+        annotations:
+          summary: "{{ $labels.instance }} 5 分鐘內有 {{ $value }} 個查詢因為並行上限（max_concurrent_queries 或每個使用者的上限）被拒"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#query-admission
+
+  - name: clickhouse-saturation
+    rules:
+      - alert: CHPartsNearInsertDelay
+        expr: |
+          max by (instance) (ClickHouseAsyncMetrics_MaxPartCountForPartition{job="clickhouse-server"})
+          / on (instance) max by (instance) (chq_merge_tree_setting{job="clickhouse-sql", name="parts_to_delay_insert"}) > 0.5
+        for: 5m
+        labels: { severity: warning, component: clickhouse, tier: "1", aspect: saturation }
+        annotations:
+          summary: "{{ $labels.instance }} 單一 partition 的 active part 數已到 parts_to_delay_insert 的 {{ $value | humanizePercentage }}；超過後 insert 被延遲，到 parts_to_throw_insert 被拒"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#parts-pressure
+      - alert: CHPartsHigh
+        expr: ClickHouseAsyncMetrics_MaxPartCountForPartition{job="clickhouse-server"} > 300
+        for: 15m
+        labels: { severity: warning, component: clickhouse, tier: "1", aspect: saturation }
+        annotations:
+          summary: "{{ $labels.instance }} 單一 partition 有 {{ $value }} 個 active part（metric 說明：大於 300 代表設定錯、過載或大量載入）；不依賴 SQL 路徑"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#parts-pressure
+      - alert: CHInsertsDelayed
+        expr: increase(ClickHouseProfileEvents_DelayedInserts{job="clickhouse-server"}[5m]) > 0
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: saturation }
+        annotations:
+          summary: "{{ $labels.instance }} 5 分鐘內有 {{ $value }} 次 insert 因為 part 太多被延遲（parts_to_delay_insert）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#parts-pressure
+      - alert: CHMemoryNearLimit
+        expr: |
+          ClickHouseMetrics_MemoryTracking{job="clickhouse-server"}
+          / on (job, instance) (ClickHouseAsyncMetrics_CGroupMemoryTotal{job="clickhouse-server"} > 0 or ClickHouseAsyncMetrics_OSMemoryTotal{job="clickhouse-server"}) > 0.8
+        for: 10m
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: saturation }
+        annotations:
+          summary: "{{ $labels.instance }} 追蹤的記憶體是 cgroup／主機記憶體的 {{ $value | humanizePercentage }}；預設 max_server_memory_usage 是 0.9 倍，超過時查詢失敗 MEMORY_LIMIT_EXCEEDED"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#memory
+      - alert: CHQueriesHitMemoryLimit
+        expr: increase(ClickHouseErrorMetric_MEMORY_LIMIT_EXCEEDED{job="clickhouse-server"}[10m]) > 0
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: saturation }
+        annotations:
+          summary: "{{ $labels.instance }} 10 分鐘內有 {{ $value }} 次 MEMORY_LIMIT_EXCEEDED（查詢的 max_memory_usage 或整台的 max_server_memory_usage）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#memory
+      - alert: CHMergePoolSaturated
+        expr: |
+          ClickHouseMetrics_BackgroundMergesAndMutationsPoolTask{job="clickhouse-server"}
+          / on (job, instance) ClickHouseMetrics_BackgroundMergesAndMutationsPoolSize{job="clickhouse-server"} >= 1
+        for: 30m
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: maintenance }
+        annotations:
+          summary: "{{ $labels.instance }} 的 merge／mutation 背景池 30 分鐘都是滿的；merge 跟不上時 part 數會一直增加"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#merge-pool
+
+  - name: clickhouse-workload
+    rules:
+      - alert: CHFailedQueriesHigh
+        expr: |
+          rate(ClickHouseProfileEvents_FailedQuery{job="clickhouse-server"}[5m])
+          / on (job, instance) rate(ClickHouseProfileEvents_Query{job="clickhouse-server"}[5m]) > 0.05
+          and on (job, instance) rate(ClickHouseProfileEvents_Query{job="clickhouse-server"}[5m]) > 0.1
+        for: 10m
+        labels: { severity: warning, component: clickhouse, tier: "3", aspect: workload }
+        annotations:
+          summary: "{{ $labels.instance }} 失敗查詢比例 {{ $value | humanizePercentage }}（例子：5%）；system.errors／ClickHouseErrorMetric_* 看是哪一種錯誤"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#failed-queries
+      - alert: CHDataErrors
+        expr: increase({job="clickhouse-server", __name__=~"ClickHouseErrorMetric_(CHECKSUM_DOESNT_MATCH|CANNOT_READ_ALL_DATA|CORRUPTED_DATA|NOT_ENOUGH_SPACE|CANNOT_WRITE_TO_FILE_DESCRIPTOR|CANNOT_FSYNC)"}[10m]) > 0
+        labels: { severity: critical, component: clickhouse, tier: "2", aspect: workload }
+        annotations:
+          summary: "{{ $labels.instance }} 出現資料或磁碟類錯誤 {{ $labels.__name__ }}（system.errors）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#error-counters
+
+  - name: clickhouse-maintenance
+    rules:
+      - alert: CHMutationFailing
+        expr: max by (instance, table) (chq_mutations_failing{job="clickhouse-sql"}) > 0
+        for: 5m
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: maintenance }
+        annotations:
+          summary: "{{ $labels.instance }} 的 {{ $labels.table }} 有 {{ $value }} 個 mutation 失敗後一直重試（system.mutations.latest_fail_reason）；後面的 mutation 會排在它後面"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#mutations
+      - alert: CHMutationsStuck
+        expr: max by (instance, table) (chq_mutation_oldest_pending_seconds{job="clickhouse-sql"}) > 21600
+        for: 15m
+        labels: { severity: warning, component: clickhouse, tier: "3", aspect: maintenance }
+        annotations:
+          summary: "{{ $labels.instance }} 的 {{ $labels.table }} 最老的 mutation 已 {{ $value | humanizeDuration }} 沒完成（例子：6 小時）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#mutations
+      - alert: CHMutationsOverExecutionTime
+        expr: ClickHouseAsyncMetrics_NumberOfPendingMutationsOverExecutionTime{job="clickhouse-server"} > 0
+        for: 15m
+        labels: { severity: warning, component: clickhouse, tier: "3", aspect: maintenance }
+        annotations:
+          summary: "{{ $labels.instance }} 有 {{ $value }} 個 mutation 超過 max_pending_mutations_execution_time_to_warn（預設 24 小時）；這個 metric 要 asynchronous_metrics_enable_heavy_metrics=true 才有"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#mutations
+      - alert: CHBrokenPartsDetached
+        expr: sum by (instance, table, reason) (chq_detached_parts{job="clickhouse-sql", reason!="detached_by_user"}) > 0
+        for: 5m
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: maintenance }
+        annotations:
+          summary: "{{ $labels.instance }} 的 {{ $labels.table }} 有 {{ $value }} 個 part 被伺服器移到 detached（{{ $labels.reason }}）；伺服器不會自己處理，可能少了資料"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#detached-parts
+      - alert: CHDetachedPartsNative
+        expr: (ClickHouseAsyncMetrics_NumberOfDetachedParts{job="clickhouse-server"} - ClickHouseAsyncMetrics_NumberOfDetachedByUserParts{job="clickhouse-server"}) > 0
+        for: 5m
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: maintenance }
+        annotations:
+          summary: "{{ $labels.instance }} 有 {{ $value }} 個非使用者 DETACH 的 detached part；要 asynchronous_metrics_enable_heavy_metrics=true 才有這個 metric"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#detached-parts
+
+  - name: clickhouse-protection
+    rules:
+      - alert: CHBackupFailed
+        expr: delta(chq_backups_failed{job="clickhouse-sql"}[30m]) > 0
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: protection }
+        annotations:
+          summary: "{{ $labels.instance }} 30 分鐘內有 BACKUP 失敗（system.backups.status = BACKUP_FAILED，error 欄有原因）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#backups
+      - alert: CHBackupTooOld
+        expr: time() - max(chq_backup_last_success_timestamp{job="clickhouse-sql"}) > 93600
+        for: 30m
+        labels: { severity: warning, component: clickhouse, tier: "3", aspect: protection }
+        annotations:
+          summary: "整個叢集最近一次成功的 BACKUP 已超過 26 小時（例子：每日備份）；system.backups 只記得 server 啟動後的備份，重啟後是 0，會誤報"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#backups
+      - alert: CHReplicatedDataLoss
+        expr: increase(ClickHouseProfileEvents_ReplicatedDataLoss{job="clickhouse-server"}[10m]) > 0
+        labels: { severity: critical, component: clickhouse, tier: "2", aspect: protection }
+        annotations:
+          summary: "{{ $labels.instance }} 有 part 在所有 replica 上都找不到（ReplicatedDataLoss）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#data-integrity
+
+  - name: clickhouse-capacity
+    rules:
+      - alert: CHDiskSpaceLow
+        expr: |
+          ClickHouseAsyncMetrics_DiskAvailable{job="clickhouse-server"}
+          / on (job, instance, disk) (ClickHouseAsyncMetrics_DiskTotal{job="clickhouse-server"} < 1e18) < 0.1
+        for: 10m
+        labels: { severity: critical, component: clickhouse, tier: "1", aspect: capacity }
+        annotations:
+          summary: "{{ $labels.instance }} 的 disk {{ $labels.disk }} 只剩 {{ $value | humanizePercentage }}（例子：10%）；merge 要預留空間，空間不夠時 merge 停、part 數上升"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#disk-space
+          absence_covered_by: CHMetricFamiliesMissing
+      - alert: CHDiskFillingUp
+        expr: predict_linear(ClickHouseAsyncMetrics_DiskAvailable{job="clickhouse-server"}[6h], 86400) < 0
+        for: 30m
+        labels: { severity: warning, component: clickhouse, tier: "2", aspect: capacity }
+        annotations:
+          summary: "{{ $labels.instance }} 的 disk {{ $labels.disk }} 照過去 6 小時的速度一天內會滿"
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#disk-space

@@ -1,0 +1,5 @@
+<clickhouse>
+    <macros><shard>01</shard><replica>ch2</replica></macros>
+    <!-- 只有 ch2 打開 heavy async metric（預設 false），對照 ch1 的預設：NumberOfDetachedParts、NumberOfPendingMutations 只在這台的 /metrics。 -->
+    <asynchronous_metrics_enable_heavy_metrics>true</asynchronous_metrics_enable_heavy_metrics>
+</clickhouse>

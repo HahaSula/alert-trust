@@ -1,0 +1,19 @@
+<!-- 監控帳號（users.d）：readonly=2 允許 SET（query-exporter 的連線不必改設定），max_execution_time 保底。
+     system.* 表對任何使用者都可讀；正式環境請改用 SQL 管理的帳號並給密碼。 -->
+<clickhouse>
+    <profiles>
+        <monitor>
+            <readonly>2</readonly>
+            <max_execution_time>10</max_execution_time>
+            <max_memory_usage>200000000</max_memory_usage>
+        </monitor>
+    </profiles>
+    <users>
+        <monitor>
+            <password>monitor</password>
+            <networks><ip>::/0</ip></networks>
+            <profile>monitor</profile>
+            <quota>default</quota>
+        </monitor>
+    </users>
+</clickhouse>

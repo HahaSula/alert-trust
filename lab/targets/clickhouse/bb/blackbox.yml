@@ -1,0 +1,49 @@
+modules:
+  # /ping：靜態回 "Ok.\n"，不檢查 Keeper、表或複寫（HTTPHandlerFactory.cpp）。只證明 HTTP 介面活著。
+  ch_ping:
+    prober: http
+    timeout: 4s
+    http:
+      preferred_ip_protocol: ip4
+      fail_if_body_not_matches_regexp: ['^Ok\.']
+  # /replicas_status：只有延遲超過 min_relative_delay_to_close（預設 300 秒）或 min_absolute_delay_to_close（預設 0＝不看）時回 503；
+  # 唯讀的表只在 verbose 內容裡寫 "is readonly"，狀態碼仍是 200（ReplicasStatusHandler.cpp）。所以另外比對 body。
+  ch_replicas_status:
+    prober: http
+    timeout: 4s
+    http:
+      preferred_ip_protocol: ip4
+      fail_if_body_matches_regexp: ['is readonly']
+  # 直接用 HTTP 介面跑一條 SQL：有唯讀的 Replicated 表就失敗。帳號用 header 給，不放在 URL。
+  ch_sql_no_readonly:
+    prober: http
+    timeout: 4s
+    http:
+      preferred_ip_protocol: ip4
+      headers: { X-ClickHouse-User: monitor, X-ClickHouse-Key: monitor }
+      fail_if_body_not_matches_regexp: ['^0\n']
+  # Keeper /ready（http_control）：自己是 leader，或 follower／observer 且看得到 leader 才回 200，否則 503。
+  keeper_ready:
+    prober: http
+    timeout: 4s
+    http:
+      preferred_ip_protocol: ip4
+      fail_if_body_not_matches_regexp: ['"status":"ok"']
+  # 4lw ruok：RuokCommand::run 一律回 imok（FourLetterCommand.cpp），不代表有 quorum。
+  keeper_ruok:
+    prober: tcp
+    timeout: 4s
+    tcp:
+      preferred_ip_protocol: ip4
+      query_response:
+        - send: "ruok"
+        - expect: "imok"
+  # 4lw mntr：沒有在服務時回 "This instance is not currently serving requests"；有在服務時第一個 zk_ 欄位是 zk_version。
+  keeper_mntr_serving:
+    prober: tcp
+    timeout: 4s
+    tcp:
+      preferred_ip_protocol: ip4
+      query_response:
+        - send: "mntr"
+        - expect: "zk_server_state\t(leader|follower|observer|standalone)"

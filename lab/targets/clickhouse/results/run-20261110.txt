@@ -1,0 +1,816 @@
+環境：ClickHouse v26.10.2.103-stable（映像 clickhouse/clickhouse-server:26.10.2.103 ×2、clickhouse/clickhouse-keeper:26.10.2.103 ×3）、
+Prometheus v3.13.5（scrape 5s）、blackbox_exporter v0.27.0（timeout 4s）、query-exporter 5.2.2（interval 15s）
+lab 設定：parts_to_delay_insert=20、parts_to_throw_insert=40、min_absolute_delay_to_close=30、session_timeout_ms=30000、max_server_memory_usage=600MB；
+ch2 打開 asynchronous_metrics_enable_heavy_metrics（ch1 用預設 false）。主機記憶體：
+               total        used        free      shared  buff/cache   available
+Mem:           15953        3353        9049          55        3849       12600
+at-ch-qe-1 99.52MiB / 256MiB
+at-ch-ch2-1 159.8MiB / 900MiB
+at-ch-ch1-1 157.7MiB / 900MiB
+at-ch-prometheus-1 59.25MiB / 15.58GiB
+at-ch-keeper2-1 109.3MiB / 256MiB
+at-ch-keeper1-1 109.7MiB / 256MiB
+at-ch-keeper3-1 107.9MiB / 256MiB
+at-ch-blackbox-1 13.39MiB / 15.58GiB
+
+## A 基線：端點、metric 名稱、Altinity 規則的名稱（02:42:14Z）
+  SQL[:31001] SELECT version() → 200 0.02s 26.10.2.103
+  SQL[:31001] CREATE TABLE default.events ON CLUSTER lab (ts DateTime DEFAULT now(), k UInt32, v String) → 200 0.23s ch2	9000	0		1	0 | ch1	9000	0		0	0
+  SQL[:31001] INSERT INTO default.events (k, v) SELECT number, 'v' FROM numbers(1000) → 200 0.10s 
+  SQL[:31002] SELECT count() FROM default.events → 200 0.02s 1000
+  SQL[:31001] SELECT name, value FROM system.server_settings WHERE name IN ('max_server_memory_usage', ' → 200 0.02s asynchronous_metrics_enable_heavy_metrics	0 | asynchronous_metrics_key_values_mode	key_values | max_server_memory_usage	629145600 | max_concurrent_queries	1000 | background_pool_size	1
+  SQL[:31001] SELECT name, value FROM system.settings WHERE name IN ('async_insert', 'wait_for_async_ins → 200 0.02s max_replica_delay_for_distributed_queries	300 | max_memory_usage	0 | async_insert	1 | wait_for_async_insert	1
+  SQL[:31001] SELECT name, value FROM system.merge_tree_settings WHERE name IN ('parts_to_delay_insert', → 200 0.02s parts_to_delay_insert	20 | parts_to_throw_insert	40 | max_parts_in_total	100000 | min_relative_delay_to_close	300 | min_absolute_delay_to_close	30
+  GET :31001/ping → 200 4B 0.02s Ok. 
+  GET :31001/replicas_status?verbose=1 → 200 54B 0.02s default.events:	Absolute delay: 0. Relative delay: 0. 
+  GET :31002/ping → 200 4B 0.02s Ok. 
+  GET :31002/replicas_status?verbose=1 → 200 54B 0.02s default.events:	Absolute delay: 0. Relative delay: 0. 
+  GET :31031/ready → 200 60B 0.02s {"details":{"hasLeader":true,"role":"leader"},"status":"ok"}
+  GET :31032/ready → 200 62B 0.02s {"details":{"hasLeader":true,"role":"follower"},"status":"ok"}
+  GET :31033/ready → 200 62B 0.02s {"details":{"hasLeader":true,"role":"follower"},"status":"ok"}
+  4LW[:31021] ruok → 0.00s imok
+  4LW[:31021] mntr → 0.00s zk_outstanding_requests	0 ; zk_server_state	leader ; zk_znode_count	87 ; zk_followers	2 ; zk_synced_followers	2
+  4LW[:31022] ruok → 0.00s imok
+  4LW[:31022] mntr → 0.00s zk_outstanding_requests	0 ; zk_server_state	follower ; zk_znode_count	87
+  4LW[:31023] ruok → 0.00s imok
+  4LW[:31023] mntr → 0.00s zk_outstanding_requests	0 ; zk_server_state	follower ; zk_znode_count	87
+  > scrape_samples_scraped{job=~"clickhouse-server|clickhouse-keeper|clickhouse-sql"}  →  6 series
+    {__name__="scrape_samples_scraped", instance="ch2:9363", job="clickhouse-server"} 3895
+    {__name__="scrape_samples_scraped", instance="ch1:9363", job="clickhouse-server"} 3882
+    {__name__="scrape_samples_scraped", app="clickhouse-keeper", instance="keeper1:9363", job="clickhouse-keeper"} 1193
+    {__name__="scrape_samples_scraped", app="clickhouse-keeper", instance="keeper2:9363", job="clickhouse-keeper"} 1193
+    {__name__="scrape_samples_scraped", instance="qe:9560", job="clickhouse-sql"} 196
+    {__name__="scrape_samples_scraped", app="clickhouse-keeper", instance="keeper3:9363", job="clickhouse-keeper"} 1193
+  > scrape_response_size_bytes{job=~"clickhouse-server|clickhouse-keeper|clickhouse-sql"}  →  0 series
+  > count by (instance) ({job="clickhouse-server", __name__=~"ClickHouseAsyncMetrics_NumberOf(Detached|Pending).*"})  →  1 series
+    {instance="ch2:9363"} 4
+  > ClickHouseAsyncMetrics_DiskAvailable  →  4 series
+    {__name__="ClickHouseAsyncMetrics_DiskAvailable", disk="backups", instance="ch2:9363", job="clickhouse-server"} 991660732416
+    {__name__="ClickHouseAsyncMetrics_DiskAvailable", disk="default", instance="ch2:9363", job="clickhouse-server"} 991660732416
+    {__name__="ClickHouseAsyncMetrics_DiskAvailable", disk="backups", instance="ch1:9363", job="clickhouse-server"} 991660716032
+    {__name__="ClickHouseAsyncMetrics_DiskAvailable", disk="default", instance="ch1:9363", job="clickhouse-server"} 991660716032
+  > count by (job) ({__name__=~"ClickHouseAsyncMetrics_DiskAvailable_.*"})  →  0 series
+  :31011 的 metric 名稱數：3225
+  :31041 的 metric 名稱數：632
+  SQL[:31001] SELECT count() FROM system.events WHERE event IN ('RejectedInserts', 'DelayedInserts') → 200 0.02s 0
+  SQL[:31001] SELECT count() FROM system.events SETTINGS system_events_show_zero_values = 1 → 200 0.02s 1706
+  Altinity clickhouse-operator release-0.27.4 規則的名稱是否有來源：
+system.metrics＋asynchronous_metrics 788 個名稱；system.events 全部 1706 個、目前非 0 的 179 個
+  OK      chi_clickhouse_event_DNSError 
+  OK      chi_clickhouse_event_DataAfterMergeDiffersFromReplica （目前是 0：system.events 預設不列，exporter 不輸出這條 series）
+  OK      chi_clickhouse_event_DelayedInserts （目前是 0：system.events 預設不列，exporter 不輸出這條 series）
+  OK      chi_clickhouse_event_DistributedConnectionFailAtAll （目前是 0：system.events 預設不列，exporter 不輸出這條 series）
+  OK      chi_clickhouse_event_DistributedConnectionFailTry （目前是 0：system.events 預設不列，exporter 不輸出這條 series）
+  OK      chi_clickhouse_event_DistributedSyncInsertionTimeoutExceeded （目前是 0：system.events 預設不列，exporter 不輸出這條 series）
+  OK      chi_clickhouse_event_InsertQuery 
+  OK      chi_clickhouse_event_InsertedRows 
+  OK      chi_clickhouse_event_KafkaCommitFailures （目前是 0：system.events 預設不列，exporter 不輸出這條 series）
+  OK      chi_clickhouse_event_KafkaConsumerErrors （目前是 0：system.events 預設不列，exporter 不輸出這條 series）
+  OK      chi_clickhouse_event_KafkaRebalanceAssignments （目前是 0：system.events 預設不列，exporter 不輸出這條 series）
+  OK      chi_clickhouse_event_KafkaRebalanceRevocations （目前是 0：system.events 預設不列，exporter 不輸出這條 series）
+  MISSING chi_clickhouse_event_NetworkErrors 
+  OK      chi_clickhouse_event_ReadBufferFromFileDescriptorReadFailed （目前是 0：system.events 預設不列，exporter 不輸出這條 series）
+  OK      chi_clickhouse_event_RejectedInserts （目前是 0：system.events 預設不列，exporter 不輸出這條 series）
+  OK      chi_clickhouse_event_ReplicatedDataLoss （目前是 0：system.events 預設不列，exporter 不輸出這條 series）
+  OK      chi_clickhouse_event_ReplicatedPartChecksFailed （目前是 0：system.events 預設不列，exporter 不輸出這條 series）
+  OK      chi_clickhouse_event_ReplicatedPartFailedFetches （目前是 0：system.events 預設不列，exporter 不輸出這條 series）
+  OK      chi_clickhouse_event_SlowRead （目前是 0：system.events 預設不列，exporter 不輸出這條 series）
+  OK      chi_clickhouse_event_StorageBufferErrorOnFlush （目前是 0：system.events 預設不列，exporter 不輸出這條 series）
+  OK      chi_clickhouse_event_WriteBufferFromFileDescriptorWriteFailed （目前是 0：system.events 預設不列，exporter 不輸出這條 series）
+  OK      chi_clickhouse_event_ZooKeeperHardwareExceptions （目前是 0：system.events 預設不列，exporter 不輸出這條 series）
+  OK      chi_clickhouse_metric_BackgroundMessageBrokerSchedulePoolSize 
+  OK      chi_clickhouse_metric_BackgroundMessageBrokerSchedulePoolTask 
+  OK      chi_clickhouse_metric_ChangedSettingsHash （exporter 自己的 SQL）
+  OK      chi_clickhouse_metric_DetachedParts （exporter 自己的 SQL）
+  OK      chi_clickhouse_metric_DiskDataBytes （exporter 自己的 SQL）
+  OK      chi_clickhouse_metric_DiskFreeBytes （exporter 自己的 SQL）
+  OK      chi_clickhouse_metric_DiskTotalBytes （exporter 自己的 SQL）
+  OK      chi_clickhouse_metric_DistributedFilesToInsert 
+  OK      chi_clickhouse_metric_HTTPConnection 
+  OK      chi_clickhouse_metric_KafkaConsumers 
+  OK      chi_clickhouse_metric_LongestRunningQuery （exporter 自己的 SQL）
+  OK      chi_clickhouse_metric_MaxPartCountForPartition 
+  OK      chi_clickhouse_metric_MySQLConnection 
+  OK      chi_clickhouse_metric_PendingAsyncInsert 
+  OK      chi_clickhouse_metric_Query 
+  OK      chi_clickhouse_metric_QueryPreempted 
+  OK      chi_clickhouse_metric_ReadonlyReplica 
+  OK      chi_clickhouse_metric_ReplicasMaxAbsoluteDelay 
+  OK      chi_clickhouse_metric_TCPConnection 
+  OK      chi_clickhouse_metric_Uptime 
+  OK      chi_clickhouse_metric_VersionInteger 
+  OK      chi_clickhouse_metric_ZooKeeperSession 
+  OK      chi_clickhouse_metric_fetch_errors （exporter 自己的 SQL）
+  OK      chi_clickhouse_table_mutations （exporter 自己的 SQL）
+  OK      chi_clickhouse_table_mutations_parts_to_do （exporter 自己的 SQL）
+Keeper /metrics 632 個名稱
+  OK      ClickHouseAsyncMetrics_KeeperEphemeralsCount
+  OK      ClickHouseAsyncMetrics_KeeperIsExceedingMemorySoftLimitHit
+  OK      ClickHouseAsyncMetrics_KeeperIsLeader
+  OK      ClickHouseAsyncMetrics_KeeperMaxFileDescriptorCount
+  OK      ClickHouseAsyncMetrics_KeeperMaxLatency
+  OK      ClickHouseAsyncMetrics_KeeperOpenFileDescriptorCount
+  OK      ClickHouseAsyncMetrics_KeeperSyncedFollowers
+  OK      ClickHouseMetrics_KeeperOutstandingRequests
+  OK      ClickHouseProfileEvents_KeeperCommitsFailed
+  OK      ClickHouseProfileEvents_KeeperSnapshotCreationsFailed
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"clickhouse-server|clickhouse-keeper|clickhouse-sql"}  →  6 series
+    {__name__="up", instance="ch2:9363", job="clickhouse-server"} 1
+    {__name__="up", instance="ch1:9363", job="clickhouse-server"} 1
+    {__name__="up", app="clickhouse-keeper", instance="keeper1:9363", job="clickhouse-keeper"} 1
+    {__name__="up", app="clickhouse-keeper", instance="keeper2:9363", job="clickhouse-keeper"} 1
+    {__name__="up", instance="qe:9560", job="clickhouse-sql"} 1
+    {__name__="up", app="clickhouse-keeper", instance="keeper3:9363", job="clickhouse-keeper"} 1
+  > probe_success  →  15 series
+    {__name__="probe_success", instance="keeper3:9363", job="clickhouse-keeper-mntr"} 1
+    {__name__="probe_success", instance="keeper2:9363", job="clickhouse-keeper-ruok"} 1
+    {__name__="probe_success", instance="ch2:9363", job="clickhouse-sql-probe"} 1
+    {__name__="probe_success", instance="ch1:9363", job="clickhouse-replicas-status"} 1
+    {__name__="probe_success", instance="keeper2:9363", job="clickhouse-keeper-mntr"} 1
+    {__name__="probe_success", instance="ch1:9363", job="clickhouse-sql-probe"} 1
+    {__name__="probe_success", instance="keeper1:9363", job="clickhouse-keeper-ready"} 1
+    {__name__="probe_success", instance="ch1:9363", job="clickhouse-ping"} 1
+    {__name__="probe_success", instance="keeper2:9363", job="clickhouse-keeper-ready"} 1
+    {__name__="probe_success", instance="ch2:9363", job="clickhouse-replicas-status"} 1
+    {__name__="probe_success", instance="keeper1:9363", job="clickhouse-keeper-ruok"} 1
+    {__name__="probe_success", instance="keeper3:9363", job="clickhouse-keeper-ready"} 1
+    {__name__="probe_success", instance="keeper3:9363", job="clickhouse-keeper-ruok"} 1
+    {__name__="probe_success", instance="ch2:9363", job="clickhouse-ping"} 1
+    {__name__="probe_success", instance="keeper1:9363", job="clickhouse-keeper-mntr"} 1
+  > ClickHouseAsyncMetrics_KeeperIsLeader  →  3 series
+    {__name__="ClickHouseAsyncMetrics_KeeperIsLeader", app="clickhouse-keeper", instance="keeper1:9363", job="clickhouse-keeper"} 1
+    {__name__="ClickHouseAsyncMetrics_KeeperIsLeader", app="clickhouse-keeper", instance="keeper2:9363", job="clickhouse-keeper"} 0
+    {__name__="ClickHouseAsyncMetrics_KeeperIsLeader", app="clickhouse-keeper", instance="keeper3:9363", job="clickhouse-keeper"} 0
+  > ClickHouseAsyncMetrics_KeeperSyncedFollowers  →  3 series
+    {__name__="ClickHouseAsyncMetrics_KeeperSyncedFollowers", app="clickhouse-keeper", instance="keeper1:9363", job="clickhouse-keeper"} 2
+    {__name__="ClickHouseAsyncMetrics_KeeperSyncedFollowers", app="clickhouse-keeper", instance="keeper2:9363", job="clickhouse-keeper"} 0
+    {__name__="ClickHouseAsyncMetrics_KeeperSyncedFollowers", app="clickhouse-keeper", instance="keeper3:9363", job="clickhouse-keeper"} 0
+  > ClickHouseMetrics_ZooKeeperSession  →  2 series
+    {__name__="ClickHouseMetrics_ZooKeeperSession", instance="ch2:9363", job="clickhouse-server"} 1
+    {__name__="ClickHouseMetrics_ZooKeeperSession", instance="ch1:9363", job="clickhouse-server"} 1
+  > ClickHouseMetrics_ReadonlyReplica  →  2 series
+    {__name__="ClickHouseMetrics_ReadonlyReplica", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseMetrics_ReadonlyReplica", instance="ch1:9363", job="clickhouse-server"} 0
+  > ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay  →  2 series
+    {__name__="ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay", instance="ch1:9363", job="clickhouse-server"} 0
+  > ClickHouseAsyncMetrics_ReplicasMaxQueueSize  →  2 series
+    {__name__="ClickHouseAsyncMetrics_ReplicasMaxQueueSize", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseAsyncMetrics_ReplicasMaxQueueSize", instance="ch1:9363", job="clickhouse-server"} 0
+  > chq_replica_readonly{table="default.events"}  →  2 series
+    {__name__="chq_replica_readonly", database="ch1", instance="ch1:9363", job="clickhouse-sql", table="default.events"} 0
+    {__name__="chq_replica_readonly", database="ch2", instance="ch2:9363", job="clickhouse-sql", table="default.events"} 0
+  > chq_replica_absolute_delay_seconds{table="default.events"}  →  2 series
+    {__name__="chq_replica_absolute_delay_seconds", database="ch1", instance="ch1:9363", job="clickhouse-sql", table="default.events"} 0
+    {__name__="chq_replica_absolute_delay_seconds", database="ch2", instance="ch2:9363", job="clickhouse-sql", table="default.events"} 0
+  > chq_replica_active_replicas{table="default.events"}  →  2 series
+    {__name__="chq_replica_active_replicas", database="ch1", instance="ch1:9363", job="clickhouse-sql", table="default.events"} 2
+    {__name__="chq_replica_active_replicas", database="ch2", instance="ch2:9363", job="clickhouse-sql", table="default.events"} 2
+  > chq_keeper_session_expired  →  2 series
+    {__name__="chq_keeper_session_expired", database="ch1", instance="ch1:9363", job="clickhouse-sql", keeper_host="keeper2"} 0
+    {__name__="chq_keeper_session_expired", database="ch2", instance="ch2:9363", job="clickhouse-sql", keeper_host="keeper1"} 0
+  > scrape_duration_seconds{job=~"clickhouse-server|clickhouse-keeper|clickhouse-sql"}  →  6 series
+    {__name__="scrape_duration_seconds", instance="ch2:9363", job="clickhouse-server"} 0.007328427
+    {__name__="scrape_duration_seconds", instance="ch1:9363", job="clickhouse-server"} 0.00725121
+    {__name__="scrape_duration_seconds", app="clickhouse-keeper", instance="keeper1:9363", job="clickhouse-keeper"} 0.002651097
+    {__name__="scrape_duration_seconds", app="clickhouse-keeper", instance="keeper2:9363", job="clickhouse-keeper"} 0.002489591
+    {__name__="scrape_duration_seconds", instance="qe:9560", job="clickhouse-sql"} 0.002883857
+    {__name__="scrape_duration_seconds", app="clickhouse-keeper", instance="keeper3:9363", job="clickhouse-keeper"} 0.00279803
+  alerts（^(CH|ClickHouse)）: 0
+
+## B Too many parts：停 merge，逐筆小 insert（async_insert=0）（02:42:42Z）
+  SQL[:31001] SYSTEM STOP MERGES default.events → 200 0.02s 
+  SQL[:31002] SYSTEM STOP MERGES default.events → 200 0.02s 
+.......................................
+  insert 40:   SQL[:31001] INSERT INTO default.events (k, v) SETTINGS async_insert = 0 VALUES (40, 'p') → 500 0.02s Code: 252. DB::Exception: Too many parts (40 with average size of 1.07 KiB) in table 'default.events (da2ce40a-23f8
+
+  insert 41:   SQL[:31001] INSERT INTO default.events (k, v) SETTINGS async_insert = 0 VALUES (41, 'p') → 500 0.02s Code: 252. DB::Exception: Too many parts (40 with average size of 1.07 KiB) in table 'default.events (da2ce40a-23f8
+
+  insert 42:   SQL[:31001] INSERT INTO default.events (k, v) SETTINGS async_insert = 0 VALUES (42, 'p') → 500 0.02s Code: 252. DB::Exception: Too many parts (40 with average size of 1.07 KiB) in table 'default.events (da2ce40a-23f8
+
+  insert 43:   SQL[:31001] INSERT INTO default.events (k, v) SETTINGS async_insert = 0 VALUES (43, 'p') → 500 0.02s Code: 252. DB::Exception: Too many parts (40 with average size of 1.07 KiB) in table 'default.events (da2ce40a-23f8
+
+  insert 44:   SQL[:31001] INSERT INTO default.events (k, v) SETTINGS async_insert = 0 VALUES (44, 'p') → 500 0.02s Code: 252. DB::Exception: Too many parts (40 with average size of 1.07 KiB) in table 'default.events (da2ce40a-23f8
+
+  insert 45:   SQL[:31001] INSERT INTO default.events (k, v) SETTINGS async_insert = 0 VALUES (45, 'p') → 500 0.02s Code: 252. DB::Exception: Too many parts (40 with average size of 1.07 KiB) in table 'default.events (da2ce40a-23f8
+
+  45 筆 insert 用了 14 秒（主機 monotonic）
+  SQL[:31001] SELECT partition_id, count() FROM system.parts WHERE table = 'events' AND active GROUP BY  → 200 0.02s all	40
+  SQL[:31001] SELECT event, value FROM system.events WHERE event IN ('DelayedInserts', 'RejectedInserts' → 200 0.02s DelayedInserts	20 | RejectedInserts	6 | DelayedInsertsMilliseconds	10500
+  > ClickHouseAsyncMetrics_MaxPartCountForPartition  →  2 series
+    {__name__="ClickHouseAsyncMetrics_MaxPartCountForPartition", instance="ch2:9363", job="clickhouse-server"} 40
+    {__name__="ClickHouseAsyncMetrics_MaxPartCountForPartition", instance="ch1:9363", job="clickhouse-server"} 40
+  > ClickHouseProfileEvents_DelayedInserts  →  2 series
+    {__name__="ClickHouseProfileEvents_DelayedInserts", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseProfileEvents_DelayedInserts", instance="ch1:9363", job="clickhouse-server"} 20
+  > ClickHouseProfileEvents_RejectedInserts  →  2 series
+    {__name__="ClickHouseProfileEvents_RejectedInserts", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseProfileEvents_RejectedInserts", instance="ch1:9363", job="clickhouse-server"} 6
+  > ClickHouseProfileEvents_DelayedInsertsMilliseconds  →  2 series
+    {__name__="ClickHouseProfileEvents_DelayedInsertsMilliseconds", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseProfileEvents_DelayedInsertsMilliseconds", instance="ch1:9363", job="clickhouse-server"} 10500
+  > ClickHouseErrorMetric_TOO_MANY_PARTS  →  2 series
+    {__name__="ClickHouseErrorMetric_TOO_MANY_PARTS", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseErrorMetric_TOO_MANY_PARTS", instance="ch1:9363", job="clickhouse-server"} 6
+  > chq_parts_max_per_partition{table="default.events"}  →  2 series
+    {__name__="chq_parts_max_per_partition", database="ch1", instance="ch1:9363", job="clickhouse-sql", table="default.events"} 40
+    {__name__="chq_parts_max_per_partition", database="ch2", instance="ch2:9363", job="clickhouse-sql", table="default.events"} 40
+  > chq_merge_tree_setting  →  0 series
+  > increase(ClickHouseProfileEvents_RejectedInserts{job="clickhouse-server"}[1m])  →  2 series
+    {instance="ch2:9363", job="clickhouse-server"} 0
+    {instance="ch1:9363", job="clickhouse-server"} 6.333333333333334
+  alerts（^(CH|ClickHouse)）: 2
+    firing   CHInsertsDelayed ch1:9363
+    firing   CHInsertsRejected ch1:9363
+  預設 async_insert（26.2 起為 1，wait_for_async_insert=1）逐筆 insert 20 次，part 數的變化：
+  SQL[:31001] SELECT count() FROM system.parts WHERE table = 'events' AND active → 200 0.02s 40
+  SQL[:31001] SELECT count() FROM system.parts WHERE table = 'events' AND active → 200 0.02s 40
+  SQL[:31001] SELECT event, value FROM system.events WHERE event IN ('AsyncInsertQuery', 'AsyncInsertFlu → 200 0.02s AsyncInsertQuery	21 | AsyncInsertFlush	21 | RejectedInserts	26
+  SQL[:31001] SYSTEM START MERGES default.events → 200 0.02s 
+  SQL[:31002] SYSTEM START MERGES default.events → 200 0.02s 
+  SQL[:31001] OPTIMIZE TABLE default.events FINAL → 200 3.57s 
+  SQL[:31001] SELECT count() FROM system.parts WHERE table = 'events' AND active → 200 0.02s 1
+
+## C 失敗的 mutation、detached part（02:43:44Z）
+  SQL[:31001] ALTER TABLE default.events UPDATE v = toString(throwIf(k >= 0, 'lab: mutation fails on pur → 200 0.04s 
+  SQL[:31001] SELECT mutation_id, is_done, parts_to_do, latest_fail_reason FROM system.mutations WHERE t → 200 0.02s 0000000000	0	1	Code: 395. DB::Exception: lab: mutation fails on purpose: while executing \'FUNCTION if(1_UInt8 :: 3, _CAST(toString(throwIf(greaterOrEquals(k, 0_UInt8), \'lab: mutation fails on purpose\'_String)), \'Stri... :: 4, v :: 2) -> if(1_UInt8, _CAST(toString(throwIf(greaterOrEquals(k, 0_UIn
+  SQL[:31002] SELECT mutation_id, is_done, parts_to_do, substring(latest_fail_reason, 1, 120) FROM syste → 200 0.02s 0000000000	0	1	Code: 395. DB::Exception: lab: mutation fails on purpose: while executing \'FUNCTION if(1_UInt8 :: 3, _CAST(toString(thro
+  SQL[:31001] SELECT count() FROM system.replication_queue WHERE table = 'events' AND last_exception !=  → 200 0.02s 1
+  > chq_mutations_failing  →  2 series
+    {__name__="chq_mutations_failing", database="ch1", instance="ch1:9363", job="clickhouse-sql", table="default.events"} 1
+    {__name__="chq_mutations_failing", database="ch2", instance="ch2:9363", job="clickhouse-sql", table="default.events"} 1
+  > chq_mutations_pending  →  2 series
+    {__name__="chq_mutations_pending", database="ch1", instance="ch1:9363", job="clickhouse-sql", table="default.events"} 1
+    {__name__="chq_mutations_pending", database="ch2", instance="ch2:9363", job="clickhouse-sql", table="default.events"} 1
+  > ClickHouseAsyncMetrics_NumberOfPendingMutations  →  1 series
+    {__name__="ClickHouseAsyncMetrics_NumberOfPendingMutations", instance="ch2:9363", job="clickhouse-server"} 1
+  > ClickHouseErrorMetric_FUNCTION_THROW_IF_VALUE_IS_NON_ZERO  →  2 series
+    {__name__="ClickHouseErrorMetric_FUNCTION_THROW_IF_VALUE_IS_NON_ZERO", instance="ch2:9363", job="clickhouse-server"} 14
+    {__name__="ClickHouseErrorMetric_FUNCTION_THROW_IF_VALUE_IS_NON_ZERO", instance="ch1:9363", job="clickhouse-server"} 15
+  > chq_replication_queue_failing  →  2 series
+    {__name__="chq_replication_queue_failing", database="ch1", instance="ch1:9363", job="clickhouse-sql", table="default.events"} 1
+    {__name__="chq_replication_queue_failing", database="ch2", instance="ch2:9363", job="clickhouse-sql", table="default.events"} 1
+  alerts（^(CH|ClickHouse)）: 8
+    firing   CHInsertsDelayed ch1:9363
+    firing   CHInsertsRejected ch1:9363
+    pending  CHBackupTooOld 
+    pending  CHFailedQueriesHigh ch1:9363
+    pending  CHMutationFailing ch1:9363
+    pending  CHMutationFailing ch2:9363
+    pending  CHReplicationQueueFailing ch1:9363
+    pending  CHReplicationQueueFailing ch2:9363
+  SQL[:31001] KILL MUTATION WHERE table = 'events' SYNC FORMAT TSV → 200 0.04s waiting	default	events	0000000000	(UPDATE v = toString(throwIf(k >= 0, \'lab: mutation fails on purpose\')) WHERE 1)
+  SQL[:31002] ALTER TABLE default.events DETACH PART 'all_0_39_3' → 500 0.03s Code: 384. DB::Exception: Part all_0_39_3 has already been assigned a merge into all_0_39_3_40. (PART_IS_TEMPORARILY_LOCKED) (version 26.10.2.103 (official build))
+  SQL[:31002] SELECT name, reason FROM system.detached_parts FORMAT TSV → 200 0.02s 
+  > chq_detached_parts  →  0 series
+  > ClickHouseAsyncMetrics_NumberOfDetachedParts  →  1 series
+    {__name__="ClickHouseAsyncMetrics_NumberOfDetachedParts", instance="ch2:9363", job="clickhouse-server"} 0
+  > ClickHouseAsyncMetrics_NumberOfDetachedByUserParts  →  1 series
+    {__name__="ClickHouseAsyncMetrics_NumberOfDetachedByUserParts", instance="ch2:9363", job="clickhouse-server"} 0
+  SQL[:31002] ALTER TABLE default.events ATTACH PART 'all_0_39_3' → 500 0.02s Code: 233. DB::Exception: Detached part "all_0_39_3" not found. (BAD_DATA_PART_NAME) (version 26.10.2.103 (official build))
+
+## D 記憶體上限與並行上限（02:45:07Z）
+  SQL[:31001] SELECT number % 3000000 AS k, count() FROM numbers(6000000) GROUP BY k FORMAT Null SETTING → 500 0.06s Code: 241. DB::Exception: Query memory limit exceeded: would use 29.43 MiB (attempt to allocate chunk of 4.13 MiB), maximum: 28.61 MiB: While executing AggregatingTransform. (MEMORY_LIMIT_EXCEEDED) (version 26.10.2.103 (official build))
+  SQL[:31001] SELECT sleep(2) SETTINGS max_concurrent_queries_for_user = 2 → 500 0.02s Code: 202. DB::Exception: Too many simultaneous queries for user default. Current: 2, maximum: 2. (TOO_MANY_SIMULTANEOUS_QUERIES) (version 26.10.2.103 (official build))
+  SQL[:31001] SELECT sleep(2) SETTINGS max_concurrent_queries_for_user = 2 → 200 2.02s 0
+  SQL[:31001] SELECT sleep(2) SETTINGS max_concurrent_queries_for_user = 2 → 200 2.02s 0
+  > ClickHouseErrorMetric_MEMORY_LIMIT_EXCEEDED  →  2 series
+    {__name__="ClickHouseErrorMetric_MEMORY_LIMIT_EXCEEDED", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseErrorMetric_MEMORY_LIMIT_EXCEEDED", instance="ch1:9363", job="clickhouse-server"} 1
+  > ClickHouseProfileEvents_QueryMemoryLimitExceeded  →  2 series
+    {__name__="ClickHouseProfileEvents_QueryMemoryLimitExceeded", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseProfileEvents_QueryMemoryLimitExceeded", instance="ch1:9363", job="clickhouse-server"} 1
+  > ClickHouseProfileEvents_GlobalMemoryLimitExceeded  →  2 series
+    {__name__="ClickHouseProfileEvents_GlobalMemoryLimitExceeded", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseProfileEvents_GlobalMemoryLimitExceeded", instance="ch1:9363", job="clickhouse-server"} 0
+  > ClickHouseErrorMetric_TOO_MANY_SIMULTANEOUS_QUERIES  →  2 series
+    {__name__="ClickHouseErrorMetric_TOO_MANY_SIMULTANEOUS_QUERIES", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseErrorMetric_TOO_MANY_SIMULTANEOUS_QUERIES", instance="ch1:9363", job="clickhouse-server"} 1
+  > ClickHouseMetrics_MemoryTracking / on (job, instance) (ClickHouseAsyncMetrics_CGroupMemoryTotal > 0 or ClickHouseAsyncMetrics_OSMemoryTotal)  →  5 series
+    {instance="ch2:9363", job="clickhouse-server"} 0.20036129421657986
+    {instance="ch1:9363", job="clickhouse-server"} 0.21234541998969184
+    {instance="keeper1:9363", job="clickhouse-keeper"} 0
+    {instance="keeper2:9363", job="clickhouse-keeper"} 0
+    {instance="keeper3:9363", job="clickhouse-keeper"} 0
+  > ClickHouseProfileEvents_FailedQuery  →  2 series
+    {__name__="ClickHouseProfileEvents_FailedQuery", instance="ch2:9363", job="clickhouse-server"} 2
+    {__name__="ClickHouseProfileEvents_FailedQuery", instance="ch1:9363", job="clickhouse-server"} 48
+  alerts（^(CH|ClickHouse)）: 10
+    firing   CHInsertsDelayed ch1:9363
+    firing   CHInsertsRejected ch1:9363
+    firing   CHQueriesHitMemoryLimit ch1:9363
+    firing   CHQueriesRejectedConcurrency ch1:9363
+    pending  CHBackupTooOld 
+    pending  CHFailedQueriesHigh ch1:9363
+    pending  CHMutationFailing ch1:9363
+    pending  CHMutationFailing ch2:9363
+    pending  CHReplicationQueueFailing ch2:9363
+    pending  CHReplicationQueueFailing ch1:9363
+
+## E Distributed 非同步送出到不存在的 shard（02:45:21Z）
+  SQL[:31001] CREATE TABLE default.dist_broken AS default.events ENGINE = Distributed(broken, default, e → 200 0.02s 
+  SQL[:31001] INSERT INTO default.dist_broken (k, v) SETTINGS distributed_foreground_insert = 0 VALUES ( → 200 0.07s 
+  SQL[:31001] INSERT INTO default.dist_broken (k, v) SETTINGS distributed_foreground_insert = 0 VALUES ( → 200 0.08s 
+  SQL[:31001] INSERT INTO default.dist_broken (k, v) SETTINGS distributed_foreground_insert = 0 VALUES ( → 200 0.08s 
+  SQL[:31001] INSERT INTO default.dist_broken (k, v) SETTINGS distributed_foreground_insert = 0 VALUES ( → 200 0.08s 
+  SQL[:31001] INSERT INTO default.dist_broken (k, v) SETTINGS distributed_foreground_insert = 0 VALUES ( → 200 0.07s 
+  SQL[:31001] SELECT data_files, error_count, broken_data_files, substring(last_exception, 1, 120) FROM  → 200 0.02s 5	2	0	Code: 279. DB::NetException: All connection tries failed. Log: \n\nCode: 198. DB::NetException: Not found address of host:
+  > ClickHouseMetrics_DistributedFilesToInsert  →  2 series
+    {__name__="ClickHouseMetrics_DistributedFilesToInsert", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseMetrics_DistributedFilesToInsert", instance="ch1:9363", job="clickhouse-server"} 5
+  > ClickHouseMetrics_BrokenDistributedFilesToInsert  →  2 series
+    {__name__="ClickHouseMetrics_BrokenDistributedFilesToInsert", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseMetrics_BrokenDistributedFilesToInsert", instance="ch1:9363", job="clickhouse-server"} 0
+  > ClickHouseProfileEvents_DistributedAsyncInsertionFailures  →  2 series
+    {__name__="ClickHouseProfileEvents_DistributedAsyncInsertionFailures", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseProfileEvents_DistributedAsyncInsertionFailures", instance="ch1:9363", job="clickhouse-server"} 2
+  > chq_distribution_queue_files  →  1 series
+    {__name__="chq_distribution_queue_files", database="ch1", instance="ch1:9363", job="clickhouse-sql", table="default.dist_broken"} 5
+  > chq_distribution_queue_errors  →  1 series
+    {__name__="chq_distribution_queue_errors", database="ch1", instance="ch1:9363", job="clickhouse-sql", table="default.dist_broken"} 0
+  alerts（^(CH|ClickHouse)）: 11
+    firing   CHInsertsDelayed ch1:9363
+    firing   CHInsertsRejected ch1:9363
+    firing   CHQueriesHitMemoryLimit ch1:9363
+    firing   CHQueriesRejectedConcurrency ch1:9363
+    pending  CHBackupTooOld 
+    pending  CHDistributedSendFailing ch1:9363
+    pending  CHFailedQueriesHigh ch1:9363
+    pending  CHMutationFailing ch1:9363
+    pending  CHMutationFailing ch2:9363
+    pending  CHReplicationQueueFailing ch2:9363
+    pending  CHReplicationQueueFailing ch1:9363
+  SQL[:31001] DROP TABLE default.dist_broken SYNC → 200 23.73s 
+
+## F 備份：成功一次、同名再做一次（失敗）（02:46:17Z）
+  SQL[:31001] BACKUP TABLE default.events TO Disk('backups', 'b1.zip') → 200 0.04s 5f6b84c4-f2fc-4419-8705-ad58169c422f	BACKUP_CREATED
+  SQL[:31001] BACKUP TABLE default.events TO Disk('backups', 'b1.zip') → 500 0.02s Code: 598. DB::Exception: Backup Disk('backups', 'b1.zip') already exists. (BACKUP_ALREADY_EXISTS) (version 26.10.2.103 (official build))
+  SQL[:31001] SELECT name, status, substring(error, 1, 120) FROM system.backups FORMAT TSV → 200 0.02s Disk(\'backups\', \'b1.zip\')	BACKUP_FAILED	Code: 598. DB::Exception: Backup Disk(\'backups\', \'b1.zip\') already exists. (BACKUP_ALREADY_EXISTS), Stack trace (when co | Disk(\'backups\', \'b1.zip\')	BACKUP_CREATED
+  > chq_backup_last_success_timestamp  →  2 series
+    {__name__="chq_backup_last_success_timestamp", database="ch1", instance="ch1:9363", job="clickhouse-sql"} 0
+    {__name__="chq_backup_last_success_timestamp", database="ch2", instance="ch2:9363", job="clickhouse-sql"} 0
+  > chq_backups_failed  →  2 series
+    {__name__="chq_backups_failed", database="ch1", instance="ch1:9363", job="clickhouse-sql"} 0
+    {__name__="chq_backups_failed", database="ch2", instance="ch2:9363", job="clickhouse-sql"} 0
+  > {__name__=~"ClickHouse.*Backup.*", job="clickhouse-server"} > 0  →  9 series
+    {__name__="ClickHouseProfileEvents_BackupsOpenedForWrite", instance="ch1:9363", job="clickhouse-server"} 2
+    {__name__="ClickHouseProfileEvents_BackupWriteMetadataMicroseconds", instance="ch1:9363", job="clickhouse-server"} 213
+    {__name__="ClickHouseProfileEvents_BackupEntriesCollectorMicroseconds", instance="ch1:9363", job="clickhouse-server"} 13442
+    {__name__="ClickHouseProfileEvents_BackupEntriesCollectorForTablesDataMicroseconds", instance="ch1:9363", job="clickhouse-server"} 793
+    {__name__="ClickHouseProfileEvents_BackupEntriesCollectorRunPostTasksMicroseconds", instance="ch1:9363", job="clickhouse-server"} 12
+    {__name__="ClickHouseProfileEvents_BackupPreparingFileInfosMicroseconds", instance="ch1:9363", job="clickhouse-server"} 606
+    {__name__="ClickHouseProfileEvents_BackupReadLocalFilesToCalculateChecksums", instance="ch1:9363", job="clickhouse-server"} 5
+    {__name__="ClickHouseProfileEvents_BackupReadLocalBytesToCalculateChecksums", instance="ch1:9363", job="clickhouse-server"} 539
+    {__name__="ClickHouseProfileEvents_BackupLockFileReads", instance="ch1:9363", job="clickhouse-server"} 4
+  alerts（^(CH|ClickHouse)）: 7
+    firing   CHInsertsDelayed ch1:9363
+    firing   CHInsertsRejected ch1:9363
+    firing   CHQueriesHitMemoryLimit ch1:9363
+    firing   CHQueriesRejectedConcurrency ch1:9363
+    pending  CHBackupTooOld 
+    pending  CHDistributedSendFailing ch1:9363
+    pending  CHFailedQueriesHigh ch1:9363
+
+## G1 replica 落後：ch2 停止 fetch，ch1 繼續寫（02:47:31Z）
+  SQL[:31002] SYSTEM STOP FETCHES default.events → 200 0.02s 
+  停止 fetch 後 65 秒（主機）
+  SQL[:31002] SELECT is_readonly, absolute_delay, queue_size, inserts_in_queue, active_replicas, total_r → 200 0.03s 0	70	9	8	2	2
+  SQL[:31001] SELECT is_readonly, absolute_delay, queue_size, inserts_in_queue, active_replicas, total_r → 200 0.04s 0	0	0	0	2	2
+  GET :31002/replicas_status?verbose=1 → 503 55B 0.02s default.events:	Absolute delay: 70. Relative delay: 0. 
+  GET :31002/replicas_status → 503 55B 0.02s default.events:	Absolute delay: 70. Relative delay: 0. 
+  > ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay  →  2 series
+    {__name__="ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay", instance="ch2:9363", job="clickhouse-server"} 80
+    {__name__="ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay", instance="ch1:9363", job="clickhouse-server"} 0
+  > ClickHouseAsyncMetrics_ReplicasMaxInsertsInQueue  →  2 series
+    {__name__="ClickHouseAsyncMetrics_ReplicasMaxInsertsInQueue", instance="ch2:9363", job="clickhouse-server"} 8
+    {__name__="ClickHouseAsyncMetrics_ReplicasMaxInsertsInQueue", instance="ch1:9363", job="clickhouse-server"} 0
+  > chq_replica_absolute_delay_seconds{table="default.events"}  →  2 series
+    {__name__="chq_replica_absolute_delay_seconds", database="ch1", instance="ch1:9363", job="clickhouse-sql", table="default.events"} 0
+    {__name__="chq_replica_absolute_delay_seconds", database="ch2", instance="ch2:9363", job="clickhouse-sql", table="default.events"} 66
+  > probe_success{job="clickhouse-replicas-status"}  →  2 series
+    {__name__="probe_success", instance="ch1:9363", job="clickhouse-replicas-status"} 1
+    {__name__="probe_success", instance="ch2:9363", job="clickhouse-replicas-status"} 0
+  alerts（^(CH|ClickHouse)）: 6
+    firing   CHQueriesHitMemoryLimit ch1:9363
+    firing   CHQueriesRejectedConcurrency ch1:9363
+    pending  CHBackupTooOld 
+    pending  CHDistributedSendFailing ch1:9363
+    pending  CHReplicasStatusNotOk ch2:9363
+    pending  CHReplicationQueueFailing ch2:9363
+  SQL[:31002] SYSTEM START FETCHES default.events → 200 0.02s 
+  SQL[:31002] SELECT absolute_delay, queue_size FROM system.replicas WHERE table = 'events' FORMAT TSV → 200 0.02s 0	1
+
+## G2 停掉 ch2，ch1 繼續寫（02:49:04Z）
+  ch2 停止後 40 秒（主機）
+  SQL[:31001] SELECT is_readonly, absolute_delay, queue_size, active_replicas, total_replicas FROM syste → 200 0.03s 0	0	0	1	2
+  GET :31001/replicas_status?verbose=1 → 200 54B 0.02s default.events:	Absolute delay: 0. Relative delay: 0. 
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"clickhouse-server|clickhouse-keeper|clickhouse-sql"}  →  6 series
+    {__name__="up", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="up", instance="ch1:9363", job="clickhouse-server"} 1
+    {__name__="up", app="clickhouse-keeper", instance="keeper1:9363", job="clickhouse-keeper"} 1
+    {__name__="up", app="clickhouse-keeper", instance="keeper2:9363", job="clickhouse-keeper"} 1
+    {__name__="up", instance="qe:9560", job="clickhouse-sql"} 1
+    {__name__="up", app="clickhouse-keeper", instance="keeper3:9363", job="clickhouse-keeper"} 1
+  > probe_success  →  15 series
+    {__name__="probe_success", instance="keeper3:9363", job="clickhouse-keeper-mntr"} 1
+    {__name__="probe_success", instance="keeper2:9363", job="clickhouse-keeper-ruok"} 1
+    {__name__="probe_success", instance="ch2:9363", job="clickhouse-sql-probe"} 0
+    {__name__="probe_success", instance="ch1:9363", job="clickhouse-replicas-status"} 1
+    {__name__="probe_success", instance="keeper2:9363", job="clickhouse-keeper-mntr"} 1
+    {__name__="probe_success", instance="ch1:9363", job="clickhouse-sql-probe"} 1
+    {__name__="probe_success", instance="keeper1:9363", job="clickhouse-keeper-ready"} 1
+    {__name__="probe_success", instance="ch1:9363", job="clickhouse-ping"} 1
+    {__name__="probe_success", instance="keeper2:9363", job="clickhouse-keeper-ready"} 1
+    {__name__="probe_success", instance="ch2:9363", job="clickhouse-replicas-status"} 0
+    {__name__="probe_success", instance="keeper1:9363", job="clickhouse-keeper-ruok"} 1
+    {__name__="probe_success", instance="keeper3:9363", job="clickhouse-keeper-ready"} 1
+    {__name__="probe_success", instance="keeper3:9363", job="clickhouse-keeper-ruok"} 1
+    {__name__="probe_success", instance="ch2:9363", job="clickhouse-ping"} 0
+    {__name__="probe_success", instance="keeper1:9363", job="clickhouse-keeper-mntr"} 1
+  > ClickHouseAsyncMetrics_KeeperIsLeader  →  3 series
+    {__name__="ClickHouseAsyncMetrics_KeeperIsLeader", app="clickhouse-keeper", instance="keeper1:9363", job="clickhouse-keeper"} 1
+    {__name__="ClickHouseAsyncMetrics_KeeperIsLeader", app="clickhouse-keeper", instance="keeper2:9363", job="clickhouse-keeper"} 0
+    {__name__="ClickHouseAsyncMetrics_KeeperIsLeader", app="clickhouse-keeper", instance="keeper3:9363", job="clickhouse-keeper"} 0
+  > ClickHouseAsyncMetrics_KeeperSyncedFollowers  →  3 series
+    {__name__="ClickHouseAsyncMetrics_KeeperSyncedFollowers", app="clickhouse-keeper", instance="keeper1:9363", job="clickhouse-keeper"} 2
+    {__name__="ClickHouseAsyncMetrics_KeeperSyncedFollowers", app="clickhouse-keeper", instance="keeper2:9363", job="clickhouse-keeper"} 0
+    {__name__="ClickHouseAsyncMetrics_KeeperSyncedFollowers", app="clickhouse-keeper", instance="keeper3:9363", job="clickhouse-keeper"} 0
+  > ClickHouseMetrics_ZooKeeperSession  →  1 series
+    {__name__="ClickHouseMetrics_ZooKeeperSession", instance="ch1:9363", job="clickhouse-server"} 1
+  > ClickHouseMetrics_ReadonlyReplica  →  1 series
+    {__name__="ClickHouseMetrics_ReadonlyReplica", instance="ch1:9363", job="clickhouse-server"} 0
+  > ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay  →  1 series
+    {__name__="ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay", instance="ch1:9363", job="clickhouse-server"} 0
+  > ClickHouseAsyncMetrics_ReplicasMaxQueueSize  →  1 series
+    {__name__="ClickHouseAsyncMetrics_ReplicasMaxQueueSize", instance="ch1:9363", job="clickhouse-server"} 0
+  > chq_replica_readonly{table="default.events"}  →  2 series
+    {__name__="chq_replica_readonly", database="ch1", instance="ch1:9363", job="clickhouse-sql", table="default.events"} 0
+    {__name__="chq_replica_readonly", database="ch2", instance="ch2:9363", job="clickhouse-sql", table="default.events"} 0
+  > chq_replica_absolute_delay_seconds{table="default.events"}  →  2 series
+    {__name__="chq_replica_absolute_delay_seconds", database="ch1", instance="ch1:9363", job="clickhouse-sql", table="default.events"} 0
+    {__name__="chq_replica_absolute_delay_seconds", database="ch2", instance="ch2:9363", job="clickhouse-sql", table="default.events"} 66
+  > chq_replica_active_replicas{table="default.events"}  →  2 series
+    {__name__="chq_replica_active_replicas", database="ch1", instance="ch1:9363", job="clickhouse-sql", table="default.events"} 1
+    {__name__="chq_replica_active_replicas", database="ch2", instance="ch2:9363", job="clickhouse-sql", table="default.events"} 2
+  > chq_keeper_session_expired  →  2 series
+    {__name__="chq_keeper_session_expired", database="ch1", instance="ch1:9363", job="clickhouse-sql", keeper_host="keeper2"} 0
+    {__name__="chq_keeper_session_expired", database="ch2", instance="ch2:9363", job="clickhouse-sql", keeper_host="keeper1"} 0
+  > scrape_duration_seconds{job=~"clickhouse-server|clickhouse-keeper|clickhouse-sql"}  →  6 series
+    {__name__="scrape_duration_seconds", instance="ch2:9363", job="clickhouse-server"} 3.125662826
+    {__name__="scrape_duration_seconds", instance="ch1:9363", job="clickhouse-server"} 0.007630933
+    {__name__="scrape_duration_seconds", app="clickhouse-keeper", instance="keeper1:9363", job="clickhouse-keeper"} 0.002846057
+    {__name__="scrape_duration_seconds", app="clickhouse-keeper", instance="keeper2:9363", job="clickhouse-keeper"} 0.002698479
+    {__name__="scrape_duration_seconds", instance="qe:9560", job="clickhouse-sql"} 0.004947083
+    {__name__="scrape_duration_seconds", app="clickhouse-keeper", instance="keeper3:9363", job="clickhouse-keeper"} 0.002927197
+  alerts（^(CH|ClickHouse)）: 11
+    firing   CHQueriesHitMemoryLimit ch1:9363
+    firing   CHQueriesRejectedConcurrency ch1:9363
+    pending  CHBackupTooOld 
+    pending  CHComponentCountLow 
+    pending  CHDistributedSendFailing ch1:9363
+    pending  CHEndpointDown ch2:9363
+    pending  CHPingFailing ch2:9363
+    pending  CHReplicaInactive ch1:9363
+    pending  CHReplicasStatusNotOk ch2:9363
+    pending  CHReplicationQueueFailing ch2:9363
+    pending  CHSqlProbeFailing ch2:9363
+  ch2 啟動後 16 秒（主機）
+  SQL[:31002] SELECT is_readonly, absolute_delay, queue_size, active_replicas FROM system.replicas WHERE → 200 0.03s 0	0	0	2
+  SQL[:31001] SELECT count() FROM default.events → 200 0.02s 1052
+  SQL[:31002] SELECT count() FROM default.events → 200 0.02s 1052
+
+## H Keeper 失去 quorum：停 leader 與一台 follower（02:50:08Z）
+  Keeper leader（mntr zk_server_state=leader）：keeper1
+  停止：keeper1 keeper2；留下：keeper3
+  +10 秒（主機）
+  SQL[:31001] SELECT is_readonly, is_session_expired FROM system.replicas WHERE table = 'events' FORMAT  → 200 0.02s 1	1
+  SQL[:31001] INSERT INTO default.events (k, v) SETTINGS async_insert = 0 VALUES (4001, 'k') → TimeoutError timed out after 30.02s
+  GET :31001/ping → 200 4B 0.02s Ok. 
+  GET :31001/replicas_status?verbose=1 → 200 30B 0.02s default.events:	is readonly.  
+  GET :31002/ping → 200 4B 0.02s Ok. 
+  GET :31002/replicas_status?verbose=1 → 200 30B 0.02s default.events:	is readonly.  
+  GET :31031/ready → URLError <urlopen error [Errno 111] Connection refused> after 0.02s
+  GET :31032/ready → URLError <urlopen error [Errno 111] Connection refused> after 0.02s
+  GET :31033/ready → 503 65B 0.02s {"details":{"hasLeader":false,"role":"follower"},"status":"fail"}
+  4LW[:31021] ruok → ConnectionRefusedError [Errno 111] Connection refused after 0.00s
+  4LW[:31021] mntr → ConnectionRefusedError [Errno 111] Connection refused after 0.00s
+  4LW[:31022] ruok → ConnectionRefusedError [Errno 111] Connection refused after 0.00s
+  4LW[:31022] mntr → ConnectionRefusedError [Errno 111] Connection refused after 0.00s
+  4LW[:31023] ruok → 0.00s imok
+  4LW[:31023] mntr → 0.00s This instance is not currently serving requests
+  +81 秒（主機；session_timeout_ms 30 秒）
+  SQL[:31001] SELECT is_readonly, is_session_expired, absolute_delay FROM system.replicas WHERE table =  → 200 0.02s 1	1	0
+  SQL[:31002] SELECT is_readonly, is_session_expired, absolute_delay FROM system.replicas WHERE table =  → 200 0.02s 1	1	0
+  SQL[:31001] SELECT host, is_expired FROM system.zookeeper_connection FORMAT TSV → TimeoutError timed out after 30.03s
+  SQL[:31001] INSERT INTO default.events (k, v) SETTINGS async_insert = 0 VALUES (4002, 'k') → TimeoutError timed out after 30.05s
+  SQL[:31001] SELECT count() FROM default.events → 200 0.02s 1052
+  GET :31001/ping → 200 4B 0.02s Ok. 
+  GET :31001/replicas_status?verbose=1 → 200 30B 0.02s default.events:	is readonly.  
+  GET :31002/ping → 200 4B 0.02s Ok. 
+  GET :31002/replicas_status?verbose=1 → 200 30B 0.02s default.events:	is readonly.  
+  GET :31031/ready → URLError <urlopen error [Errno 111] Connection refused> after 0.02s
+  GET :31032/ready → URLError <urlopen error [Errno 111] Connection refused> after 0.02s
+  GET :31033/ready → 503 65B 0.02s {"details":{"hasLeader":false,"role":"follower"},"status":"fail"}
+  4LW[:31021] ruok → ConnectionRefusedError [Errno 111] Connection refused after 0.00s
+  4LW[:31021] mntr → ConnectionRefusedError [Errno 111] Connection refused after 0.00s
+  4LW[:31022] ruok → ConnectionRefusedError [Errno 111] Connection refused after 0.00s
+  4LW[:31022] mntr → ConnectionRefusedError [Errno 111] Connection refused after 0.00s
+  4LW[:31023] ruok → 0.00s imok
+  4LW[:31023] mntr → 0.00s This instance is not currently serving requests
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"clickhouse-server|clickhouse-keeper|clickhouse-sql"}  →  6 series
+    {__name__="up", instance="ch2:9363", job="clickhouse-server"} 1
+    {__name__="up", instance="ch1:9363", job="clickhouse-server"} 1
+    {__name__="up", app="clickhouse-keeper", instance="keeper1:9363", job="clickhouse-keeper"} 0
+    {__name__="up", app="clickhouse-keeper", instance="keeper2:9363", job="clickhouse-keeper"} 0
+    {__name__="up", instance="qe:9560", job="clickhouse-sql"} 1
+    {__name__="up", app="clickhouse-keeper", instance="keeper3:9363", job="clickhouse-keeper"} 1
+  > probe_success  →  15 series
+    {__name__="probe_success", instance="keeper3:9363", job="clickhouse-keeper-mntr"} 0
+    {__name__="probe_success", instance="keeper2:9363", job="clickhouse-keeper-ruok"} 0
+    {__name__="probe_success", instance="ch2:9363", job="clickhouse-sql-probe"} 0
+    {__name__="probe_success", instance="ch1:9363", job="clickhouse-replicas-status"} 0
+    {__name__="probe_success", instance="keeper2:9363", job="clickhouse-keeper-mntr"} 0
+    {__name__="probe_success", instance="ch1:9363", job="clickhouse-sql-probe"} 0
+    {__name__="probe_success", instance="keeper1:9363", job="clickhouse-keeper-ready"} 0
+    {__name__="probe_success", instance="ch1:9363", job="clickhouse-ping"} 1
+    {__name__="probe_success", instance="keeper2:9363", job="clickhouse-keeper-ready"} 0
+    {__name__="probe_success", instance="ch2:9363", job="clickhouse-replicas-status"} 0
+    {__name__="probe_success", instance="keeper1:9363", job="clickhouse-keeper-ruok"} 0
+    {__name__="probe_success", instance="keeper3:9363", job="clickhouse-keeper-ready"} 0
+    {__name__="probe_success", instance="keeper3:9363", job="clickhouse-keeper-ruok"} 1
+    {__name__="probe_success", instance="ch2:9363", job="clickhouse-ping"} 1
+    {__name__="probe_success", instance="keeper1:9363", job="clickhouse-keeper-mntr"} 0
+  > ClickHouseAsyncMetrics_KeeperIsLeader  →  1 series
+    {__name__="ClickHouseAsyncMetrics_KeeperIsLeader", app="clickhouse-keeper", instance="keeper3:9363", job="clickhouse-keeper"} 0
+  > ClickHouseAsyncMetrics_KeeperSyncedFollowers  →  1 series
+    {__name__="ClickHouseAsyncMetrics_KeeperSyncedFollowers", app="clickhouse-keeper", instance="keeper3:9363", job="clickhouse-keeper"} 0
+  > ClickHouseMetrics_ZooKeeperSession  →  2 series
+    {__name__="ClickHouseMetrics_ZooKeeperSession", instance="ch2:9363", job="clickhouse-server"} 1
+    {__name__="ClickHouseMetrics_ZooKeeperSession", instance="ch1:9363", job="clickhouse-server"} 1
+  > ClickHouseMetrics_ReadonlyReplica  →  2 series
+    {__name__="ClickHouseMetrics_ReadonlyReplica", instance="ch2:9363", job="clickhouse-server"} 1
+    {__name__="ClickHouseMetrics_ReadonlyReplica", instance="ch1:9363", job="clickhouse-server"} 1
+  > ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay  →  2 series
+    {__name__="ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay", instance="ch1:9363", job="clickhouse-server"} 0
+  > ClickHouseAsyncMetrics_ReplicasMaxQueueSize  →  2 series
+    {__name__="ClickHouseAsyncMetrics_ReplicasMaxQueueSize", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseAsyncMetrics_ReplicasMaxQueueSize", instance="ch1:9363", job="clickhouse-server"} 0
+  > chq_replica_readonly{table="default.events"}  →  0 series
+  > chq_replica_absolute_delay_seconds{table="default.events"}  →  0 series
+  > chq_replica_active_replicas{table="default.events"}  →  0 series
+  > chq_keeper_session_expired  →  0 series
+  > scrape_duration_seconds{job=~"clickhouse-server|clickhouse-keeper|clickhouse-sql"}  →  6 series
+    {__name__="scrape_duration_seconds", instance="ch2:9363", job="clickhouse-server"} 0.007048809
+    {__name__="scrape_duration_seconds", instance="ch1:9363", job="clickhouse-server"} 0.007172822
+    {__name__="scrape_duration_seconds", app="clickhouse-keeper", instance="keeper1:9363", job="clickhouse-keeper"} 2.850793326
+    {__name__="scrape_duration_seconds", app="clickhouse-keeper", instance="keeper2:9363", job="clickhouse-keeper"} 2.844494202
+    {__name__="scrape_duration_seconds", instance="qe:9560", job="clickhouse-sql"} 0.004573307
+    {__name__="scrape_duration_seconds", app="clickhouse-keeper", instance="keeper3:9363", job="clickhouse-keeper"} 0.002632073
+  > ClickHouseErrorMetric_TABLE_IS_READ_ONLY  →  2 series
+    {__name__="ClickHouseErrorMetric_TABLE_IS_READ_ONLY", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseErrorMetric_TABLE_IS_READ_ONLY", instance="ch1:9363", job="clickhouse-server"} 32
+  > ClickHouseErrorMetric_KEEPER_EXCEPTION  →  2 series
+    {__name__="ClickHouseErrorMetric_KEEPER_EXCEPTION", instance="ch2:9363", job="clickhouse-server"} 33
+    {__name__="ClickHouseErrorMetric_KEEPER_EXCEPTION", instance="ch1:9363", job="clickhouse-server"} 34
+  > ClickHouseProfileEvents_ZooKeeperHardwareExceptions  →  2 series
+    {__name__="ClickHouseProfileEvents_ZooKeeperHardwareExceptions", instance="ch2:9363", job="clickhouse-server"} 32
+    {__name__="ClickHouseProfileEvents_ZooKeeperHardwareExceptions", instance="ch1:9363", job="clickhouse-server"} 34
+  > sum(probe_success{job="clickhouse-keeper-ready"})  →  1 series
+    {} 0
+  alerts（^(CH|ClickHouse)）: 43
+    firing   CHBackupFailed ch1:9363
+    firing   CHDistributedSendFailing ch1:9363
+    firing   CHEndpointDown keeper1:9363
+    firing   CHEndpointDown keeper2:9363
+    firing   CHKeeperNoLeader 
+    firing   CHKeeperNotReady keeper1:9363
+    firing   CHKeeperNotReady keeper2:9363
+    firing   CHKeeperNotReady keeper3:9363
+    firing   CHKeeperQuorumLost 
+    firing   CHKeeperSessionLost ch1:9363
+    firing   CHKeeperSessionLost ch2:9363
+    firing   CHQueriesHitMemoryLimit ch1:9363
+    firing   CHReplicaReadonly ch2:9363
+    firing   CHReplicaReadonly ch1:9363
+    firing   CHReplicasStatusNotOk ch1:9363
+    firing   CHReplicasStatusNotOk ch2:9363
+    firing   CHSqlProbeFailing ch1:9363
+    firing   CHSqlProbeFailing ch2:9363
+    firing   CHWritesToReadonlyTable ch1:9363
+    firing   ClickHouseKeeperDown keeper1:9363
+    firing   ClickHouseKeeperDown keeper2:9363
+    pending  CHComponentCountLow 
+    pending  CHKeeperFollowersMissing 
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  ClickHouseKeeperHighFileDescriptorUsage keeper3:9363
+    pending  ClickHouseKeeperHighLatency keeper3:9363
+  Keeper 啟動後 3 秒 ch1 的 Replicated 表不再唯讀（主機）
+  SQL[:31001] INSERT INTO default.events (k, v) SETTINGS async_insert = 0 VALUES (4003, 'k') → 200 0.04s 
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"clickhouse-server|clickhouse-keeper|clickhouse-sql"}  →  6 series
+    {__name__="up", instance="ch2:9363", job="clickhouse-server"} 1
+    {__name__="up", instance="ch1:9363", job="clickhouse-server"} 1
+    {__name__="up", app="clickhouse-keeper", instance="keeper1:9363", job="clickhouse-keeper"} 1
+    {__name__="up", app="clickhouse-keeper", instance="keeper2:9363", job="clickhouse-keeper"} 1
+    {__name__="up", instance="qe:9560", job="clickhouse-sql"} 1
+    {__name__="up", app="clickhouse-keeper", instance="keeper3:9363", job="clickhouse-keeper"} 1
+  > probe_success  →  15 series
+    {__name__="probe_success", instance="keeper3:9363", job="clickhouse-keeper-mntr"} 1
+    {__name__="probe_success", instance="keeper2:9363", job="clickhouse-keeper-ruok"} 1
+    {__name__="probe_success", instance="ch2:9363", job="clickhouse-sql-probe"} 1
+    {__name__="probe_success", instance="ch1:9363", job="clickhouse-replicas-status"} 1
+    {__name__="probe_success", instance="keeper2:9363", job="clickhouse-keeper-mntr"} 1
+    {__name__="probe_success", instance="ch1:9363", job="clickhouse-sql-probe"} 1
+    {__name__="probe_success", instance="keeper1:9363", job="clickhouse-keeper-ready"} 1
+    {__name__="probe_success", instance="ch1:9363", job="clickhouse-ping"} 1
+    {__name__="probe_success", instance="keeper2:9363", job="clickhouse-keeper-ready"} 1
+    {__name__="probe_success", instance="ch2:9363", job="clickhouse-replicas-status"} 1
+    {__name__="probe_success", instance="keeper1:9363", job="clickhouse-keeper-ruok"} 1
+    {__name__="probe_success", instance="keeper3:9363", job="clickhouse-keeper-ready"} 1
+    {__name__="probe_success", instance="keeper3:9363", job="clickhouse-keeper-ruok"} 1
+    {__name__="probe_success", instance="ch2:9363", job="clickhouse-ping"} 1
+    {__name__="probe_success", instance="keeper1:9363", job="clickhouse-keeper-mntr"} 1
+  > ClickHouseAsyncMetrics_KeeperIsLeader  →  3 series
+    {__name__="ClickHouseAsyncMetrics_KeeperIsLeader", app="clickhouse-keeper", instance="keeper1:9363", job="clickhouse-keeper"} 0
+    {__name__="ClickHouseAsyncMetrics_KeeperIsLeader", app="clickhouse-keeper", instance="keeper2:9363", job="clickhouse-keeper"} 0
+    {__name__="ClickHouseAsyncMetrics_KeeperIsLeader", app="clickhouse-keeper", instance="keeper3:9363", job="clickhouse-keeper"} 1
+  > ClickHouseAsyncMetrics_KeeperSyncedFollowers  →  3 series
+    {__name__="ClickHouseAsyncMetrics_KeeperSyncedFollowers", app="clickhouse-keeper", instance="keeper1:9363", job="clickhouse-keeper"} 0
+    {__name__="ClickHouseAsyncMetrics_KeeperSyncedFollowers", app="clickhouse-keeper", instance="keeper2:9363", job="clickhouse-keeper"} 0
+    {__name__="ClickHouseAsyncMetrics_KeeperSyncedFollowers", app="clickhouse-keeper", instance="keeper3:9363", job="clickhouse-keeper"} 2
+  > ClickHouseMetrics_ZooKeeperSession  →  2 series
+    {__name__="ClickHouseMetrics_ZooKeeperSession", instance="ch2:9363", job="clickhouse-server"} 1
+    {__name__="ClickHouseMetrics_ZooKeeperSession", instance="ch1:9363", job="clickhouse-server"} 1
+  > ClickHouseMetrics_ReadonlyReplica  →  2 series
+    {__name__="ClickHouseMetrics_ReadonlyReplica", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseMetrics_ReadonlyReplica", instance="ch1:9363", job="clickhouse-server"} 0
+  > ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay  →  2 series
+    {__name__="ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay", instance="ch1:9363", job="clickhouse-server"} 0
+  > ClickHouseAsyncMetrics_ReplicasMaxQueueSize  →  2 series
+    {__name__="ClickHouseAsyncMetrics_ReplicasMaxQueueSize", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="ClickHouseAsyncMetrics_ReplicasMaxQueueSize", instance="ch1:9363", job="clickhouse-server"} 0
+  > chq_replica_readonly{table="default.events"}  →  2 series
+    {__name__="chq_replica_readonly", database="ch1", instance="ch1:9363", job="clickhouse-sql", table="default.events"} 0
+    {__name__="chq_replica_readonly", database="ch2", instance="ch2:9363", job="clickhouse-sql", table="default.events"} 0
+  > chq_replica_absolute_delay_seconds{table="default.events"}  →  2 series
+    {__name__="chq_replica_absolute_delay_seconds", database="ch1", instance="ch1:9363", job="clickhouse-sql", table="default.events"} 0
+    {__name__="chq_replica_absolute_delay_seconds", database="ch2", instance="ch2:9363", job="clickhouse-sql", table="default.events"} 0
+  > chq_replica_active_replicas{table="default.events"}  →  2 series
+    {__name__="chq_replica_active_replicas", database="ch1", instance="ch1:9363", job="clickhouse-sql", table="default.events"} 2
+    {__name__="chq_replica_active_replicas", database="ch2", instance="ch2:9363", job="clickhouse-sql", table="default.events"} 2
+  > chq_keeper_session_expired  →  2 series
+    {__name__="chq_keeper_session_expired", database="ch2", instance="ch2:9363", job="clickhouse-sql", keeper_host="keeper3"} 0
+    {__name__="chq_keeper_session_expired", database="ch1", instance="ch1:9363", job="clickhouse-sql", keeper_host="keeper3"} 0
+  > scrape_duration_seconds{job=~"clickhouse-server|clickhouse-keeper|clickhouse-sql"}  →  6 series
+    {__name__="scrape_duration_seconds", instance="ch2:9363", job="clickhouse-server"} 0.006943626
+    {__name__="scrape_duration_seconds", instance="ch1:9363", job="clickhouse-server"} 0.006867999
+    {__name__="scrape_duration_seconds", app="clickhouse-keeper", instance="keeper1:9363", job="clickhouse-keeper"} 0.002830402
+    {__name__="scrape_duration_seconds", app="clickhouse-keeper", instance="keeper2:9363", job="clickhouse-keeper"} 0.002633296
+    {__name__="scrape_duration_seconds", instance="qe:9560", job="clickhouse-sql"} 0.004925817
+    {__name__="scrape_duration_seconds", app="clickhouse-keeper", instance="keeper3:9363", job="clickhouse-keeper"} 0.002944007
+  alerts（^(CH|ClickHouse)）: 25
+    firing   CHBackupFailed ch1:9363
+    firing   CHDistributedSendFailing ch1:9363
+    firing   CHKeeperSessionLost ch1:9363
+    firing   CHKeeperSessionLost ch2:9363
+    firing   CHQueriesHitMemoryLimit ch1:9363
+    firing   CHWritesToReadonlyTable ch1:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  ClickHouseKeeperHighLatency keeper3:9363
+
+## I <prometheus> 的子項關掉、整段拿掉（02:53:28Z）
+  GET :31012/metrics → 200 800765B 0.02s # HELP ClickHouse_Info ClickHouse server information # TYPE ClickHouse_Info gauge ClickHouse_Info{name="ClickHouse",version="26.10.2.103",version_describe="v26.10.2.103-stable",version_major="26",vers
+  > up{instance="ch2:9363"}  →  4 series
+    {__name__="up", instance="ch2:9363", job="clickhouse-server"} 1
+    {__name__="up", instance="ch2:9363", job="clickhouse-sql-probe"} 1
+    {__name__="up", instance="ch2:9363", job="clickhouse-replicas-status"} 1
+    {__name__="up", instance="ch2:9363", job="clickhouse-ping"} 1
+  > scrape_samples_scraped{job="clickhouse-server"}  →  2 series
+    {__name__="scrape_samples_scraped", instance="ch2:9363", job="clickhouse-server"} 3183
+    {__name__="scrape_samples_scraped", instance="ch1:9363", job="clickhouse-server"} 3884
+  > ClickHouseAsyncMetrics_MaxPartCountForPartition  →  1 series
+    {__name__="ClickHouseAsyncMetrics_MaxPartCountForPartition", instance="ch1:9363", job="clickhouse-server"} 5
+  > up{job="clickhouse-server"} == 1 unless on (job, instance) (ClickHouseAsyncMetrics_MaxPartCountForPartition and on (job, instance) ClickHouseMetrics_ReadonlyReplica and on (job, instance) ClickHouseProfileEvents_RejectedInserts and on (job, instance) ClickHouseErrorMetric_ALL and on (job, instance) group by (job, instance) (ClickHouseAsyncMetrics_DiskAvailable))  →  1 series
+    {__name__="up", instance="ch2:9363", job="clickhouse-server"} 1
+  alerts（^(CH|ClickHouse)）: 25
+    firing   CHBackupFailed ch1:9363
+    firing   CHDistributedSendFailing ch1:9363
+    firing   CHKeeperSessionLost ch1:9363
+    firing   CHQueriesHitMemoryLimit ch1:9363
+    firing   CHWritesToReadonlyTable ch1:9363
+    pending  CHMetricFamiliesMissing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  ClickHouseKeeperHighLatency keeper3:9363
+  GET :31012/metrics → ConnectionResetError [Errno 104] Connection reset by peer after 0.02s
+  GET :31002/metrics → 404 183B 0.02s Code: 60. DB::Exception: There is no handle /metrics. Maybe you meant /merges? Or table default.metrics (which does not exist). (UNKNOWN_TABLE) (version 26.10.2.103 (official build)) 
+  > up{instance="ch2:9363"}  →  4 series
+    {__name__="up", instance="ch2:9363", job="clickhouse-server"} 0
+    {__name__="up", instance="ch2:9363", job="clickhouse-sql-probe"} 1
+    {__name__="up", instance="ch2:9363", job="clickhouse-replicas-status"} 1
+    {__name__="up", instance="ch2:9363", job="clickhouse-ping"} 1
+  > probe_success{instance="ch2:9363"}  →  3 series
+    {__name__="probe_success", instance="ch2:9363", job="clickhouse-sql-probe"} 1
+    {__name__="probe_success", instance="ch2:9363", job="clickhouse-replicas-status"} 1
+    {__name__="probe_success", instance="ch2:9363", job="clickhouse-ping"} 1
+  target ch1:9363 up 
+  target ch2:9363 down Get "http://ch2:9363/metrics": dial tcp 172.18.0.7:9363: connect: connection refused
+  alerts（^(CH|ClickHouse)）: 31
+    firing   CHBackupFailed ch1:9363
+    firing   CHDistributedSendFailing ch1:9363
+    firing   CHKeeperSessionLost ch1:9363
+    firing   CHQueriesHitMemoryLimit ch1:9363
+    firing   CHWritesToReadonlyTable ch1:9363
+    pending  CHComponentCountLow 
+    pending  CHEndpointDown ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlQueriesFailing ch2:9363
+    pending  CHSqlQueriesFailing ch1:9363
+    pending  CHSqlStale ch1:9363
+    pending  CHSqlStale ch2:9363
+    pending  ClickHouseKeeperHighLatency keeper3:9363
+
+## 結束（02:54:42Z）
+at-ch-qe-1 100.7MiB / 256MiB
+at-ch-ch2-1 195.9MiB / 900MiB
+at-ch-ch1-1 246.9MiB / 900MiB
+at-ch-prometheus-1 115.4MiB / 15.58GiB
+at-ch-keeper2-1 109.2MiB / 256MiB
+at-ch-keeper1-1 111.2MiB / 256MiB
+at-ch-keeper3-1 112.7MiB / 256MiB
+at-ch-blackbox-1 18.95MiB / 15.58GiB
+  沒有 at-ch 容器
+  沒有 at-ch volume

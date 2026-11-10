@@ -1,0 +1,1076 @@
+# ClickHouse target 的參考：v26.10.2.103-stable 的原始碼位置（在 tag 上依關鍵字找行號）、Altinity clickhouse-operator release-0.27.4 的規則與
+# metrics-exporter（Apache-2.0），與 lab 結果。
+refs:
+  ch-cfg-prom-commented:
+    kind: code
+    title: "預設 config.xml 的 <prometheus> 區塊在註解內（要自己打開）"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "programs/server/config.xml"
+    line: 1238
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/programs/server/config.xml#L1238"
+  ch-cfg-max-conc:
+    kind: code
+    title: "預設 config.xml 設 max_concurrent_queries 1000"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "programs/server/config.xml"
+    line: 450
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/programs/server/config.xml#L450"
+  ch-prom-handler:
+    kind: code
+    title: "/metrics handler 依設定依序輸出 info、events、metrics、asynchronous_metrics、errors、histograms、dimensional"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/PrometheusRequestHandler.cpp"
+    line: 106
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/PrometheusRequestHandler.cpp#L106"
+  ch-prom-expose-defaults:
+    kind: code
+    title: "<prometheus> 的子項（info、metrics、asynchronous_metrics、events、errors、histograms、dimensional_metrics）預設都是 true"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/PrometheusRequestHandlerFactory.cpp"
+    line: 93
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/PrometheusRequestHandlerFactory.cpp#L93"
+  ch-prom-http-default:
+    kind: code
+    title: "沒有 <prometheus> 時不註冊 /metrics；有但沒設 port 時掛在 http_port"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/PrometheusRequestHandlerFactory.cpp"
+    line: 401
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/PrometheusRequestHandlerFactory.cpp#L401"
+  ch-prom-keeper-factory:
+    kind: code
+    title: "Keeper 自己的 /metrics handler（for_keeper=true）"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/PrometheusRequestHandlerFactory.cpp"
+    line: 415
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/PrometheusRequestHandlerFactory.cpp#L415"
+  ch-prom-prefixes:
+    kind: code
+    title: "名稱前綴：ClickHouseProfileEvents_、ClickHouseMetrics_、ClickHouseAsyncMetrics_、ClickHouseErrorMetric_"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/PrometheusMetricsWriter.cpp"
+    line: 84
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/PrometheusMetricsWriter.cpp#L84"
+  ch-prom-events-all:
+    kind: code
+    title: "/metrics 輸出全部 ProfileEvents，值是 0 的也輸出"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/PrometheusMetricsWriter.cpp"
+    line: 221
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/PrometheusMetricsWriter.cpp#L221"
+  ch-prom-metric-atomic:
+    kind: code
+    title: "CurrentMetrics 直接讀 atomic，不拿鎖"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/PrometheusMetricsWriter.cpp"
+    line: 112
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/PrometheusMetricsWriter.cpp#L112"
+  ch-prom-async-snapshot:
+    kind: code
+    title: "asynchronous_metrics 輸出背景執行緒算好的快照"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/PrometheusMetricsWriter.cpp"
+    line: 233
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/PrometheusMetricsWriter.cpp#L233"
+  ch-prom-keyvalue-label:
+    kind: code
+    title: "key-value 型 async metric 以 label 輸出（例如 DiskAvailable{disk=\"default\"}）"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/PrometheusMetricsWriter.cpp"
+    line: 168
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/PrometheusMetricsWriter.cpp#L168"
+  ch-prom-errors-local:
+    kind: code
+    title: "ClickHouseErrorMetric_* 是本機發生的錯誤次數（system.errors），每個錯誤碼一條，含 0"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/PrometheusMetricsWriter.cpp"
+    line: 255
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/PrometheusMetricsWriter.cpp#L255"
+  ch-prom-errors-all:
+    kind: code
+    title: "ClickHouseErrorMetric_ALL 是所有錯誤碼的總和"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/PrometheusMetricsWriter.cpp"
+    line: 261
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/PrometheusMetricsWriter.cpp#L261"
+  ch-prom-keeper-noerrors:
+    kind: code
+    title: "Keeper 的 /metrics 不輸出 errors"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/PrometheusMetricsWriter.cpp"
+    line: 505
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/PrometheusMetricsWriter.cpp#L505"
+  ch-prom-keeper-events:
+    kind: code
+    title: "Keeper 的 /metrics 只輸出 keeper_profile_events 與 keeper_metrics"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/PrometheusMetricsWriter.cpp"
+    line: 461
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/PrometheusMetricsWriter.cpp#L461"
+  ch-async-getvalues:
+    kind: code
+    title: "讀 async metric 快照只拿共享鎖"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/AsynchronousMetrics.cpp"
+    line: 417
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/AsynchronousMetrics.cpp#L417"
+  ch-async-swap:
+    kind: code
+    title: "背景執行緒算完後換上新快照（scrape 不觸發計算）"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/AsynchronousMetrics.cpp"
+    line: 2920
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/AsynchronousMetrics.cpp#L2920"
+  ch-ss-async-period:
+    kind: code
+    title: "asynchronous_metrics_update_period_s 預設 1 秒"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Core/ServerSettings.cpp"
+    line: 281
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Core/ServerSettings.cpp#L281"
+  ch-ss-heavy-enable:
+    kind: code
+    title: "asynchronous_metrics_enable_heavy_metrics 預設 false"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Core/ServerSettings.cpp"
+    line: 282
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Core/ServerSettings.cpp#L282"
+  ch-ss-heavy-period:
+    kind: code
+    title: "asynchronous_heavy_metrics_update_period_s 預設 120 秒"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Core/ServerSettings.cpp"
+    line: 283
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Core/ServerSettings.cpp#L283"
+  ch-ss-kv-mode:
+    kind: code
+    title: "asynchronous_metrics_key_values_mode 預設 key_values；legacy_names 是 26.8 以前的 DiskAvailable_default 這種名稱"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Core/ServerSettings.cpp"
+    line: 285
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Core/ServerSettings.cpp#L285"
+  ch-ss-max-mem:
+    kind: code
+    title: "max_server_memory_usage 預設 0（由 RAM 比例決定）"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Core/ServerSettings.cpp"
+    line: 422
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Core/ServerSettings.cpp#L422"
+  ch-ss-mem-ratio:
+    kind: code
+    title: "max_server_memory_usage_to_ram_ratio 預設 0.9"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Core/ServerSettings.cpp"
+    line: 459
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Core/ServerSettings.cpp#L459"
+  ch-ss-max-conc:
+    kind: code
+    title: "max_concurrent_queries 的程式預設 0（不限制）"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Core/ServerSettings.cpp"
+    line: 577
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Core/ServerSettings.cpp#L577"
+  ch-sam-heavy-gate:
+    kind: code
+    title: "heavy metric 只在 asynchronous_metrics_enable_heavy_metrics 打開時計算"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Interpreters/ServerAsynchronousMetrics.cpp"
+    line: 665
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Interpreters/ServerAsynchronousMetrics.cpp#L665"
+  ch-sam-detached:
+    kind: code
+    title: "NumberOfDetachedParts（heavy metric）"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Interpreters/ServerAsynchronousMetrics.cpp"
+    line: 1026
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Interpreters/ServerAsynchronousMetrics.cpp#L1026"
+  ch-sam-detached-user:
+    kind: code
+    title: "NumberOfDetachedByUserParts（heavy metric）"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Interpreters/ServerAsynchronousMetrics.cpp"
+    line: 1027
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Interpreters/ServerAsynchronousMetrics.cpp#L1027"
+  ch-sam-mutations:
+    kind: code
+    title: "NumberOfPendingMutations（heavy metric）"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Interpreters/ServerAsynchronousMetrics.cpp"
+    line: 1028
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Interpreters/ServerAsynchronousMetrics.cpp#L1028"
+  ch-sam-mutations-over:
+    kind: code
+    title: "NumberOfPendingMutationsOverExecutionTime（heavy metric）"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Interpreters/ServerAsynchronousMetrics.cpp"
+    line: 1029
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Interpreters/ServerAsynchronousMetrics.cpp#L1029"
+  ch-sam-maxparts:
+    kind: code
+    title: "MaxPartCountForPartition：所有 MergeTree 表單一 partition 的最大 part 數"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Interpreters/ServerAsynchronousMetrics.cpp"
+    line: 595
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Interpreters/ServerAsynchronousMetrics.cpp#L595"
+  ch-sam-skip-readonly:
+    kind: code
+    title: "唯讀的 Replicated 表不計入 ReplicasMaxAbsoluteDelay"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Interpreters/ServerAsynchronousMetrics.cpp"
+    line: 554
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Interpreters/ServerAsynchronousMetrics.cpp#L554"
+  ch-sam-absdelay:
+    kind: code
+    title: "ReplicasMaxAbsoluteDelay"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Interpreters/ServerAsynchronousMetrics.cpp"
+    line: 592
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Interpreters/ServerAsynchronousMetrics.cpp#L592"
+  ch-sam-queue:
+    kind: code
+    title: "ReplicasMaxQueueSize"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Interpreters/ServerAsynchronousMetrics.cpp"
+    line: 584
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Interpreters/ServerAsynchronousMetrics.cpp#L584"
+  ch-sam-inserts-queue:
+    kind: code
+    title: "ReplicasMaxInsertsInQueue"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Interpreters/ServerAsynchronousMetrics.cpp"
+    line: 585
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Interpreters/ServerAsynchronousMetrics.cpp#L585"
+  ch-sam-disk-available:
+    kind: code
+    title: "DiskAvailable（key-value，key 是 disk 名稱）"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Interpreters/ServerAsynchronousMetrics.cpp"
+    line: 405
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Interpreters/ServerAsynchronousMetrics.cpp#L405"
+  ch-sam-disk-total:
+    kind: code
+    title: "DiskTotal（遠端檔案系統可能是很大的值，例如 16 EiB）"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Interpreters/ServerAsynchronousMetrics.cpp"
+    line: 397
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Interpreters/ServerAsynchronousMetrics.cpp#L397"
+  ch-ping-path:
+    kind: code
+    title: "註冊 /ping"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/HTTPHandlerFactory.cpp"
+    line: 496
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/HTTPHandlerFactory.cpp#L496"
+  ch-ping-static:
+    kind: code
+    title: "/ping 是靜態回應 Ok.，不檢查 Keeper 或表"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/HTTPHandlerFactory.cpp"
+    line: 172
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/HTTPHandlerFactory.cpp#L172"
+  ch-rs-path:
+    kind: code
+    title: "註冊 /replicas_status"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/HTTPHandlerFactory.cpp"
+    line: 502
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/HTTPHandlerFactory.cpp#L502"
+  ch-rs-readonly-skip:
+    kind: code
+    title: "/replicas_status：唯讀的表不檢查延遲，也不讓結果變成失敗"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/ReplicasStatusHandler.cpp"
+    line: 79
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/ReplicasStatusHandler.cpp#L79"
+  ch-rs-close:
+    kind: code
+    title: "/replicas_status：absolute 或 relative 延遲超過 min_*_delay_to_close 才算不 OK"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/ReplicasStatusHandler.cpp"
+    line: 83
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/ReplicasStatusHandler.cpp#L83"
+  ch-rs-readonly-msg:
+    kind: code
+    title: "/replicas_status：唯讀只寫在 verbose 內容"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/ReplicasStatusHandler.cpp"
+    line: 93
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/ReplicasStatusHandler.cpp#L93"
+  ch-rs-503:
+    kind: code
+    title: "/replicas_status 不 OK 時回 503"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/ReplicasStatusHandler.cpp"
+    line: 102
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/ReplicasStatusHandler.cpp#L102"
+  ch-mt-min-rel-close:
+    kind: code
+    title: "min_relative_delay_to_close 預設 300 秒"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/MergeTree/MergeTreeSettings.cpp"
+    line: 2076
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/MergeTree/MergeTreeSettings.cpp#L2076"
+  ch-mt-min-abs-close:
+    kind: code
+    title: "min_absolute_delay_to_close 預設 0（不看絕對延遲）"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/MergeTree/MergeTreeSettings.cpp"
+    line: 2080
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/MergeTree/MergeTreeSettings.cpp#L2080"
+  ch-set-max-replica-delay:
+    kind: code
+    title: "max_replica_delay_for_distributed_queries 預設 300 秒（Distributed 查詢選 replica 用，不影響 /replicas_status）"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Core/Settings.cpp"
+    line: 3194
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Core/Settings.cpp#L3194"
+  ch-mt-delay:
+    kind: code
+    title: "parts_to_delay_insert 預設 1000"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/MergeTree/MergeTreeSettings.cpp"
+    line: 1171
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/MergeTree/MergeTreeSettings.cpp#L1171"
+  ch-mt-throw:
+    kind: code
+    title: "parts_to_throw_insert 預設 3000"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/MergeTree/MergeTreeSettings.cpp"
+    line: 1193
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/MergeTree/MergeTreeSettings.cpp#L1193"
+  ch-mt-max-total:
+    kind: code
+    title: "max_parts_in_total 預設 100000"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/MergeTree/MergeTreeSettings.cpp"
+    line: 1301
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/MergeTree/MergeTreeSettings.cpp#L1301"
+  ch-mt-max-delay:
+    kind: code
+    title: "max_delay_to_insert 預設 1 秒"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/MergeTree/MergeTreeSettings.cpp"
+    line: 1263
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/MergeTree/MergeTreeSettings.cpp#L1263"
+  ch-mt-mut-delay:
+    kind: code
+    title: "number_of_mutations_to_delay 預設 500"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/MergeTree/MergeTreeSettings.cpp"
+    line: 994
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/MergeTree/MergeTreeSettings.cpp#L994"
+  ch-mt-mut-throw:
+    kind: code
+    title: "number_of_mutations_to_throw 預設 1000"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/MergeTree/MergeTreeSettings.cpp"
+    line: 998
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/MergeTree/MergeTreeSettings.cpp#L998"
+  ch-mt-zk-check:
+    kind: code
+    title: "zookeeper_session_expiration_check_period 預設 60 秒"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/MergeTree/MergeTreeSettings.cpp"
+    line: 1775
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/MergeTree/MergeTreeSettings.cpp#L1775"
+  ch-mtd-delay-fn:
+    kind: code
+    title: "delayInsertOrThrowIfNeeded：part 數對 parts_to_delay_insert／parts_to_throw_insert"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/MergeTree/MergeTreeData.cpp"
+    line: 8623
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/MergeTree/MergeTreeData.cpp#L8623"
+  ch-mtd-rejected:
+    kind: code
+    title: "超過門檻時 RejectedInserts 加 1 並丟 TOO_MANY_PARTS"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/MergeTree/MergeTreeData.cpp"
+    line: 8640
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/MergeTree/MergeTreeData.cpp#L8640"
+  ch-mtd-delayed:
+    kind: code
+    title: "超過 parts_to_delay_insert 時 DelayedInserts 加 1 並 sleep"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/MergeTree/MergeTreeData.cpp"
+    line: 8778
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/MergeTree/MergeTreeData.cpp#L8778"
+  ch-pe-rejected:
+    kind: code
+    title: "ProfileEvent RejectedInserts"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/ProfileEvents.cpp"
+    line: 386
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/ProfileEvents.cpp#L386"
+  ch-pe-delayed:
+    kind: code
+    title: "ProfileEvent DelayedInserts"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/ProfileEvents.cpp"
+    line: 385
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/ProfileEvents.cpp#L385"
+  ch-pe-qmle:
+    kind: code
+    title: "ProfileEvent QueryMemoryLimitExceeded"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/ProfileEvents.cpp"
+    line: 920
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/ProfileEvents.cpp#L920"
+  ch-pe-datalost:
+    kind: code
+    title: "ProfileEvent ReplicatedDataLoss"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/ProfileEvents.cpp"
+    line: 376
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/ProfileEvents.cpp#L376"
+  ch-pe-dist-fail:
+    kind: code
+    title: "ProfileEvent DistributedAsyncInsertionFailures"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/ProfileEvents.cpp"
+    line: 715
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/ProfileEvents.cpp#L715"
+  ch-pe-failed-query:
+    kind: code
+    title: "ProfileEvent FailedQuery"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/ProfileEvents.cpp"
+    line: 43
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/ProfileEvents.cpp#L43"
+  ch-cm-delayed:
+    kind: code
+    title: "CurrentMetric DelayedInserts（目前被延遲中的 insert 數）"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/CurrentMetrics.cpp"
+    line: 85
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/CurrentMetrics.cpp#L85"
+  ch-cm-readonly:
+    kind: code
+    title: "CurrentMetric ReadonlyReplica"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/CurrentMetrics.cpp"
+    line: 73
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/CurrentMetrics.cpp#L73"
+  ch-cm-zksession:
+    kind: code
+    title: "CurrentMetric ZooKeeperSession"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/CurrentMetrics.cpp"
+    line: 80
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/CurrentMetrics.cpp#L80"
+  ch-cm-distfiles:
+    kind: code
+    title: "CurrentMetric DistributedFilesToInsert"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/CurrentMetrics.cpp"
+    line: 324
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/CurrentMetrics.cpp#L324"
+  ch-cm-brokendist:
+    kind: code
+    title: "CurrentMetric BrokenDistributedFilesToInsert"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/CurrentMetrics.cpp"
+    line: 325
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/CurrentMetrics.cpp#L325"
+  ch-cm-memtracking:
+    kind: code
+    title: "CurrentMetric MemoryTracking"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/CurrentMetrics.cpp"
+    line: 75
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/CurrentMetrics.cpp#L75"
+  ch-cm-querypreempted:
+    kind: code
+    title: "CurrentMetric QueryPreempted：因 priority 設定暫停的查詢，不是被拒絕的查詢"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/CurrentMetrics.cpp"
+    line: 42
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/CurrentMetrics.cpp#L42"
+  ch-cm-pendingasync:
+    kind: code
+    title: "CurrentMetric PendingAsyncInsert"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/CurrentMetrics.cpp"
+    line: 349
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/CurrentMetrics.cpp#L349"
+  ch-cm-poolsize:
+    kind: code
+    title: "CurrentMetric BackgroundMergesAndMutationsPoolSize"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/CurrentMetrics.cpp"
+    line: 20
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/CurrentMetrics.cpp#L20"
+  ch-cm-pooltask:
+    kind: code
+    title: "CurrentMetric BackgroundMergesAndMutationsPoolTask"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/CurrentMetrics.cpp"
+    line: 19
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/CurrentMetrics.cpp#L19"
+  ch-events-zero:
+    kind: code
+    title: "system.events 預設只列出非 0 的事件"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/System/StorageSystemEvents.cpp"
+    line: 39
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/System/StorageSystemEvents.cpp#L39"
+  ch-set-events-zero:
+    kind: code
+    title: "system_events_show_zero_values 預設 false"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Core/Settings.cpp"
+    line: 6411
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Core/Settings.cpp#L6411"
+  ch-set-async-insert:
+    kind: code
+    title: "async_insert 預設 true（26.2 起）"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Core/Settings.cpp"
+    line: 8475
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Core/Settings.cpp#L8475"
+  ch-set-max-mem:
+    kind: code
+    title: "max_memory_usage（單一查詢）預設 0"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Core/Settings.cpp"
+    line: 4588
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Core/Settings.cpp#L4588"
+  ch-pl-toomany:
+    kind: code
+    title: "ProcessList 超過並行上限時丟 TOO_MANY_SIMULTANEOUS_QUERIES"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Interpreters/ProcessList.cpp"
+    line: 196
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Interpreters/ProcessList.cpp#L196"
+  ch-mem-exceeded:
+    kind: code
+    title: "MemoryTracker 超過上限時 QueryMemoryLimitExceeded 加 1，丟 MEMORY_LIMIT_EXCEEDED"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Common/MemoryTracker.cpp"
+    line: 260
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Common/MemoryTracker.cpp#L260"
+  ch-rt-setreadonly:
+    kind: code
+    title: "Keeper session 遺失時表進入唯讀，ReadonlyReplica 加 1"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/MergeTree/ReplicatedMergeTreeRestartingThread.cpp"
+    line: 408
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/MergeTree/ReplicatedMergeTreeRestartingThread.cpp#L408"
+  ch-rt-expired:
+    kind: code
+    title: "restarting thread 發現 session 過期後重新連線"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/MergeTree/ReplicatedMergeTreeRestartingThread.cpp"
+    line: 142
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/MergeTree/ReplicatedMergeTreeRestartingThread.cpp#L142"
+  ch-rmt-assert-ro:
+    kind: code
+    title: "寫入唯讀表時丟 TABLE_IS_READ_ONLY"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/StorageReplicatedMergeTree.cpp"
+    line: 6550
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/StorageReplicatedMergeTree.cpp#L6550"
+  ch-sys-mut-fail:
+    kind: code
+    title: "system.mutations.latest_fail_reason"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/System/StorageSystemMutations.cpp"
+    line: 117
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/System/StorageSystemMutations.cpp#L117"
+  ch-sys-rep-absdelay:
+    kind: code
+    title: "system.replicas.absolute_delay"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/System/StorageSystemReplicas.cpp"
+    line: 85
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/System/StorageSystemReplicas.cpp#L85"
+  ch-sys-rep-active:
+    kind: code
+    title: "system.replicas.active_replicas"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/System/StorageSystemReplicas.cpp"
+    line: 87
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/System/StorageSystemReplicas.cpp#L87"
+  ch-sys-backups-status:
+    kind: code
+    title: "system.backups.status"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/System/StorageSystemBackups.cpp"
+    line: 32
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/System/StorageSystemBackups.cpp#L32"
+  ch-backups-infos:
+    kind: code
+    title: "BackupsWorker 把備份狀態存在記憶體的 infos map（system.backups 的來源）"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Backups/BackupsWorker.cpp"
+    line: 464
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Backups/BackupsWorker.cpp#L464"
+  ch-dist-broken:
+    kind: code
+    title: "Distributed 送出佇列的 broken 目錄計數"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/Distributed/DistributedAsyncInsertDirectoryQueue.cpp"
+    line: 148
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/Distributed/DistributedAsyncInsertDirectoryQueue.cpp#L148"
+  ch-k-ruok:
+    kind: code
+    title: "4lw ruok 一律回 imok"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Coordination/FourLetterCommand.cpp"
+    line: 282
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Coordination/FourLetterCommand.cpp#L282"
+  ch-k-mntr-inactive:
+    kind: code
+    title: "mntr：沒有在服務時回 This instance is not currently serving requests"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Coordination/FourLetterCommand.cpp"
+    line: 304
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Coordination/FourLetterCommand.cpp#L304"
+  ch-k-mntr-state:
+    kind: code
+    title: "mntr 的 zk_server_state"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Coordination/FourLetterCommand.cpp"
+    line: 330
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Coordination/FourLetterCommand.cpp#L330"
+  ch-k-mntr-synced:
+    kind: code
+    title: "mntr 的 zk_synced_followers（只有 leader 輸出）"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Coordination/FourLetterCommand.cpp"
+    line: 365
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Coordination/FourLetterCommand.cpp#L365"
+  ch-k-4lw-default:
+    kind: code
+    title: "four_letter_word_allow_list 預設包含 ruok、mntr、srvr、stat 等"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Coordination/CoordinationSettings.cpp"
+    line: 231
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Coordination/CoordinationSettings.cpp#L231"
+  ch-k-ready:
+    kind: code
+    title: "Keeper /ready：leader，或 follower 且有 leader 才算 ok"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/KeeperHTTPHandlerFactory.cpp"
+    line: 284
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/KeeperHTTPHandlerFactory.cpp#L284"
+  ch-k-ready-503:
+    kind: code
+    title: "Keeper /ready 不 ok 時回 503"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/KeeperHTTPHandlerFactory.cpp"
+    line: 304
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/KeeperHTTPHandlerFactory.cpp#L304"
+  ch-k-ready-path:
+    kind: code
+    title: "/ready 在 keeper_server.http_control 底下設定"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Server/KeeperHTTPHandlerFactory.cpp"
+    line: 102
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Server/KeeperHTTPHandlerFactory.cpp#L102"
+  ch-k-isleader:
+    kind: code
+    title: "KeeperIsLeader"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Coordination/KeeperAsynchronousMetrics.cpp"
+    line: 76
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Coordination/KeeperAsynchronousMetrics.cpp#L76"
+  ch-k-synced:
+    kind: code
+    title: "KeeperSyncedFollowers（follower 上是 0）"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Coordination/KeeperAsynchronousMetrics.cpp"
+    line: 96
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Coordination/KeeperAsynchronousMetrics.cpp#L96"
+  ch-k-znode:
+    kind: code
+    title: "KeeperZnodeCount"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Coordination/KeeperAsynchronousMetrics.cpp"
+    line: 84
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Coordination/KeeperAsynchronousMetrics.cpp#L84"
+  alt-server-down:
+    kind: code
+    title: "Altinity：ClickHouseServerDown 用 exporter 的 metric_fetch_errors"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "deploy/prometheus/prometheus-alert-rules-clickhouse.yaml"
+    line: 25
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-clickhouse.yaml#L25"
+  alt-dns:
+    kind: code
+    title: "Altinity：ClickHouseDNSErrors（後半的 NetworkErrors 不存在）"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "deploy/prometheus/prometheus-alert-rules-clickhouse.yaml"
+    line: 64
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-clickhouse.yaml#L64"
+  alt-dist-files:
+    kind: code
+    title: "Altinity：DistributedFilesToInsert > 50"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "deploy/prometheus/prometheus-alert-rules-clickhouse.yaml"
+    line: 79
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-clickhouse.yaml#L79"
+  alt-rejected:
+    kind: code
+    title: "Altinity：increase(RejectedInserts[1m]) > 0"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "deploy/prometheus/prometheus-alert-rules-clickhouse.yaml"
+    line: 120
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-clickhouse.yaml#L120"
+  alt-delayed:
+    kind: code
+    title: "Altinity：increase(DelayedInserts[1m]) > 0"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "deploy/prometheus/prometheus-alert-rules-clickhouse.yaml"
+    line: 138
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-clickhouse.yaml#L138"
+  alt-maxparts:
+    kind: code
+    title: "Altinity：MaxPartCountForPartition > 100"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "deploy/prometheus/prometheus-alert-rules-clickhouse.yaml"
+    line: 150
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-clickhouse.yaml#L150"
+  alt-querypreempted:
+    kind: code
+    title: "Altinity：QueryPreempted > 0"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "deploy/prometheus/prometheus-alert-rules-clickhouse.yaml"
+    line: 196
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-clickhouse.yaml#L196"
+  alt-readonly:
+    kind: code
+    title: "Altinity：ReadonlyReplica > 0"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "deploy/prometheus/prometheus-alert-rules-clickhouse.yaml"
+    line: 211
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-clickhouse.yaml#L211"
+  alt-absdelay:
+    kind: code
+    title: "Altinity：ReplicasMaxAbsoluteDelay > 300"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "deploy/prometheus/prometheus-alert-rules-clickhouse.yaml"
+    line: 230
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-clickhouse.yaml#L230"
+  alt-running:
+    kind: code
+    title: "Altinity：Query - PendingAsyncInsert > 80"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "deploy/prometheus/prometheus-alert-rules-clickhouse.yaml"
+    line: 265
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-clickhouse.yaml#L265"
+  alt-zksession:
+    kind: code
+    title: "Altinity：ZooKeeperSession > 1"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "deploy/prometheus/prometheus-alert-rules-clickhouse.yaml"
+    line: 317
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-clickhouse.yaml#L317"
+  alt-disk:
+    kind: code
+    title: "Altinity：predict_linear(DiskFreeBytes[1d], 86400) < 0"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "deploy/prometheus/prometheus-alert-rules-clickhouse.yaml"
+    line: 330
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-clickhouse.yaml#L330"
+  alt-datalost:
+    kind: code
+    title: "Altinity：increase(ReplicatedDataLoss[1m]) > 0"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "deploy/prometheus/prometheus-alert-rules-clickhouse.yaml"
+    line: 377
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-clickhouse.yaml#L377"
+  alt-mutations:
+    kind: code
+    title: "Altinity：table_mutations > 100（只看數量，不看失敗）"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "deploy/prometheus/prometheus-alert-rules-clickhouse.yaml"
+    line: 477
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-clickhouse.yaml#L477"
+  alt-detached:
+    kind: code
+    title: "Altinity：DetachedParts > 0（exporter 查 system.detached_parts）"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "deploy/prometheus/prometheus-alert-rules-clickhouse.yaml"
+    line: 493
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-clickhouse.yaml#L493"
+  alt-k-down:
+    kind: code
+    title: "Altinity：ClickHouseKeeperDown（up == 0，沒有 absent）"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "deploy/prometheus/prometheus-alert-rules-chkeeper.yaml"
+    line: 13
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-chkeeper.yaml#L13"
+  alt-k-lostquorum:
+    kind: code
+    title: "Altinity：KeeperSyncedFollowers < 1 and KeeperIsLeader == 1（失去 quorum 時沒有 leader，回傳空）"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "deploy/prometheus/prometheus-alert-rules-chkeeper.yaml"
+    line: 147
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-chkeeper.yaml#L147"
+  alt-k-outstanding:
+    kind: code
+    title: "Altinity：KeeperOutstandingRequests > 10"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "deploy/prometheus/prometheus-alert-rules-chkeeper.yaml"
+    line: 63
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-chkeeper.yaml#L63"
+  alt-backup-failed:
+    kind: code
+    title: "Altinity：備份規則用 clickhouse-backup 工具的 metric"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "deploy/prometheus/prometheus-alert-rules-backup.yaml"
+    line: 39
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/deploy/prometheus/prometheus-alert-rules-backup.yaml#L39"
+  alt-fetch-events:
+    kind: code
+    title: "metrics-exporter 從 system.events 取事件（預設只有非 0 的列）"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "pkg/metrics/clickhouse/clickhouse_metrics_fetcher.go"
+    line: 58
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/pkg/metrics/clickhouse/clickhouse_metrics_fetcher.go#L58"
+  alt-fetch-disks:
+    kind: code
+    title: "metrics-exporter 查 system.disks（DiskFreeBytes）"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "pkg/metrics/clickhouse/clickhouse_metrics_fetcher.go"
+    line: 116
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/pkg/metrics/clickhouse/clickhouse_metrics_fetcher.go#L116"
+  alt-fetch-detached:
+    kind: code
+    title: "metrics-exporter 查 system.detached_parts"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "pkg/metrics/clickhouse/clickhouse_metrics_fetcher.go"
+    line: 125
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/pkg/metrics/clickhouse/clickhouse_metrics_fetcher.go#L125"
+  alt-exporter-kube:
+    kind: code
+    title: "metrics-exporter 從 Kubernetes 的 ClickHouseInstallation 物件找 target，不能單獨對一般部署使用"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "pkg/metrics/clickhouse/exporter.go"
+    line: 143
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/pkg/metrics/clickhouse/exporter.go#L143"
+  alt-writer-namespace:
+    kind: code
+    title: "metrics-exporter 的名稱前綴 chi_（chi_clickhouse_metric_*）"
+    project: "clickhouse-operator"
+    version: "release-0.27.4"
+    file: "pkg/metrics/clickhouse/prometheus_writer.go"
+    line: 33
+    url: "https://github.com/Altinity/clickhouse-operator/blob/release-0.27.4/pkg/metrics/clickhouse/prometheus_writer.go#L33"
+  ch-rmt-relative-measure:
+    kind: code
+    title: "relative delay 只在 absolute delay ≥ min_relative_delay_to_measure 時才算，否則是 0"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/StorageReplicatedMergeTree.cpp"
+    line: 8449
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/StorageReplicatedMergeTree.cpp#L8449"
+  ch-mt-rel-measure:
+    kind: code
+    title: "min_relative_delay_to_measure 預設 120 秒"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/MergeTree/MergeTreeSettings.cpp"
+    line: 2057
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/MergeTree/MergeTreeSettings.cpp#L2057"
+  ch-rmt-getdelays:
+    kind: code
+    title: "getReplicaDelays：先 assertNotReadonly，唯讀時丟例外"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Storages/StorageReplicatedMergeTree.cpp"
+    line: 8436
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Storages/StorageReplicatedMergeTree.cpp#L8436"
+  ch-set-insert-keeper-retries:
+    kind: code
+    title: "insert_keeper_max_retries 預設 20：insert 遇到 Keeper 錯誤時重試"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Core/Settings.cpp"
+    line: 9176
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Core/Settings.cpp#L9176"
+  ch-set-insert-keeper-backoff:
+    kind: code
+    title: "insert_keeper_retry_max_backoff_ms 預設 10 秒"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Core/Settings.cpp"
+    line: 9203
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Core/Settings.cpp#L9203"
+  ch-k-nuraft:
+    kind: code
+    title: "Keeper 的 Raft 用 NuRaft 函式庫"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Coordination/KeeperServer.cpp"
+    line: 21
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Coordination/KeeperServer.cpp#L21"
+  ch-k-heartbeat:
+    kind: code
+    title: "Keeper heart_beat_interval_ms 預設 500ms"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Coordination/CoordinationSettings.cpp"
+    line: 37
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Coordination/CoordinationSettings.cpp#L37"
+  ch-k-election:
+    kind: code
+    title: "Keeper election timeout 1–2 秒"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "src/Coordination/CoordinationSettings.cpp"
+    line: 38
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/src/Coordination/CoordinationSettings.cpp#L38"
+
+  ch-exp:
+    kind: experiment
+    title: "ClickHouse lab（server ×2：1 shard、2 replicas；Keeper ×3）"
+    url: "https://github.com/HahaSula/alert-trust/tree/main/lab/targets/clickhouse"
+  ch-exp-raw:
+    kind: experiment
+    title: "ClickHouse lab 原始輸出"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/clickhouse/results/run-20261110.txt"
+  ch-exp-summary:
+    kind: experiment
+    title: "ClickHouse lab 結果摘要（README 的結果一節）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/clickhouse/README.md"
+  ch-exp-names:
+    kind: experiment
+    title: "ClickHouse lab：server 與 Keeper /metrics 的 metric 名稱清單（v26.10.2.103）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/clickhouse/results/names-server-26.10.2.103.txt"
+  ch-exp-extra:
+    kind: experiment
+    title: "ClickHouse lab 補充：parts 對門檻、broken part、DETACH、備份、Keeper 失去 quorum 時的 SQL 路徑與 ZooKeeperSession*（extra.sh）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/clickhouse/results/extra-20261110.txt"
+  ch-exp-extra-first:
+    kind: experiment
+    title: "ClickHouse lab 補充第一次：query-exporter 的 1m 查詢被排程器跳過（was missed），5 分鐘內沒有執行"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/clickhouse/results/extra-first-20261110.txt"
+  ch-exp-altinity:
+    kind: experiment
+    title: "ClickHouse lab：Altinity release-0.27.4 規則用到的名稱在 v26.10.2.103 有沒有來源（altinity_names.py，原始輸出 A 節）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/clickhouse/altinity_names.py"
+  ch-exp-qe:
+    kind: experiment
+    title: "ClickHouse lab：query-exporter 5.2.2 映像內建 clickhouse-sqlalchemy 0.3.2，用 native 協定連線（queries/clickhouse/clickhouse.yaml）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/queries/clickhouse/clickhouse.yaml"

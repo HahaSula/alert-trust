@@ -1,0 +1,60 @@
+<!-- 兩台 ClickHouse server 共用的 lab 設定（config.d）。每台自己的 macros 在 ch1.xml／ch2.xml。 -->
+<clickhouse>
+    <logger><level>information</level><console>1</console></logger>
+    <!-- 輕量 lab：容器 mem_limit 900m，server 上限 600MB（預設是 RAM × max_server_memory_usage_to_ram_ratio 0.9）。 -->
+    <max_server_memory_usage>629145600</max_server_memory_usage>
+    <mark_cache_size>67108864</mark_cache_size>
+    <uncompressed_cache_size>0</uncompressed_cache_size>
+    <!-- heavy async metric（NumberOfPendingMutations、NumberOfDetachedParts）預設不算（asynchronous_metrics_enable_heavy_metrics=false）；
+         只有 ch2.xml 打開，ch1 保持預設，用來對照。開了之後每 15 秒更新一次（預設 120 秒）。 -->
+    <asynchronous_heavy_metrics_update_period_s>15</asynchronous_heavy_metrics_update_period_s>
+
+    <!-- 原生 /metrics：預設 config.xml 這段是註解掉的，要自己打開（card 的前提）。 -->
+    <prometheus>
+        <endpoint>/metrics</endpoint>
+        <port>9363</port>
+        <metrics>true</metrics>
+        <events>true</events>
+        <asynchronous_metrics>true</asynchronous_metrics>
+        <errors>true</errors>
+    </prometheus>
+
+    <zookeeper>
+        <node><host>keeper1</host><port>9181</port></node>
+        <node><host>keeper2</host><port>9181</port></node>
+        <node><host>keeper3</host><port>9181</port></node>
+        <session_timeout_ms>30000</session_timeout_ms>
+    </zookeeper>
+
+    <remote_servers>
+        <lab>
+            <shard>
+                <internal_replication>true</internal_replication>
+                <replica><host>ch1</host><port>9000</port></replica>
+                <replica><host>ch2</host><port>9000</port></replica>
+            </shard>
+        </lab>
+        <!-- 指向不存在的主機：Distributed 非同步送出會累積檔案（DistributedFilesToInsert 情境）。 -->
+        <broken>
+            <shard><replica><host>nohost</host><port>9000</port></replica></shard>
+        </broken>
+    </remote_servers>
+
+    <!-- lab 把 Too many parts 的門檻調低（預設 parts_to_delay_insert 1000、parts_to_throw_insert 3000）；
+         min_absolute_delay_to_close 預設 0（不看絕對延遲），lab 設 30 秒才看得到 /replicas_status 回 503。 -->
+    <merge_tree>
+        <parts_to_delay_insert>20</parts_to_delay_insert>
+        <parts_to_throw_insert>40</parts_to_throw_insert>
+        <min_absolute_delay_to_close>30</min_absolute_delay_to_close>
+    </merge_tree>
+
+    <storage_configuration>
+        <disks>
+            <backups><type>local</type><path>/backups/</path></backups>
+        </disks>
+    </storage_configuration>
+    <backups>
+        <allowed_disk>backups</allowed_disk>
+        <allowed_path>/backups/</allowed_path>
+    </backups>
+</clickhouse>

@@ -1,0 +1,254 @@
+# query-exporter 5.2.2（Docker 映像 adonato/query-exporter:5.2.2）的 ClickHouse 自訂查詢。
+# 映像內建 clickhouse-sqlalchemy 0.3.2 與 clickhouse-driver 0.2.11（lab 實測：sqlalchemy.dialects 有 clickhouse、clickhouse.native、clickhouse.http），不必另裝。
+# 補 ClickHouse 原生 /metrics（<prometheus>）沒有的「每張表」資料：複寫佇列與唯讀、mutation 失敗、detached parts、
+# Distributed 送出佇列、備份。/metrics 只有全伺服器的最大值或總數（例如 ReplicasMaxAbsoluteDelay、MaxPartCountForPartition），
+# 而且 ReplicasMaxAbsoluteDelay 不算唯讀的表（ServerAsynchronousMetrics.cpp），Keeper 斷線時看起來像沒有延遲。
+# 說明與證據：docs/targets/clickhouse.md#custom-queries；實驗：lab/targets/clickhouse/。
+#
+# 帳號：system.* 表任何使用者都讀得到；建議專用帳號、readonly=2（允許連線時 SET）、max_execution_time 保底。lab 用 users.d 的 monitor（見 lab/targets/clickhouse/conf/server/monitor-user.xml）。
+#   SQL 管理時：CREATE USER monitor IDENTIFIED BY '...' SETTINGS readonly = 2, max_execution_time = 10;（system 表不需要 GRANT）
+#
+# DSN 用環境變數給，每台 server 一個（不要用 Distributed 或 clusterAllReplicas 一次查全部：那台掛了所有 series 一起停住）：
+#   CHQ_CH1_DSN  clickhouse+native://monitor:密碼@ch1:9000/default   （native 協定 9000；HTTP 用 clickhouse+http://...:8123/default）
+#   CHQ_CH2_DSN  同上，第二台
+# 每個 database 名稱（ch1、ch2）會變成 metric 的 database label；規則用它區分 server。
+#
+# 行為（query-exporter 5.2.2，和 MySQL／PostgreSQL 那兩份相同）：
+#   - 查詢失敗（含 timeout）時 metric 保留舊值，只有 queries_total{status="error"|"timeout"} 增加、query_timestamp 停住；規則用 query_timestamp 判斷是否新鮮。
+#   - 查詢沒有回傳列時不更新 series；每列一個 series 的 metric 都設了 expiration。
+#   - 第一次執行是在啟動後一個 interval（lab：5m 的查詢在前 5 分鐘沒有任何 series），所以這裡最長的 interval 約 1 分鐘。
+#   - 排程器（APScheduler）在同一時刻有多個查詢時會跳過晚了的那幾次（log：Run time of job ... was missed）。lab 第一版所有查詢都是 15s 或 1m，
+#     1m 的查詢每次都和 15s 的撞在一起，5 分鐘內一次都沒有執行。所以這裡的 interval 刻意錯開（15、17、19、23、29、61、67、71 秒）。
+#   - 沒有問題時多數查詢回傳 0 列（例如沒有失敗的 mutation）；規則要寫成「有列就告警」，不要寫 == 0。
+#
+# 成本：每個 DSN 一條常駐連線。system.replicas 在表很多時較慢（每張表要拿狀態），所以設 timeout 5 秒；
+# system.parts 只讀 active 的 part 中繼資料，不讀資料檔。
+
+databases:
+  ch1:
+    dsn: !env CHQ_CH1_DSN
+  ch2:
+    dsn: !env CHQ_CH2_DSN
+
+metrics:
+  # --- 複寫（system.replicas、system.replication_queue） ---
+  chq_replica_readonly:
+    type: gauge
+    description: system.replicas.is_readonly（Keeper session 遺失、或啟動時沒有 Keeper 設定）
+    labels: [table]
+    expiration: 2m
+  chq_replica_session_expired:
+    type: gauge
+    description: system.replicas.is_session_expired
+    labels: [table]
+    expiration: 2m
+  chq_replica_absolute_delay_seconds:
+    type: gauge
+    description: system.replicas.absolute_delay（唯讀時也有值，不像 /metrics 的 ReplicasMaxAbsoluteDelay 會略過）
+    labels: [table]
+    expiration: 2m
+  chq_replica_queue_size:
+    type: gauge
+    description: system.replicas.queue_size（待執行的 fetch、merge、mutation 等）
+    labels: [table]
+    expiration: 2m
+  chq_replica_inserts_in_queue:
+    type: gauge
+    description: system.replicas.inserts_in_queue（還沒從其他 replica 拿到的 insert）
+    labels: [table]
+    expiration: 2m
+  chq_replica_log_lag:
+    type: gauge
+    description: log_max_index - log_pointer（Keeper 上的複寫 log 還沒讀進 queue 的筆數）
+    labels: [table]
+    expiration: 2m
+  chq_replica_active_replicas:
+    type: gauge
+    description: system.replicas.active_replicas（Keeper 上有 is_active 節點的 replica 數）
+    labels: [table]
+    expiration: 2m
+  chq_replica_total_replicas:
+    type: gauge
+    description: system.replicas.total_replicas
+    labels: [table]
+    expiration: 2m
+  chq_replication_queue_failing:
+    type: gauge
+    description: system.replication_queue 中 last_exception 非空的項目數（重試中的 fetch／merge／mutation）
+    labels: [table]
+    expiration: 2m
+  chq_replication_queue_oldest_seconds:
+    type: gauge
+    description: system.replication_queue 最老項目的年齡（now() - create_time）
+    labels: [table]
+    expiration: 2m
+
+  # --- parts ---
+  chq_parts_max_per_partition:
+    type: gauge
+    description: 每張表 active part 最多的那個 partition 的 part 數（對 parts_to_delay_insert／parts_to_throw_insert）
+    labels: [table]
+    expiration: 2m
+  chq_detached_parts:
+    type: gauge
+    description: system.detached_parts，依 reason（空字串＝使用者 DETACH，broken／unexpected 等是伺服器自己移走的）
+    labels: [table, reason]
+    expiration: 2m
+
+  chq_merge_tree_setting:
+    type: gauge
+    description: system.merge_tree_settings 的伺服器層級值（parts_to_delay_insert、parts_to_throw_insert、max_parts_in_total）；表層級的 SETTINGS 覆寫不在這裡
+    labels: [name]
+
+  # --- mutation ---
+  chq_mutations_pending:
+    type: gauge
+    description: system.mutations 中 is_done = 0 的數量
+    labels: [table]
+    expiration: 2m
+  chq_mutations_failing:
+    type: gauge
+    description: is_done = 0 且 latest_fail_reason 非空（失敗後一直重試）
+    labels: [table]
+    expiration: 2m
+  chq_mutation_oldest_pending_seconds:
+    type: gauge
+    description: 最老未完成 mutation 的年齡（now() - create_time）
+    labels: [table]
+    expiration: 2m
+
+  # --- Distributed 非同步送出（system.distribution_queue） ---
+  chq_distribution_queue_files:
+    type: gauge
+    description: data_files，等待送到遠端 shard 的檔案數
+    labels: [table]
+    expiration: 2m
+  chq_distribution_queue_errors:
+    type: gauge
+    description: error_count（這個目錄送出失敗的次數，成功送出後歸零）
+    labels: [table]
+    expiration: 2m
+  chq_distribution_queue_broken_files:
+    type: gauge
+    description: broken_data_files（無法送出、被移到 broken 目錄的檔案）
+    labels: [table]
+    expiration: 2m
+
+  # Keeper 連線不用 SQL 查：lab 中 Keeper 失去 quorum 時 SELECT ... FROM system.zookeeper_connection 卡住超過 30 秒，
+  # 而每個 DSN 只有一條連線，卡住的查詢讓同一個 DSN 的其他查詢一起逾時。改用原生的 ClickHouseMetrics_ZooKeeperSession*。
+
+  # --- 備份（system.backups：只記得 server 啟動後的 BACKUP／RESTORE） ---
+  chq_backup_last_success_timestamp:
+    type: gauge
+    description: 最近一次 BACKUP_CREATED 的 end_time（Unix 秒）；server 重啟後歸零，要和 Uptime 一起看
+  chq_backups_failed:
+    type: gauge
+    description: status = BACKUP_FAILED 的數量（server 啟動後）
+
+queries:
+  replicas:
+    databases: [ch1, ch2]
+    interval: 15s
+    timeout: 5
+    metrics:
+      - chq_replica_readonly
+      - chq_replica_session_expired
+      - chq_replica_absolute_delay_seconds
+      - chq_replica_queue_size
+      - chq_replica_inserts_in_queue
+      - chq_replica_log_lag
+      - chq_replica_active_replicas
+      - chq_replica_total_replicas
+    sql: |
+      SELECT concat(database, '.', table) AS table,
+             toUInt8(is_readonly) AS chq_replica_readonly,
+             toUInt8(is_session_expired) AS chq_replica_session_expired,
+             absolute_delay AS chq_replica_absolute_delay_seconds,
+             queue_size AS chq_replica_queue_size,
+             inserts_in_queue AS chq_replica_inserts_in_queue,
+             toInt64(log_max_index) - toInt64(log_pointer) AS chq_replica_log_lag,
+             active_replicas AS chq_replica_active_replicas,
+             total_replicas AS chq_replica_total_replicas
+      FROM system.replicas
+
+  replication_queue:
+    databases: [ch1, ch2]
+    interval: 17s
+    timeout: 5
+    metrics: [chq_replication_queue_failing, chq_replication_queue_oldest_seconds]
+    sql: |
+      SELECT concat(database, '.', table) AS table,
+             countIf(last_exception != '') AS chq_replication_queue_failing,
+             max(dateDiff('second', create_time, now())) AS chq_replication_queue_oldest_seconds
+      FROM system.replication_queue
+      GROUP BY database, table
+
+  parts:
+    databases: [ch1, ch2]
+    interval: 19s
+    timeout: 5
+    metrics: [chq_parts_max_per_partition]
+    sql: |
+      SELECT table, max(c) AS chq_parts_max_per_partition
+      FROM (SELECT concat(database, '.', table) AS table, partition_id, count() AS c
+            FROM system.parts WHERE active GROUP BY database, table, partition_id)
+      GROUP BY table
+
+  merge_tree_settings:
+    databases: [ch1, ch2]
+    interval: 61s
+    timeout: 5
+    metrics: [chq_merge_tree_setting]
+    sql: |
+      SELECT name, toFloat64(value) AS chq_merge_tree_setting
+      FROM system.merge_tree_settings
+      WHERE name IN ('parts_to_delay_insert', 'parts_to_throw_insert', 'max_parts_in_total')
+
+  detached_parts:
+    databases: [ch1, ch2]
+    interval: 67s
+    timeout: 5
+    metrics: [chq_detached_parts]
+    sql: |
+      SELECT concat(database, '.', table) AS table,
+             if(coalesce(reason, '') = '', 'detached_by_user', reason) AS reason,
+             count() AS chq_detached_parts
+      FROM system.detached_parts
+      GROUP BY database, table, reason
+
+  mutations:
+    databases: [ch1, ch2]
+    interval: 23s
+    timeout: 5
+    metrics: [chq_mutations_pending, chq_mutations_failing, chq_mutation_oldest_pending_seconds]
+    sql: |
+      SELECT concat(database, '.', table) AS table,
+             count() AS chq_mutations_pending,
+             countIf(latest_fail_reason != '') AS chq_mutations_failing,
+             max(dateDiff('second', create_time, now())) AS chq_mutation_oldest_pending_seconds
+      FROM system.mutations
+      WHERE NOT is_done
+      GROUP BY database, table
+
+  distribution_queue:
+    databases: [ch1, ch2]
+    interval: 29s
+    timeout: 5
+    metrics: [chq_distribution_queue_files, chq_distribution_queue_errors, chq_distribution_queue_broken_files]
+    sql: |
+      SELECT concat(database, '.', table) AS table,
+             sum(data_files) AS chq_distribution_queue_files,
+             sum(error_count) AS chq_distribution_queue_errors,
+             sum(broken_data_files) AS chq_distribution_queue_broken_files
+      FROM system.distribution_queue
+      GROUP BY database, table
+
+  backups:
+    databases: [ch1, ch2]
+    interval: 71s
+    timeout: 5
+    metrics: [chq_backup_last_success_timestamp, chq_backups_failed]
+    sql: |
+      SELECT toUnixTimestamp(maxIf(end_time, status = 'BACKUP_CREATED')) AS chq_backup_last_success_timestamp,
+             countIf(status = 'BACKUP_FAILED') AS chq_backups_failed
+      FROM system.backups

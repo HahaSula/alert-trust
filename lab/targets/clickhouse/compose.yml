@@ -1,0 +1,80 @@
+# ClickHouse v26.10.2.103-stable（server ×2：1 shard、2 replicas；ClickHouse Keeper ×3）、Prometheus v3.13.5、blackbox_exporter v0.27.0、
+# query-exporter 5.2.2（clickhouse-sqlalchemy 0.3.2，映像內建）。執行 ./run.sh，結束會 docker compose down -v。
+# 只對外開 127.0.0.1 的 31000–31099：
+#   31001–31002 ch1／ch2 HTTP（8123：/ping、/replicas_status、SQL）、31011–31012 ch1／ch2 /metrics（9363）、
+#   31021–31023 keeper 4lw（9181）、31031–31033 keeper /ready（9182）、31041–31043 keeper /metrics（9363）、
+#   31090 Prometheus、31091 blackbox、31092 query-exporter。
+# 記憶體刻意壓小（server mem_limit 900m、max_server_memory_usage 600MB；keeper 256m）；這是輕量 lab，不是正式環境的設定。
+# conf/server/lab.xml 把 parts_to_delay_insert／parts_to_throw_insert 調成 20／40、min_absolute_delay_to_close 30 秒，
+# asynchronous_heavy_metrics_update_period_s 15 秒，才能在 lab 時間內看到效果。
+name: at-ch
+x-ch: &ch
+  image: clickhouse/clickhouse-server:26.10.2.103
+  mem_limit: 900m
+  ulimits: { nofile: { soft: 262144, hard: 262144 } }
+  environment: { CLICKHOUSE_SKIP_USER_SETUP: "1" }
+x-keeper: &keeper
+  image: clickhouse/clickhouse-keeper:26.10.2.103
+  mem_limit: 256m
+services:
+  keeper1:
+    <<: *keeper
+    hostname: keeper1
+    volumes: ["./conf/keeper/keeper1.xml:/etc/clickhouse-keeper/keeper_config.xml:ro"]
+    ports: ["127.0.0.1:31021:9181", "127.0.0.1:31031:9182", "127.0.0.1:31041:9363"]
+  keeper2:
+    <<: *keeper
+    hostname: keeper2
+    volumes: ["./conf/keeper/keeper2.xml:/etc/clickhouse-keeper/keeper_config.xml:ro"]
+    ports: ["127.0.0.1:31022:9181", "127.0.0.1:31032:9182", "127.0.0.1:31042:9363"]
+  keeper3:
+    <<: *keeper
+    hostname: keeper3
+    volumes: ["./conf/keeper/keeper3.xml:/etc/clickhouse-keeper/keeper_config.xml:ro"]
+    ports: ["127.0.0.1:31023:9181", "127.0.0.1:31033:9182", "127.0.0.1:31043:9363"]
+  ch1:
+    <<: *ch
+    hostname: ch1
+    volumes:
+      - ./conf/server/lab.xml:/etc/clickhouse-server/config.d/lab.xml:ro
+      - ./conf/server/ch1.xml:/etc/clickhouse-server/config.d/macros.xml:ro
+      - ./conf/server/monitor-user.xml:/etc/clickhouse-server/users.d/monitor.xml:ro
+      - ch1-backups:/backups
+    ports: ["127.0.0.1:31001:8123", "127.0.0.1:31011:9363"]
+    depends_on: [keeper1, keeper2, keeper3]
+  ch2:
+    <<: *ch
+    hostname: ch2
+    volumes:
+      - ./conf/server/lab.xml:/etc/clickhouse-server/config.d/lab.xml:ro
+      - ./conf/server/ch2.xml:/etc/clickhouse-server/config.d/macros.xml:ro
+      - ./conf/server/monitor-user.xml:/etc/clickhouse-server/users.d/monitor.xml:ro
+      - ch2-backups:/backups
+    ports: ["127.0.0.1:31002:8123", "127.0.0.1:31012:9363"]
+    depends_on: [keeper1, keeper2, keeper3]
+  blackbox:
+    image: prom/blackbox-exporter:v0.27.0
+    command: ["--config.file=/etc/bb/blackbox.yml"]
+    volumes: ["./bb:/etc/bb:ro"]
+    ports: ["127.0.0.1:31091:9115"]
+  qe:
+    image: adonato/query-exporter:5.2.2
+    mem_limit: 256m
+    command: ["--config", "/config/clickhouse.yaml", "--host", "0.0.0.0", "--port", "9560"]
+    environment:
+      CHQ_CH1_DSN: "clickhouse+native://monitor:monitor@ch1:9000/default"
+      CHQ_CH2_DSN: "clickhouse+native://monitor:monitor@ch2:9000/default"
+    volumes: ["../../../queries/clickhouse:/config:ro"]
+    ports: ["127.0.0.1:31092:9560"]
+    depends_on: [ch1, ch2]
+  prometheus:
+    image: prom/prometheus:v3.13.5
+    command: ["--config.file=/etc/prom/prometheus.yml", "--storage.tsdb.retention.time=1d"]
+    volumes:
+      - ./prom:/etc/prom:ro
+      - ../../../rules/targets/clickhouse.yml:/etc/rules/clickhouse.yml:ro
+      - ./prom/altinity:/etc/rules/altinity:ro
+    ports: ["127.0.0.1:31090:9090"]
+volumes:
+  ch1-backups: {}
+  ch2-backups: {}

@@ -1,0 +1,64 @@
+# scrape_interval 5s（lab 用，比規則檔假設的 15s 短）。job 名稱 clickhouse-server、clickhouse-keeper 等是例子（規則檔開頭有對照）。
+# probe job 把 instance 改成和被探測元件的 /metrics target 相同的 host:port（9363），規則才能用 on (instance) 交叉比對。
+# query-exporter 的 database label（ch1、ch2）在 metric_relabel_configs 轉成 instance="ch1:9363"，和 /metrics 對齊。
+global: { scrape_interval: 5s, scrape_timeout: 4s, evaluation_interval: 5s }
+rule_files: [/etc/rules/clickhouse.yml, /etc/rules/altinity/*.yml]
+scrape_configs:
+  - job_name: clickhouse-server
+    static_configs: [{ targets: [ch1:9363, ch2:9363] }]
+  - job_name: clickhouse-keeper
+    static_configs: [{ targets: [keeper1:9363, keeper2:9363, keeper3:9363], labels: { app: clickhouse-keeper } }]
+  - job_name: clickhouse-sql
+    static_configs: [{ targets: [qe:9560] }]
+    metric_relabel_configs:
+      - { source_labels: [database], regex: '(ch[0-9]+)', target_label: instance, replacement: '${1}:9363' }
+  - job_name: prometheus
+    static_configs: [{ targets: [localhost:9090] }]
+  - job_name: clickhouse-ping
+    metrics_path: /probe
+    params: { module: [ch_ping] }
+    static_configs: [{ targets: [ch1, ch2] }]
+    relabel_configs:
+      - { source_labels: [__address__], target_label: instance, replacement: '${1}:9363' }
+      - { source_labels: [__address__], target_label: __param_target, replacement: 'http://${1}:8123/ping' }
+      - { target_label: __address__, replacement: blackbox:9115 }
+  - job_name: clickhouse-replicas-status
+    metrics_path: /probe
+    params: { module: [ch_replicas_status] }
+    static_configs: [{ targets: [ch1, ch2] }]
+    relabel_configs:
+      - { source_labels: [__address__], target_label: instance, replacement: '${1}:9363' }
+      - { source_labels: [__address__], target_label: __param_target, replacement: 'http://${1}:8123/replicas_status?verbose=1' }
+      - { target_label: __address__, replacement: blackbox:9115 }
+  - job_name: clickhouse-sql-probe
+    metrics_path: /probe
+    params: { module: [ch_sql_no_readonly] }
+    static_configs: [{ targets: [ch1, ch2] }]
+    relabel_configs:
+      - { source_labels: [__address__], target_label: instance, replacement: '${1}:9363' }
+      - { source_labels: [__address__], target_label: __param_target, replacement: 'http://${1}:8123/?query=SELECT%20count()%20FROM%20system.replicas%20WHERE%20is_readonly' }
+      - { target_label: __address__, replacement: blackbox:9115 }
+  - job_name: clickhouse-keeper-ready
+    metrics_path: /probe
+    params: { module: [keeper_ready] }
+    static_configs: [{ targets: [keeper1, keeper2, keeper3] }]
+    relabel_configs:
+      - { source_labels: [__address__], target_label: instance, replacement: '${1}:9363' }
+      - { source_labels: [__address__], target_label: __param_target, replacement: 'http://${1}:9182/ready' }
+      - { target_label: __address__, replacement: blackbox:9115 }
+  - job_name: clickhouse-keeper-ruok
+    metrics_path: /probe
+    params: { module: [keeper_ruok] }
+    static_configs: [{ targets: [keeper1, keeper2, keeper3] }]
+    relabel_configs:
+      - { source_labels: [__address__], target_label: instance, replacement: '${1}:9363' }
+      - { source_labels: [__address__], target_label: __param_target, replacement: '${1}:9181' }
+      - { target_label: __address__, replacement: blackbox:9115 }
+  - job_name: clickhouse-keeper-mntr
+    metrics_path: /probe
+    params: { module: [keeper_mntr_serving] }
+    static_configs: [{ targets: [keeper1, keeper2, keeper3] }]
+    relabel_configs:
+      - { source_labels: [__address__], target_label: instance, replacement: '${1}:9363' }
+      - { source_labels: [__address__], target_label: __param_target, replacement: '${1}:9181' }
+      - { target_label: __address__, replacement: blackbox:9115 }
