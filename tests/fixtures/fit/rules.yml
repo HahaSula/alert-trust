@@ -1,0 +1,18 @@
+groups:
+  - name: rec
+    interval: 1m
+    rules:
+      - record: job:http_requests:rate5m
+        expr: sum by (job) (rate(http_requests_total[5m]))
+  - name: alerts
+    rules:
+      - alert: ErrorsHigh
+        expr: rate(http_errors_total{job="api"}[1m]) > 1
+      - alert: MySQLSlow
+        expr: increase(mysql_global_status_slow_queries{job="mysql"}[2m]) > 0
+      - alert: RecordedDrop
+        expr: job:http_requests:rate5m < 1 and job:http_requests:rate5m offset 1h > 10
+      - alert: RecordedWindow
+        expr: max_over_time(job:http_requests:rate5m[2m]) == 0
+      - alert: Down
+        expr: up == 0

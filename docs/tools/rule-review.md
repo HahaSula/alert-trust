@@ -36,7 +36,27 @@ python3 tools/check_metric_sources.py --rules my-rules/*.yml --config prometheus
 python3 tools/check_coverage.py --env env/<name>.yaml --snapshot snapshot --out report --live
 ```
 
-第 4 步的公式見[信任契約](../contracts.md)，可以用[契約計算器](calculator.md)代入數字。
+```bash
+# 第 4 步：時間契約；不合格時同時給「改 rule」與「改環境」兩個方向
+python3 tools/fit_contracts.py --rules my-rules/*.yml --stack prometheus \
+    --scrape-interval 30s --scrape-duration 20s --eval-interval 30s --job-interval mysql=60s --job-duration mysql=45s \
+    --out report --write-fitted report/fitted-rules.yml
+```
+
+第 4 步的公式見[信任契約](../contracts.md)，也可以用[契約計算器](calculator.md)手動代入數字。
+
+## 第 4 步：不合規格時給兩個方向
+
+`fit_contracts.py` 的報告不是只列 FAIL，而是照這個順序：
+
+1. **環境本身合不合**：scrape 耗時有沒有超過 `scrape_interval`、rule group 有沒有在 interval 內跑完、lookback。不合時開頭就寫「目前規格不合」與怎麼改。
+2. **在目前規格下合格的 rule**，附邊際。
+3. **不合格的 rule**：
+    - 方案 A：改 rule 配合現在的環境。工具算出最短的合格視窗，`--write-fitted` 另存一份改好的 rule 檔，原檔不動。代價是視窗變長，短暫尖峰反應變慢。
+    - 方案 B：不改 rule，改環境。該 job 的 `scrape_interval` 至多多少，或加 `query_offset` ≥ 尖峰 scrape 耗時（Prometheus 2.53 起）。代價是 scrape 負載增加，或每條 rule 都晚判斷。
+4. **一次讓所有 rule 合格的環境設定**，依 job 分列。
+
+讀 recording rule 的 rule，要調的是上游 recording rule 所在 group 的 `interval`，不是 `scrape_interval`；工具會分開標示。
 
 ## 第 2 步：metric 的來源不能用猜的
 

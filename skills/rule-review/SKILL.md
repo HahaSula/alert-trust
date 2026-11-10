@@ -16,6 +16,7 @@ argument-hint: "<rule files...>"
 - 唯讀，不改使用者的檔案，除非對方要求。
 - 數字標來源：量到的、使用者說的、推算的。
 - **不要假定 metric 從哪裡來。**每個 metric 的來源只能是：使用者給的 Prometheus config 裡的 scrape job、live 快照、使用者的回答。目錄卡片寫「這個 metric 通常由 mysqld_exporter 產生」只是提示，不能當成來源。
+- **不合規格時要給出路，不要只列 FAIL。**每個不合格的地方都照這個格式回報：「目前規格不合（哪一項、差多少）→ 在目前規格下合格的是這些 → 方案 A：改 rule 配合現在的環境（改成什麼）→ 方案 B：不改 rule，改環境（例如 `scrape_interval` 調到多少、加多少 `query_offset`）」，兩個方案的代價都寫出來，讓使用者選。使用者沒選之前不要替他改檔。
 - 一次最多問 3 題；不知道就記「未知」繼續，最後列在「沒有確認的部分」。
 - 結論要引用目錄：`$AT/catalog/` 的訊號 id、契約 id，以及網站連結 `https://hahasula.github.io/alert-trust/components/<卡片>/#<訊號>`。
 
@@ -67,7 +68,27 @@ python3 "$AT/tools/check_coverage.py" --env env/<name>.yaml --snapshot snapshot 
 
 ## 第 4 步：每條 rule 的時間契約
 
-需要的數字：`scrape_interval`（S）、尖峰 scrape 耗時（d）、`evaluation_interval`（E）、尖峰 group 耗時（T）；vmalert 另外要 `eval_delay`（D）與資料延遲（L）。拿不到就問，或標成未知並給出「在什麼條件下會失效」。
+需要的數字：`scrape_interval`（S）、尖峰 scrape 耗時（d）、`evaluation_interval`（E）、尖峰 group 耗時（T）；vmalert 另外要 `eval_delay`（D）與資料延遲（L）。S 從使用者給的 Prometheus config 讀（含每個 job 自己的 `scrape_interval`）；d、T 從 live 快照（`peaks.json`）或問使用者。拿不到就標成假設，工具會用最壞情況並在報告開頭寫出來。
+
+先跑：
+
+```bash
+python3 "$AT/tools/fit_contracts.py" --rules <rule 檔...> --stack prometheus|vmalert \
+    --scrape-interval <S> --scrape-duration <d> --eval-interval <E> [--group-duration <T>] \
+    [--job-interval <job>=<S>] [--job-duration <job>=<d>] [--query-offset <O>] [--k 1] \
+    [--latency <L> --eval-delay <D>] --out report [--write-fitted report/fitted-rules.yml]
+```
+
+報告 `contracts-fit.md` 的順序就是回報的順序：
+
+1. **環境本身合不合**：`d ≤ S`、`T ≤ E`、lookback。不合時開頭就說「目前規格不合」，並說怎麼改（例如 mysql job 的 scrape 耗時比 `scrape_interval` 長，要把 `scrape_interval` 調到多少，或降低 exporter 的查詢耗時）。
+2. **在目前規格下合格的 rule**，附邊際。
+3. **不合格的 rule，兩個方向**：方案 A 改 rule（工具算出最短的合格視窗，`--write-fitted` 另存一份改好的 rule 檔，原檔不動）；方案 B 不改 rule、改環境（該 job 的 `scrape_interval` 至多多少，或加 `query_offset` ≥ d）。
+4. **一次讓所有 rule 合格的環境設定**（依 job 分列）。
+
+兩個方案的代價要一起說：A 的視窗變長，短暫尖峰反應變慢；B 的 `scrape_interval` 變短會增加 scrape 負載，`query_offset` 會讓每條 rule 都晚判斷。讓使用者選。
+
+工具只處理視窗契約與環境檢查；下面各 pack 的其他契約（resend／EndsAt、Alertmanager 告警視窗、exporter 期限）照各自的 SKILL.md：
 
 - Prometheus：照 `$AT/skills/prometheus/SKILL.md` 第 2 節。
 - vmalert／VictoriaLogs：照 `$AT/skills/victoriametrics/SKILL.md` 第 1、2 節。

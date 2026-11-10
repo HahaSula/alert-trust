@@ -93,6 +93,8 @@ argument-hint: "[snapshot-dir] [component-id]"
 
 ### 互動
 
+> 不合格時不要只列 FAIL：用 `$AT/tools/fit_contracts.py` 給出「目前規格哪裡不合 → 目前合格的 rule → 方案 A 改 rule／方案 B 改環境」，格式見 `$AT/skills/rule-review/SKILL.md` 第 4 步。
+
 1. 先報 FAIL 數與最嚴重的 3 條，優先看使用者提到的重要 alert。
 2. 用 `peaks.json: for_state_resets` 或 `changes(ALERTS_FOR_STATE{alertname="X"}[1h])` 驗證：算出 FAIL 的 alert，`for` 真的有在重置嗎？
 3. 問：尖峰是常態還是偶發？常態要修 scrape；偶發可以先用 offset 與 range 吸收。

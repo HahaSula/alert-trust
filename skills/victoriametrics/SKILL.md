@@ -68,6 +68,8 @@ VM 的 `peaks.json` 只有在各元件的 `/metrics` 有被抓進這個 VM 時�
 
 ## 2. Log rule `L ≤ D`
 
+> 不合格時不要只列 FAIL：用 `$AT/tools/fit_contracts.py` 給出「目前規格哪裡不合 → 目前合格的 rule → 方案 A 改 rule／方案 B 改環境」，格式見 `$AT/skills/rule-review/SKILL.md` 第 4 步。
+
 `rules.json` 裡 `type: vlogs` 的 group：
 
 - 沒寫 `_time` 的 log rule 只查 `[ts − interval, ts]`，視窗不重疊。`L ≤ D` 保證涵蓋；`L > D + E` 必定漏掉，事後卻查得到（契約 `vl-log-delay`）。

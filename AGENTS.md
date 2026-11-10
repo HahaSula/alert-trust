@@ -24,7 +24,7 @@ alert-trust 回答兩個問題：
 | `catalog/refs-code.yaml` | 釘在版本與行號的原始碼參考 | **產生**：`tools/gen_code_refs.py` 讀 `refs-code.src.json` |
 | `catalog/refs.yaml`、`refs.d/*.yaml` | 實驗參考，也可放手動核對過的原始碼參考 | 手寫 |
 | `rules/<component>/*.yml`、`rules/targets/*.yml` | 規則範本；每條都有 `labels.tier` 與 `annotations.runbook_url` | 手寫 |
-| `tools/` | `validate.py`、`build_pages.py`、`check_coverage.py`、`check_metric_sources.py`、`rules_to_snapshot.py`、`collect.py`、`check_metrics.py`、`gen_code_refs.py`、`catalog.py`（loader） | 手寫 |
+| `tools/` | `validate.py`、`build_pages.py`、`check_coverage.py`、`check_metric_sources.py`、`fit_contracts.py`、`rules_to_snapshot.py`、`collect.py`、`check_metrics.py`、`gen_code_refs.py`、`catalog.py`（loader） | 手寫 |
 | `hooks/refs.py` | MkDocs hook：`[^key]` 變註腳、反引號名稱連到名詞表、`<!-- figure: name -->` 內嵌 SVG | 手寫 |
 | `docs/` | 網站；`docs/components/*.md`、`docs/reference/*.md` 由 `build_pages.py` 產生，不 commit | 混合 |
 | `docs/assets/figures/*.svg` | 圖；顏色用 class，由 `docs/assets/extra.css` 對應主題 | 手寫 |
@@ -51,7 +51,7 @@ docker run --rm -u $(id -u):$(id -g) -v "$PWD":/docs squidfunk/mkdocs-material:9
 1. **確認監控體系**：評估這些 rule 的是 Prometheus 還是 vmalert（版本）、資料從哪裡來、有沒有外部觀察者、告警走哪台 Alertmanager。能從檔案判斷就判斷，否則問。寫成 `env/<name>.yaml`。
 2. **每個 metric 的來源**：**不要假定。**使用者給了 Prometheus config 就一定要讀：`python3 tools/check_metric_sources.py --rules <rule 檔...> --config prometheus.yml --out report`。來源只能是 config 的 scrape job、live 快照（`collect.py` 的 `metric_jobs.json`，用 `--live`）或使用者的回答（`--answers env/<name>.sources.yaml`）；目錄卡片只是提示。報告最後的問題逐題問使用者。job 對不上、被 `metric_relabel_configs` 丟掉的 rule 永遠不會響，先回報。
 3. **監控基礎設施的覆蓋**：`python3 tools/rules_to_snapshot.py --out snapshot --ruler <id> <rule 檔...>`，再 `python3 tools/check_coverage.py --env env/<name>.yaml --snapshot snapshot --out report`。先回報第 1 級缺口，例如 scrape 耗時、rule group 跑不完或停止評估、WAL 寫入失敗、送不到 Alertmanager、Watchdog。
-4. **每條 rule 的時間契約**：依體系用對的公式（`catalog/contracts.yaml`）。
+4. **每條 rule 的時間契約**：`python3 tools/fit_contracts.py --rules <rule 檔...> --stack prometheus|vmalert --scrape-interval <S> --scrape-duration <d> --eval-interval <E> --out report`。不合規格時不要只列 FAIL：先說目前規格哪裡不合，列出在目前規格下合格的 rule，再給兩個方向——方案 A 改 rule（最短合格視窗），方案 B 改環境（`scrape_interval` 至多多少、或加 `query_offset`），附代價，讓使用者選。
 5. **寫法問題**：presence lint、group 擺放。
 
 完整步驟在 `skills/rule-review/SKILL.md`。
