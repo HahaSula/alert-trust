@@ -115,10 +115,43 @@ compaction 之後檔案不會縮小，空出來的頁面要 defrag 才還給檔�
 
 **和 etcd 不同的陷阱。**PD 的 store／region 狀態只在 PD leader 上有；PD leader 那台抓不到時，用 `etcd_server_is_leader` 當前提的官方規則全部安靜（lab 實測）。etcd 的 quorum 計數可以用 `etcd_network_known_peers` 當成員數，PD 內嵌的 etcd 3.5.15 沒有這個 metric。[^pd-rule-down][^pd-etcd-version]
 
+## YugabyteDB：master 一組 Raft、每個 tablet 一組 Raft {#yugabytedb}
+
+**兩層 Raft。**yb-master 之間是一組 Raft（sys catalog tablet），選出的 master leader 管 catalog、tablet 位置與 cluster balancer；yb-tserver 上每個 tablet 各自一組 Raft，tablet leader 服務那個 tablet 的讀寫。兩層的 leader 互不相干：master 失去 quorum 時，tablet 的 Raft 照常運作；但 YSQL 另外依賴 master leader 續約的 operation lease，30 秒後停止服務（見下面的 lab）。[^yb-c-is-leader][^yb-m-bg-report][^yb-ysql-lease-ttl]
+
+**時間參數**（v2026.1.3.0 預設）：
+
+| 參數 | 預設 | 作用 | 依據 |
+|---|---|---|---|
+| `raft_heartbeat_interval_ms` | 500ms | leader 對 follower 的 heartbeat | [^yb-c-hb-interval] |
+| `leader_failure_max_missed_heartbeat_periods` | 6 | 約 3 秒沒收到 heartbeat 才發起選舉 | [^yb-c-missed-hb] |
+| `leader_lease_duration_ms` | 2 秒 | 新 leader 要等舊 leader 的 lease 過期才服務；讀寫不必每次問過半 | [^yb-c-lease][^yb-c-lease-default] |
+| `follower_unavailable_considered_failed_sec` | 900 秒 | leader 把沒回應的 follower 踢出 Raft 設定；3 個 voter 可以降成 2，不會自動從 2 降成 1 | [^yb-c-follower-failed][^yb-c-evict-two] |
+| `tserver_unresponsive_timeout_ms`（master） | 60 秒 | master 判定 tserver dead；和上一列是兩個獨立的時間 | [^yb-m-ts-unresponsive] |
+
+| etcd 的機制 | YugabyteDB 的對應 | 什麼會壞 | 看得到的訊號 |
+|---|---|---|---|
+| [選主](#election) | master：sys catalog 的 Raft；tablet：每個各自選 | master 換 leader 期間 DDL、新連線的 catalog 讀取等待；tablet 換 leader 期間那個 tablet 不能寫 | [role-detection](../components/yugabytedb.md#role-detection)、[leader-changes](../components/yugabytedb.md#leader-changes) |
+| [quorum](#quorum) | master 過半；每個 tablet 過半副本 | master 失去 quorum 時存活那台照常回應 `/prometheus-metrics`；tablet 失去過半時 leaderless | [master-quorum](../components/yugabytedb.md#master-quorum)、[tablet-health](../components/yugabytedb.md#tablet-health) |
+| [log 複寫](#replication) | `follower_lag_ms`：距上次收到 leader `UpdateConsensus` 的時間，閒置時也會更新 | follower 長時間收不到 | [replication-lag](../components/yugabytedb.md#replication-lag) |
+| [fsync](#fsync) | WAL 預設不是每次寫入都 fsync（`durable_wal_write` false，每 1 秒或 1MB） | 磁碟慢時 `log_sync_latency` 上升；只有平均值 | [wal-fsync](../components/yugabytedb.md#wal-fsync) |
+| 時鐘 | leader lease 與 hybrid time 都依賴各台時鐘的差在 `max_clock_skew_usec`（500ms）內 | 超過時有交易表的 tserver FATAL | [clock-skew](../components/yugabytedb.md#clock-skew) |
+
+**leader lease 與時鐘。**tablet leader 在 lease 內不必問過半就能服務讀取；這個保證假設各台時鐘的差小於 `max_clock_skew_usec`。超過時 YugabyteDB 選擇讓 process 結束：本機實體時鐘比最後的 hybrid time 落後超過上限、而且有交易表的 tablet 已開啟時 `LOG(FATAL)`；`fail_on_out_of_range_clock_skew=false` 時只每秒寫 ERROR，但超過 60 秒仍會 FATAL。[^yb-clk-fatal][^yb-clk-fail-flag][^yb-clk-enable][^yb-clk-crash-bound]`hybrid_clock_skew` 是這個差值（微秒），在 crash 之前看得到。[^yb-clk-skew-def]
+
+**lab 看到的。**<span class="at-chip at-ev-tested">實測</span>[^yb-exp-raw][^yb-exp-clock]
+
+- 預設設定下三台 tserver 啟動約 20 秒內同時 FATAL（skew 7 秒，牆鐘被 WSL 往回調）；master 只寫 ERROR。之後的實驗都用 `fail_on_out_of_range_clock_skew=false`。
+- 停一台 tserver：剛好在它上面有 leader 的 tablet，下一筆寫入要等新 leader（lab 一筆 insert 9 秒）；之後讀寫照常。master 的 `/api/v1/health-check` 在它被判定 dead 後列出 dead node 與副本在它上面的 tablet；`/api/v1/tablet-under-replication` 整段都是空的。
+- 再停第二台：兩台都有副本的 tablet 失去過半，讀取 20 秒逾時；`/api/v1/tablet-replication` 要超過 `leaderless_tablet_alert_delay_secs`（120 秒）才列出。
+- 停 master leader：3 秒內另一台成為 leader（主機 monotonic）。停 2 台 master：tablet 的 Raft 不受影響，但約 30 秒後 tserver 的 YSQL operation lease（由 master leader 續約）過期，三台 tserver 都結束 PostgreSQL，YSQL 全停。[^yb-exp-lease-log][^yb-ysql-lease-kill]細節見 [YugabyteDB 頁](../targets/yugabytedb.md#cluster)。
+
+**和 etcd、TiKV 不同的陷阱。**tablet 的 leaderless、under-replicated 沒有 Prometheus metric，只在 master 的 JSON API；master follower 會把這些請求轉給 leader，轉送失敗時仍回 200。[^yb-m-h-leader-or-redirect][^yb-m-h-redirect-nolist]所以 blackbox 要比對 body，並且和「master 拿得到 leader 的回應」一起看。
+
 ## 之後加入的資料庫
 
 | 資料庫 | Raft 的單位 | 要補的段落 |
 |---|---|---|
 | TiKV（TiDB） | 每個 Region 一組；PD 內嵌 etcd | 已加在 [TiKV](#tikv)；snapshot 傳送與 Region 層級的 leader 平衡尚未補 |
-| YugabyteDB | 每個 tablet 一組；master 另一組 | leaderless tablet、follower lag |
+| YugabyteDB | 每個 tablet 一組；master 另一組 | 已加在 [YugabyteDB](#yugabytedb)；remote bootstrap 與 tablet leader 平衡尚未補 |
 | MongoDB | replica set 的選舉協定（Raft 變體） | term、election、oplog 落後 |

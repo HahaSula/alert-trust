@@ -1,0 +1,800 @@
+# YugabyteDB target 的參考：v2026.1.3.0 的原始碼位置（在 tag 的 commit f2635f5 上依關鍵字找行號），YBA 告警範本（Polyform，只引用），
+# postgres_exporter v0.20.1，與 lab 結果。
+refs:
+  yb-h-status:
+    kind: code
+    title: "/status 一律輸出 {}（master 與 tserver 共用的預設 handler）"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/server/default-path-handlers.cc"
+    line: 307
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/server/default-path-handlers.cc#L307"
+  yb-h-status-register:
+    kind: code
+    title: "註冊 /status"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/server/default-path-handlers.cc"
+    line: 764
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/server/default-path-handlers.cc#L764"
+  yb-h-prom-register:
+    kind: code
+    title: "註冊 /prometheus-metrics（master、tserver、YCQL 共用）"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/server/default-path-handlers.cc"
+    line: 802
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/server/default-path-handlers.cc#L802"
+  yb-h-prom-write:
+    kind: code
+    title: "/prometheus-metrics 從 MetricRegistry 輸出，不拿 catalog 或 tablet 的鎖"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/server/default-path-handlers.cc"
+    line: 479
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/server/default-path-handlers.cc#L479"
+  yb-h-prom-maxentries-flag:
+    kind: code
+    title: "max_prometheus_metric_entries 預設 UINT32_MAX（不限制）"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/server/default-path-handlers.cc"
+    line: 111
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/server/default-path-handlers.cc#L111"
+  yb-h-prom-v2:
+    kind: code
+    title: "URL 參數 version=v2：table／server 的 allowlist、blocklist"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/server/default-path-handlers.cc"
+    line: 702
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/server/default-path-handlers.cc#L702"
+  yb-m-h-register-health:
+    kind: code
+    title: "master 註冊 /api/v1/health-check（RegisterLeaderOrRedirect）"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/master-path-handlers.cc"
+    line: 3674
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/master-path-handlers.cc#L3674"
+  yb-m-h-register-isleader:
+    kind: code
+    title: "master 註冊 /api/v1/is-leader（不轉送）"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/master-path-handlers.cc"
+    line: 3692
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/master-path-handlers.cc#L3692"
+  yb-m-h-register-replication:
+    kind: code
+    title: "master 註冊 /api/v1/tablet-replication（leaderless tablet）"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/master-path-handlers.cc"
+    line: 3678
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/master-path-handlers.cc#L3678"
+  yb-m-h-register-underrep:
+    kind: code
+    title: "master 註冊 /api/v1/tablet-under-replication"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/master-path-handlers.cc"
+    line: 3682
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/master-path-handlers.cc#L3682"
+  yb-m-h-leader-or-redirect:
+    kind: code
+    title: "不是 leader 時把請求轉給 leader（RedirectToLeader）"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/master-path-handlers.cc"
+    line: 377
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/master-path-handlers.cc#L377"
+  yb-m-h-redirect-fail:
+    kind: code
+    title: "轉送失敗時只把錯誤寫進回應內容，HTTP 狀態仍是 200"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/master-path-handlers.cc"
+    line: 330
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/master-path-handlers.cc#L330"
+  yb-m-h-redirect-nolist:
+    kind: code
+    title: "找不到 leader 位址時輸出錯誤訊息（<h2>），HTTP 狀態仍是 200"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/master-path-handlers.cc"
+    line: 315
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/master-path-handlers.cc#L315"
+  yb-m-h-isleader:
+    kind: code
+    title: "/api/v1/is-leader：不是已初始化的 leader 時回 503"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/master-path-handlers.cc"
+    line: 3177
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/master-path-handlers.cc#L3177"
+  yb-m-h-isleader-503:
+    kind: code
+    title: "is-leader 的 503"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/master-path-handlers.cc"
+    line: 3187
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/master-path-handlers.cc#L3187"
+  yb-m-h-healthcheck:
+    kind: code
+    title: "/api/v1/health-check：dead_nodes、most_recent_uptime、under_replicated_tablets"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/master-path-handlers.cc"
+    line: 1129
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/master-path-handlers.cc#L1129"
+  yb-m-h-health-dead:
+    kind: code
+    title: "health-check 的 dead_nodes：master 認定不是 live 的 tserver"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/master-path-handlers.cc"
+    line: 1165
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/master-path-handlers.cc#L1165"
+  yb-m-h-health-underrep:
+    kind: code
+    title: "health-check 的 under_replicated_tablets：副本位置少於 RF，或副本落在 dead tserver"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/master-path-handlers.cc"
+    line: 1221
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/master-path-handlers.cc#L1221"
+  yb-m-h-leaderless:
+    kind: code
+    title: "leaderless tablet：沒有 valid leader 超過 leaderless_tablet_alert_delay_secs"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/master-path-handlers.cc"
+    line: 2484
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/master-path-handlers.cc#L2484"
+  yb-m-leaderless-delay:
+    kind: code
+    title: "leaderless_tablet_alert_delay_secs 預設 120 秒"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/master-path-handlers.cc"
+    line: 119
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/master-path-handlers.cc#L119"
+  yb-m-h-underrep-running:
+    kind: code
+    title: "tablet-under-replication 只數 RUNNING／UNKNOWN 的副本；停掉的 tserver 被踢出 Raft 設定前仍算"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/master-path-handlers.cc"
+    line: 2522
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/master-path-handlers.cc#L2522"
+  yb-ts-h-register-health:
+    kind: code
+    title: "tserver 註冊 /api/v1/health-check"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/tserver/tserver-path-handlers.cc"
+    line: 541
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/tserver/tserver-path-handlers.cc#L541"
+  yb-ts-h-health:
+    kind: code
+    title: "tserver /api/v1/health-check 只列 FAILED 狀態的 tablet，不看 master 或其他 tserver"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/tserver/tserver-path-handlers.cc"
+    line: 1315
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/tserver/tserver-path-handlers.cc#L1315"
+  yb-m-num-live:
+    kind: code
+    title: "metric：num_tablet_servers_live（tserver_unresponsive_timeout_ms 內有 heartbeat）"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/catalog_manager.cc"
+    line: 539
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/catalog_manager.cc#L539"
+  yb-m-num-dead:
+    kind: code
+    title: "metric：num_tablet_servers_dead"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/catalog_manager.cc"
+    line: 545
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/catalog_manager.cc#L545"
+  yb-m-hb-delay:
+    kind: code
+    title: "metric：max_follower_heartbeat_delay（master leader 多久沒收到 master follower 的 ACK）"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/catalog_manager.cc"
+    line: 551
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/catalog_manager.cc#L551"
+  yb-m-report-metrics:
+    kind: code
+    title: "ReportMetrics：寫 live／dead tserver 數與 master follower 延遲"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/catalog_manager.cc"
+    line: 13146
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/catalog_manager.cc#L13146"
+  yb-m-reset-metrics:
+    kind: code
+    title: "ResetMetrics：live／dead 設 0"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/catalog_manager.cc"
+    line: 13174
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/catalog_manager.cc#L13174"
+  yb-m-bg-report:
+    kind: code
+    title: "只有 leader 的背景執行緒（RunOnceAsLeader）呼叫 ReportMetrics"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/catalog_manager_bg_tasks.cc"
+    line: 226
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/catalog_manager_bg_tasks.cc#L226"
+  yb-m-bg-reset:
+    kind: code
+    title: "失去 leader 時呼叫 ResetMetrics"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/catalog_manager_bg_tasks.cc"
+    line: 346
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/catalog_manager_bg_tasks.cc#L346"
+  yb-m-lb-enabled:
+    kind: code
+    title: "metric：is_load_balancing_enabled（cluster 層級，leader 寫入）"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/cluster_balance.cc"
+    line: 156
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/cluster_balance.cc#L156"
+  yb-m-split-outstanding:
+    kind: code
+    title: "metric：outstanding_tablet_splits"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/tablet_split_manager.cc"
+    line: 143
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/tablet_split_manager.cc#L143"
+  yb-m-ts-unresponsive:
+    kind: code
+    title: "tserver_unresponsive_timeout_ms 預設 60 秒：超過就不算 live"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/ts_manager.cc"
+    line: 59
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/ts_manager.cc#L59"
+  yb-ts-heartbeat-interval:
+    kind: code
+    title: "tserver 對 master 的 heartbeat_interval_ms 預設 1 秒"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/tserver/heartbeater.cc"
+    line: 87
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/tserver/heartbeater.cc#L87"
+  yb-c-follower-failed:
+    kind: code
+    title: "follower_unavailable_considered_failed_sec 預設 900 秒：leader 把沒回應的 follower 踢出 Raft 設定"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/consensus/consensus_queue.cc"
+    line: 84
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/consensus/consensus_queue.cc#L84"
+  yb-c-lease:
+    kind: code
+    title: "leader_lease_duration_ms（預設 kDefaultLeaderLeaseDurationMs）"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/consensus/raft_consensus.cc"
+    line: 220
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/consensus/raft_consensus.cc#L220"
+  yb-c-lease-default:
+    kind: code
+    title: "leader lease 預設 2 秒"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/consensus/raft_consensus.h"
+    line: 86
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/consensus/raft_consensus.h#L86"
+  yb-c-hb-interval:
+    kind: code
+    title: "raft_heartbeat_interval_ms 預設 500ms"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/consensus/raft_consensus.cc"
+    line: 94
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/consensus/raft_consensus.cc#L94"
+  yb-c-missed-hb:
+    kind: code
+    title: "leader_failure_max_missed_heartbeat_periods 預設 6（約 3 秒沒收到 heartbeat 才發起選舉）"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/consensus/raft_consensus.cc"
+    line: 100
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/consensus/raft_consensus.cc#L100"
+  yb-c-raft-term:
+    kind: code
+    title: "metric：raft_term"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/consensus/raft_consensus.cc"
+    line: 197
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/consensus/raft_consensus.cc#L197"
+  yb-c-is-leader:
+    kind: code
+    title: "metric：is_raft_leader（tablet 層級，輸出時加總到表）"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/consensus/raft_consensus.cc"
+    line: 208
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/consensus/raft_consensus.cc#L208"
+  yb-c-follower-lag:
+    kind: code
+    title: "metric：follower_lag_ms（距上次收到 leader UpdateConsensus 的時間，取 max）"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/consensus/raft_consensus.cc"
+    line: 203
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/consensus/raft_consensus.cc#L203"
+  yb-log-sync:
+    kind: code
+    title: "metric：log_sync_latency（微秒，event_stats：只有 sum 與 count）"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/consensus/log_metrics.cc"
+    line: 54
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/consensus/log_metrics.cc#L54"
+  yb-log-durable:
+    kind: code
+    title: "durable_wal_write 預設 false：WAL 不是每次寫入都 fsync"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/consensus/log_util.cc"
+    line: 86
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/consensus/log_util.cc#L86"
+  yb-log-interval-durable:
+    kind: code
+    title: "interval_durable_wal_write_ms 預設 1000"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/consensus/log_util.cc"
+    line: 90
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/consensus/log_util.cc#L90"
+  yb-clk-max-skew:
+    kind: code
+    title: "max_clock_skew_usec 預設 500ms"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/util/physical_time.cc"
+    line: 38
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/util/physical_time.cc#L38"
+  yb-clk-fail-flag:
+    kind: code
+    title: "fail_on_out_of_range_clock_skew 預設 true：有交易表時 skew 超過上限就 crash"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/server/hybrid_clock.cc"
+    line: 76
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/server/hybrid_clock.cc#L76"
+  yb-clk-crash-bound:
+    kind: code
+    title: "clock_skew_force_crash_bound_usec 預設 60 秒：超過就 crash，不論上一個旗標"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/server/hybrid_clock.cc"
+    line: 80
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/server/hybrid_clock.cc#L80"
+  yb-clk-fatal:
+    kind: code
+    title: "skew 超過 max_clock_skew_usec：LOG(FATAL)"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/server/hybrid_clock.cc"
+    line: 208
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/server/hybrid_clock.cc#L208"
+  yb-clk-error:
+    kind: code
+    title: "不 crash 時每秒寫一次 ERROR log"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/server/hybrid_clock.cc"
+    line: 212
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/server/hybrid_clock.cc#L212"
+  yb-clk-skew-metric:
+    kind: code
+    title: "metric：hybrid_clock_skew（微秒）"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/server/hybrid_clock.cc"
+    line: 65
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/server/hybrid_clock.cc#L65"
+  yb-clk-skew-def:
+    kind: code
+    title: "hybrid_clock_skew = 最後的 hybrid time − 本機實體時鐘（只取正值）"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/server/hybrid_clock.cc"
+    line: 306
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/server/hybrid_clock.cc#L306"
+  yb-clk-enable:
+    kind: code
+    title: "開啟一個交易表的 tablet 時才啟用 skew 的 crash 檢查"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/tablet/tablet.cc"
+    line: 817
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/tablet/tablet.cc#L817"
+  yb-mem-hard:
+    kind: code
+    title: "memory_limit_hard_bytes 預設 0（用 default_memory_limit_to_ram_ratio 算）"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/util/mem_tracker.cc"
+    line: 70
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/util/mem_tracker.cc#L70"
+  yb-mem-soft:
+    kind: code
+    title: "memory_limit_soft_percentage 預設 85"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/util/mem_tracker.cc"
+    line: 85
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/util/mem_tracker.cc#L85"
+  yb-mem-leader-rej:
+    kind: code
+    title: "metric：leader_memory_pressure_rejections"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/tablet/tablet_metrics.cc"
+    line: 112
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/tablet/tablet_metrics.cc#L112"
+  yb-sst-rej:
+    kind: code
+    title: "metric：majority_sst_files_rejections"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/tablet/tablet_metrics.cc"
+    line: 117
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/tablet/tablet_metrics.cc#L117"
+  yb-sst-soft:
+    kind: code
+    title: "sst_files_soft_limit 預設 24：超過後依比例拒絕寫入"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/tserver/service_util.cc"
+    line: 50
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/tserver/service_util.cc#L50"
+  yb-sst-hard:
+    kind: code
+    title: "sst_files_hard_limit 預設 48：超過後全部拒絕"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/tserver/service_util.cc"
+    line: 55
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/tserver/service_util.cc#L55"
+  yb-ysql-maxconn:
+    kind: code
+    title: "ysql_max_connections 預設 0（由 PostgreSQL 決定）"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/yql/pgwrapper/pg_wrapper.cc"
+    line: 173
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/yql/pgwrapper/pg_wrapper.cc#L173"
+  yb-ysql-m-conn:
+    kind: code
+    title: "metric：yb_ysqlserver_connection_total"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/yql/pggate/webserver/ybc_pg_webserver_wrapper.cc"
+    line: 67
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/yql/pggate/webserver/ybc_pg_webserver_wrapper.cc#L67"
+  yb-ysql-m-overlimit:
+    kind: code
+    title: "metric：yb_ysqlserver_connection_over_limit_total（超過上限被拒的連線）"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/yql/pggate/webserver/ybc_pg_webserver_wrapper.cc"
+    line: 70
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/yql/pggate/webserver/ybc_pg_webserver_wrapper.cc#L70"
+  yb-ysql-m-max:
+    kind: code
+    title: "metric：yb_ysqlserver_max_connection_total"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/yql/pggate/webserver/ybc_pg_webserver_wrapper.cc"
+    line: 71
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/yql/pggate/webserver/ybc_pg_webserver_wrapper.cc#L71"
+  yb-connmgr:
+    kind: code
+    title: "enable_ysql_conn_mgr 預設 false"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/tserver/tablet_server.cc"
+    line: 181
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/tserver/tablet_server.cc#L181"
+  yb-ts-supportable:
+    kind: code
+    title: "metric：ts_supportable_tablet_peers（-1 = 沒有 guardrail）"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/tserver/ts_tablet_manager.cc"
+    line: 412
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/tserver/ts_tablet_manager.cc#L412"
+  yb-metrics-retire:
+    kind: code
+    title: "metrics_retirement_age_ms 預設 120 秒：實體刪除後 metric 留多久"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/util/metric_entity.cc"
+    line: 30
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/util/metric_entity.cc#L30"
+  yb-license-md:
+    kind: code
+    title: "授權：核心 Apache-2.0，managed/（YBA）Polyform Free Trial"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "README.md"
+    line: 182
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/README.md#L182"
+  yba-leaderless:
+    kind: code
+    title: "YBA 範本 LEADERLESS_TABLETS：yb_node_leaderless_tablet_count（YBA 產生），門檻參數名是 underreplicated_tablets_secs_severe"
+    project: "YugabyteDB Anywhere（Polyform Free Trial，只引用不複製）"
+    version: "v2026.1.3.0"
+    file: "managed/src/main/resources/alert/alert_templates.yml"
+    line: 870
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml#L870"
+  yba-underrep:
+    kind: code
+    title: "YBA 範本 UNDER_REPLICATED_TABLETS：yb_node_underreplicated_tablet_count，門檻參數名是 leaderless_tablets_secs_severe"
+    project: "YugabyteDB Anywhere（Polyform Free Trial，只引用不複製）"
+    version: "v2026.1.3.0"
+    file: "managed/src/main/resources/alert/alert_templates.yml"
+    line: 1483
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml#L1483"
+  yba-master-leader:
+    kind: code
+    title: "YBA 範本 MASTER_LEADER_MISSING：yb_node_is_master_leader，for 300 秒"
+    project: "YugabyteDB Anywhere（Polyform Free Trial，只引用不複製）"
+    version: "v2026.1.3.0"
+    file: "managed/src/main/resources/alert/alert_templates.yml"
+    line: 958
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml#L958"
+  yba-instance-down:
+    kind: code
+    title: "YBA 範本 DB_INSTANCE_DOWN：up 15 分鐘 < 1，且 YBA 認為 process 應該在跑"
+    project: "YugabyteDB Anywhere（Polyform Free Trial，只引用不複製）"
+    version: "v2026.1.3.0"
+    file: "managed/src/main/resources/alert/alert_templates.yml"
+    line: 405
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml#L405"
+  yba-compaction:
+    kind: code
+    title: "YBA 範本 DB_COMPACTION_OVERLOAD：majority_sst_files_rejections 10 分鐘增加"
+    project: "YugabyteDB Anywhere（Polyform Free Trial，只引用不複製）"
+    version: "v2026.1.3.0"
+    file: "managed/src/main/resources/alert/alert_templates.yml"
+    line: 433
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml#L433"
+  yba-memory:
+    kind: code
+    title: "YBA 範本 DB_MEMORY_OVERLOAD：記憶體壓力拒絕（用 YBA relabel 出來的 saved_name）"
+    project: "YugabyteDB Anywhere（Polyform Free Trial，只引用不複製）"
+    version: "v2026.1.3.0"
+    file: "managed/src/main/resources/alert/alert_templates.yml"
+    line: 560
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml#L560"
+  yba-ysql-conn:
+    kind: code
+    title: "YBA 範本 HIGH_NUM_YSQL_CONNECTIONS：yb_ysqlserver_connection_total 對固定門檻"
+    project: "YugabyteDB Anywhere（Polyform Free Trial，只引用不複製）"
+    version: "v2026.1.3.0"
+    file: "managed/src/main/resources/alert/alert_templates.yml"
+    line: 771
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml#L771"
+  yba-ysql-connect:
+    kind: code
+    title: "YBA 範本 DB_YSQL_CONNECTION：yb_node_ysql_connect（YBA 的 ysqlsh 連線測試）"
+    project: "YugabyteDB Anywhere（Polyform Free Trial，只引用不複製）"
+    version: "v2026.1.3.0"
+    file: "managed/src/main/resources/alert/alert_templates.yml"
+    line: 610
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml#L610"
+  yba-tablet-peers:
+    kind: code
+    title: "YBA 範本 TABLET_PEERS_GUARDRAIL：90%／100%"
+    project: "YugabyteDB Anywhere（Polyform Free Trial，只引用不複製）"
+    version: "v2026.1.3.0"
+    file: "managed/src/main/resources/alert/alert_templates.yml"
+    line: 2096
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml#L2096"
+  yba-write-latency:
+    kind: code
+    title: "YBA 範本 TABLET_SERVER_AVG_WRITE_LATENCY：500"
+    project: "YugabyteDB Anywhere（Polyform Free Trial，只引用不複製）"
+    version: "v2026.1.3.0"
+    file: "managed/src/main/resources/alert/alert_templates.yml"
+    line: 1863
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml#L1863"
+  yba-pitr:
+    kind: code
+    title: "YBA 範本 PITR_CONFIG_FAILURE：ybp_pitr_config_status（YBA 平台 metric）"
+    project: "YugabyteDB Anywhere（Polyform Free Trial，只引用不複製）"
+    version: "v2026.1.3.0"
+    file: "managed/src/main/resources/alert/alert_templates.yml"
+    line: 1257
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml#L1257"
+  yba-repl-lag:
+    kind: code
+    title: "YBA 範本 REPLICATION_LAG（xCluster）"
+    project: "YugabyteDB Anywhere（Polyform Free Trial，只引用不複製）"
+    version: "v2026.1.3.0"
+    file: "managed/src/main/resources/alert/alert_templates.yml"
+    line: 1360
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml#L1360"
+  yba-node-down:
+    kind: code
+    title: "YBA 範本 NODE_DOWN：node_exporter 的 up"
+    project: "YugabyteDB Anywhere（Polyform Free Trial，只引用不複製）"
+    version: "v2026.1.3.0"
+    file: "managed/src/main/resources/alert/alert_templates.yml"
+    line: 1006
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml#L1006"
+  yba-master-underrep:
+    kind: code
+    title: "YBA 範本 MASTER_UNDER_REPLICATED：ybp_universe_replication_factor（YBA 平台 metric）"
+    project: "YugabyteDB Anywhere（Polyform Free Trial，只引用不複製）"
+    version: "v2026.1.3.0"
+    file: "managed/src/main/resources/alert/alert_templates.yml"
+    line: 931
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml#L931"
+  yba-disk:
+    kind: code
+    title: "YBA 範本 NODE_DISK_USAGE：node_exporter 的 filesystem"
+    project: "YugabyteDB Anywhere（Polyform Free Trial，只引用不複製）"
+    version: "v2026.1.3.0"
+    file: "managed/src/main/resources/alert/alert_templates.yml"
+    line: 1154
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml#L1154"
+  yba-ysql-avg:
+    kind: code
+    title: "YBA 範本 YSQL_OP_AVG_LATENCY：rpc_latency{export_type=\"ysql_export\"}（YBA relabel 後的名稱）"
+    project: "YugabyteDB Anywhere（Polyform Free Trial，只引用不複製）"
+    version: "v2026.1.3.0"
+    file: "managed/src/main/resources/alert/alert_templates.yml"
+    line: 1557
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml#L1557"
+  yba-health-check:
+    kind: code
+    title: "YBA 範本 HEALTH_CHECK_ERROR：ybp_health_check_status（YBA 自己的健康檢查是否執行成功）"
+    project: "YugabyteDB Anywhere（Polyform Free Trial，只引用不複製）"
+    version: "v2026.1.3.0"
+    file: "managed/src/main/resources/alert/alert_templates.yml"
+    line: 724
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml#L724"
+  pgexp-statrepl-default:
+    kind: code
+    title: "stat_replication collector 預設開"
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_replication.go"
+    line: 27
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_replication.go#L27"
+  pgexp-statrepl-query:
+    kind: code
+    title: "stat_replication 的查詢：pg_stat_replication join pg_replication_slots，用 pg_current_wal_lsn()"
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_replication.go"
+    line: 71
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_replication.go#L71"
+  pgexp-settings-default:
+    kind: code
+    title: "settings collector 預設開"
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_setting.go"
+    line: 30
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_setting.go#L30"
+  pgexp-settings-query:
+    kind: code
+    title: "settings 的查詢：pg_settings 每個 bool／integer／real 輸出一條 pg_settings_<name>"
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_setting.go"
+    line: 55
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_setting.go#L55"
+  yb-c-evict-two:
+    kind: code
+    title: "超過 follower_unavailable_considered_failed_sec 時通知踢掉 follower；voter 只剩 2 個時不再踢"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/consensus/consensus_queue.cc"
+    line: 600
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/consensus/consensus_queue.cc#L600"
+  yb-ysql-lease-flag:
+    kind: code
+    title: "enable_ysql_operation_lease 預設 true：tserver 要持有 master leader 給的 YSQL operation lease 才能服務 YSQL"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/common/ysql_operation_lease.cc"
+    line: 21
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/common/ysql_operation_lease.cc#L21"
+  yb-ysql-lease-ttl:
+    kind: code
+    title: "master_ysql_operation_lease_ttl_ms 預設 30 秒"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/master/object_lock_info_manager.cc"
+    line: 63
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/master/object_lock_info_manager.cc#L63"
+  yb-ysql-lease-kill:
+    kind: code
+    title: "lease 過期時 tserver 結束 PostgreSQL（KillPg）"
+    project: "YugabyteDB"
+    version: "v2026.1.3.0"
+    file: "src/yb/tserver/ysql_lease_manager.cc"
+    line: 282
+    url: "https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/src/yb/tserver/ysql_lease_manager.cc#L282"
+
+  yb-exp:
+    kind: experiment
+    title: "YugabyteDB lab（master ×3、tserver ×3，RF=3）"
+    url: "https://github.com/HahaSula/alert-trust/tree/main/lab/targets/yugabytedb"
+  yb-exp-raw:
+    kind: experiment
+    title: "YugabyteDB lab 原始輸出"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/yugabytedb/results/run-20261110.txt"
+  yb-exp-summary:
+    kind: experiment
+    title: "YugabyteDB lab 結果摘要（README 的結果一節）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/yugabytedb/README.md"
+  yb-exp-names:
+    kind: experiment
+    title: "YugabyteDB lab：master、tserver、YSQL、YCQL /prometheus-metrics 的 metric 名稱清單（v2026.1.3.0）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/yugabytedb/results/names-tserver-2026.1.3.0.txt"
+  yb-exp-clock:
+    kind: experiment
+    title: "YugabyteDB lab：預設 fail_on_out_of_range_clock_skew 時三台 tserver 因牆鐘往回跳 7 秒 FATAL"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/yugabytedb/results/clock-skew-crash-20261110.txt"
+  yb-exp-lease-log:
+    kind: experiment
+    title: "YugabyteDB lab：master 失去 quorum 時 tserver 的 log（YSQL lease 過期、PostgreSQL 結束與恢復）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/yugabytedb/results/master-quorum-tserver-log-20261110.txt"
+  yb-exp-rulefix:
+    kind: experiment
+    title: "YugabyteDB lab：YBMasterLeaderProbeMissing 初版（sum by (job) … or vector(0)）一直 firing 的原因與修正"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/yugabytedb/results/rule-fix-20261110.txt"
+  yb-exp-pgexp:
+    kind: experiment
+    title: "YugabyteDB lab：postgres_exporter 對 YSQL 的 collector 與連線（情境 B 補查）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/yugabytedb/results/pgexp-collectors-20261110.txt"
+  yb-exp-pgexp-startup:
+    kind: experiment
+    title: "YugabyteDB lab：第一次啟動時預設 collector 的 exporter log（too many clients、collector 60 秒逾時）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/yugabytedb/results/pgexp-startup-20261110.txt"
+  yb-prom-track-ts-staleness:
+    kind: code
+    title: "Prometheus：track_timestamps_staleness 預設 false：帶明確時間戳的 sample 在 target 停掉時不寫 staleness marker"
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "docs/configuration/configuration.md"
+    line: 380
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/docs/configuration/configuration.md#L380"
+  yb-prom-track-ts-config:
+    kind: code
+    title: "Prometheus：scrape config 的 track_timestamps_staleness 欄位"
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "config/config.go"
+    line: 772
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/config/config.go#L772"
+  yb-prom-honor-ts:
+    kind: code
+    title: "Prometheus：scrape config 的 honor_timestamps 欄位（預設 true：使用 target 給的時間戳）"
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "config/config.go"
+    line: 770
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/config/config.go#L770"

@@ -1,0 +1,37 @@
+# 情境 B 期間與之後，從 lab 的 Prometheus 補查（2026-11-10T01:31:50Z，run.sh 仍在執行）
+  > max_over_time(up{job="yb-pgexp-default"}[10m])  →  1 series
+    {instance="pgexp-default:9187", job="yb-pgexp-default"} 1
+  > min_over_time(up{job="yb-pgexp-default"}[10m])  →  1 series
+    {instance="pgexp-default:9187", job="yb-pgexp-default"} 0
+  > max_over_time(pg_up{job="yb-pgexp-default"}[10m])  →  1 series
+    {instance="pgexp-default:9187", job="yb-pgexp-default"} 1
+  > min_over_time(pg_up{job="yb-pgexp-default"}[10m])  →  1 series
+    {instance="pgexp-default:9187", job="yb-pgexp-default"} 1
+  > count_over_time(up{job="yb-pgexp-default"}[10m])  →  1 series
+    {instance="pgexp-default:9187", job="yb-pgexp-default"} 36
+  > sum_over_time(up{job="yb-pgexp-default"}[10m])  →  1 series
+    {instance="pgexp-default:9187", job="yb-pgexp-default"} 1
+  > max_over_time(scrape_duration_seconds{job="yb-pgexp-default"}[10m])  →  1 series
+    {instance="pgexp-default:9187", job="yb-pgexp-default"} 4.001247202
+  > pg_scrape_collector_success{job="yb-pgexp"}  →  13 series
+    {__name__="pg_scrape_collector_success", collector="database", instance="pgexp:9187", job="yb-pgexp"} 1
+    {__name__="pg_scrape_collector_success", collector="locks", instance="pgexp:9187", job="yb-pgexp"} 1
+    {__name__="pg_scrape_collector_success", collector="replication", instance="pgexp:9187", job="yb-pgexp"} 1
+    {__name__="pg_scrape_collector_success", collector="replication_slots", instance="pgexp:9187", job="yb-pgexp"} 1
+    {__name__="pg_scrape_collector_success", collector="roles", instance="pgexp:9187", job="yb-pgexp"} 1
+    {__name__="pg_scrape_collector_success", collector="stat_activity", instance="pgexp:9187", job="yb-pgexp"} 1
+    {__name__="pg_scrape_collector_success", collector="stat_archiver", instance="pgexp:9187", job="yb-pgexp"} 1
+    {__name__="pg_scrape_collector_success", collector="stat_bgwriter", instance="pgexp:9187", job="yb-pgexp"} 1
+    {__name__="pg_scrape_collector_success", collector="stat_database", instance="pgexp:9187", job="yb-pgexp"} 1
+    {__name__="pg_scrape_collector_success", collector="stat_progress_vacuum", instance="pgexp:9187", job="yb-pgexp"} 1
+    {__name__="pg_scrape_collector_success", collector="stat_user_tables", instance="pgexp:9187", job="yb-pgexp"} 1
+    {__name__="pg_scrape_collector_success", collector="statio_user_tables", instance="pgexp:9187", job="yb-pgexp"} 1
+    {__name__="pg_scrape_collector_success", collector="wal", instance="pgexp:9187", job="yb-pgexp"} 1
+  > min_over_time(pg_up{job="yb-pgexp"}[10m])  →  1 series
+    {instance="pgexp:9187", job="yb-pgexp"} 0
+  > min_over_time(up{job="yb-pgexp"}[10m])  →  1 series
+    {instance="pgexp:9187", job="yb-pgexp"} 0
+  > max_over_time(yb_ysqlserver_connection_total{instance="yb-tserver-1:13000"}[10m])  →  1 series
+    {exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 14
+  > increase(yb_ysqlserver_connection_over_limit_total{instance="yb-tserver-1:13000"}[10m])  →  1 series
+    {exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 6.154064685314685

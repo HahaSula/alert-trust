@@ -1,0 +1,9 @@
+# YBMasterLeaderProbeMissing 初版與修正版（2026-11-10T01:32:26Z，run.sh 執行中，tserver 停機情境）
+# 初版 sum by (job) (...) or vector(0)：vector(0) 的 label 集合是 {}，和 {job=...} 不同，or 會把它也加進來，所以永遠 0 < 1、一直 firing。
+# 規則檔是單一檔案 bind mount，sed -i 換掉檔案後容器內仍是舊檔，所以這次 run 載入的是初版；修正版改用 sum(...)。
+  > (sum by (job) (probe_success{job="yb-master-is-leader"}) or vector(0))  →  2 series
+    {job="yb-master-is-leader"} 1
+    {} 0
+  > (sum(probe_success{job="yb-master-is-leader"}) or vector(0)) < 1  →  0 series
+  > (sum(probe_success{job="yb-master-is-leader"}) or vector(0))  →  1 series
+    {} 1

@@ -1,0 +1,25 @@
+# 第一次啟動（預設 fail_on_out_of_range_clock_skew=true、max_clock_skew_usec=500000），2026-11-10T01:16:03Z 記錄
+# 三台 tserver 都在啟動後約 20 秒 exit 134；同一台主機的容器共用核心時鐘，skew 來自牆鐘往回跳（WSL 校時）
+at-yb-blackbox-1 Up About a minute
+at-yb-pgexp-1 Up About a minute
+at-yb-prometheus-1 Up About a minute
+at-yb-yb-master-1-1 Up About a minute
+at-yb-yb-master-2-1 Up About a minute
+at-yb-yb-master-3-1 Up About a minute
+at-yb-yb-tserver-1-1 Exited (134) 51 seconds ago
+at-yb-yb-tserver-2-1 Exited (134) 51 seconds ago
+at-yb-yb-tserver-3-1 Exited (134) 51 seconds ago
+## yb-tserver-1
+F1110 01:15:11.959192    20 hybrid_clock.cc:208] Too big clock skew is detected: 7.029s, while max allowed is: 0.500s; clock_skew_force_crash_bound_usec=60000000
+F1110 01:15:11.959792   123 hybrid_clock.cc:208] Too big clock skew is detected: 7.021s, while max allowed is: 0.500s; clock_skew_force_crash_bound_usec=60000000F1110 01:15:11.978315    19 hybrid_cloc
+F1110 01:15:11.959792   123 hybrid_clock.cc:208] Too big clock skew is detected: 7.021s, while max allowed is: 0.500s; clock_skew_force_crash_bound_usec=60000000F1110 01:15:11.978315    19 hybrid_cloc
+## yb-tserver-2
+F1110 01:15:11.956857    20 hybrid_clock.cc:208] Too big clock skew is detected: 7.021s, while max allowed is: 0.500s; clock_skew_force_crash_bound_usec=60000000
+F1110 01:15:11.956863    18 hybrid_clock.cc:208] Too big clock skew is detected: 7.021s, while max allowed is: 0.500s; clock_skew_force_crash_bound_usec=60000000F1110 01:15:11.956913    19 hybrid_cloc
+## yb-tserver-3
+F1110 01:15:11.956525    20 hybrid_clock.cc:208] Too big clock skew is detected: 7.027s, while max allowed is: 0.500s; clock_skew_force_crash_bound_usec=60000000
+## yb-master-1
+E1110 01:15:12.074841    46 hybrid_clock.cc:212] Too big clock skew is detected: 6.581s, while max allowed is: 0.500s; clock_skew_force_crash_bound_usec=60000000
+## yb-master-2
+E1110 01:15:12.074572    56 hybrid_clock.cc:212] Too big clock skew is detected: 6.612s, while max allowed is: 0.500s; clock_skew_force_crash_bound_usec=60000000
+## yb-master-3

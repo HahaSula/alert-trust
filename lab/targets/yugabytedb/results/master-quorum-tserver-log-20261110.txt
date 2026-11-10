@@ -1,0 +1,29 @@
+# 情境 E（停 3 台 master 中的 2 台，01:37:5x 開始；master 01:40:2x 重新啟動）期間 tserver 的 log 摘錄，2026-11-10T01:41:04Z 從執行中的容器取出
+# log 時間是容器的牆鐘
+## yb-tserver-1
+I1110 01:38:32.450505    19 ysql_lease_manager.cc:282] Lease has expired, killing pg sessions.
+I1110 01:38:32.452343   214 webserver.cc:498] Stopping webserver on 0.0.0.0:13000
+I1110 01:38:32.581790   183 process_wrapper.cc:91] PostgreSQL exited normally
+I1110 01:38:32.581820   183 process_wrapper.cc:113] Supervisor thread for PostgreSQL waiting on paused state.
+I1110 01:40:30.611136   184 ysql_lease_manager.cc:136] Received new lease epoch 2 from the master leader. Clearing all pg sessions.
+I1110 01:40:31.044495  2641 webserver.cc:361] Starting webserver on 0.0.0.0:13000
+I1110 01:40:31.044618  2641 webserver.cc:356] Webserver listen spec is 0.0.0.0:13000
+I1110 01:40:31.044811  2641 webserver.cc:486] Webserver started. Bound to: http://0.0.0.0:13000/
+## yb-tserver-2
+I1110 01:38:32.441780    19 ysql_lease_manager.cc:282] Lease has expired, killing pg sessions.
+I1110 01:38:32.447403   144 webserver.cc:498] Stopping webserver on 0.0.0.0:13000
+I1110 01:38:32.563740    87 process_wrapper.cc:91] PostgreSQL exited normally
+I1110 01:38:32.563769    87 process_wrapper.cc:113] Supervisor thread for PostgreSQL waiting on paused state.
+I1110 01:40:30.414366    88 ysql_lease_manager.cc:136] Received new lease epoch 3 from the master leader. Clearing all pg sessions.
+I1110 01:40:30.756135   422 webserver.cc:361] Starting webserver on 0.0.0.0:13000
+I1110 01:40:30.756261   422 webserver.cc:356] Webserver listen spec is 0.0.0.0:13000
+I1110 01:40:30.756429   422 webserver.cc:486] Webserver started. Bound to: http://0.0.0.0:13000/
+## yb-tserver-3
+I1110 01:38:32.714273    19 ysql_lease_manager.cc:282] Lease has expired, killing pg sessions.
+I1110 01:38:32.716292   136 webserver.cc:498] Stopping webserver on 0.0.0.0:13000
+I1110 01:38:32.796731    86 process_wrapper.cc:91] PostgreSQL exited normally
+I1110 01:38:32.796764    86 process_wrapper.cc:113] Supervisor thread for PostgreSQL waiting on paused state.
+I1110 01:40:30.772090    87 ysql_lease_manager.cc:136] Received new lease epoch 3 from the master leader. Clearing all pg sessions.
+I1110 01:40:31.197706   350 webserver.cc:361] Starting webserver on 0.0.0.0:13000
+I1110 01:40:31.197831   350 webserver.cc:356] Webserver listen spec is 0.0.0.0:13000
+I1110 01:40:31.198024   350 webserver.cc:486] Webserver started. Bound to: http://0.0.0.0:13000/

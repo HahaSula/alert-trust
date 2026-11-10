@@ -1,0 +1,1354 @@
+環境：YugabyteDB v2026.1.3.0-b100（master ×3、tserver ×3，RF=3）、Prometheus v3.13.5（scrape 5s）、blackbox_exporter v0.27.0（timeout 4s）、postgres_exporter v0.20.1
+tserver：follower_unavailable_considered_failed_sec=120（預設 900）、ysql_max_connections=12、memory_limit_hard_bytes=384MB；master 256MB；全部 fail_on_out_of_range_clock_skew=false。主機記憶體：
+               total        used        free      shared  buff/cache   available
+Mem:           15953        3684        9629         950        3805       12269
+at-yb-yb-tserver-1-1 385.4MiB / 768MiB
+at-yb-yb-tserver-3-1 373MiB / 768MiB
+at-yb-yb-tserver-2-1 373MiB / 768MiB
+at-yb-prometheus-1 112.6MiB / 384MiB
+at-yb-pgexp-1 8.172MiB / 64MiB
+at-yb-yb-master-1-1 36.22MiB / 448MiB
+at-yb-blackbox-1 16.33MiB / 64MiB
+at-yb-yb-master-2-1 36.73MiB / 448MiB
+at-yb-yb-master-3-1 65.2MiB / 448MiB
+
+## A 基線：端點、metric 由誰輸出（01:29:04Z）
+  master leader（/api/v1/is-leader 回 200 的那台）：yb-master-3
+  SQL[tserver-1→tserver-1] create table if not exists t (k int primary key, v text)     rc=0 1s CREATE TABLE 
+  SQL[tserver-1→tserver-1] insert into t select g, 'v' from generate_series(1, 1000) g on conflict do nothing rc=0 0s INSERT 0 1000 
+  SQL[tserver-1→tserver-1] select count(*) from t                                       rc=0 0s 1000 
+  SQL[tserver-1→tserver-1] select count(*) from yb_table_properties('t'::regclass)      rc=0 0s 1 
+  SQL[tserver-1→tserver-1] show max_connections                                         rc=0 0s 12 
+  SQL[tserver-1→tserver-1] show superuser_reserved_connections                          rc=0 0s 3 
+  > scrape_samples_scraped{job=~"yb-master|yb-tserver|yb-ysql|yb-ycql|yb-pgexp"}  →  13 series
+    {__name__="scrape_samples_scraped", instance="yb-tserver-1:9000", job="yb-tserver"} 3943
+    {__name__="scrape_samples_scraped", instance="yb-master-1:7000", job="yb-master"} 4576
+    {__name__="scrape_samples_scraped", instance="yb-tserver-2:9000", job="yb-tserver"} 3943
+    {__name__="scrape_samples_scraped", instance="yb-master-2:7000", job="yb-master"} 4576
+    {__name__="scrape_samples_scraped", instance="yb-master-3:7000", job="yb-master"} 4920
+    {__name__="scrape_samples_scraped", instance="yb-tserver-3:12000", job="yb-ycql"} 416
+    {__name__="scrape_samples_scraped", instance="yb-tserver-3:13000", job="yb-ysql"} 428
+    {__name__="scrape_samples_scraped", instance="yb-tserver-1:12000", job="yb-ycql"} 416
+    {__name__="scrape_samples_scraped", instance="yb-tserver-2:13000", job="yb-ysql"} 428
+    {__name__="scrape_samples_scraped", instance="pgexp:9187", job="yb-pgexp"} 348
+    {__name__="scrape_samples_scraped", instance="yb-tserver-3:9000", job="yb-tserver"} 3943
+    {__name__="scrape_samples_scraped", instance="yb-tserver-2:12000", job="yb-ycql"} 416
+    {__name__="scrape_samples_scraped", instance="yb-tserver-1:13000", job="yb-ysql"} 428
+  > scrape_response_size_bytes{job=~"yb-master|yb-tserver|yb-ysql|yb-ycql|yb-pgexp"}  →  0 series
+  > scrape_duration_seconds{job=~"yb-master|yb-tserver|yb-ysql|yb-ycql|yb-pgexp"}  →  13 series
+    {__name__="scrape_duration_seconds", instance="yb-tserver-1:9000", job="yb-tserver"} 0.019061375
+    {__name__="scrape_duration_seconds", instance="yb-master-1:7000", job="yb-master"} 0.020773643
+    {__name__="scrape_duration_seconds", instance="yb-tserver-2:9000", job="yb-tserver"} 0.017881518
+    {__name__="scrape_duration_seconds", instance="yb-master-2:7000", job="yb-master"} 0.017859794
+    {__name__="scrape_duration_seconds", instance="yb-master-3:7000", job="yb-master"} 0.023704971
+    {__name__="scrape_duration_seconds", instance="yb-tserver-3:12000", job="yb-ycql"} 0.003071522
+    {__name__="scrape_duration_seconds", instance="yb-tserver-3:13000", job="yb-ysql"} 0.003121433
+    {__name__="scrape_duration_seconds", instance="yb-tserver-1:12000", job="yb-ycql"} 0.002877365
+    {__name__="scrape_duration_seconds", instance="yb-tserver-2:13000", job="yb-ysql"} 0.003353595
+    {__name__="scrape_duration_seconds", instance="pgexp:9187", job="yb-pgexp"} 0.347297322
+    {__name__="scrape_duration_seconds", instance="yb-tserver-3:9000", job="yb-tserver"} 0.020789621
+    {__name__="scrape_duration_seconds", instance="yb-tserver-2:12000", job="yb-ycql"} 0.003196388
+    {__name__="scrape_duration_seconds", instance="yb-tserver-1:13000", job="yb-ysql"} 0.003337645
+  master /prometheus-metrics 的 metric 名稱 2761 個；metric_type：     13 metric_type="cluster"       9 metric_type="drive"    4202 metric_type="server"     104 metric_type="table"     247 metric_type="tablet" 
+  tserver /prometheus-metrics 的 metric 名稱 2274 個；metric_type：      9 metric_type="drive"    2907 metric_type="server"     416 metric_type="table"     972 metric_type="tablet" 
+  ysql /prometheus-metrics 的 metric 名稱 52 個；metric_type：    428 metric_type="server" 
+  ycql /prometheus-metrics 的 metric 名稱 266 個；metric_type：      9 metric_type="drive"     406 metric_type="server" 
+  每台 master 的端點：
+  [yb-master-1]
+  GET :30001/status → 200 2B 0.02s {}
+  GET :30001/api/v1/is-leader → 503 0B 0.02s 
+  GET :30001/api/v1/health-check → 200 71B 0.02s {"dead_nodes":[],"most_recent_uptime":21,"under_replicated_tablets":[]}
+  GET :30001/api/v1/tablet-replication → 200 25B 0.02s {"leaderless_tablets":[]}
+  GET :30001/api/v1/tablet-under-replication → 200 30B 0.02s {"underreplicated_tablets":[]}
+  [yb-master-2]
+  GET :30002/status → 200 2B 0.02s {}
+  GET :30002/api/v1/is-leader → 503 0B 0.02s 
+  GET :30002/api/v1/health-check → 200 71B 0.02s {"dead_nodes":[],"most_recent_uptime":26,"under_replicated_tablets":[]}
+  GET :30002/api/v1/tablet-replication → 200 25B 0.02s {"leaderless_tablets":[]}
+  GET :30002/api/v1/tablet-under-replication → 200 30B 0.02s {"underreplicated_tablets":[]}
+  [yb-master-3]
+  GET :30003/status → 200 2B 0.02s {}
+  GET :30003/api/v1/is-leader → 200 15B 0.02s {"STATUS":"OK"}
+  GET :30003/api/v1/health-check → 200 71B 0.02s {"dead_nodes":[],"most_recent_uptime":26,"under_replicated_tablets":[]}
+  GET :30003/api/v1/tablet-replication → 200 25B 0.02s {"leaderless_tablets":[]}
+  GET :30003/api/v1/tablet-under-replication → 200 30B 0.02s {"underreplicated_tablets":[]}
+  tserver 的端點：
+  GET :30011/status → 200 2B 0.02s {}
+  GET :30011/api/v1/health-check → 200 21B 0.02s {"failed_tablets":[]}
+  GET :30021/prometheus-metrics → 200 159076B 0.02s # HELP handler_latency_yb_ysqlserver_SQLProcessor_SelectStmt_count Number of SELECT statements that have been executed # TYPE handler_latency_yb_ysqlserver_SQLProcessor_SelectStmt_count counter handle
+  叢集 metric 由哪台 master 輸出（follower 是 0）：
+  > num_tablet_servers_live{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 3
+  > is_load_balancing_enabled{job="yb-master"}  →  3 series
+    {__name__="is_load_balancing_enabled", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="is_load_balancing_enabled", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="is_load_balancing_enabled", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 1
+  > is_raft_leader{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="is_raft_leader", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+    {__name__="is_raft_leader", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+    {__name__="is_raft_leader", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+  tablet 層級 metric 是加總到表（同一台 tserver 上同一張表的 tablet 加起來）：
+  > is_raft_leader{job="yb-tserver", table_name="t"}  →  2 series
+    {__name__="is_raft_leader", database_oid="13665", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:9000", job="yb-tserver", metric_type="tablet", namespace_name="yugabyte", table_id="00003561000030008000000000004000", table_name="t", table_type="PGSQL_TABLE_TYPE"} 0
+    {__name__="is_raft_leader", database_oid="13665", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:9000", job="yb-tserver", metric_type="tablet", namespace_name="yugabyte", table_id="00003561000030008000000000004000", table_name="t", table_type="PGSQL_TABLE_TYPE"} 1
+  > sum by (table_name) (is_raft_leader{job="yb-tserver", table_name=~"t|transactions"})  →  2 series
+    {table_name="transactions"} 24
+    {table_name="t"} 1
+  > server_memory_hard_limit  →  9 series
+    {__name__="server_memory_hard_limit", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.master", metric_type="server"} 268435456
+    {__name__="server_memory_hard_limit", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.master", metric_type="server"} 268435456
+    {__name__="server_memory_hard_limit", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.master", metric_type="server"} 268435456
+    {__name__="server_memory_hard_limit", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 402653184
+    {__name__="server_memory_hard_limit", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:12000", job="yb-ycql", metric_id="yb.cqlserver", metric_type="server"} 402653184
+    {__name__="server_memory_hard_limit", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 402653184
+    {__name__="server_memory_hard_limit", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 402653184
+    {__name__="server_memory_hard_limit", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:12000", job="yb-ycql", metric_id="yb.cqlserver", metric_type="server"} 402653184
+    {__name__="server_memory_hard_limit", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:12000", job="yb-ycql", metric_id="yb.cqlserver", metric_type="server"} 402653184
+  > server_memory_soft_limit{job="yb-tserver"}  →  3 series
+    {__name__="server_memory_soft_limit", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 342255206
+    {__name__="server_memory_soft_limit", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 342255206
+    {__name__="server_memory_soft_limit", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 342255206
+  > mem_tracker_server{job=~"yb-master|yb-tserver"}  →  6 series
+    {__name__="mem_tracker_server", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.master", metric_type="server"} 161720
+    {__name__="mem_tracker_server", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.master", metric_type="server"} 161720
+    {__name__="mem_tracker_server", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.master", metric_type="server"} 14052857
+    {__name__="mem_tracker_server", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 4501224
+    {__name__="mem_tracker_server", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 8791567
+    {__name__="mem_tracker_server", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 4793512
+  > ts_supportable_tablet_peers  →  3 series
+    {__name__="ts_supportable_tablet_peers", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} -1
+    {__name__="ts_supportable_tablet_peers", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} -1
+    {__name__="ts_supportable_tablet_peers", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} -1
+  > yb_ysqlserver_max_connection_total  →  3 series
+    {__name__="yb_ysqlserver_max_connection_total", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 12
+    {__name__="yb_ysqlserver_max_connection_total", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 12
+    {__name__="yb_ysqlserver_max_connection_total", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 12
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"yb-master|yb-tserver|yb-ysql|yb-ycql|yb-pgexp"}  →  13 series
+    {__name__="up", instance="yb-tserver-1:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-master-1:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-tserver-2:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-master-2:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-master-3:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-tserver-3:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-3:13000", job="yb-ysql"} 1
+    {__name__="up", instance="yb-tserver-1:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-2:13000", job="yb-ysql"} 1
+    {__name__="up", instance="pgexp:9187", job="yb-pgexp"} 1
+    {__name__="up", instance="yb-tserver-3:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-tserver-2:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-1:13000", job="yb-ysql"} 1
+  > probe_success  →  21 series
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-leaderless"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-master-is-leader"} 1
+    {__name__="probe_success", instance="yb-tserver-1:13000", job="yb-ysql-tcp"} 1
+    {__name__="probe_success", instance="yb-tserver-2:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-health"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-health"} 1
+    {__name__="probe_success", instance="yb-tserver-3:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-tserver-1:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-tserver-2:13000", job="yb-ysql-tcp"} 1
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-leaderless"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-leaderless"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-tserver-3:13000", job="yb-ysql-tcp"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-health"} 1
+  > is_raft_leader{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="is_raft_leader", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+    {__name__="is_raft_leader", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+    {__name__="is_raft_leader", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+  > raft_term{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="raft_term", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+    {__name__="raft_term", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+    {__name__="raft_term", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+  > num_tablet_servers_live{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 3
+  > num_tablet_servers_dead{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+  > max_follower_heartbeat_delay{job="yb-master"}  →  3 series
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 454
+  > ts_live_tablet_peers{job="yb-tserver"}  →  3 series
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 28
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+  > max by (instance) (follower_lag_ms{job="yb-tserver"})  →  3 series
+    {instance="yb-tserver-3:9000"} 595
+    {instance="yb-tserver-1:9000"} 477
+    {instance="yb-tserver-2:9000"} 539
+  > yb_ysqlserver_connection_total{job="yb-ysql"}  →  3 series
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 2
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 2
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 3
+  alerts（^YB）: 1
+    pending  YBMasterLeaderProbeMissing 
+
+## B postgres_exporter 預設 collector 對 YSQL（01:29:09Z）
+  直接執行 exporter 用到、可能出問題的查詢（statement_timeout 8 秒）：
+  SQL[tserver-1→tserver-1] set statement_timeout=8000; select count(*) from pg_stat_replication rc=1 10s ERROR:  canceling statement due to statement timeout 
+  SQL[tserver-1→tserver-1] set statement_timeout=8000; select count(*) from pg_replication_slots rc=0 0s 0 
+  SQL[tserver-1→tserver-1] set statement_timeout=8000; select pg_is_in_recovery()       rc=0 0s f 
+  SQL[tserver-1→tserver-1] set statement_timeout=8000; select pg_current_wal_lsn()      rc=1 0s ERROR:  pg_current_wal_lsn() is not yet supported HINT:  See https://github.com/yugabyte/yugabyte-db/issues/30243. React with thumbs up to raise its priority. 
+  SQL[tserver-1→tserver-1] set statement_timeout=8000; select name, count(*) from pg_settings group by 1 having count(*) > 1 rc=0 0s log_statement_sample_rate|2 log_transaction_sample_rate|2 
+  SQL[tserver-1→tserver-1] set statement_timeout=8000; select count(*) from pg_stat_bgwriter rc=0 0s 1 
+  SQL[tserver-1→tserver-1] set statement_timeout=8000; select pg_database_size('yugabyte') rc=0 0s 
+  SQL[tserver-1→tserver-1] set statement_timeout=8000; select count(*) from pg_stat_archiver rc=0 0s 1 
+  SQL[tserver-1→tserver-1] set statement_timeout=8000; select count(*) from pg_ls_waldir() rc=0 0s 1 
+  +20 秒：
+  > up{job="yb-pgexp-default"}  →  1 series
+    {__name__="up", instance="pgexp-default:9187", job="yb-pgexp-default"} 0
+  > yb_ysqlserver_connection_total{job="yb-ysql", instance="yb-tserver-1:13000"}  →  1 series
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 7
+  > increase(yb_ysqlserver_connection_over_limit_total{job="yb-ysql", instance="yb-tserver-1:13000"}[1m])  →  1 series
+    {exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 0
+  GET :30093/metrics → TimeoutError timed out after 30.04s
+  SQL[tserver-1→tserver-1] select count(*) from pg_stat_activity where query like '%FROM pg_stat_replication%' and state = 'active' rc=2 0s ysqlsh: error: connection to server at "yb-tserver-1" (172.18.0.9), port 5433 failed: FATAL:  sorry, too many clients already 
+  +51 秒：
+  > up{job="yb-pgexp-default"}  →  1 series
+    {__name__="up", instance="pgexp-default:9187", job="yb-pgexp-default"} 1
+  > yb_ysqlserver_connection_total{job="yb-ysql", instance="yb-tserver-1:13000"}  →  1 series
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 14
+  > increase(yb_ysqlserver_connection_over_limit_total{job="yb-ysql", instance="yb-tserver-1:13000"}[1m])  →  1 series
+    {exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 1.028336577979667
+  GET :30093/metrics → 200 14217B 0.02s # HELP go_gc_duration_seconds A summary of the wall-time pause (stop-the-world) duration in garbage collection cycles. # TYPE go_gc_duration_seconds summary go_gc_duration_seconds{quantile="0"} 0.0001
+  SQL[tserver-1→tserver-1] select count(*) from pg_stat_activity where query like '%FROM pg_stat_replication%' and state = 'active' rc=2 0s ysqlsh: error: connection to server at "yb-tserver-1" (172.18.0.9), port 5433 failed: FATAL:  sorry, too many clients already 
+      5 level=WARN source=pg_setting.go:74 msg="Error normalising unit for setting" collector=settings setting=yb_transaction_priority value="0.000000000 (Normal priority transaction)" unit="" error="error converting setting \"yb_transaction_priority\" value \"0.000000000 (Normal priority transaction)\" to float: strconv.ParseFloat: parsing \"0.000000000 (Normal priority transaction)\": invalid syntax"
+      2 level=ERROR source=collector.go:191 msg="Error opening connection to database" err="error querying postgresql version: pq: sorry, too many clients already"
+      1 level=WARN source=main.go:81 msg="Error loading config" err="error opening config file \"postgres_exporter.yml\": open postgres_exporter.yml: no such file or directory"
+  exporter 停掉 5 秒後，server 端卡住的 backend 還在（客戶端斷線不會結束它們）：
+  SQL[tserver-2→tserver-1] select count(*) from pg_stat_activity where query like '%FROM pg_stat_replication%' and state = 'active' rc=0 0s 11 
+  SQL[tserver-2→tserver-1] select count(pg_terminate_backend(pid)) from pg_stat_activity where query like '%FROM pg_stat_replication%' and pid <> pg_backend_pid() rc=0 0s 10 
+  關掉 stat_replication 與 settings 的 exporter（job yb-pgexp）：
+  > pg_scrape_collector_success{job="yb-pgexp"}  →  0 series
+  > up{job="yb-pgexp"}  →  1 series
+    {__name__="up", instance="pgexp:9187", job="yb-pgexp"} 1
+  > pg_up{job="yb-pgexp"}  →  1 series
+    {__name__="pg_up", instance="pgexp:9187", job="yb-pgexp"} 1
+  > count by (__name__) ({job="yb-pgexp", __name__=~"pg_.*"})  →  83 series
+    {__name__="pg_exporter_last_scrape_duration_seconds"} 1
+    {__name__="pg_exporter_last_scrape_error"} 1
+    {__name__="pg_exporter_scrapes_total"} 1
+    {__name__="pg_up"} 1
+    {__name__="pg_database_connection_limit"} 5
+    {__name__="pg_database_size_bytes"} 5
+    {__name__="pg_locks_count"} 45
+    {__name__="pg_replication_is_replica"} 1
+    {__name__="pg_replication_lag_seconds"} 1
+    {__name__="pg_replication_last_replay_seconds"} 1
+    {__name__="pg_roles_connection_limit"} 18
+    {__name__="pg_scrape_collector_duration_seconds"} 13
+    {__name__="pg_scrape_collector_success"} 13
+    {__name__="pg_stat_activity_count"} 30
+    {__name__="pg_stat_activity_max_tx_duration"} 30
+    {__name__="pg_stat_archiver_archived_count"} 1
+    {__name__="pg_stat_archiver_failed_count"} 1
+    {__name__="pg_stat_bgwriter_buffers_alloc_total"} 1
+    {__name__="pg_stat_bgwriter_buffers_backend_fsync_total"} 1
+    {__name__="pg_stat_bgwriter_buffers_backend_total"} 1
+    {__name__="pg_stat_bgwriter_buffers_checkpoint_total"} 1
+    {__name__="pg_stat_bgwriter_buffers_clean_total"} 1
+    {__name__="pg_stat_bgwriter_checkpoint_sync_time_total"} 1
+    {__name__="pg_stat_bgwriter_checkpoint_write_time_total"} 1
+    {__name__="pg_stat_bgwriter_checkpoints_req_total"} 1
+    {__name__="pg_stat_bgwriter_checkpoints_timed_total"} 1
+    {__name__="pg_stat_bgwriter_maxwritten_clean_total"} 1
+    {__name__="pg_stat_bgwriter_stats_reset_total"} 1
+    {__name__="pg_stat_database_active_time_seconds_total"} 5
+    {__name__="pg_stat_database_blk_read_time"} 5
+    {__name__="pg_stat_database_blk_write_time"} 5
+    {__name__="pg_stat_database_blks_hit"} 5
+    {__name__="pg_stat_database_blks_read"} 5
+    {__name__="pg_stat_database_conflicts"} 5
+    {__name__="pg_stat_database_conflicts_confl_bufferpin"} 5
+    {__name__="pg_stat_database_conflicts_confl_deadlock"} 5
+    {__name__="pg_stat_database_conflicts_confl_lock"} 5
+    {__name__="pg_stat_database_conflicts_confl_snapshot"} 5
+    {__name__="pg_stat_database_conflicts_confl_tablespace"} 5
+    {__name__="pg_stat_database_deadlocks"} 5
+    {__name__="pg_stat_database_numbackends"} 5
+    {__name__="pg_stat_database_stats_reset"} 5
+    {__name__="pg_stat_database_temp_bytes"} 5
+    {__name__="pg_stat_database_temp_files"} 5
+    {__name__="pg_stat_database_tup_deleted"} 5
+    {__name__="pg_stat_database_tup_fetched"} 5
+    {__name__="pg_stat_database_tup_inserted"} 5
+    {__name__="pg_stat_database_tup_returned"} 5
+    {__name__="pg_stat_database_tup_updated"} 5
+    {__name__="pg_stat_database_xact_commit"} 5
+    {__name__="pg_stat_database_xact_rollback"} 5
+    {__name__="pg_static"} 1
+    {__name__="pg_wal_segments"} 1
+    {__name__="pg_wal_size_bytes"} 1
+    {__name__="pg_stat_user_tables_analyze_count"} 1
+    {__name__="pg_stat_user_tables_autoanalyze_count"} 1
+    {__name__="pg_stat_user_tables_autovacuum_count"} 1
+    {__name__="pg_stat_user_tables_idx_scan"} 1
+    {__name__="pg_stat_user_tables_idx_tup_fetch"} 1
+    {__name__="pg_stat_user_tables_index_size_bytes"} 1
+    {__name__="pg_stat_user_tables_last_analyze"} 1
+    {__name__="pg_stat_user_tables_last_autoanalyze"} 1
+    {__name__="pg_stat_user_tables_last_autovacuum"} 1
+    {__name__="pg_stat_user_tables_last_vacuum"} 1
+    {__name__="pg_stat_user_tables_n_dead_tup"} 1
+    {__name__="pg_stat_user_tables_n_live_tup"} 1
+    {__name__="pg_stat_user_tables_n_mod_since_analyze"} 1
+    {__name__="pg_stat_user_tables_n_tup_del"} 1
+    {__name__="pg_stat_user_tables_n_tup_hot_upd"} 1
+    {__name__="pg_stat_user_tables_n_tup_ins"} 1
+    {__name__="pg_stat_user_tables_n_tup_upd"} 1
+    {__name__="pg_stat_user_tables_seq_scan"} 1
+    {__name__="pg_stat_user_tables_seq_tup_read"} 1
+    {__name__="pg_stat_user_tables_table_size_bytes"} 1
+    {__name__="pg_stat_user_tables_vacuum_count"} 1
+    {__name__="pg_statio_user_tables_heap_blocks_hit"} 1
+    {__name__="pg_statio_user_tables_heap_blocks_read"} 1
+    {__name__="pg_statio_user_tables_idx_blocks_hit"} 1
+    {__name__="pg_statio_user_tables_idx_blocks_read"} 1
+    {__name__="pg_statio_user_tables_tidx_blocks_hit"} 1
+    {__name__="pg_statio_user_tables_tidx_blocks_read"} 1
+    {__name__="pg_statio_user_tables_toast_blocks_hit"} 1
+    {__name__="pg_statio_user_tables_toast_blocks_read"} 1
+  > pg_stat_database_xact_commit{job="yb-pgexp", datname="yugabyte"}  →  1 series
+    {__name__="pg_stat_database_xact_commit", datid="13665", datname="yugabyte", instance="pgexp:9187", job="yb-pgexp"} 627
+  > pg_stat_database_tup_inserted{job="yb-pgexp", datname="yugabyte"}  →  1 series
+    {__name__="pg_stat_database_tup_inserted", datid="13665", datname="yugabyte", instance="pgexp:9187", job="yb-pgexp"} 0
+  > pg_database_size_bytes{job="yb-pgexp"}  →  5 series
+    {__name__="pg_database_size_bytes", datname="postgres", instance="pgexp:9187", job="yb-pgexp"} 0
+    {__name__="pg_database_size_bytes", datname="system_platform", instance="pgexp:9187", job="yb-pgexp"} 0
+    {__name__="pg_database_size_bytes", datname="template0", instance="pgexp:9187", job="yb-pgexp"} 0
+    {__name__="pg_database_size_bytes", datname="template1", instance="pgexp:9187", job="yb-pgexp"} 512
+    {__name__="pg_database_size_bytes", datname="yugabyte", instance="pgexp:9187", job="yb-pgexp"} 0
+  > pg_stat_bgwriter_buffers_alloc_total{job="yb-pgexp"}  →  1 series
+    {__name__="pg_stat_bgwriter_buffers_alloc_total", instance="pgexp:9187", job="yb-pgexp"} 0
+  > pg_stat_user_tables_n_live_tup{job="yb-pgexp"}  →  1 series
+    {__name__="pg_stat_user_tables_n_live_tup", datname="yugabyte", instance="pgexp:9187", job="yb-pgexp", relname="t", schemaname="public"} 0
+  > pg_replication_lag_seconds{job="yb-pgexp"}  →  1 series
+    {__name__="pg_replication_lag_seconds", instance="pgexp:9187", job="yb-pgexp"} 0
+  > pg_replication_is_replica{job="yb-pgexp"}  →  1 series
+    {__name__="pg_replication_is_replica", instance="pgexp:9187", job="yb-pgexp"} 0
+  > pg_stat_activity_count{job="yb-pgexp", state="active"}  →  5 series
+    {__name__="pg_stat_activity_count", datname="postgres", instance="pgexp:9187", job="yb-pgexp", state="active"} 0
+    {__name__="pg_stat_activity_count", datname="system_platform", instance="pgexp:9187", job="yb-pgexp", state="active"} 0
+    {__name__="pg_stat_activity_count", datname="template0", instance="pgexp:9187", job="yb-pgexp", state="active"} 0
+    {__name__="pg_stat_activity_count", datname="template1", instance="pgexp:9187", job="yb-pgexp", state="active"} 0
+    {__name__="pg_stat_activity_count", datname="yugabyte", instance="pgexp:9187", job="yb-pgexp", state="active"} 0
+  > pg_locks_count{job="yb-pgexp", mode="accessexclusivelock"}  →  5 series
+    {__name__="pg_locks_count", datname="postgres", instance="pgexp:9187", job="yb-pgexp", mode="accessexclusivelock"} 0
+    {__name__="pg_locks_count", datname="system_platform", instance="pgexp:9187", job="yb-pgexp", mode="accessexclusivelock"} 0
+    {__name__="pg_locks_count", datname="template0", instance="pgexp:9187", job="yb-pgexp", mode="accessexclusivelock"} 0
+    {__name__="pg_locks_count", datname="template1", instance="pgexp:9187", job="yb-pgexp", mode="accessexclusivelock"} 0
+    {__name__="pg_locks_count", datname="yugabyte", instance="pgexp:9187", job="yb-pgexp", mode="accessexclusivelock"} 0
+
+## C1 停 tserver-3（docker kill）：dead 判定與 under-replicated（01:30:30Z）
+
+  ---- tserver-3 停掉 +20 秒（tserver_unresponsive_timeout_ms 60 秒；follower_unavailable_considered_failed_sec 120 秒）----
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"yb-master|yb-tserver|yb-ysql|yb-ycql|yb-pgexp"}  →  13 series
+    {__name__="up", instance="yb-tserver-1:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-master-1:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-tserver-2:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-master-2:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-master-3:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-tserver-3:12000", job="yb-ycql"} 0
+    {__name__="up", instance="yb-tserver-3:13000", job="yb-ysql"} 0
+    {__name__="up", instance="yb-tserver-1:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-2:13000", job="yb-ysql"} 1
+    {__name__="up", instance="pgexp:9187", job="yb-pgexp"} 1
+    {__name__="up", instance="yb-tserver-3:9000", job="yb-tserver"} 0
+    {__name__="up", instance="yb-tserver-2:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-1:13000", job="yb-ysql"} 1
+  > probe_success  →  21 series
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-leaderless"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-master-is-leader"} 1
+    {__name__="probe_success", instance="yb-tserver-1:13000", job="yb-ysql-tcp"} 1
+    {__name__="probe_success", instance="yb-tserver-2:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-health"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-health"} 1
+    {__name__="probe_success", instance="yb-tserver-3:9000", job="yb-tserver-health"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-tserver-1:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-tserver-2:13000", job="yb-ysql-tcp"} 1
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-leaderless"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-leaderless"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-tserver-3:13000", job="yb-ysql-tcp"} 0
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-health"} 1
+  > is_raft_leader{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="is_raft_leader", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+    {__name__="is_raft_leader", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+    {__name__="is_raft_leader", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+  > raft_term{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="raft_term", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+    {__name__="raft_term", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+    {__name__="raft_term", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+  > num_tablet_servers_live{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 3
+  > num_tablet_servers_dead{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+  > max_follower_heartbeat_delay{job="yb-master"}  →  3 series
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 421
+  > ts_live_tablet_peers{job="yb-tserver"}  →  3 series
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+  > max by (instance) (follower_lag_ms{job="yb-tserver"})  →  3 series
+    {instance="yb-tserver-3:9000"} 410
+    {instance="yb-tserver-1:9000"} 569
+    {instance="yb-tserver-2:9000"} 549
+  > yb_ysqlserver_connection_total{job="yb-ysql"}  →  3 series
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 2
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 2
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 4
+  GET :30003/status → 200 2B 0.02s {}
+  GET :30003/api/v1/is-leader → 200 15B 0.02s {"STATUS":"OK"}
+  GET :30003/api/v1/health-check → 200 72B 0.02s {"dead_nodes":[],"most_recent_uptime":103,"under_replicated_tablets":[]}
+  GET :30003/api/v1/tablet-replication → 200 25B 0.02s {"leaderless_tablets":[]}
+  GET :30003/api/v1/tablet-under-replication → 200 30B 0.02s {"underreplicated_tablets":[]}
+  GET :30011/api/v1/health-check → 200 21B 0.02s {"failed_tablets":[]}
+  SQL[tserver-1→tserver-1] insert into t values (2020, 'c1') on conflict do nothing     rc=0 9s INSERT 0 1 
+  SQL[tserver-1→tserver-1] select count(*) from t                                       rc=0 0s 1001 
+  alerts（^YB）: 8
+    firing   YBMasterLeaderProbeMissing 
+    firing   YBYsqlConnectionsRejected yb-tserver-1:13000
+    pending  YBEndpointDown yb-tserver-3:12000
+    pending  YBEndpointDown yb-tserver-3:9000
+    pending  YBEndpointDown yb-tserver-3:13000
+    pending  YBTServerHealthProbeFailing yb-tserver-3:9000
+    pending  YBTServerNotScraped 
+    pending  YBYsqlPortDown yb-tserver-3:13000
+
+  ---- tserver-3 停掉 +75 秒（tserver_unresponsive_timeout_ms 60 秒；follower_unavailable_considered_failed_sec 120 秒）----
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"yb-master|yb-tserver|yb-ysql|yb-ycql|yb-pgexp"}  →  13 series
+    {__name__="up", instance="yb-tserver-1:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-master-1:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-tserver-2:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-master-2:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-master-3:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-tserver-3:12000", job="yb-ycql"} 0
+    {__name__="up", instance="yb-tserver-3:13000", job="yb-ysql"} 0
+    {__name__="up", instance="yb-tserver-1:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-2:13000", job="yb-ysql"} 1
+    {__name__="up", instance="pgexp:9187", job="yb-pgexp"} 1
+    {__name__="up", instance="yb-tserver-3:9000", job="yb-tserver"} 0
+    {__name__="up", instance="yb-tserver-2:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-1:13000", job="yb-ysql"} 1
+  > probe_success  →  21 series
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-leaderless"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-master-is-leader"} 1
+    {__name__="probe_success", instance="yb-tserver-1:13000", job="yb-ysql-tcp"} 1
+    {__name__="probe_success", instance="yb-tserver-2:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-health"} 0
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-health"} 0
+    {__name__="probe_success", instance="yb-tserver-3:9000", job="yb-tserver-health"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-tserver-1:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-tserver-2:13000", job="yb-ysql-tcp"} 1
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-leaderless"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-leaderless"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-tserver-3:13000", job="yb-ysql-tcp"} 0
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-health"} 0
+  > is_raft_leader{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="is_raft_leader", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+    {__name__="is_raft_leader", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+    {__name__="is_raft_leader", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+  > raft_term{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="raft_term", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+    {__name__="raft_term", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+    {__name__="raft_term", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+  > num_tablet_servers_live{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 2
+  > num_tablet_servers_dead{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 1
+  > max_follower_heartbeat_delay{job="yb-master"}  →  3 series
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 249
+  > ts_live_tablet_peers{job="yb-tserver"}  →  3 series
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+  > max by (instance) (follower_lag_ms{job="yb-tserver"})  →  3 series
+    {instance="yb-tserver-3:9000"} 410
+    {instance="yb-tserver-1:9000"} 563
+    {instance="yb-tserver-2:9000"} 592
+  > yb_ysqlserver_connection_total{job="yb-ysql"}  →  3 series
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 2
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 2
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 3
+  GET :30003/status → 200 2B 0.02s {}
+  GET :30003/api/v1/is-leader → 200 15B 0.02s {"STATUS":"OK"}
+  GET :30003/api/v1/health-check → 200 980B 0.02s {"dead_nodes":["4f87e9414ec5412499bcb6865e2aba7c"],"most_recent_uptime":179,"under_replicated_tablets":["1653f2b70d8e4d82b46b11f8383a1083","59fad516c63344b0bc8408a3c8510678","4f29a087748d44c4918f82023
+  GET :30003/api/v1/tablet-replication → 200 25B 0.02s {"leaderless_tablets":[]}
+  GET :30003/api/v1/tablet-under-replication → 200 30B 0.02s {"underreplicated_tablets":[]}
+  GET :30011/api/v1/health-check → 200 21B 0.02s {"failed_tablets":[]}
+  SQL[tserver-1→tserver-1] insert into t values (2075, 'c1') on conflict do nothing     rc=0 0s INSERT 0 1 
+  SQL[tserver-1→tserver-1] select count(*) from t                                       rc=0 0s 1002 
+  alerts（^YB）: 10
+    firing   YBMasterLeaderProbeMissing 
+    firing   YBTServerHealthProbeFailing yb-tserver-3:9000
+    firing   YBYsqlConnectionsRejected yb-tserver-1:13000
+    firing   YBYsqlPortDown yb-tserver-3:13000
+    pending  YBClusterHealthCheckDirty 
+    pending  YBEndpointDown yb-tserver-3:12000
+    pending  YBEndpointDown yb-tserver-3:9000
+    pending  YBEndpointDown yb-tserver-3:13000
+    pending  YBTServerDead 
+    pending  YBTServerNotScraped 
+
+  ---- tserver-3 停掉 +150 秒（tserver_unresponsive_timeout_ms 60 秒；follower_unavailable_considered_failed_sec 120 秒）----
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"yb-master|yb-tserver|yb-ysql|yb-ycql|yb-pgexp"}  →  13 series
+    {__name__="up", instance="yb-tserver-1:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-master-1:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-tserver-2:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-master-2:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-master-3:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-tserver-3:12000", job="yb-ycql"} 0
+    {__name__="up", instance="yb-tserver-3:13000", job="yb-ysql"} 0
+    {__name__="up", instance="yb-tserver-1:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-2:13000", job="yb-ysql"} 1
+    {__name__="up", instance="pgexp:9187", job="yb-pgexp"} 1
+    {__name__="up", instance="yb-tserver-3:9000", job="yb-tserver"} 0
+    {__name__="up", instance="yb-tserver-2:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-1:13000", job="yb-ysql"} 1
+  > probe_success  →  21 series
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-leaderless"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-master-is-leader"} 1
+    {__name__="probe_success", instance="yb-tserver-1:13000", job="yb-ysql-tcp"} 1
+    {__name__="probe_success", instance="yb-tserver-2:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-health"} 0
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-health"} 0
+    {__name__="probe_success", instance="yb-tserver-3:9000", job="yb-tserver-health"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-tserver-1:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-tserver-2:13000", job="yb-ysql-tcp"} 1
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-leaderless"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-leaderless"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-tserver-3:13000", job="yb-ysql-tcp"} 0
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-health"} 0
+  > is_raft_leader{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="is_raft_leader", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+    {__name__="is_raft_leader", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+    {__name__="is_raft_leader", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+  > raft_term{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="raft_term", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+    {__name__="raft_term", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+    {__name__="raft_term", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+  > num_tablet_servers_live{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 2
+  > num_tablet_servers_dead{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 1
+  > max_follower_heartbeat_delay{job="yb-master"}  →  3 series
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 130
+  > ts_live_tablet_peers{job="yb-tserver"}  →  3 series
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+  > max by (instance) (follower_lag_ms{job="yb-tserver"})  →  3 series
+    {instance="yb-tserver-3:9000"} 410
+    {instance="yb-tserver-1:9000"} 486
+    {instance="yb-tserver-2:9000"} 564
+  > yb_ysqlserver_connection_total{job="yb-ysql"}  →  3 series
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 2
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 2
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 3
+  GET :30003/status → 200 2B 0.02s {}
+  GET :30003/api/v1/is-leader → 200 15B 0.02s {"STATUS":"OK"}
+  GET :30003/api/v1/health-check → 200 980B 0.02s {"dead_nodes":["4f87e9414ec5412499bcb6865e2aba7c"],"most_recent_uptime":256,"under_replicated_tablets":["1653f2b70d8e4d82b46b11f8383a1083","59fad516c63344b0bc8408a3c8510678","4f29a087748d44c4918f82023
+  GET :30003/api/v1/tablet-replication → 200 25B 0.02s {"leaderless_tablets":[]}
+  GET :30003/api/v1/tablet-under-replication → 200 30B 0.02s {"underreplicated_tablets":[]}
+  GET :30011/api/v1/health-check → 200 21B 0.02s {"failed_tablets":[]}
+  SQL[tserver-1→tserver-1] insert into t values (2150, 'c1') on conflict do nothing     rc=0 0s INSERT 0 1 
+  SQL[tserver-1→tserver-1] select count(*) from t                                       rc=0 0s 1003 
+  alerts（^YB）: 10
+    firing   YBClusterHealthCheckDirty 
+    firing   YBEndpointDown yb-tserver-3:12000
+    firing   YBEndpointDown yb-tserver-3:9000
+    firing   YBEndpointDown yb-tserver-3:13000
+    firing   YBMasterLeaderProbeMissing 
+    firing   YBTServerDead 
+    firing   YBTServerHealthProbeFailing yb-tserver-3:9000
+    firing   YBYsqlConnectionsRejected yb-tserver-1:13000
+    firing   YBYsqlPortDown yb-tserver-3:13000
+    pending  YBTServerNotScraped 
+
+## C2 再停 tserver-2：tablet 沒有過半副本（leaderless）（01:33:19Z）
+
+  ---- tserver-2 也停掉 +30 秒（leaderless_tablet_alert_delay_secs 120 秒）----
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"yb-master|yb-tserver|yb-ysql|yb-ycql|yb-pgexp"}  →  13 series
+    {__name__="up", instance="yb-tserver-1:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-master-1:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-tserver-2:9000", job="yb-tserver"} 0
+    {__name__="up", instance="yb-master-2:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-master-3:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-tserver-3:12000", job="yb-ycql"} 0
+    {__name__="up", instance="yb-tserver-3:13000", job="yb-ysql"} 0
+    {__name__="up", instance="yb-tserver-1:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-2:13000", job="yb-ysql"} 0
+    {__name__="up", instance="pgexp:9187", job="yb-pgexp"} 0
+    {__name__="up", instance="yb-tserver-3:9000", job="yb-tserver"} 0
+    {__name__="up", instance="yb-tserver-2:12000", job="yb-ycql"} 0
+    {__name__="up", instance="yb-tserver-1:13000", job="yb-ysql"} 1
+  > probe_success  →  21 series
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-leaderless"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-master-is-leader"} 1
+    {__name__="probe_success", instance="yb-tserver-1:13000", job="yb-ysql-tcp"} 1
+    {__name__="probe_success", instance="yb-tserver-2:9000", job="yb-tserver-health"} 0
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-health"} 0
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-health"} 0
+    {__name__="probe_success", instance="yb-tserver-3:9000", job="yb-tserver-health"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-tserver-1:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-tserver-2:13000", job="yb-ysql-tcp"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-leaderless"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-leaderless"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-tserver-3:13000", job="yb-ysql-tcp"} 0
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-health"} 0
+  > is_raft_leader{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="is_raft_leader", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+    {__name__="is_raft_leader", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+    {__name__="is_raft_leader", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+  > raft_term{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="raft_term", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+    {__name__="raft_term", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+    {__name__="raft_term", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+  > num_tablet_servers_live{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 2
+  > num_tablet_servers_dead{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 1
+  > max_follower_heartbeat_delay{job="yb-master"}  →  3 series
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 125
+  > ts_live_tablet_peers{job="yb-tserver"}  →  3 series
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+  > max by (instance) (follower_lag_ms{job="yb-tserver"})  →  3 series
+    {instance="yb-tserver-3:9000"} 410
+    {instance="yb-tserver-1:9000"} 30772
+    {instance="yb-tserver-2:9000"} 564
+  > yb_ysqlserver_connection_total{job="yb-ysql"}  →  3 series
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 2
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 2
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 6
+  GET :30003/status → 200 2B 0.02s {}
+  GET :30003/api/v1/is-leader → 200 15B 0.02s {"STATUS":"OK"}
+  GET :30003/api/v1/health-check → 200 980B 0.02s {"dead_nodes":["4f87e9414ec5412499bcb6865e2aba7c"],"most_recent_uptime":256,"under_replicated_tablets":["1653f2b70d8e4d82b46b11f8383a1083","59fad516c63344b0bc8408a3c8510678","4f29a087748d44c4918f82023
+  GET :30003/api/v1/tablet-replication → 200 25B 0.02s {"leaderless_tablets":[]}
+  GET :30003/api/v1/tablet-under-replication → 200 30B 0.02s {"underreplicated_tablets":[]}
+  SQL[tserver-1→tserver-1] select count(*) from t                                       rc=1 21s ERROR:  canceling statement due to statement timeout 
+  alerts（^YB）: 16
+    firing   YBClusterHealthCheckDirty 
+    firing   YBEndpointDown yb-tserver-3:9000
+    firing   YBEndpointDown yb-tserver-3:13000
+    firing   YBEndpointDown yb-tserver-3:12000
+    firing   YBMasterLeaderProbeMissing 
+    firing   YBTServerDead 
+    firing   YBTServerHealthProbeFailing yb-tserver-3:9000
+    firing   YBYsqlConnectionsRejected yb-tserver-1:13000
+    firing   YBYsqlPortDown yb-tserver-3:13000
+    pending  YBEndpointDown yb-tserver-2:9000
+    pending  YBEndpointDown yb-tserver-2:13000
+    pending  YBEndpointDown yb-tserver-2:12000
+    pending  YBFollowerLagHigh yb-tserver-1:9000
+    pending  YBTServerHealthProbeFailing yb-tserver-2:9000
+    pending  YBTServerNotScraped 
+    pending  YBYsqlPortDown yb-tserver-2:13000
+
+  ---- tserver-2 也停掉 +150 秒（leaderless_tablet_alert_delay_secs 120 秒）----
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"yb-master|yb-tserver|yb-ysql|yb-ycql|yb-pgexp"}  →  13 series
+    {__name__="up", instance="yb-tserver-1:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-master-1:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-tserver-2:9000", job="yb-tserver"} 0
+    {__name__="up", instance="yb-master-2:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-master-3:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-tserver-3:12000", job="yb-ycql"} 0
+    {__name__="up", instance="yb-tserver-3:13000", job="yb-ysql"} 0
+    {__name__="up", instance="yb-tserver-1:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-2:13000", job="yb-ysql"} 0
+    {__name__="up", instance="pgexp:9187", job="yb-pgexp"} 1
+    {__name__="up", instance="yb-tserver-3:9000", job="yb-tserver"} 0
+    {__name__="up", instance="yb-tserver-2:12000", job="yb-ycql"} 0
+    {__name__="up", instance="yb-tserver-1:13000", job="yb-ysql"} 1
+  > probe_success  →  21 series
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-leaderless"} 0
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-master-is-leader"} 1
+    {__name__="probe_success", instance="yb-tserver-1:13000", job="yb-ysql-tcp"} 1
+    {__name__="probe_success", instance="yb-tserver-2:9000", job="yb-tserver-health"} 0
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-health"} 0
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-health"} 0
+    {__name__="probe_success", instance="yb-tserver-3:9000", job="yb-tserver-health"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-tserver-1:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-tserver-2:13000", job="yb-ysql-tcp"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-leaderless"} 0
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-leaderless"} 0
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-tserver-3:13000", job="yb-ysql-tcp"} 0
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-health"} 0
+  > is_raft_leader{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="is_raft_leader", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+    {__name__="is_raft_leader", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+    {__name__="is_raft_leader", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+  > raft_term{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="raft_term", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+    {__name__="raft_term", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+    {__name__="raft_term", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+  > num_tablet_servers_live{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 1
+  > num_tablet_servers_dead{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 2
+  > max_follower_heartbeat_delay{job="yb-master"}  →  3 series
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 284
+  > ts_live_tablet_peers{job="yb-tserver"}  →  2 series
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+  > max by (instance) (follower_lag_ms{job="yb-tserver"})  →  2 series
+    {instance="yb-tserver-1:9000"} 155648
+    {instance="yb-tserver-2:9000"} 564
+  > yb_ysqlserver_connection_total{job="yb-ysql"}  →  2 series
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 2
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 3
+  GET :30003/status → 200 2B 0.02s {}
+  GET :30003/api/v1/is-leader → 200 15B 0.02s {"STATUS":"OK"}
+  GET :30003/api/v1/health-check → 200 1015B 0.02s {"dead_nodes":["3f75b2e70a7b49b4abc09e109f2a1459","4f87e9414ec5412499bcb6865e2aba7c"],"most_recent_uptime":407,"under_replicated_tablets":["1653f2b70d8e4d82b46b11f8383a1083","59fad516c63344b0bc8408a3c
+  GET :30003/api/v1/tablet-replication → 200 4691B 0.02s {"leaderless_tablets":[{"table_uuid":"00003561000030008000000000004000","tablet_uuid":"1653f2b70d8e4d82b46b11f8383a1083","reason":"No valid leader reported for 152.388769174 seconds"},{"table_uuid":"1
+  GET :30003/api/v1/tablet-under-replication → 200 30B 0.02s {"underreplicated_tablets":[]}
+  SQL[tserver-1→tserver-1] select count(*) from t                                       rc=1 19s ERROR:  Timed out waiting kResponseSent, state: kProcessingRequest 
+  alerts（^YB）: 16
+    firing   YBClusterHealthCheckDirty 
+    firing   YBEndpointDown yb-tserver-2:13000
+    firing   YBEndpointDown yb-tserver-2:12000
+    firing   YBEndpointDown yb-tserver-3:9000
+    firing   YBEndpointDown yb-tserver-3:13000
+    firing   YBEndpointDown yb-tserver-2:9000
+    firing   YBEndpointDown yb-tserver-3:12000
+    firing   YBMasterLeaderProbeMissing 
+    firing   YBTServerDead 
+    firing   YBTServerHealthProbeFailing yb-tserver-3:9000
+    firing   YBTServerHealthProbeFailing yb-tserver-2:9000
+    firing   YBTServerNotScraped 
+    firing   YBYsqlPortDown yb-tserver-3:13000
+    firing   YBYsqlPortDown yb-tserver-2:13000
+    pending  YBFollowerLagHigh yb-tserver-1:9000
+    pending  YBLeaderlessTablets 
+  兩台 tserver 啟動後 0 秒 dead_nodes 清空
+  GET :30003/status → 200 2B 0.02s {}
+  GET :30003/api/v1/is-leader → 200 15B 0.02s {"STATUS":"OK"}
+  GET :30003/api/v1/health-check → 200 71B 0.02s {"dead_nodes":[],"most_recent_uptime":25,"under_replicated_tablets":[]}
+  GET :30003/api/v1/tablet-replication → 200 25B 0.02s {"leaderless_tablets":[]}
+  GET :30003/api/v1/tablet-under-replication → 200 30B 0.02s {"underreplicated_tablets":[]}
+  alerts（^YB）: 1
+    firing   YBMasterLeaderProbeMissing 
+
+## D 停 master leader：重新選舉（01:36:51Z）
+  master leader：yb-master-3
+  新 leader yb-master-2，kill 後 3 秒 /api/v1/is-leader 回 200（主機 monotonic）
+  SQL[tserver-1→tserver-1] insert into t values (3001, 'd') on conflict do nothing      rc=0 13s INSERT 0 1 
+  +26 秒：
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"yb-master|yb-tserver|yb-ysql|yb-ycql|yb-pgexp"}  →  13 series
+    {__name__="up", instance="yb-tserver-1:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-master-1:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-tserver-2:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-master-2:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-master-3:7000", job="yb-master"} 0
+    {__name__="up", instance="yb-tserver-3:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-3:13000", job="yb-ysql"} 1
+    {__name__="up", instance="yb-tserver-1:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-2:13000", job="yb-ysql"} 1
+    {__name__="up", instance="pgexp:9187", job="yb-pgexp"} 1
+    {__name__="up", instance="yb-tserver-3:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-tserver-2:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-1:13000", job="yb-ysql"} 1
+  > probe_success  →  21 series
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-leaderless"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-tserver-1:13000", job="yb-ysql-tcp"} 1
+    {__name__="probe_success", instance="yb-tserver-2:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-health"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-health"} 1
+    {__name__="probe_success", instance="yb-tserver-3:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-underreplicated"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-master-health"} 0
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-tserver-1:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-tserver-2:13000", job="yb-ysql-tcp"} 1
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-leaderless"} 0
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-leaderless"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-tserver-3:13000", job="yb-ysql-tcp"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-master-is-leader"} 1
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-health"} 0
+  > is_raft_leader{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="is_raft_leader", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+    {__name__="is_raft_leader", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+    {__name__="is_raft_leader", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+  > raft_term{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="raft_term", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 2
+    {__name__="raft_term", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 2
+    {__name__="raft_term", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+  > num_tablet_servers_live{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 3
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 3
+  > num_tablet_servers_dead{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+  > max_follower_heartbeat_delay{job="yb-master"}  →  3 series
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 19997
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 337
+  > ts_live_tablet_peers{job="yb-tserver"}  →  3 series
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+  > max by (instance) (follower_lag_ms{job="yb-tserver"})  →  3 series
+    {instance="yb-tserver-3:9000"} 543
+    {instance="yb-tserver-1:9000"} 469
+    {instance="yb-tserver-2:9000"} 512
+  > yb_ysqlserver_connection_total{job="yb-ysql"}  →  3 series
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 2
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 2
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 3
+  alerts（^YB）: 6
+    firing   YBMasterLeaderProbeMissing 
+    pending  YBComponentCountLow 
+    pending  YBEndpointDown yb-master-3:7000
+    pending  YBMasterFollowerHeartbeatDelay 
+    pending  YBMasterHealthProbeFailing yb-master-3:7000
+    pending  YBMasterLeaderCountWrong 
+
+## E 停 3 台 master 中的 2 台：master 失去 quorum（01:37:49Z）
+  停 yb-master-2（leader）與 yb-master-1，留下 yb-master-3
+
+  ---- 停 2 台 master +20 秒 ----
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"yb-master|yb-tserver|yb-ysql|yb-ycql|yb-pgexp"}  →  13 series
+    {__name__="up", instance="yb-tserver-1:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-master-1:7000", job="yb-master"} 0
+    {__name__="up", instance="yb-tserver-2:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-master-2:7000", job="yb-master"} 0
+    {__name__="up", instance="yb-master-3:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-tserver-3:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-3:13000", job="yb-ysql"} 1
+    {__name__="up", instance="yb-tserver-1:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-2:13000", job="yb-ysql"} 1
+    {__name__="up", instance="pgexp:9187", job="yb-pgexp"} 0
+    {__name__="up", instance="yb-tserver-3:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-tserver-2:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-1:13000", job="yb-ysql"} 1
+  > probe_success  →  21 series
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-leaderless"} 0
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-tserver-1:13000", job="yb-ysql-tcp"} 1
+    {__name__="probe_success", instance="yb-tserver-2:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-underreplicated"} 0
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-health"} 0
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-health"} 0
+    {__name__="probe_success", instance="yb-tserver-3:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-underreplicated"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-master-health"} 0
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-master-health"} 0
+    {__name__="probe_success", instance="yb-tserver-1:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-underreplicated"} 0
+    {__name__="probe_success", instance="yb-tserver-2:13000", job="yb-ysql-tcp"} 1
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-leaderless"} 0
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-leaderless"} 0
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-master-health"} 0
+    {__name__="probe_success", instance="yb-tserver-3:13000", job="yb-ysql-tcp"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-health"} 0
+  > is_raft_leader{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="is_raft_leader", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+    {__name__="is_raft_leader", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+    {__name__="is_raft_leader", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+  > raft_term{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="raft_term", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 2
+    {__name__="raft_term", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 2
+    {__name__="raft_term", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 2
+  > num_tablet_servers_live{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 3
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+  > num_tablet_servers_dead{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+  > max_follower_heartbeat_delay{job="yb-master"}  →  3 series
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 269
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+  > ts_live_tablet_peers{job="yb-tserver"}  →  3 series
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+  > max by (instance) (follower_lag_ms{job="yb-tserver"})  →  3 series
+    {instance="yb-tserver-3:9000"} 580
+    {instance="yb-tserver-1:9000"} 486
+    {instance="yb-tserver-2:9000"} 465
+  > yb_ysqlserver_connection_total{job="yb-ysql"}  →  3 series
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 2
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 3
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 4
+  GET :30003/status → 200 2B 0.02s {}
+  GET :30003/api/v1/is-leader → 503 0B 0.02s 
+  GET :30003/api/v1/health-check → 200 138B 3.02s <h2>Not found (yb/master/master-path-handlers.cc:358): Unable to locate leader master to redirect this request: /api/v1/health-check</h2> 
+  GET :30003/api/v1/tablet-replication → 200 144B 3.02s <h2>Not found (yb/master/master-path-handlers.cc:358): Unable to locate leader master to redirect this request: /api/v1/tablet-replication</h2> 
+  GET :30003/api/v1/tablet-under-replication → 200 150B 3.02s <h2>Not found (yb/master/master-path-handlers.cc:358): Unable to locate leader master to redirect this request: /api/v1/tablet-under-replication</h2> 
+  GET :30003/prometheus-metrics → 200 1837187B 0.03s # HELP threads_started_server_clientcb threads_started_server_clientcb metric in ThreadCategoryTracker # TYPE threads_started_server_clientcb counter threads_started_server_clientcb{metric_id="yb.mast
+  GET :30011/api/v1/health-check → 200 21B 0.02s {"failed_tablets":[]}
+  GET :30011/status → 200 2B 0.02s {}
+  SQL[tserver-1→tserver-1] select count(*) from t                                       rc=2 0s ysqlsh: error: connection to server at "yb-tserver-1" (172.18.0.9), port 5433 failed: Connection refused 	Is the server running on that host and accepting TCP/IP connecti
+  SQL[tserver-1→tserver-1] insert into t values (5020, 'e') on conflict do nothing      rc=2 0s ysqlsh: error: connection to server at "yb-tserver-1" (172.18.0.9), port 5433 failed: Connection refused 	Is the server running on that host and accepting TCP/IP connecti
+  SQL[tserver-1→tserver-1] select 1                                                     rc=2 0s ysqlsh: error: connection to server at "yb-tserver-1" (172.18.0.9), port 5433 failed: Connection refused 	Is the server running on that host and accepting TCP/IP connecti
+  alerts（^YB）: 11
+    firing   YBMasterLeaderProbeMissing 
+    pending  YBComponentCountLow 
+    pending  YBEndpointDown yb-master-1:7000
+    pending  YBEndpointDown yb-master-2:7000
+    pending  YBMasterHealthProbeFailing yb-master-1:7000
+    pending  YBMasterHealthProbeFailing yb-master-3:7000
+    pending  YBMasterHealthProbeFailing yb-master-2:7000
+    pending  YBMasterLeaderProbeMissing 
+    pending  YBMasterQuorumAtRisk 
+    pending  YBMasterServingMetricsButNoLeader yb-master-3:7000
+    pending  YBYsqlPortDown yb-tserver-1:13000
+
+  ---- 停 2 台 master +60 秒 ----
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"yb-master|yb-tserver|yb-ysql|yb-ycql|yb-pgexp"}  →  13 series
+    {__name__="up", instance="yb-tserver-1:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-master-1:7000", job="yb-master"} 0
+    {__name__="up", instance="yb-tserver-2:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-master-2:7000", job="yb-master"} 0
+    {__name__="up", instance="yb-master-3:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-tserver-3:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-3:13000", job="yb-ysql"} 0
+    {__name__="up", instance="yb-tserver-1:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-2:13000", job="yb-ysql"} 0
+    {__name__="up", instance="pgexp:9187", job="yb-pgexp"} 1
+    {__name__="up", instance="yb-tserver-3:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-tserver-2:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-1:13000", job="yb-ysql"} 0
+  > probe_success  →  21 series
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-leaderless"} 0
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-tserver-1:13000", job="yb-ysql-tcp"} 0
+    {__name__="probe_success", instance="yb-tserver-2:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-underreplicated"} 0
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-health"} 0
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-health"} 0
+    {__name__="probe_success", instance="yb-tserver-3:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-underreplicated"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-master-health"} 0
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-master-health"} 0
+    {__name__="probe_success", instance="yb-tserver-1:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-underreplicated"} 0
+    {__name__="probe_success", instance="yb-tserver-2:13000", job="yb-ysql-tcp"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-leaderless"} 0
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-leaderless"} 0
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-master-health"} 0
+    {__name__="probe_success", instance="yb-tserver-3:13000", job="yb-ysql-tcp"} 0
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-health"} 0
+  > is_raft_leader{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="is_raft_leader", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+    {__name__="is_raft_leader", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+    {__name__="is_raft_leader", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+  > raft_term{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="raft_term", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 2
+    {__name__="raft_term", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 2
+    {__name__="raft_term", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 2
+  > num_tablet_servers_live{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 3
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+  > num_tablet_servers_dead{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+  > max_follower_heartbeat_delay{job="yb-master"}  →  3 series
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 269
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+  > ts_live_tablet_peers{job="yb-tserver"}  →  3 series
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+  > max by (instance) (follower_lag_ms{job="yb-tserver"})  →  3 series
+    {instance="yb-tserver-3:9000"} 548
+    {instance="yb-tserver-1:9000"} 529
+    {instance="yb-tserver-2:9000"} 473
+  > yb_ysqlserver_connection_total{job="yb-ysql"}  →  3 series
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 2
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 3
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 4
+  GET :30003/status → 200 2B 0.02s {}
+  GET :30003/api/v1/is-leader → 503 0B 0.02s 
+  GET :30003/api/v1/health-check → 200 138B 2.23s <h2>Not found (yb/master/master-path-handlers.cc:358): Unable to locate leader master to redirect this request: /api/v1/health-check</h2> 
+  GET :30003/api/v1/tablet-replication → 200 144B 3.03s <h2>Not found (yb/master/master-path-handlers.cc:358): Unable to locate leader master to redirect this request: /api/v1/tablet-replication</h2> 
+  GET :30003/api/v1/tablet-under-replication → 200 150B 1.53s <h2>Not found (yb/master/master-path-handlers.cc:358): Unable to locate leader master to redirect this request: /api/v1/tablet-under-replication</h2> 
+  GET :30003/prometheus-metrics → 200 1837206B 0.03s # HELP threads_started_server_clientcb threads_started_server_clientcb metric in ThreadCategoryTracker # TYPE threads_started_server_clientcb counter threads_started_server_clientcb{metric_id="yb.mast
+  GET :30011/api/v1/health-check → 200 21B 0.02s {"failed_tablets":[]}
+  GET :30011/status → 200 2B 0.02s {}
+  SQL[tserver-1→tserver-1] select count(*) from t                                       rc=2 0s ysqlsh: error: connection to server at "yb-tserver-1" (172.18.0.9), port 5433 failed: Connection refused 	Is the server running on that host and accepting TCP/IP connecti
+  SQL[tserver-1→tserver-1] insert into t values (5060, 'e') on conflict do nothing      rc=2 0s ysqlsh: error: connection to server at "yb-tserver-1" (172.18.0.9), port 5433 failed: Connection refused 	Is the server running on that host and accepting TCP/IP connecti
+  SQL[tserver-1→tserver-1] select 1                                                     rc=2 0s ysqlsh: error: connection to server at "yb-tserver-1" (172.18.0.9), port 5433 failed: Connection refused 	Is the server running on that host and accepting TCP/IP connecti
+  alerts（^YB）: 16
+    firing   YBMasterHealthProbeFailing yb-master-1:7000
+    firing   YBMasterLeaderProbeMissing 
+    firing   YBMasterLeaderProbeMissing 
+    firing   YBMasterQuorumAtRisk 
+    pending  YBComponentCountLow 
+    pending  YBEndpointDown yb-tserver-2:13000
+    pending  YBEndpointDown yb-master-2:7000
+    pending  YBEndpointDown yb-tserver-1:13000
+    pending  YBEndpointDown yb-tserver-3:13000
+    pending  YBEndpointDown yb-master-1:7000
+    pending  YBMasterHealthProbeFailing yb-master-3:7000
+    pending  YBMasterHealthProbeFailing yb-master-2:7000
+    pending  YBMasterServingMetricsButNoLeader yb-master-3:7000
+    pending  YBYsqlPortDown yb-tserver-3:13000
+    pending  YBYsqlPortDown yb-tserver-2:13000
+    pending  YBYsqlPortDown yb-tserver-1:13000
+
+  ---- 停 2 台 master +120 秒 ----
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"yb-master|yb-tserver|yb-ysql|yb-ycql|yb-pgexp"}  →  13 series
+    {__name__="up", instance="yb-tserver-1:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-master-1:7000", job="yb-master"} 0
+    {__name__="up", instance="yb-tserver-2:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-master-2:7000", job="yb-master"} 0
+    {__name__="up", instance="yb-master-3:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-tserver-3:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-3:13000", job="yb-ysql"} 0
+    {__name__="up", instance="yb-tserver-1:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-2:13000", job="yb-ysql"} 0
+    {__name__="up", instance="pgexp:9187", job="yb-pgexp"} 1
+    {__name__="up", instance="yb-tserver-3:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-tserver-2:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-1:13000", job="yb-ysql"} 0
+  > probe_success  →  21 series
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-leaderless"} 0
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-tserver-1:13000", job="yb-ysql-tcp"} 0
+    {__name__="probe_success", instance="yb-tserver-2:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-underreplicated"} 0
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-health"} 0
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-health"} 0
+    {__name__="probe_success", instance="yb-tserver-3:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-underreplicated"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-master-health"} 0
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-master-health"} 0
+    {__name__="probe_success", instance="yb-tserver-1:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-underreplicated"} 0
+    {__name__="probe_success", instance="yb-tserver-2:13000", job="yb-ysql-tcp"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-leaderless"} 0
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-leaderless"} 0
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-master-health"} 0
+    {__name__="probe_success", instance="yb-tserver-3:13000", job="yb-ysql-tcp"} 0
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-health"} 0
+  > is_raft_leader{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="is_raft_leader", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+    {__name__="is_raft_leader", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+    {__name__="is_raft_leader", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+  > raft_term{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="raft_term", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 2
+    {__name__="raft_term", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 2
+    {__name__="raft_term", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 2
+  > num_tablet_servers_live{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 3
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+  > num_tablet_servers_dead{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+  > max_follower_heartbeat_delay{job="yb-master"}  →  3 series
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 269
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+  > ts_live_tablet_peers{job="yb-tserver"}  →  3 series
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+  > max by (instance) (follower_lag_ms{job="yb-tserver"})  →  3 series
+    {instance="yb-tserver-3:9000"} 578
+    {instance="yb-tserver-1:9000"} 531
+    {instance="yb-tserver-2:9000"} 596
+  > yb_ysqlserver_connection_total{job="yb-ysql"}  →  3 series
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 2
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 3
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 4
+  GET :30003/status → 200 2B 0.02s {}
+  GET :30003/api/v1/is-leader → 503 0B 0.02s 
+  GET :30003/api/v1/health-check → 200 138B 1.70s <h2>Not found (yb/master/master-path-handlers.cc:358): Unable to locate leader master to redirect this request: /api/v1/health-check</h2> 
+  GET :30003/api/v1/tablet-replication → 200 144B 3.02s <h2>Not found (yb/master/master-path-handlers.cc:358): Unable to locate leader master to redirect this request: /api/v1/tablet-replication</h2> 
+  GET :30003/api/v1/tablet-under-replication → 200 150B 3.02s <h2>Not found (yb/master/master-path-handlers.cc:358): Unable to locate leader master to redirect this request: /api/v1/tablet-under-replication</h2> 
+  GET :30003/prometheus-metrics → 200 1836868B 0.03s # HELP threads_started_server_clientcb threads_started_server_clientcb metric in ThreadCategoryTracker # TYPE threads_started_server_clientcb counter threads_started_server_clientcb{metric_id="yb.mast
+  GET :30011/api/v1/health-check → 200 21B 0.02s {"failed_tablets":[]}
+  GET :30011/status → 200 2B 0.02s {}
+  SQL[tserver-1→tserver-1] select count(*) from t                                       rc=2 0s ysqlsh: error: connection to server at "yb-tserver-1" (172.18.0.9), port 5433 failed: Connection refused 	Is the server running on that host and accepting TCP/IP connecti
+  SQL[tserver-1→tserver-1] insert into t values (5120, 'e') on conflict do nothing      rc=2 0s ysqlsh: error: connection to server at "yb-tserver-1" (172.18.0.9), port 5433 failed: Connection refused 	Is the server running on that host and accepting TCP/IP connecti
+  SQL[tserver-1→tserver-1] select 1                                                     rc=2 0s ysqlsh: error: connection to server at "yb-tserver-1" (172.18.0.9), port 5433 failed: Connection refused 	Is the server running on that host and accepting TCP/IP connecti
+  alerts（^YB）: 16
+    firing   YBEndpointDown yb-master-2:7000
+    firing   YBEndpointDown yb-master-1:7000
+    firing   YBMasterHealthProbeFailing yb-master-1:7000
+    firing   YBMasterHealthProbeFailing yb-master-3:7000
+    firing   YBMasterHealthProbeFailing yb-master-2:7000
+    firing   YBMasterLeaderProbeMissing 
+    firing   YBMasterLeaderProbeMissing 
+    firing   YBMasterQuorumAtRisk 
+    firing   YBMasterServingMetricsButNoLeader yb-master-3:7000
+    firing   YBYsqlPortDown yb-tserver-2:13000
+    firing   YBYsqlPortDown yb-tserver-1:13000
+    firing   YBYsqlPortDown yb-tserver-3:13000
+    pending  YBComponentCountLow 
+    pending  YBEndpointDown yb-tserver-2:13000
+    pending  YBEndpointDown yb-tserver-1:13000
+    pending  YBEndpointDown yb-tserver-3:13000
+  長連線（建立在 master 停掉之前）的輸出：
+    SET
+    sess 1|2026-11-10 01:37:50.237635+00|1004
+    INSERT 0 1
+    
+    sess 2|2026-11-10 01:38:00.262942+00|1005
+    INSERT 0 1
+    
+    sess 3|2026-11-10 01:38:13.012902+00|1006
+    ysqlsh:/tmp/sess.sql:9: ERROR:  canceling statement due to statement timeout
+    ysqlsh:/tmp/sess.sql:10: FATAL:  terminating connection due to administrator command
+    ysqlsh:/tmp/sess.sql:10: server closed the connection unexpectedly
+    	This probably means the server terminated abnormally
+    	before or while processing the request.
+    ysqlsh:/tmp/sess.sql:10: error: connection to server was lost
+  三方交叉（up／probe／健康 metric）：
+  > up{job=~"yb-master|yb-tserver|yb-ysql|yb-ycql|yb-pgexp"}  →  13 series
+    {__name__="up", instance="yb-tserver-1:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-master-1:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-tserver-2:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-master-2:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-master-3:7000", job="yb-master"} 1
+    {__name__="up", instance="yb-tserver-3:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-3:13000", job="yb-ysql"} 1
+    {__name__="up", instance="yb-tserver-1:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-2:13000", job="yb-ysql"} 1
+    {__name__="up", instance="pgexp:9187", job="yb-pgexp"} 1
+    {__name__="up", instance="yb-tserver-3:9000", job="yb-tserver"} 1
+    {__name__="up", instance="yb-tserver-2:12000", job="yb-ycql"} 1
+    {__name__="up", instance="yb-tserver-1:13000", job="yb-ysql"} 1
+  > probe_success  →  21 series
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-leaderless"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-master-is-leader"} 0
+    {__name__="probe_success", instance="yb-tserver-1:13000", job="yb-ysql-tcp"} 1
+    {__name__="probe_success", instance="yb-tserver-2:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-health"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-health"} 1
+    {__name__="probe_success", instance="yb-tserver-3:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-tserver-1:9000", job="yb-tserver-health"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-cluster-underreplicated"} 1
+    {__name__="probe_success", instance="yb-tserver-2:13000", job="yb-ysql-tcp"} 1
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-leaderless"} 1
+    {__name__="probe_success", instance="yb-master-1:7000", job="yb-cluster-leaderless"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-master-health"} 1
+    {__name__="probe_success", instance="yb-tserver-3:13000", job="yb-ysql-tcp"} 1
+    {__name__="probe_success", instance="yb-master-2:7000", job="yb-master-is-leader"} 1
+    {__name__="probe_success", instance="yb-master-3:7000", job="yb-cluster-health"} 1
+  > is_raft_leader{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="is_raft_leader", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+    {__name__="is_raft_leader", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 1
+    {__name__="is_raft_leader", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 0
+  > raft_term{job="yb-master", table_name="sys.catalog"}  →  3 series
+    {__name__="raft_term", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 3
+    {__name__="raft_term", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 3
+    {__name__="raft_term", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_type="tablet", table_id="sys.catalog.uuid", table_name="sys.catalog", table_type="YQL_TABLE_TYPE"} 3
+  > num_tablet_servers_live{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 3
+    {__name__="num_tablet_servers_live", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+  > num_tablet_servers_dead{job="yb-master"}  →  3 series
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="num_tablet_servers_dead", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+  > max_follower_heartbeat_delay{job="yb-master"}  →  3 series
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 277
+    {__name__="max_follower_heartbeat_delay", exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.cluster", metric_type="cluster"} 0
+  > ts_live_tablet_peers{job="yb-tserver"}  →  3 series
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+    {__name__="ts_live_tablet_peers", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 29
+  > max by (instance) (follower_lag_ms{job="yb-tserver"})  →  3 series
+    {instance="yb-tserver-3:9000"} 585
+    {instance="yb-tserver-1:9000"} 603
+    {instance="yb-tserver-2:9000"} 549
+  > yb_ysqlserver_connection_total{job="yb-ysql"}  →  3 series
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 2
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 2
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 3
+  alerts（^YB）: 1
+    firing   YBMasterLeaderProbeMissing 
+
+## F YSQL 連線上限（ysql_max_connections=12）（01:41:10Z）
+  SQL[tserver-3→tserver-1] select 1                                                     rc=2 0s ysqlsh: error: connection to server at "yb-tserver-1" (172.18.0.9), port 5433 failed: FATAL:  sorry, too many clients already 
+  SQL[tserver-3→tserver-2] select 1                                                     rc=0 0s 1 
+  > yb_ysqlserver_connection_total{job="yb-ysql"}  →  3 series
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 2
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 2
+    {__name__="yb_ysqlserver_connection_total", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 14
+  > yb_ysqlserver_max_connection_total{job="yb-ysql", instance="yb-tserver-1:13000"}  →  1 series
+    {__name__="yb_ysqlserver_max_connection_total", exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 12
+  > increase(yb_ysqlserver_connection_over_limit_total{job="yb-ysql"}[1m])  →  3 series
+    {exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 0
+    {exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 0
+    {exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:13000", job="yb-ysql", metric_id="yb.ysqlserver", metric_type="server"} 7.281468531468532
+  > probe_success{job="yb-ysql-tcp"}  →  3 series
+    {__name__="probe_success", instance="yb-tserver-1:13000", job="yb-ysql-tcp"} 1
+    {__name__="probe_success", instance="yb-tserver-2:13000", job="yb-ysql-tcp"} 1
+    {__name__="probe_success", instance="yb-tserver-3:13000", job="yb-ysql-tcp"} 1
+  > up{job="yb-pgexp"}  →  1 series
+    {__name__="up", instance="pgexp:9187", job="yb-pgexp"} 1
+  > pg_up{job="yb-pgexp"}  →  1 series
+    {__name__="pg_up", instance="pgexp:9187", job="yb-pgexp"} 1
+  > pg_stat_activity_count{job="yb-pgexp", state="active"}  →  0 series
+  alerts（^YB）: 3
+    firing   YBMasterLeaderProbeMissing 
+    firing   YBYsqlConnectionsRejected yb-tserver-1:13000
+    pending  YBYsqlConnectionsNearLimit yb-tserver-1:13000
+
+## G 整段：clock skew、scrape 時間、記憶體（01:42:36Z）
+  > max_over_time(hybrid_clock_skew{job=~"yb-master|yb-tserver"}[1h])  →  6 series
+    {exported_instance="yb-master-1:7000", instance="yb-master-1:7000", job="yb-master", metric_id="yb.master", metric_type="server"} 0
+    {exported_instance="yb-master-2:7000", instance="yb-master-2:7000", job="yb-master", metric_id="yb.master", metric_type="server"} 0
+    {exported_instance="yb-master-3:7000", instance="yb-master-3:7000", job="yb-master", metric_id="yb.master", metric_type="server"} 0
+    {exported_instance="yb-tserver-3:9000", instance="yb-tserver-3:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 0
+    {exported_instance="yb-tserver-1:9000", instance="yb-tserver-1:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 0
+    {exported_instance="yb-tserver-2:9000", instance="yb-tserver-2:9000", job="yb-tserver", metric_id="yb.tabletserver", metric_type="server"} 0
+  > max_over_time(scrape_duration_seconds{job=~"yb-master|yb-tserver|yb-ysql|yb-ycql|yb-pgexp"}[1h])  →  13 series
+    {instance="yb-tserver-1:9000", job="yb-tserver"} 0.03557683
+    {instance="yb-master-1:7000", job="yb-master"} 2.876304658
+    {instance="yb-tserver-2:9000", job="yb-tserver"} 3.137948206
+    {instance="yb-master-2:7000", job="yb-master"} 2.897018354
+    {instance="yb-master-3:7000", job="yb-master"} 2.867639375
+    {instance="yb-tserver-3:12000", job="yb-ycql"} 3.134427436
+    {instance="yb-tserver-3:13000", job="yb-ysql"} 2.858149762
+    {instance="yb-tserver-1:12000", job="yb-ycql"} 0.004964132
+    {instance="yb-tserver-2:13000", job="yb-ysql"} 3.609844539
+    {instance="pgexp:9187", job="yb-pgexp"} 4.001717316
+    {instance="yb-tserver-3:9000", job="yb-tserver"} 1.686229486
+    {instance="yb-tserver-2:12000", job="yb-ycql"} 2.47875802
+    {instance="yb-tserver-1:13000", job="yb-ysql"} 0.005543064
+  > max_over_time(prometheus_target_scrapes_sample_out_of_bounds_total[1h])  →  1 series
+    {instance="localhost:9090", job="prometheus"} 0
+  > max_over_time(prometheus_target_scrapes_sample_out_of_order_total[1h])  →  1 series
+    {instance="localhost:9090", job="prometheus"} 20748
+  yb-master-1 的 clock skew ERROR log 行數：2
+  yb-master-2 的 clock skew ERROR log 行數：7
+  yb-master-3 的 clock skew ERROR log 行數：9
+  yb-tserver-1 的 clock skew ERROR log 行數：26
+  yb-tserver-2 的 clock skew ERROR log 行數：20
+  yb-tserver-3 的 clock skew ERROR log 行數：15
+at-yb-yb-tserver-1-1 411.1MiB / 768MiB
+at-yb-yb-tserver-3-1 418.4MiB / 768MiB
+at-yb-yb-tserver-2-1 408.4MiB / 768MiB
+at-yb-prometheus-1 175.4MiB / 384MiB
+at-yb-pgexp-1 12.19MiB / 64MiB
+at-yb-yb-master-1-1 40.25MiB / 448MiB
+at-yb-blackbox-1 20.04MiB / 64MiB
+at-yb-yb-master-2-1 67.72MiB / 448MiB
+at-yb-yb-master-3-1 43.08MiB / 448MiB
+
+## 結束（01:42:39Z）
+殘留容器：0；殘留 volume：0

@@ -25,7 +25,7 @@
 | Valkey／Redis | redis_exporter | — | OTel redisreceiver（beta） | INFO、LATENCY、SLOWLOG／COMMANDLOG | PMM（有 valkey_down 範本） |
 | etcd | — | `/metrics`、`/health`、`/livez`、`/readyz` | — | —（只有 debug 模式的 `/debug/pprof`） | —（只有 mixin 規則） |
 | TiDB／TiKV／PD | — | 各元件 status port 的 `/metrics` | — | statements_summary、slow query、Top SQL、Continuous Profiling | TiUP（Prometheus＋Grafana＋Alertmanager＋blackbox＋node_exporter） |
-| YugabyteDB | —（YSQL 走 postgres_exporter 未確認） | 7000／9000／13000／12000 的 `/prometheus-metrics` | YBA 的 OTel 匯出（有告警範本） | pg_stat_statements、Active Session History | YugabyteDB Anywhere、Aeon |
+| YugabyteDB | postgres_exporter 對 YSQL 要關掉 stat_replication 與 settings，多數儲存類數字是 0（[實測](yugabytedb.md#postgres)） | 7000／9000／13000／12000 的 `/prometheus-metrics` | YBA 的 OTel 匯出（有告警範本） | pg_stat_statements、Active Session History | YugabyteDB Anywhere、Aeon |
 | ClickHouse | Altinity operator 內的 metrics-exporter | `<prometheus>` 的 `/metrics`（預設關） | — | system.metrics／events、`system.*_log`、metric_log | ClickHouse Cloud（Cloud API 的 Prometheus 端點） |
 | MongoDB | Percona mongodb_exporter | 8.3 起有 OTel 檔案／推送（metric 很少） | OTel mongodbreceiver（beta）、PMM client | serverStatus、FTDC（diagnostic.data）、profiler、currentOp | Ops Manager、Cloud Manager、Atlas、PMM |
 
@@ -145,7 +145,7 @@ OTel receiver 的成熟度見 metadata.yaml。[^dbm-otel-mysql][^dbm-otel-postgr
 
 **YBA 告警範本（v2026.1.3.0）的例子：**`LEADERLESS_TABLETS`（`yb_node_leaderless_tablet_count` 持續大於 0）、`CLOCK_SKEW`（`hybrid_clock_skew`，門檻由參數決定）。[^dbm-yb-leaderless][^dbm-yb-clock-skew]平台自己的告警有 `ALERT_QUERY_FAILED`、`UNIVERSE_METRIC_COLLECTION_FAILURE` 等，用 `last_over_time(...[1d]) < 1` 判斷。[^dbm-yb-alert-query-failed][^dbm-yb-metric-collection]這些平台 metric 由 YBA 寫出、由 YBA 自己的 Prometheus 評估；YBA 或它的 Prometheus 停了時是否還有人通知，未確認（推論是沒有）。
 
-**alert-trust：**以 (b) 為基礎，四個 port 各一個 job。YBA 範本當作門檻與訊號清單的參考（leaderless tablet、under-replicated、clock skew 是分散式 SQL 特有的）。補盲點：ASH 與 pg_stat_statements 經自訂查詢彙總。
+**alert-trust：**以 (b) 為基礎，四個 port 各一個 job（見 [YugabyteDB 怎麼監控](yugabytedb.md)）。YBA 範本當作門檻與訊號清單的參考（leaderless tablet、under-replicated、clock skew 是分散式 SQL 特有的）。補盲點：ASH 與 pg_stat_statements 經自訂查詢彙總。
 
 ## ClickHouse {#clickhouse}
 

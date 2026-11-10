@@ -1,0 +1,161 @@
+# YugabyteDB v2026.1.3.0（yb-master ×3、yb-tserver ×3，RF=3）、Prometheus v3.13.5、blackbox_exporter v0.27.0、postgres_exporter v0.20.1（連 YSQL）。
+# 執行 ./run.sh，結束會 docker compose down -v。只對外開 127.0.0.1 的 30000–30099：
+#   30001–30003 master web（7000）、30011–30013 tserver web（9000）、30021–30023 YSQL web（13000）、30031–30033 YCQL web（12000）、
+#   30041 YSQL（tserver1 的 5433）、30090 Prometheus、30091 blackbox、30092 postgres_exporter。
+# 記憶體刻意壓小（master hard limit 256MB、tserver 384MB、block cache 32MB、每台 1 個 shard）；這是輕量 lab，不是正式環境的設定。
+# fail_on_out_of_range_clock_skew=false：這台機器的牆鐘會被 WSL 往回調，預設值下三台 tserver 啟動 20 秒內就因 clock skew 7 秒 FATAL（results/clock-skew-crash-20261110.txt）。
+#   關掉後 skew 超過 max_clock_skew_usec 只寫 ERROR log，超過 clock_skew_force_crash_bound_usec（60 秒）仍會 crash。
+# follower_unavailable_considered_failed_sec 120（預設 900）、ysql_max_connections 12（預設 0 = 由 PostgreSQL 決定）是為了在 lab 時間內看到效果。
+name: at-yb
+x-yb: &yb
+  image: yugabytedb/yugabyte:2026.1.3.0-b100
+  ulimits: { nofile: { soft: 1048576, hard: 1048576 } }
+services:
+  yb-master-1:
+    <<: *yb
+    hostname: yb-master-1
+    mem_limit: 448m
+    command:
+      - /home/yugabyte/bin/yb-master
+      - "--rpc_bind_addresses=yb-master-1:7100"
+      - "--master_addresses=yb-master-1:7100,yb-master-2:7100,yb-master-3:7100"
+      - "--fs_data_dirs=/home/yugabyte/yb_data"
+      - "--replication_factor=3"
+      - "--webserver_interface=0.0.0.0"
+      - "--memory_limit_hard_bytes=268435456"
+      - "--db_block_cache_size_bytes=16777216"
+      - "--logtostderr"
+      - "--fail_on_out_of_range_clock_skew=false"
+    ports: ["127.0.0.1:30001:7000"]
+  yb-master-2:
+    <<: *yb
+    hostname: yb-master-2
+    mem_limit: 448m
+    command:
+      - /home/yugabyte/bin/yb-master
+      - "--rpc_bind_addresses=yb-master-2:7100"
+      - "--master_addresses=yb-master-1:7100,yb-master-2:7100,yb-master-3:7100"
+      - "--fs_data_dirs=/home/yugabyte/yb_data"
+      - "--replication_factor=3"
+      - "--webserver_interface=0.0.0.0"
+      - "--memory_limit_hard_bytes=268435456"
+      - "--db_block_cache_size_bytes=16777216"
+      - "--logtostderr"
+      - "--fail_on_out_of_range_clock_skew=false"
+    ports: ["127.0.0.1:30002:7000"]
+  yb-master-3:
+    <<: *yb
+    hostname: yb-master-3
+    mem_limit: 448m
+    command:
+      - /home/yugabyte/bin/yb-master
+      - "--rpc_bind_addresses=yb-master-3:7100"
+      - "--master_addresses=yb-master-1:7100,yb-master-2:7100,yb-master-3:7100"
+      - "--fs_data_dirs=/home/yugabyte/yb_data"
+      - "--replication_factor=3"
+      - "--webserver_interface=0.0.0.0"
+      - "--memory_limit_hard_bytes=268435456"
+      - "--db_block_cache_size_bytes=16777216"
+      - "--logtostderr"
+      - "--fail_on_out_of_range_clock_skew=false"
+    ports: ["127.0.0.1:30003:7000"]
+  yb-tserver-1:
+    <<: *yb
+    hostname: yb-tserver-1
+    mem_limit: 768m
+    command:
+      - /home/yugabyte/bin/yb-tserver
+      - "--rpc_bind_addresses=yb-tserver-1:9100"
+      - "--tserver_master_addrs=yb-master-1:7100,yb-master-2:7100,yb-master-3:7100"
+      - "--fs_data_dirs=/home/yugabyte/yb_data"
+      - "--webserver_interface=0.0.0.0"
+      - "--enable_ysql=true"
+      - "--pgsql_proxy_bind_address=0.0.0.0:5433"
+      - "--cql_proxy_bind_address=0.0.0.0:9042"
+      - "--memory_limit_hard_bytes=402653184"
+      - "--db_block_cache_size_bytes=33554432"
+      - "--yb_num_shards_per_tserver=1"
+      - "--ysql_num_shards_per_tserver=1"
+      - "--ysql_max_connections=12"
+      - "--follower_unavailable_considered_failed_sec=120"
+      - "--logtostderr"
+      - "--fail_on_out_of_range_clock_skew=false"
+    depends_on: [yb-master-1, yb-master-2, yb-master-3]
+    ports: ["127.0.0.1:30011:9000", "127.0.0.1:30021:13000", "127.0.0.1:30031:12000", "127.0.0.1:30041:5433"]
+  yb-tserver-2:
+    <<: *yb
+    hostname: yb-tserver-2
+    mem_limit: 768m
+    command:
+      - /home/yugabyte/bin/yb-tserver
+      - "--rpc_bind_addresses=yb-tserver-2:9100"
+      - "--tserver_master_addrs=yb-master-1:7100,yb-master-2:7100,yb-master-3:7100"
+      - "--fs_data_dirs=/home/yugabyte/yb_data"
+      - "--webserver_interface=0.0.0.0"
+      - "--enable_ysql=true"
+      - "--pgsql_proxy_bind_address=0.0.0.0:5433"
+      - "--cql_proxy_bind_address=0.0.0.0:9042"
+      - "--memory_limit_hard_bytes=402653184"
+      - "--db_block_cache_size_bytes=33554432"
+      - "--yb_num_shards_per_tserver=1"
+      - "--ysql_num_shards_per_tserver=1"
+      - "--ysql_max_connections=12"
+      - "--follower_unavailable_considered_failed_sec=120"
+      - "--logtostderr"
+      - "--fail_on_out_of_range_clock_skew=false"
+    depends_on: [yb-master-1, yb-master-2, yb-master-3]
+    ports: ["127.0.0.1:30012:9000", "127.0.0.1:30022:13000", "127.0.0.1:30032:12000"]
+  yb-tserver-3:
+    <<: *yb
+    hostname: yb-tserver-3
+    mem_limit: 768m
+    command:
+      - /home/yugabyte/bin/yb-tserver
+      - "--rpc_bind_addresses=yb-tserver-3:9100"
+      - "--tserver_master_addrs=yb-master-1:7100,yb-master-2:7100,yb-master-3:7100"
+      - "--fs_data_dirs=/home/yugabyte/yb_data"
+      - "--webserver_interface=0.0.0.0"
+      - "--enable_ysql=true"
+      - "--pgsql_proxy_bind_address=0.0.0.0:5433"
+      - "--cql_proxy_bind_address=0.0.0.0:9042"
+      - "--memory_limit_hard_bytes=402653184"
+      - "--db_block_cache_size_bytes=33554432"
+      - "--yb_num_shards_per_tserver=1"
+      - "--ysql_num_shards_per_tserver=1"
+      - "--ysql_max_connections=12"
+      - "--follower_unavailable_considered_failed_sec=120"
+      - "--logtostderr"
+      - "--fail_on_out_of_range_clock_skew=false"
+    depends_on: [yb-master-1, yb-master-2, yb-master-3]
+    ports: ["127.0.0.1:30013:9000", "127.0.0.1:30023:13000", "127.0.0.1:30033:12000"]
+  blackbox:
+    image: prom/blackbox-exporter:v0.27.0
+    mem_limit: 64m
+    command: [--config.file=/etc/bb/blackbox.yml]
+    volumes: ["./bb:/etc/bb:ro"]
+    ports: ["127.0.0.1:30091:9115"]
+  # postgres_exporter 和 lab/targets/postgres 同一版，連 tserver1 的 YSQL（yugabyte 帳號是 superuser）。
+  # pgexp-default：預設 collector；stat_replication 的查詢在 YSQL 上卡住不回（lab 實測），每次 scrape 多佔一條連線，
+  #   幾十秒內用光 ysql_max_connections。只在 run.sh 的情境 B 啟動約 60 秒（profile），結束後把卡住的 backend 結束掉。
+  # pgexp：關掉 stat_replication 與 settings（YSQL 的 pg_settings 有兩個重複的 GUC，exporter 輸出重複的 series，整個 /metrics 回 500），
+  #   其他預設 collector 照開；整個 lab 期間都在跑（job yb-pgexp）。
+  pgexp-default:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+    profiles: [pgexp-default]
+    mem_limit: 64m
+    environment:
+      DATA_SOURCE_NAME: "postgresql://yugabyte:yugabyte@yb-tserver-1:5433/yugabyte?sslmode=disable"
+    ports: ["127.0.0.1:30093:9187"]
+  pgexp:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+    mem_limit: 64m
+    command: [--no-collector.stat_replication, --no-collector.settings]
+    environment:
+      DATA_SOURCE_NAME: "postgresql://yugabyte:yugabyte@yb-tserver-1:5433/yugabyte?sslmode=disable"
+    ports: ["127.0.0.1:30092:9187"]
+  prometheus:
+    image: prom/prometheus:v3.13.5
+    mem_limit: 384m
+    command: [--config.file=/etc/lab/prometheus.yml, --web.enable-lifecycle, --storage.tsdb.path=/prometheus]
+    volumes: ["./prom:/etc/lab:ro", "../../../rules/targets/yugabytedb.yml:/etc/rules/yugabytedb.yml:ro"]
+    ports: ["127.0.0.1:30090:9090"]

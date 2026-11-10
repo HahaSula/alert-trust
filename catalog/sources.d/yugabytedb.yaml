@@ -1,0 +1,36 @@
+# YugabyteDB 卡引用的來源。key 一律以 yb- 開頭，避免和其他 target 衝突。
+# 授權：核心（src/）是 Apache-2.0；YugabyteDB Anywhere（managed/）是 Polyform Free Trial。後者只引用位置與條件，不複製內容。
+sources:
+  yb-lab:
+    title: YugabyteDB 三方交叉、master quorum、YSQL 連線上限與 postgres_exporter 實驗（lab/targets/yugabytedb）
+    kind: experiment
+    visibility: public
+    url: https://github.com/HahaSula/alert-trust/tree/main/lab/targets/yugabytedb
+    checked: "2026-11-10, YugabyteDB v2026.1.3.0-b100（master ×3、tserver ×3，RF=3）, Prometheus v3.13.5, blackbox_exporter v0.27.0, postgres_exporter v0.20.1"
+    note: results/run-20261110.txt 是原始輸出，README.md 的結果一節是摘要
+  yb-core:
+    title: YugabyteDB v2026.1.3.0 src/yb（server 的 webserver、master 的 path handler 與 catalog manager、consensus、hybrid clock、YSQL webserver）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/yugabyte/yugabyte-db/tree/v2026.1.3.0/src/yb
+    checked: "2026-11-10, v2026.1.3.0（commit f2635f5，映像 2026.1.3.0-b100 的 version_metadata.json 同一個 git_hash）"
+    note: "gh api repos/yugabyte/yugabyte-db/releases/latest 回 v2026.1.3.0（2026-11-05）；核心 Apache-2.0"
+  yb-yba-templates:
+    title: YugabyteDB Anywhere 告警範本（managed/src/main/resources/alert/alert_templates.yml，v2026.1.3.0）
+    kind: upstream-rules
+    visibility: public
+    url: https://github.com/yugabyte/yugabyte-db/blob/v2026.1.3.0/managed/src/main/resources/alert/alert_templates.yml
+    checked: "2026-11-10, v2026.1.3.0"
+    note: "Polyform Free Trial 授權，只引用範本名稱、metric 與行號。範本由 YBA 自己的 Prometheus 評估，用 YBA relabel 後的 label（universe_uuid、export_type、node_name、saved_name）"
+  yb-pgexp:
+    title: postgres_exporter v0.20.1 的 collector（stat_replication、settings）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/prometheus-community/postgres_exporter/tree/v0.20.1/collector
+    checked: "2026-11-10, v0.20.1（和 lab/targets/postgres 同一版）"
+  yb-doc-metrics:
+    title: "YugabyteDB 文件：Metrics（/prometheus-metrics 與 URL 參數）"
+    kind: upstream-doc
+    visibility: public
+    url: https://docs.yugabyte.com/stable/launch-and-manage/monitor-and-alert/metrics/
+    checked: "2026-11-10"

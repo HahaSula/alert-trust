@@ -522,3 +522,90 @@ terms:
     observe:
       - "`tidb_server_tokens`：目前拿著 token 的語句數；`tidb_server_connections`：連線數"
     refs: [tidb-cfg-token-limit, tidb-cfg-max-conn, tidb-m-tokens, tidb-m-connections]
+
+  # ---------- YugabyteDB ----------
+  yb-tserver-unresponsive-timeout:
+    title: master 判定 tserver dead 的時間
+    kind: config
+    systems: [yugabytedb]
+    tokens: [tserver_unresponsive_timeout_ms]
+    where: "yb-master 的 gflag `--tserver_unresponsive_timeout_ms`（runtime）；tserver 每 `heartbeat_interval_ms`（1 秒）送一次 heartbeat"
+    default: "60000（60 秒）"
+    observe:
+      - "master leader 的 `num_tablet_servers_live`、`num_tablet_servers_dead`（follower 輸出 0）"
+      - "master 的 `/api/v1/health-check` 的 `dead_nodes`"
+    note: "這只是 master 的看法；tablet 的 Raft 設定要等 `follower_unavailable_considered_failed_sec` 才把那台踢掉。"
+    refs: [yb-m-ts-unresponsive, yb-ts-heartbeat-interval, yb-m-num-live, yb-m-h-health-dead]
+
+  yb-follower-unavailable-failed:
+    title: tablet leader 把沒回應的 follower 踢出 Raft 設定的時間
+    kind: config
+    systems: [yugabytedb]
+    tokens: [follower_unavailable_considered_failed_sec]
+    where: "yb-tserver（與 yb-master）的 gflag `--follower_unavailable_considered_failed_sec`（runtime）"
+    default: "900（15 分鐘）"
+    observe:
+      - "master 的 `/api/v1/tablet-under-replication`：被踢掉之後副本數才少於 RF"
+    note: "踢掉之後 master 的 cluster balancer 在別台補副本（remote bootstrap）；只有 RF 台 tserver 時沒有地方補，tablet 一直 under-replicated。"
+    refs: [yb-c-follower-failed, yb-m-h-underrep-running]
+
+  yb-leaderless-delay:
+    title: leaderless tablet 的判定延遲
+    kind: config
+    systems: [yugabytedb]
+    tokens: [leaderless_tablet_alert_delay_secs]
+    where: "yb-master 的 gflag `--leaderless_tablet_alert_delay_secs`（runtime）"
+    default: "120"
+    observe:
+      - "master 的 `/api/v1/tablet-replication` 的 `leaderless_tablets`（/prometheus-metrics 沒有對應的 metric）"
+    refs: [yb-m-leaderless-delay, yb-m-h-leaderless]
+
+  yb-max-clock-skew:
+    title: 允許的最大時鐘偏移
+    kind: config
+    systems: [yugabytedb]
+    tokens: [max_clock_skew_usec, fail_on_out_of_range_clock_skew, clock_skew_force_crash_bound_usec]
+    where: "所有 yb-master、yb-tserver 的 gflag `--max_clock_skew_usec`；超過時的行為由 `--fail_on_out_of_range_clock_skew` 與 `--clock_skew_force_crash_bound_usec` 決定"
+    default: "max_clock_skew_usec 500000（500ms）；fail_on_out_of_range_clock_skew true；clock_skew_force_crash_bound_usec 60000000（60 秒）"
+    observe:
+      - "`hybrid_clock_skew`（微秒）：這台的 hybrid time 比本機實體時鐘快多少"
+      - "log：`Too big clock skew is detected`（FATAL 時 process 結束）"
+    note: "有交易表的 tablet 開啟後才會因 skew crash；lab 裡牆鐘往回跳 7 秒時三台 tserver 同時 FATAL。"
+    refs: [yb-clk-max-skew, yb-clk-fail-flag, yb-clk-crash-bound, yb-clk-fatal, yb-clk-skew-metric, yb-clk-skew-def, yb-clk-enable, yb-exp-clock]
+
+  yb-ysql-max-connections:
+    title: YSQL 每台 tserver 的連線上限
+    kind: config
+    systems: [yugabytedb]
+    tokens: [ysql_max_connections]
+    where: "yb-tserver 的 gflag `--ysql_max_connections`（對應 PostgreSQL 的 max_connections；每台 tserver 各自計算）"
+    default: "0（由 PostgreSQL 依平台決定）"
+    observe:
+      - "`yb_ysqlserver_max_connection_total`、`yb_ysqlserver_connection_total`、`yb_ysqlserver_connection_over_limit_total`（13000 port）"
+    note: "superuser 也會被擋：superuser_reserved_connections 是保留給 superuser 的，連線全是 superuser 時一樣用完（lab）。"
+    refs: [yb-ysql-maxconn, yb-ysql-m-conn, yb-ysql-m-overlimit, yb-ysql-m-max, yb-exp-raw]
+
+  yb-memory-limit:
+    title: yb-tserver／yb-master 的記憶體上限
+    kind: config
+    systems: [yugabytedb]
+    tokens: [memory_limit_hard_bytes, memory_limit_soft_percentage, default_memory_limit_to_ram_ratio]
+    where: "gflag `--memory_limit_hard_bytes`；0 時用 `--default_memory_limit_to_ram_ratio` × 主機記憶體；soft limit 是 hard 的 `--memory_limit_soft_percentage`"
+    default: "memory_limit_hard_bytes 0；default_memory_limit_to_ram_ratio 0.85；memory_limit_soft_percentage 85"
+    observe:
+      - "`server_memory_hard_limit`、`server_memory_soft_limit`、`mem_tracker_server`"
+      - "`leader_memory_pressure_rejections`、`follower_memory_pressure_rejections`、`operation_memory_pressure_rejections`、`rpc_inbound_calls_rejected_because_memory_pressure`"
+    note: "YSQL 的 PostgreSQL backend 不在這個 tracker 裡。"
+    refs: [yb-mem-hard, yb-mem-soft, yb-mem-leader-rej]
+
+  yb-sst-files-limit:
+    title: tablet 的 SST 檔數上限（寫入節流）
+    kind: config
+    systems: [yugabytedb]
+    tokens: [sst_files_soft_limit, sst_files_hard_limit]
+    where: "yb-tserver 的 gflag `--sst_files_soft_limit`、`--sst_files_hard_limit`（runtime）"
+    default: "24、48"
+    observe:
+      - "`majority_sst_files_rejections`：過半副本超過上限而拒絕的寫入"
+      - "`rocksdb_current_version_num_sst_files`（輸出時加總到表）"
+    refs: [yb-sst-soft, yb-sst-hard, yb-sst-rej]

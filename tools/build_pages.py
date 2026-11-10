@@ -242,7 +242,8 @@ def terms_page(terms: dict) -> str:
 
 
 DB_PAGES = {"mysqld_exporter": ("MySQL／MariaDB", "mysql.md"), "postgres_exporter": ("PostgreSQL", "postgres.md"),
-            "redis_exporter": ("Valkey／Redis", "valkey.md"), "etcd": ("etcd", "etcd.md"), "tidb": ("TiDB", "tidb.md")}
+            "redis_exporter": ("Valkey／Redis", "valkey.md"), "etcd": ("etcd", "etcd.md"), "tidb": ("TiDB", "tidb.md"),
+            "yugabytedb": ("YugabyteDB", "yugabytedb.md")}
 
 
 def targets_overview(cards: list[dict]) -> str:

@@ -1,0 +1,25 @@
+# 基線：postgres_exporter v0.20.1 預設 collector 對 YSQL（ysql_max_connections=12），scrape 5s，2026-11-10T01:18:53Z
+     15 level=ERROR source=collector.go:191 msg="Error opening connection to database" err="error querying postgresql version: pq: sorry, too many clients already"
+     11 level=ERROR source=collector.go:227 msg="collector failed" name=database duration_seconds=… err="context deadline exceeded"
+     10 level=ERROR source=collector.go:227 msg="collector failed" name=replication_slots duration_seconds=… err="context deadline exceeded"
+      7 level=ERROR source=collector.go:227 msg="collector failed" name=stat_progress_vacuum duration_seconds=… err="context deadline exceeded"
+      7 level=ERROR source=collector.go:227 msg="collector failed" name=stat_bgwriter duration_seconds=… err="context deadline exceeded"
+      7 level=ERROR source=collector.go:227 msg="collector failed" name=stat_archiver duration_seconds=… err="context deadline exceeded"
+      7 level=ERROR source=collector.go:227 msg="collector failed" name=roles duration_seconds=… err="context deadline exceeded"
+      6 level=WARN source=pg_setting.go:74 msg="Error normalising unit for setting" collector=settings setting=yb_transaction_priority value="0.000000000 (Normal priority transaction)" unit="" error="error converting setting \"yb_transaction_priority\" value \"0.000000000 (Normal priority transaction)\" to float: strconv.ParseFloat: parsing \"0.000000000 (Normal priority transaction)\": invalid syntax"
+      6 level=ERROR source=collector.go:227 msg="collector failed" name=wal duration_seconds=… err="context deadline exceeded"
+      6 level=ERROR source=collector.go:227 msg="collector failed" name=stat_database duration_seconds=… err="context deadline exceeded"
+      5 level=ERROR source=collector.go:227 msg="collector failed" name=statio_user_tables duration_seconds=… err="context deadline exceeded"
+      5 level=ERROR source=collector.go:227 msg="collector failed" name=stat_user_tables duration_seconds=… err="context deadline exceeded"
+      5 level=ERROR source=collector.go:227 msg="collector failed" name=settings duration_seconds=… err="context deadline exceeded"
+      5 level=ERROR source=collector.go:227 msg="collector failed" name=replication duration_seconds=… err="context deadline exceeded"
+      4 level=ERROR source=collector.go:227 msg="collector failed" name=locks duration_seconds=… err="context deadline exceeded"
+      3 level=INFO source=server.go:96 msg="Established new database connection" fingerprint=yb-tserver-1:5433
+      3 level=ERROR source=collector.go:227 msg="collector failed" name=stat_activity duration_seconds=… err="context deadline exceeded"
+      2 level=ERROR source=postgres_exporter.go:606 msg="error scraping dsn" err="Error opening connection to database (postgresql://yugabyte:PASSWORD_REMOVED@yb-tserver-1:5433/yugabyte?sslmode=disable): dial tcp 172.18.0.10:5433: connect: connection refused" dsn="postgresql://yugabyte:PASSWORD_REMOVED@yb-tserver-1:5433/yugabyte?sslmode=disable"
+      2 level=ERROR source=collector.go:191 msg="Error opening connection to database" err="error querying postgresql version: dial tcp 172.18.0.10:5433: connect: connection refused"
+      1 level=WARN source=main.go:81 msg="Error loading config" err="error opening config file \"postgres_exporter.yml\": open postgres_exporter.yml: no such file or directory"
+      1 level=INFO source=tls_config.go:375 msg="TLS is disabled." http2=false address=[::]:9187
+      1 level=INFO source=tls_config.go:372 msg="Listening on" address=[::]:9187
+      1 level=INFO source=postgres_exporter.go:537 msg="Semantic version changed" server=yb-tserver-1:5433 from=0.0.0 to=15.12.0
+      1 level=INFO source=main.go:91 msg="Excluded databases" databases=[]

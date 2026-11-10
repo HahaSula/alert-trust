@@ -1,0 +1,81 @@
+# scrape_interval 5s（lab 用，比規則檔假設的 15s 短）。job 名稱 yb-master、yb-tserver、yb-ysql、yb-ycql 是例子（YBA 用 export_type label 區分）。
+# probe job 把 instance 改成和被探測元件的 /prometheus-metrics target 相同的 host:port，規則才能用 on (instance) 交叉比對。
+# 注意：這次 run（results/run-20261110.txt）用的是 Prometheus 預設的 honor_timestamps: true，結果裡「停掉的節點的值還在」是這個造成的（Prometheus 文件），out-of-order 推論也是；沒有用 false 重跑。
+# 正式環境建議在 yb-master／yb-tserver／yb-ysql／yb-ycql 四個 job 加 honor_timestamps: false（見 rules/targets/yugabytedb.yml 的開頭說明）。
+global: { scrape_interval: 5s, scrape_timeout: 4s, evaluation_interval: 5s }
+rule_files: [/etc/rules/yugabytedb.yml]
+scrape_configs:
+  - job_name: yb-master
+    metrics_path: /prometheus-metrics
+    static_configs: [{ targets: [yb-master-1:7000, yb-master-2:7000, yb-master-3:7000] }]
+  - job_name: yb-tserver
+    metrics_path: /prometheus-metrics
+    static_configs: [{ targets: [yb-tserver-1:9000, yb-tserver-2:9000, yb-tserver-3:9000] }]
+  - job_name: yb-ysql
+    metrics_path: /prometheus-metrics
+    static_configs: [{ targets: [yb-tserver-1:13000, yb-tserver-2:13000, yb-tserver-3:13000] }]
+  - job_name: yb-ycql
+    metrics_path: /prometheus-metrics
+    static_configs: [{ targets: [yb-tserver-1:12000, yb-tserver-2:12000, yb-tserver-3:12000] }]
+  - job_name: yb-pgexp
+    static_configs: [{ targets: [pgexp:9187] }]
+  - job_name: yb-pgexp-default
+    static_configs: [{ targets: [pgexp-default:9187] }]
+  - job_name: prometheus
+    static_configs: [{ targets: [localhost:9090] }]
+  - job_name: yb-master-is-leader
+    metrics_path: /probe
+    params: { module: [http_2xx] }
+    static_configs: [{ targets: [yb-master-1:7000, yb-master-2:7000, yb-master-3:7000] }]
+    relabel_configs:
+      - { source_labels: [__address__], target_label: instance }
+      - { source_labels: [__address__], target_label: __param_target, replacement: 'http://${1}/api/v1/is-leader' }
+      - { target_label: __address__, replacement: blackbox:9115 }
+  - job_name: yb-master-health
+    metrics_path: /probe
+    params: { module: [yb_master_health_reachable] }
+    static_configs: [{ targets: [yb-master-1:7000, yb-master-2:7000, yb-master-3:7000] }]
+    relabel_configs:
+      - { source_labels: [__address__], target_label: instance }
+      - { source_labels: [__address__], target_label: __param_target, replacement: 'http://${1}/api/v1/health-check' }
+      - { target_label: __address__, replacement: blackbox:9115 }
+  - job_name: yb-cluster-health
+    metrics_path: /probe
+    params: { module: [yb_master_health_clean] }
+    static_configs: [{ targets: [yb-master-1:7000, yb-master-2:7000, yb-master-3:7000] }]
+    relabel_configs:
+      - { source_labels: [__address__], target_label: instance }
+      - { source_labels: [__address__], target_label: __param_target, replacement: 'http://${1}/api/v1/health-check' }
+      - { target_label: __address__, replacement: blackbox:9115 }
+  - job_name: yb-cluster-leaderless
+    metrics_path: /probe
+    params: { module: [yb_master_no_leaderless] }
+    static_configs: [{ targets: [yb-master-1:7000, yb-master-2:7000, yb-master-3:7000] }]
+    relabel_configs:
+      - { source_labels: [__address__], target_label: instance }
+      - { source_labels: [__address__], target_label: __param_target, replacement: 'http://${1}/api/v1/tablet-replication' }
+      - { target_label: __address__, replacement: blackbox:9115 }
+  - job_name: yb-cluster-underreplicated
+    metrics_path: /probe
+    params: { module: [yb_master_no_underreplicated] }
+    static_configs: [{ targets: [yb-master-1:7000, yb-master-2:7000, yb-master-3:7000] }]
+    relabel_configs:
+      - { source_labels: [__address__], target_label: instance }
+      - { source_labels: [__address__], target_label: __param_target, replacement: 'http://${1}/api/v1/tablet-under-replication' }
+      - { target_label: __address__, replacement: blackbox:9115 }
+  - job_name: yb-tserver-health
+    metrics_path: /probe
+    params: { module: [yb_tserver_health] }
+    static_configs: [{ targets: [yb-tserver-1:9000, yb-tserver-2:9000, yb-tserver-3:9000] }]
+    relabel_configs:
+      - { source_labels: [__address__], target_label: instance }
+      - { source_labels: [__address__], target_label: __param_target, replacement: 'http://${1}/api/v1/health-check' }
+      - { target_label: __address__, replacement: blackbox:9115 }
+  - job_name: yb-ysql-tcp
+    metrics_path: /probe
+    params: { module: [tcp_connect] }
+    static_configs: [{ targets: [yb-tserver-1:5433, yb-tserver-2:5433, yb-tserver-3:5433] }]
+    relabel_configs:
+      - { source_labels: [__address__], regex: '([^:]+):.*', target_label: instance, replacement: '${1}:13000' }
+      - { source_labels: [__address__], target_label: __param_target }
+      - { target_label: __address__, replacement: blackbox:9115 }

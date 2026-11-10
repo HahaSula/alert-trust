@@ -1,0 +1,402 @@
+# YugabyteDB（yb-master、yb-tserver、YSQL、YCQL；內建 /prometheus-metrics，model: native）的建議規則。YugabyteDB v2026.1.3.0（核心 Apache-2.0）。
+#
+# job 選擇器是佔位用的（YBA 用 export_type label 區分，名稱不同）。請換成實際的名稱：
+#   job="yb-master"                  Prometheus 抓每台 yb-master 的 :7000/prometheus-metrics
+#   job="yb-tserver"                 Prometheus 抓每台 yb-tserver 的 :9000/prometheus-metrics
+#   job="yb-ysql"                    Prometheus 抓每台 tserver 上 YSQL 的 :13000/prometheus-metrics（PostgreSQL 程序內的 webserver）
+#   job="yb-ycql"                    Prometheus 抓每台 tserver 上 YCQL 的 :12000/prometheus-metrics
+#   job="yb-master-is-leader"        blackbox http_2xx 探每台 master 的 /api/v1/is-leader（只有 leader 回 200，其他回 503）
+#   job="yb-master-health"           blackbox 探每台 master 的 /api/v1/health-check，body 有 "dead_nodes" 才算成功：
+#                                    follower 會把這個請求轉給 leader，轉送失敗時仍回 200 但內容是錯誤訊息
+#   job="yb-cluster-health"          同一個端點，dead_nodes 或 under_replicated_tablets 非空就失敗
+#   job="yb-cluster-leaderless"      /api/v1/tablet-replication，leaderless_tablets 非空就失敗
+#   job="yb-cluster-underreplicated" /api/v1/tablet-under-replication，underreplicated_tablets 非空就失敗
+#   job="yb-tserver-health"          blackbox 探每台 tserver 的 /api/v1/health-check，failed_tablets 非空就失敗
+#   job="yb-ysql-tcp"                blackbox tcp 探每台 tserver 的 YSQL port（5433）
+#   job="yb-pgexp"                   postgres_exporter 連 YSQL（選用；預設 collector 在 YSQL 上有兩個會壞，見 docs/targets/yugabytedb.md#postgres）
+# probe job 都要把 instance relabel 成和被探測元件 /prometheus-metrics target 相同的 host:port（例子見 lab/targets/yugabytedb/prom/prometheus.yml），
+# 三方交叉（up、probe、元件自己的健康 metric）才能用 on (instance) 對上。
+# job 名稱錯了不會安靜：每個 job 都有 absent(up{job=...})。一組 job 代表一個叢集（universe）；多個叢集共用 job 時，把 by (job) 換成你的 cluster label。
+#
+# 叢集層的 metric（num_tablet_servers_live／dead、is_load_balancing_enabled）只有 master leader 在算；follower 輸出 0（lab 實測）。
+# 所以這裡用 is_raft_leader{table_name="sys.catalog"} == 1 挑出 leader 那台，再用 YBMasterLeaderMetricsMissing 在「抓不到 leader」時告警。
+# YBA 的 leaderless／under-replicated 告警用的 yb_node_* metric 是 YBA 平台產生的，資料庫的 /prometheus-metrics 沒有；這裡改用 master 的 JSON API 加 blackbox 的 body 比對。
+#
+# scrape 設定：/prometheus-metrics 的每個 sample 都帶時間戳。請在這四個 job 設 honor_timestamps: false（或 track_timestamps_staleness: true），
+# 否則停掉的節點的最後值留在查詢裡 5 分鐘（lab：停掉的舊 master leader 的 is_raft_leader=1 還在，YBMasterLeaderCountWrong 誤判），
+# 牆鐘往回跳時 sample 也會被當成 out-of-order 丟掉（lab：約 14 分鐘 20,748 個；honor_timestamps: false 能否避開未重跑驗證）。
+#
+# 預期的 master 數寫在 yb-params（recording rule），請依叢集修改；tserver 的預期數用 master leader 記得的 live + dead。
+# 門檻以 scrape_interval 15s、scrape_timeout 10s 為基準；標「例子」的數字沒有官方依據，請依環境調整。
+# runbook_url 指向 alert-trust 網站上對應訊號的段落。
+groups:
+  - name: yb-params
+    rules:
+      - record: yb_expected_members
+        expr: vector(3)
+        labels: { component: master }
+
+  - name: yb-liveness
+    rules:
+      - alert: YBEndpointDown
+        expr: up{job=~"yb-master|yb-tserver|yb-ysql|yb-ycql"} == 0
+        for: 2m
+        labels: { severity: critical, component: yugabytedb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "抓不到 {{ $labels.job }} {{ $labels.instance }} 的 /prometheus-metrics；和同一台的 probe 一起看：兩者都失敗是 process 或主機，只有這條響是 scrape 路徑"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#endpoint-up
+      - alert: YBMasterEndpointMissing
+        expr: absent(up{job="yb-master"})
+        for: 5m
+        labels: { severity: critical, component: yugabytedb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "完全沒有 job=\"yb-master\" 的 target；服務發現或 job 名稱錯了，所有 master 規則都回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#endpoint-up
+      - alert: YBTServerEndpointMissing
+        expr: absent(up{job="yb-tserver"})
+        for: 5m
+        labels: { severity: critical, component: yugabytedb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "完全沒有 job=\"yb-tserver\" 的 target；所有 tserver 規則都回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#endpoint-up
+      - alert: YBYsqlEndpointMissing
+        expr: absent(up{job="yb-ysql"})
+        for: 5m
+        labels: { severity: critical, component: yugabytedb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "完全沒有 job=\"yb-ysql\" 的 target（13000 port）；YSQL 連線數與延遲規則都回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#endpoint-up
+      - alert: YBYcqlEndpointMissing
+        expr: absent(up{job="yb-ycql"})
+        for: 5m
+        labels: { severity: warning, component: yugabytedb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "完全沒有 job=\"yb-ycql\" 的 target（12000 port）；沒用 YCQL 的叢集可以刪掉這條與 yb-ycql job"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#endpoint-up
+
+      # ---- 三方交叉：master（健康 = 拿得到 leader 的回應） ----
+      - alert: YBMasterHealthProbeFailing
+        expr: probe_success{job="yb-master-health"} == 0
+        for: 1m
+        labels: { severity: critical, component: yugabytedb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "master {{ $labels.instance }} 的 /api/v1/health-check 沒有拿到 leader 的回應：這台停了、它找不到 master leader，或 master 失去 quorum"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#health-second-path
+          absence_covered_by: "YBProbesMissing"
+      - alert: YBMasterServingMetricsButNoLeader
+        expr: |
+          up{job="yb-master"} == 1
+            and on (instance) probe_success{job="yb-master-health"} == 0
+        for: 1m
+        labels: { severity: critical, component: yugabytedb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "master {{ $labels.instance }} 照常回應 /prometheus-metrics（up=1），卻拿不到 master leader 的回應：process 活著但 master 沒有 leader（失去 quorum）或它和 leader 斷線。/status 這時仍回 {}"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#health-second-path
+          absence_covered_by: "YBProbesMissing, YBMasterEndpointMissing"
+      # ---- 三方交叉：tserver（健康 metric = master leader 看到的 live tserver 數） ----
+      - alert: YBTServerHealthProbeFailing
+        expr: probe_success{job="yb-tserver-health"} == 0
+        for: 1m
+        labels: { severity: critical, component: yugabytedb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "tserver {{ $labels.instance }} 的 /api/v1/health-check 失敗：process 或網路有問題，或有 tablet 是 FAILED 狀態"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#health-second-path
+          absence_covered_by: "YBProbesMissing"
+      - alert: YBTServerRunningButNotLive
+        expr: |
+          count by (job) (up{job="yb-tserver"} == 1)
+            > on () group_left max(num_tablet_servers_live{job="yb-master"} and on (instance) is_raft_leader{job="yb-master", table_name="sys.catalog"} == 1)
+        for: 2m
+        labels: { severity: critical, component: yugabytedb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "有 {{ $value }} 台 tserver 的 /prometheus-metrics 抓得到，master leader 看到的 live tserver 卻比較少：tserver 活著但 heartbeat 送不到 master"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#health-second-path
+          absence_covered_by: "YBMasterLeaderMetricsMissing, YBTServerEndpointMissing"
+      # ---- 三方交叉：YSQL ----
+      - alert: YBYsqlPortDown
+        expr: probe_success{job="yb-ysql-tcp"} == 0
+        for: 1m
+        labels: { severity: critical, component: yugabytedb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "{{ $labels.instance }} 的 YSQL port（5433）連不上；13000 的 /prometheus-metrics 是同一個 PostgreSQL 程序的另一個 port，兩者一起失敗是 postmaster 停了"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#health-second-path
+          absence_covered_by: "YBProbesMissing"
+      - alert: YBProbesMissing
+        expr: |
+          absent(probe_success{job="yb-master-health"})
+            or absent(probe_success{job="yb-master-is-leader"})
+            or absent(probe_success{job="yb-cluster-leaderless"})
+            or absent(probe_success{job="yb-cluster-underreplicated"})
+            or absent(probe_success{job="yb-tserver-health"})
+            or absent(probe_success{job="yb-ysql-tcp"})
+        for: 5m
+        labels: { severity: warning, component: yugabytedb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "至少一個 probe job 沒有結果；blackbox_exporter 停了或 job 名稱不對。leader 與 tablet 健康只有 probe 看得到（/prometheus-metrics 沒有），這時那些規則全部回傳空"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#health-second-path
+
+      - alert: YBMetricFamiliesMissing
+        expr: |
+          (up{job="yb-master"} == 1 unless on (job, instance) (hybrid_clock_skew{job="yb-master"} and on (job, instance) is_raft_leader{job="yb-master", table_name="sys.catalog"}))
+            or (up{job="yb-tserver"} == 1 unless on (job, instance) (ts_live_tablet_peers{job="yb-tserver"} and on (job, instance) hybrid_clock_skew{job="yb-tserver"}))
+            or (up{job="yb-ysql"} == 1 unless on (job, instance) yb_ysqlserver_max_connection_total{job="yb-ysql"})
+        for: 5m
+        labels: { severity: warning, component: yugabytedb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "{{ $labels.job }} {{ $labels.instance }} 有回應，關鍵 metric 卻不見了；抓到的可能不是這個元件、URL 參數（metrics=、priority_regex=、max_metric_entries=）濾掉了，或升級後改名"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#metric-families-present
+      - alert: YBSamplesDropped
+        expr: scrape_samples_scraped{job=~"yb-master|yb-tserver|yb-ysql|yb-ycql"} < 0.5 * (scrape_samples_scraped{job=~"yb-master|yb-tserver|yb-ysql|yb-ycql"} offset 1h)
+        for: 10m
+        labels: { severity: warning, component: yugabytedb, tier: "1", aspect: exporter }
+        annotations:
+          summary: "{{ $labels.job }} {{ $labels.instance }} 的 sample 數比一小時前少一半以上，有一批 metric 消失了（表被刪除時 table 層級的 metric 也會在 metrics_retirement_age_ms 後消失）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#metric-families-present
+      - alert: YBScrapeNearTimeout
+        expr: scrape_duration_seconds{job=~"yb-master|yb-tserver|yb-ysql|yb-ycql"} > 8
+        for: 5m
+        labels: { severity: warning, component: yugabytedb, tier: "2", aspect: exporter }
+        annotations:
+          summary: "{{ $labels.job }} {{ $labels.instance }} 的 scrape 要 {{ $value }} 秒，接近 scrape_timeout（例子：10 秒）；table 層級的 metric 隨表數成長，可用 URL 參數 version=v2 的 table_allowlist 或 max_metric_entries 限制"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#scrape-budget
+
+  - name: yb-cluster
+    rules:
+      - alert: YBMasterLeaderMetricsMissing
+        expr: absent(is_raft_leader{job="yb-master", table_name="sys.catalog"} == 1)
+        for: 1m
+        labels: { severity: critical, component: yugabytedb, tier: "1", aspect: cluster }
+        annotations:
+          summary: "抓得到的 master 沒有一台是 leader：可能真的沒有 master leader，或 leader 那台抓不到。num_tablet_servers_live／dead 只有 leader 在算（follower 是 0），下面依賴它們的規則不可信"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#role-detection
+      - alert: YBMasterLeaderProbeMissing
+        expr: (sum(probe_success{job="yb-master-is-leader"}) or vector(0)) < 1
+        for: 1m
+        labels: { severity: critical, component: yugabytedb, tier: "1", aspect: cluster }
+        annotations:
+          summary: "沒有任何一台 master 的 /api/v1/is-leader 回 200：沒有 master leader（失去 quorum、選舉中），或 leader 那台探不到"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#role-detection
+      - alert: YBMasterLeaderCountWrong
+        expr: |
+          sum by (job) (probe_success{job="yb-master-is-leader"}) > 1
+            or sum by (job) (is_raft_leader{job="yb-master", table_name="sys.catalog"}) > 1
+        for: 1m
+        labels: { severity: critical, component: yugabytedb, tier: "2", aspect: cluster }
+        annotations:
+          summary: "{{ $value }} 台 master 認為自己是 leader；舊 leader 的 lease 還沒過期，或同一個 job 混了兩個叢集"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#role-detection
+          absence_covered_by: "YBMasterLeaderMetricsMissing, YBMasterLeaderProbeMissing"
+      - alert: YBMasterQuorumAtRisk
+        expr: |
+          (count(probe_success{job="yb-master-health"} == 1) or vector(0))
+            < on () (floor(yb_expected_members{component="master"} / 2) + 1)
+        for: 1m
+        labels: { severity: critical, component: yugabytedb, tier: "1", aspect: cluster }
+        annotations:
+          summary: "拿得到 master leader 回應的 master 少於過半：master 選不出 leader 或即將選不出。現有連線的讀寫可能還能用，建表、新連線、tablet 搬移會失敗"
+          description: "成員數取自 yb-params 的 yb_expected_members{component=\"master\"}。"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#master-quorum
+      - alert: YBMasterFollowerHeartbeatDelay
+        expr: |
+          max by (job) (max_follower_heartbeat_delay{job="yb-master"} and on (instance) is_raft_leader{job="yb-master", table_name="sys.catalog"} == 1) > 10000
+        for: 2m
+        labels: { severity: warning, component: yugabytedb, tier: "2", aspect: cluster }
+        annotations:
+          summary: "master leader 已經 {{ $value }} 毫秒沒收到某台 master follower 的回應（例子：10 秒）；master 的 Raft group 少一台，再少一台就失去 quorum"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#master-quorum
+          absence_covered_by: "YBMasterLeaderMetricsMissing"
+      - alert: YBComponentCountLow
+        expr: |
+          count by (job) (up{job="yb-master"} == 1) < on () group_left yb_expected_members{component="master"}
+        for: 5m
+        labels: { severity: warning, component: yugabytedb, tier: "2", aspect: cluster }
+        annotations:
+          summary: "yb-master 只抓得到 {{ $value }} 台，比 yb-params 的預期少"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#component-count
+          absence_covered_by: "YBMasterEndpointMissing"
+      - alert: YBTServerNotScraped
+        expr: |
+          (count(up{job="yb-tserver"} == 1) or vector(0))
+            < on () max(
+                (num_tablet_servers_live{job="yb-master"} + on (instance) num_tablet_servers_dead{job="yb-master"})
+                and on (instance) is_raft_leader{job="yb-master", table_name="sys.catalog"} == 1)
+        for: 5m
+        labels: { severity: warning, component: yugabytedb, tier: "2", aspect: cluster }
+        annotations:
+          summary: "抓得到的 tserver 只有 {{ $value }} 台，比 master leader 記得的 tserver 數少（停機，或 scrape 設定漏了）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#component-count
+          absence_covered_by: "YBMasterLeaderMetricsMissing"
+      - alert: YBMasterLeaderChanges
+        expr: changes(max by (job) (raft_term{job="yb-master", table_name="sys.catalog"})[15m:]) >= 3
+        for: 0m
+        labels: { severity: warning, component: yugabytedb, tier: "2", aspect: cluster }
+        annotations:
+          summary: "master 的 Raft term 15 分鐘內變了 {{ $value }} 次（例子：3 次）；master 網路不穩或磁碟太慢"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#leader-changes
+      - alert: YBLeaderlessTablets
+        expr: |
+          (max by (job) (probe_success{job="yb-master-health"}) == 1)
+            and on () (max(probe_success{job="yb-cluster-leaderless"}) == 0)
+        for: 1m
+        labels: { severity: critical, component: yugabytedb, tier: "1", aspect: cluster }
+        annotations:
+          summary: "master leader 回報有 tablet 超過 leaderless_tablet_alert_delay_secs（預設 120 秒）沒有 valid leader：那些 tablet 不能讀寫。多半是同一個 tablet 有過半副本所在的 tserver 停了"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#tablet-health
+          absence_covered_by: "YBProbesMissing, YBMasterHealthProbeFailing"
+      - alert: YBUnderReplicatedTablets
+        expr: |
+          (max by (job) (probe_success{job="yb-master-health"}) == 1)
+            and on () (max(probe_success{job="yb-cluster-underreplicated"}) == 0)
+        for: 2m
+        labels: { severity: warning, component: yugabytedb, tier: "1", aspect: cluster }
+        annotations:
+          summary: "有 tablet 的 RUNNING 副本少於 replication factor。停掉的 tserver 要等 follower_unavailable_considered_failed_sec（預設 900 秒）被踢出 Raft 設定後才算進來；在那之前看 YBClusterHealthCheckDirty"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#tablet-health
+          absence_covered_by: "YBProbesMissing, YBMasterHealthProbeFailing"
+      - alert: YBClusterHealthCheckDirty
+        expr: |
+          (max by (job) (probe_success{job="yb-master-health"}) == 1)
+            and on () (max(probe_success{job="yb-cluster-health"}) == 0)
+        for: 1m
+        labels: { severity: warning, component: yugabytedb, tier: "1", aspect: cluster }
+        annotations:
+          summary: "master 的 /api/v1/health-check 列出 dead tserver（超過 tserver_unresponsive_timeout_ms，預設 60 秒，沒有 heartbeat）或副本落在 dead tserver 上的 tablet"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#tablet-health
+          absence_covered_by: "YBProbesMissing, YBMasterHealthProbeFailing"
+
+  - name: yb-availability
+    rules:
+      - alert: YBTServerDead
+        expr: |
+          max by (job) (num_tablet_servers_dead{job="yb-master"} and on (instance) is_raft_leader{job="yb-master", table_name="sys.catalog"} == 1) > 0
+        for: 1m
+        labels: { severity: critical, component: yugabytedb, tier: "1", aspect: availability }
+        annotations:
+          summary: "master leader 判定 {{ $value }} 台 tserver dead（超過 tserver_unresponsive_timeout_ms，預設 60 秒，沒有 heartbeat）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#tserver-liveness
+          absence_covered_by: "YBMasterLeaderMetricsMissing"
+      - alert: YBYsqlConnectionsRejected
+        expr: increase(yb_ysqlserver_connection_over_limit_total{job="yb-ysql"}[5m]) > 0
+        for: 0m
+        labels: { severity: critical, component: yugabytedb, tier: "1", aspect: availability }
+        annotations:
+          summary: "{{ $labels.instance }} 5 分鐘內拒絕了 {{ $value }} 個 YSQL 連線（超過 ysql_max_connections，too many clients）；TCP probe 仍然成功"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#ysql-available
+          absence_covered_by: "YBMetricFamiliesMissing, YBYsqlEndpointMissing"
+
+  - name: yb-replication
+    rules:
+      - alert: YBFollowerLagHigh
+        expr: max by (job, instance) (follower_lag_ms{job="yb-tserver"}) > 10000
+        for: 5m
+        labels: { severity: warning, component: yugabytedb, tier: "2", aspect: replication }
+        annotations:
+          summary: "{{ $labels.instance }} 上有 follower 已經 {{ $value }} 毫秒沒收到 leader 的 UpdateConsensus（例子：10 秒）；leader 每 raft_heartbeat_interval_ms（500ms）送一次，沒寫入時也會更新，所以這個值不會因為閒置而假裝是 0"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#replication-lag
+
+  - name: yb-saturation
+    rules:
+      - alert: YBClockSkew
+        expr: max by (job, instance) (max_over_time(hybrid_clock_skew{job=~"yb-master|yb-tserver"}[10m])) > 250000
+        for: 0m
+        labels: { severity: critical, component: yugabytedb, tier: "1", aspect: saturation }
+        annotations:
+          summary: "{{ $labels.instance }} 的 hybrid time 比自己的實體時鐘快 {{ $value }} 微秒（例子：max_clock_skew_usec 預設 500ms 的一半）；超過 max_clock_skew_usec 時有交易表的 tserver 會直接 FATAL（lab 實測）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#clock-skew
+      - alert: YBMemoryNearSoftLimit
+        expr: |
+          mem_tracker_server{job=~"yb-master|yb-tserver"} / on (job, instance) server_memory_soft_limit{job=~"yb-master|yb-tserver"} > 0.9
+        for: 5m
+        labels: { severity: warning, component: yugabytedb, tier: "2", aspect: saturation }
+        annotations:
+          summary: "{{ $labels.instance }} 的記憶體用量到 soft limit 的 {{ $value | humanizePercentage }}（例子：90%）；超過 soft limit（memory_limit_soft_percentage，預設 hard limit 的 85%）後開始依機率拒絕寫入"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#memory
+      - alert: YBMemoryPressureRejections
+        expr: |
+          sum by (job, instance) (increase({__name__=~"leader_memory_pressure_rejections|follower_memory_pressure_rejections|operation_memory_pressure_rejections", job="yb-tserver"}[10m]))
+            + on (job, instance) sum by (job, instance) (increase(rpc_inbound_calls_rejected_because_memory_pressure{job="yb-tserver"}[10m])) > 0
+        for: 0m
+        labels: { severity: critical, component: yugabytedb, tier: "2", aspect: saturation }
+        annotations:
+          summary: "{{ $labels.instance }} 10 分鐘內因記憶體壓力拒絕了 {{ $value }} 個請求（同 YBA DB_MEMORY_OVERLOAD 的訊號，名稱沒有經過 YBA 的 saved_name 改寫）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#memory
+      - alert: YBWriteStall
+        expr: |
+          sum by (job, instance) (increase(majority_sst_files_rejections{job="yb-tserver"}[10m])) > 0
+            or sum by (job, instance) (rate(rocksdb_stall_micros{job="yb-tserver"}[5m])) > 0
+        for: 0m
+        labels: { severity: critical, component: yugabytedb, tier: "1", aspect: saturation }
+        annotations:
+          summary: "{{ $labels.instance }} 的 DocDB（RocksDB）在拒絕或延遲寫入：過半副本的 SST 檔數超過 sst_files_hard_limit（48），或 RocksDB write stall。compaction 跟不上寫入"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#write-stall
+      - alert: YBWalSyncSlow
+        expr: |
+          sum by (job, instance) (rate(log_sync_latency_sum{job=~"yb-master|yb-tserver"}[5m]))
+            / sum by (job, instance) (rate(log_sync_latency_count{job=~"yb-master|yb-tserver"}[5m])) > 50000
+        for: 5m
+        labels: { severity: warning, component: yugabytedb, tier: "2", aspect: saturation }
+        annotations:
+          summary: "{{ $labels.instance }} 的 Raft WAL fsync 平均 {{ $value }} 微秒（例子：50ms）；只是平均值（event_stats 沒有 bucket）。durable_wal_write 預設 false，WAL 依 interval_durable_wal_write_ms（1 秒）或 bytes_durable_wal_write_mb（1MB）才 fsync"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#wal-fsync
+
+  - name: yb-workload
+    rules:
+      - alert: YBYsqlConnectionsNearLimit
+        expr: |
+          yb_ysqlserver_connection_total{job="yb-ysql"} / on (job, instance) yb_ysqlserver_max_connection_total{job="yb-ysql"} > 0.8
+        for: 5m
+        labels: { severity: warning, component: yugabytedb, tier: "2", aspect: workload }
+        annotations:
+          summary: "{{ $labels.instance }} 的 YSQL 連線到上限的 {{ $value | humanizePercentage }}；連線上限是每台 tserver 各自的 ysql_max_connections，superuser_reserved_connections 之外的連線用完時新連線被拒"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#connections
+      - alert: YBYsqlLatencyHigh
+        expr: |
+          sum by (job, instance) (rate({__name__=~"handler_latency_yb_ysqlserver_SQLProcessor_(Select|Insert|Update|Delete)Stmt_sum", job="yb-ysql"}[5m]))
+            / sum by (job, instance) (rate({__name__=~"handler_latency_yb_ysqlserver_SQLProcessor_(Select|Insert|Update|Delete)Stmt_count", job="yb-ysql"}[5m])) > 100000
+        for: 10m
+        labels: { severity: warning, component: yugabytedb, tier: "3", aspect: workload }
+        annotations:
+          summary: "{{ $labels.instance }} 的 YSQL 語句平均 {{ $value }} 微秒（例子：100ms）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#query-latency
+      - alert: YBTServerWriteLatencyHigh
+        expr: |
+          rate(handler_latency_yb_tserver_TabletServerService_Write_sum{job="yb-tserver"}[5m])
+            / rate(handler_latency_yb_tserver_TabletServerService_Write_count{job="yb-tserver"}[5m]) > 500000
+        for: 10m
+        labels: { severity: warning, component: yugabytedb, tier: "3", aspect: workload }
+        annotations:
+          summary: "{{ $labels.instance }} 的 tserver Write RPC 平均 {{ $value }} 微秒（YBA TABLET_SERVER_AVG_WRITE_LATENCY 的預設 500ms）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#query-latency
+
+  - name: yb-maintenance
+    rules:
+      - alert: YBLoadBalancerDisabled
+        expr: |
+          is_load_balancing_enabled{job="yb-master"} == 0
+            and on (instance) is_raft_leader{job="yb-master", table_name="sys.catalog"} == 1
+        for: 30m
+        labels: { severity: warning, component: yugabytedb, tier: "3", aspect: maintenance }
+        annotations:
+          summary: "master leader 的 cluster balancer 關著：under-replicated 的 tablet 不會自動補副本、leader 不會重新分散。follower 的這個值永遠是 0，所以只看 leader"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#balancer
+          absence_covered_by: "YBMasterLeaderMetricsMissing"
+      - alert: YBTabletSplitsBacklog
+        expr: |
+          max by (job) (outstanding_tablet_splits{job="yb-master"} and on (instance) is_raft_leader{job="yb-master", table_name="sys.catalog"} == 1) > 0
+        for: 1h
+        labels: { severity: warning, component: yugabytedb, tier: "3", aspect: maintenance }
+        annotations:
+          summary: "有 {{ $value }} 個 tablet split 超過 1 小時沒完成（例子）"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#balancer
+          absence_covered_by: "YBMasterLeaderMetricsMissing"
+
+  - name: yb-capacity
+    rules:
+      - alert: YBTabletPeersNearLimit
+        expr: |
+          ts_live_tablet_peers{job="yb-tserver"} / on (job, instance) (ts_supportable_tablet_peers{job="yb-tserver"} > 0) > 0.9
+        for: 20m
+        labels: { severity: warning, component: yugabytedb, tier: "2", aspect: capacity }
+        annotations:
+          summary: "{{ $labels.instance }} 的 tablet peer 數到可支撐數的 {{ $value | humanizePercentage }}（YBA TABLET_PEERS_GUARDRAIL 的 90%）；ts_supportable_tablet_peers 是 -1 時沒有開 guardrail，這條不評估"
+          runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#capacity

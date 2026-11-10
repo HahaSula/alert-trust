@@ -84,8 +84,32 @@ Offline（下線中）與 Tombstone（已移除）是另一個維度，有各自
 
 **哪個訊號看得到。**[gc-progress](../components/tidb.md#gc-progress)（safe point 多久沒前進、長交易、官方 TiKV_GC_can_not_work）。
 
+## YugabyteDB：YSQL／YCQL、yb-master、tablet {#yugabytedb}
+
+YugabyteDB v2026.1.3.0 的同一組機制。以原始碼與 `lab/targets/yugabytedb`（master ×3、tserver ×3，RF=3）為準；完整清單在 [YugabyteDB 怎麼監控](../targets/yugabytedb.md)，訊號連到 [YugabyteDB 元件卡](../components/yugabytedb.md)。
+
+| 機制 | TiDB | YugabyteDB | 對監控的差別 |
+|---|---|---|---|
+| SQL 層 | 獨立的 TiDB server，無狀態 | YSQL（PostgreSQL 程序）與 YCQL 跑在每台 yb-tserver 裡，和儲存同一台 | 沒有「SQL 層活著、儲存層死了」的分開部署；但 YSQL 有自己的 port（5433）與 metric port（13000），會各自失敗 |
+| 儲存層分片 | Region，每個一組 Raft | tablet，每個一組 Raft（DocDB，底層 RocksDB） | 故障單位都是「那台上有副本的每個分片」 |
+| 中央角色 | PD（內嵌 etcd）：排程、TSO、store 狀態 | yb-master：catalog、tablet 位置、balancer；自己一組 Raft（sys catalog tablet） | 兩者的叢集狀態都只在 leader 上；master 不發時間戳 |
+| 時間戳 | PD leader 發 TSO，所有交易經過它 | 每台自己的 hybrid clock（實體時鐘 + 邏輯計數），沒有中央 | 改成依賴時鐘同步；但 YSQL 仍依賴 master leader 續約的 operation lease，master 失去 quorum 約 30 秒後 YSQL 全停（lab） |
+| 健康判定 | PD 依 store heartbeat 分 Disconnected（20 秒）／Down（30 分鐘） | master 依 tserver heartbeat 分 live／dead（`tserver_unresponsive_timeout_ms` 60 秒）；tablet leader 另外在 `follower_unavailable_considered_failed_sec`（900 秒）後把 follower 踢出 Raft 設定 | YugabyteDB 有兩個獨立的時間：master 的看法與 tablet Raft 的看法 |
+
+**SQL 層。**YSQL 是 PostgreSQL 程序，連線上限 `ysql_max_connections` 是每台 tserver 各自的。`/status` 不看任何狀態，一律回 `{}`。[^yb-h-status][^yb-ysql-maxconn]PostgreSQL 的監控能沿用多少，見 [YugabyteDB 頁的對照](../targets/yugabytedb.md#postgres)。
+
+**master 與 PD。**兩者都是「只有 leader 在算叢集狀態」：master leader 的背景執行緒寫 `num_tablet_servers_live`、`num_tablet_servers_dead`、`is_load_balancing_enabled`，follower 一直是 0；失去 leader 時歸 0。[^yb-m-bg-report][^yb-m-report-metrics][^yb-m-bg-reset]lab：follower 的 `num_tablet_servers_live` 是 0、leader 是 3。所以和 TiDB 一樣，規則要先挑出 leader 那台（`is_raft_leader{table_name="sys.catalog"} == 1`），並在「抓不到 leader」時告警。<span class="at-chip at-ev-tested">實測</span>[^yb-exp-raw]
+
+不同的是 master 的 JSON API：follower 會把 `/api/v1/health-check` 等請求轉給 leader，失敗時仍回 200、內容是錯誤訊息。[^yb-m-h-leader-or-redirect][^yb-m-h-redirect-nolist]用 blackbox 探這些端點時要比對 body。
+
+**tablet 與 Region。**tablet 的健康不在 `/prometheus-metrics` 裡：leaderless（沒有 valid leader 超過 120 秒）與 under-replicated 只在 master 的 JSON API 算。[^yb-m-h-leaderless][^yb-m-h-underrep-running]TiDB 的 PD 把 down／pending／miss peer 做成 `pd_regions_status`，YugabyteDB 沒有對應的 metric；YBA 的告警範本用的 `yb_node_leaderless_tablet_count` 是 YBA 平台自己產生的。[^yba-leaderless]
+
+**時間戳與時鐘。**沒有 TSO，交易時間來自每台的 hybrid clock：收到別台較新的 hybrid time 時把自己的往前推；本機實體時鐘落後最後的 hybrid time 超過 `max_clock_skew_usec`（500ms）時，有交易表的 tserver 直接 FATAL。[^yb-clk-skew-def][^yb-clk-fatal][^yb-clk-enable]lab：牆鐘往回跳 7 秒時三台 tserver 同時 crash。<span class="at-chip at-ev-tested">實測</span>[^yb-exp-clock]機制見[共識架構的 YugabyteDB 段](db-raft.md#yugabytedb)。
+
+**哪個訊號看得到。**[role-detection](../components/yugabytedb.md#role-detection)、[master-quorum](../components/yugabytedb.md#master-quorum)、[tablet-health](../components/yugabytedb.md#tablet-health)、[tserver-liveness](../components/yugabytedb.md#tserver-liveness)、[clock-skew](../components/yugabytedb.md#clock-skew)、[ysql-available](../components/yugabytedb.md#ysql-available)。
+
 ## 之後加入的資料庫
 
 | 資料庫 | SQL 層 | 儲存與分片 | 中央角色 | 要補的段落 |
 |---|---|---|---|---|
-| YugabyteDB | YSQL（PostgreSQL 相容）、YCQL | tablet，每個一組 Raft | yb-master（自己一組 Raft） | 每節加 tablet 層級的 leaderless、under-replicated；clock skew（混合邏輯時鐘，沒有中央 TSO） |
+| YugabyteDB | YSQL（PostgreSQL 相容）、YCQL | tablet，每個一組 Raft | yb-master（自己一組 Raft） | 已加在 [YugabyteDB](#yugabytedb)；熱點與 MVCC 歷史保留（`timestamp_history_retention_interval_sec`）尚未補 |

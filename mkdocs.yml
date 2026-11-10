@@ -94,6 +94,10 @@ nav:
           - 怎麼監控: targets/tidb.md
           - 監控訊號: components/tidb.md
           - 原始碼到 metric: targets/tidb-appendix.md
+      - YugabyteDB:
+          - 怎麼監控: targets/yugabytedb.md
+          - 監控訊號: components/yugabytedb.md
+          - 原始碼到 metric: targets/yugabytedb-appendix.md
   - 原理:
       - 信任契約: contracts.md
       - 名詞：設定與 metric: reference/terms.md
