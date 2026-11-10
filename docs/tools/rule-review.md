@@ -58,6 +58,16 @@ python3 tools/fit_contracts.py --rules my-rules/*.yml --stack prometheus \
     - 方案 B：不改 rule，改環境。該 job 的 `scrape_interval` 至多多少，或加 `query_offset` ≥ 尖峰 scrape 耗時（Prometheus 2.53 起）。代價是 scrape 負載增加，或每條 rule 都晚判斷。
 4. **一次讓所有 rule 合格的環境設定**，依 job 分列。
 
+**視窗是刻意選的時候。**`[1m]` 這種短視窗常常就是要「最近 1 分鐘」的語意，拉長會改變 rule 的意思。在 rule 加 annotation `keep_range: "true"`，或用 `--keep-range <rule 名稱>`，方案 A 就不會改它，報告改列保留語意的做法：
+
+| 做法 | 效果 | 代價 |
+|---|---|---|
+| 縮短該 job 的 `scrape_interval` | 視窗內 sample 變多，「最近 R」才真的有 R 的精度 | scrape 負載與 sample 數增加 |
+| 加 `query_offset` ≥ d | 視窗不必多涵蓋 d | 每條 rule 晚 d 判斷 |
+| Prometheus 3.x `anchored`（實驗功能，`--enable-feature=promql-extended-range-selectors`） | `rate`、`increase`、`delta`、`changes`、`resets` 用視窗前的最後一個 sample 當起點，視窗內只要 1 個 sample；不外推，值是兩端的實際差 | 實驗功能，語法和行為可能改；只能在開了 flag 的 Prometheus 上用 |
+
+視窗內實際看得到的 sample 數約是 R ÷ I。`scrape_interval` 比 R 的一半還長時，「最近 R」的精度其實由 `scrape_interval` 決定，不是由 R 決定。各函式需要幾個 sample 見[各 range 函式需要的視窗](../contracts.md#range-functions)。
+
 讀 recording rule 的 rule，要調的是上游 recording rule 所在 group 的 `interval`，不是 `scrape_interval`；工具會分開標示。
 
 ## 第 2 步：metric 的來源不能用猜的

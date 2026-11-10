@@ -89,6 +89,8 @@ python3 "$AT/tools/fit_contracts.py" --rules <rule 檔...> --stack prometheus|vm
 3. **不合格的 rule，兩個方向**：方案 A 改 rule（工具算出最短的合格視窗，`--write-fitted` 另存一份改好的 rule 檔，原檔不動）；方案 B 不改 rule、改環境（該 job 的 `scrape_interval` 至多多少，或加 `query_offset` ≥ d）。
 4. **一次讓所有 rule 合格的環境設定**（依 job 分列）。
 
+**視窗可能是刻意選的。**像 `[1m]` 這種短視窗，常常就是要「最近 1 分鐘」的語意，拉長會改變 rule 的意思。所以提方案 A 之前先問使用者：「這條的視窗是刻意的嗎？」是的話在 rule 加 annotation `keep_range: "true"`（或用 `--keep-range <rule>`），工具就不改它，改給保留語意的做法：該 job 的 `scrape_interval` 縮到多少（B）、加 `query_offset`、或 Prometheus 3.x 的實驗功能 `anchored`（視窗內只要 1 個 sample、不外推）。也要說明：`scrape_interval` 比 R 的一半還長時，「最近 R」的精度其實由 `scrape_interval` 決定。
+
 兩個方案的代價要一起說：A 的視窗變長，短暫尖峰反應變慢；B 的 `scrape_interval` 變短會增加 scrape 負載，`query_offset` 會讓每條 rule 都晚判斷。讓使用者選。
 
 工具只處理視窗契約與環境檢查；下面各 pack 的其他契約（resend／EndsAt、Alertmanager 告警視窗、exporter 期限）照各自的 SKILL.md：

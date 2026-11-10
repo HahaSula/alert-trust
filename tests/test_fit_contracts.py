@@ -17,7 +17,7 @@ class FitContractsTest(unittest.TestCase):
         a.stack, a.S, a.d, a.E, a.O, a.k = "prometheus", 30.0, 10.0, 30.0, 0.0, 1
         a.T, a.lookback, a.latency, a.eval_delay = 5.0, 300.0, 0.0, 30.0
         a.job_interval, a.job_duration = {"mysql": 60.0}, {"mysql": 75.0}
-        a.dedup, a.query_step = None, 300.0
+        a.dedup, a.query_step, a.keep_range = None, 300.0, []
         a.timeout, a.p99, a.job_timeout, a.job_p99, a.exporter_deadline, a.job_failrun = None, None, {}, {}, {}, {}
         for k, v in kw.items():
             setattr(a, k, v)
@@ -92,6 +92,14 @@ class FitContractsTest(unittest.TestCase):
         self.assertEqual(r["I"], 60)            # dedup 60s > S 30s
         self.assertEqual(r["need"], 130)        # (1+1)*60 + (40-30)
         self.assertFalse(r["ok"])
+
+    def test_keep_range(self):
+        rows, fitted = F.analyze(self._args(keep_range=["ErrorsHigh"]), F.load([RULES]))
+        r = {x["rule"]: x for x in rows}["ErrorsHigh"]
+        self.assertTrue(r["keep"])
+        self.assertEqual(r["need_anchored"], 70)                 # (1+1)*30 + 10
+        exprs = [x["expr"] for _, d in fitted for g in d["groups"] for x in g["rules"]]
+        self.assertIn('rate(http_errors_total{job="api"}[1m]) > 1', exprs)   # not rewritten
 
     def test_cli_exit_code(self):
         with tempfile.TemporaryDirectory() as d:

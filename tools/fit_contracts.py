@@ -102,6 +102,7 @@ def eff_interval(S: float, d: float) -> float:
 # samples needed in the window for a non-empty / meaningful result (docs/contracts.md#range-functions)
 TWO_SAMPLES = {"rate", "increase", "delta", "irate", "idelta", "deriv", "predict_linear", "holt_winters",
                "double_exponential_smoothing", "changes", "resets"}  # changes/resets: 2 to detect a change
+ANCHORED_OK = {"rate", "increase", "delta", "changes", "resets"}  # Prometheus 3.x `anchored` modifier
 ONE_SAMPLE = {f"{x}_over_time" for x in ("avg", "min", "max", "sum", "count", "stddev", "stdvar", "quantile",
                                           "last", "present", "absent", "mad")}
 
@@ -167,6 +168,8 @@ def analyze(a, docs):
             for ri, r in enumerate(g.get("rules", []) or []):
                 expr = str(r.get("expr", ""))
                 name = r.get("alert") or r.get("record")
+                ann = r.get("annotations") or {}
+                keep = name in a.keep_range or str(ann.get("keep_range", "")).lower() in ("true", "yes", "1")
                 new_expr = expr
                 for m in _RANGE.finditer(expr):
                     sel = m.group("sel")
@@ -191,10 +194,14 @@ def analyze(a, docs):
                     need = need_window(a, I, d, off, k, n)
                     row = {"file": path, "group": g.get("name"), "rule": name, "metric": metric, "func": func, "n": n, "R": R, "S": S,
                            "d": d, "I": I, "offset": off, "need": need, "src": src, "ok": R >= need}
+                    row["keep"] = keep
+                    if a.stack == "prometheus" and func in ANCHORED_OK:
+                        row["need_anchored"] = need_window(a, I, d, off, k, 1)
                     if not row["ok"]:
                         fit = nice_up(need)
                         row["fit_R"] = fit
-                        new_expr = new_expr.replace(m.group(0), m.group(0).replace(f"[{m.group('r')}]", f"[{fmt(fit)}]", 1), 1)
+                        if not keep:
+                            new_expr = new_expr.replace(m.group(0), m.group(0).replace(f"[{m.group('r')}]", f"[{fmt(fit)}]", 1), 1)
                         if a.stack == "vmalert":
                             row["opt_b"] = {"eval_delay": max(0.0, (n + k) * I + a.latency - R),
                                             "scrape_interval": (R - max(0.0, a.latency - a.eval_delay)) / (n + k)}
@@ -324,7 +331,33 @@ def report(a, rows, checks, assumptions) -> str:
                 if r["src"].startswith("recording"):
                     s1, s2 = f"上游 group `interval` 至多 {fmt_max(b['scrape_interval_with_offset'])}", "—"
                 out.append(f"| `{r['rule']}` | `{r['metric']}` | {r['src']} | {fmt(r['R'])} | {fmt(r['need'])} | `[{fmt(r['fit_R'])}]` | {s1} | {s2} |")
-        out.append("\nA 的視窗是把需要的長度往上取整；視窗變長，`rate` 對短暫尖峰的反應會變慢（突波被稀釋成約 t/R）。")
+        out.append("\nA 的視窗是把需要的長度往上取整；視窗變長，`rate` 對短暫尖峰的反應會變慢（突波被稀釋成約 t/R），"
+                   "也可能改變 rule 的語意。視窗是刻意選的（例如就是要「最近 1 分鐘」），在 rule 加 annotation `keep_range: \"true\"`"
+                   "或用 `--keep-range <rule>`，A 就不會改它，改看下一節。")
+        keep = [r for r in bad if r.get("keep")]
+        if keep:
+            out.append("\n### 視窗要保留時\n")
+            out.append("視窗內實際看得到的 sample 數約是 R ÷ I；`scrape_interval` 比 R 的一半還長時，「最近 R」的精度其實由 "
+                       "`scrape_interval` 決定，不是由 R 決定。保留語意的做法：\n")
+            out.append("| rule | 函式 | R | 實際約幾個 sample | B：該 job `scrape_interval` 至多 | C：`anchored`（Prometheus 3.x 實驗功能） |\n|---|---|---|---|---|---|")
+            for r in keep:
+                if a.stack == "vmalert":
+                    c = "MetricsQL 已經用視窗前的 sample（n = 1）"
+                elif "need_anchored" in r:
+                    c = ("可行：`" + r["func"] + "(…[" + fmt(r["R"]) + "] anchored)`，需要 ≥ " + fmt(r["need_anchored"])
+                         + "；要開 `--enable-feature=promql-extended-range-selectors`，不外推")
+                    if r["R"] < r["need_anchored"]:
+                        no_d = r["need_anchored"] - max(0.0, r["d"] - r["offset"])
+                        c = (f"單獨不夠（需要 ≥ {fmt(r['need_anchored'])}）；再加 `query_offset` ≥ {fmt(r['d'])} 後需要 ≥ {fmt(no_d)}，"
+                             + ("可行" if r["R"] >= no_d else "仍不夠，要縮短 `scrape_interval`"))
+                else:
+                    c = "不適用這個函式"
+                b = r["opt_b"]["scrape_interval"] if a.stack == "prometheus" else r["opt_b"]["scrape_interval"]
+                bs = fmt_max(b) if b > 0 and b >= r["d"] else "做不到"
+                out.append(f"| `{r['rule']}` | `{r['func'] or '—'}` | {fmt(r['R'])} | {r['R'] / r['I']:.1f} | {bs} | {c} |")
+            out.append("\n`anchored` 用視窗前 lookback 內的最後一個 sample 當起點，視窗內只要 1 個 sample；它不外推，"
+                       "值是視窗兩端的實際差，比 `rate` 更接近「最近 R 內增加多少」的語意。實驗功能，見"
+                       "[各 range 函式需要的視窗](https://hahasula.github.io/alert-trust/contracts/#range-functions)。")
         raw = [r for r in bad if not r["src"].startswith("recording")]
         out.append("\n## 4. 一次讓所有 rule 合格的環境設定（方案 B）\n")
         if a.stack == "vmalert":
@@ -372,6 +405,7 @@ def main() -> int:
     ap.add_argument("--eval-delay", default="30s", help="D：-rule.evalDelay（vmalert，預設 30s）")
     ap.add_argument("--query-step", default="5m", help="vmalert -datasource.queryStep（預設 5m）")
     ap.add_argument("--dedup-interval", help="VictoriaMetrics 的 -dedup.minScrapeInterval；大於 S 時實際間隔用它")
+    ap.add_argument("--keep-range", action="append", default=[], help="這條 rule 的視窗是刻意選的，不要建議拉長（也可在 rule 加 annotation keep_range: \"true\"）")
     ap.add_argument("--out", required=True)
     ap.add_argument("--write-fitted", help="把方案 A 改好的 rule 寫到這個檔（不動原檔；註解不會保留）")
     a = ap.parse_args()
