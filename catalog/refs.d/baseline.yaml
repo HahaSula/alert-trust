@@ -174,8 +174,8 @@ refs:
     project: "VictoriaMetrics"
     version: "v1.155.0"
     file: "lib/promscrape/config.go"
-    line: 932
-    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/lib/promscrape/config.go#L932"
+    line: 931
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/lib/promscrape/config.go#L931"
   bl-vmag-maxscrapesize:
     kind: code
     project: "VictoriaMetrics"

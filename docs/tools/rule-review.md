@@ -78,6 +78,17 @@ python3 tools/fit_contracts.py --rules my-rules/*.yml --stack prometheus \
 
 讀 recording rule 的 rule，要調的是上游 recording rule 所在 group 的 `interval`，不是 `scrape_interval`；工具會分開標示。
 
+### 「一次 scrape 失敗會讓 `for` 重新計時」要怎麼測 {#for-reset-test}
+
+說「一次失敗就重新計時、改成 `last_over_time` 就不會」時，證據是一對 promtool 測試：原本的 rule 在失敗下被重置、提案的寫法照常 firing。**模擬 scrape 失敗要用 `stale`，不要用 `_`。**
+
+| `input_series` 的值 | 對應的情況 | instant selector 在下一次評估 |
+|---|---|---|
+| `stale` | scrape 失敗：Prometheus 寫入 staleness marker | 立刻變空，pending 被刪、`for` 從頭算 |
+| `_` | 這個時間點沒有 sample（不是失敗） | lookback 內仍看得到前一個 sample，**不會**重置 |
+
+用 `_` 的測試裡原本的 rule 也不會被重置，所以證明不了宣稱的事。範本：[for-reset.rules.yml](templates/for-reset.rules.yml)、[for-reset.test.yml](templates/for-reset.test.yml)，`promtool test rules for-reset.test.yml`（Prometheus 2.54.1 與 3.13.5 的 promtool 都通過）。把兩條 rule 換成要比較的寫法，保留三組測試：`stale` 下原本的 rule 被重置、`stale` 下提案的照常 firing、`_` 的對照。
+
 ## 第 2 步：metric 的來源不能用猜的
 
 `check_metric_sources.py` 把每條 rule 裡的每個 metric selector，對到 Prometheus config 的 scrape job：

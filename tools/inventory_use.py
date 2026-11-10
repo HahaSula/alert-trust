@@ -117,7 +117,8 @@ def ms_jobs(inv: dict) -> list[dict]:
         notes = []
         if "job" in (tl.get("from_relabel") or []):
             notes.append("relabel_configs 會改寫 job label")
-        out.append({"scrape_interval": val(j.get("interval")), "scrape_timeout": val(j.get("timeout")),
+        extra = {"static_targets": list(j["static_targets"])} if j.get("static_targets") else {}
+        out.append({**extra, "scrape_interval": val(j.get("interval")), "scrape_timeout": val(j.get("timeout")),
                     "target_labels": sorted(l for l in labels if not l.startswith("__")),
                     "open_labels": list(tl.get("open") or []), "job": j["name"], "metrics_path": j.get("metrics_path", "/metrics"),
                     "module": None, "sd": j.get("sd") or ["static_configs"], "honor_labels": bool(tl.get("honor_labels")),

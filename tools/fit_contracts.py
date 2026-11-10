@@ -28,7 +28,11 @@ The report answers, in this order (the order a reviewer needs):
   5. Threshold rules with `for` whose selector has no range: one failed scrape writes staleness
      markers, the selector is empty at the next evaluation and the pending alert is dropped
      (docs/contracts.md#lookback, #range-window). Reported as a recommendation (last_over_time(x[R]),
-     R from range-window-1sample), labelled 推論.
+     R from range-window-1sample), labelled 推論. To verify it with promtool, a failed scrape is `stale`, never `_`
+     (template docs/tools/templates/for-reset.test.yml).
+  6. --notify-within X: per critical alert the worst case to the first notification, S + d + E + O (vmalert:
+     + max(L, D)) + ⌈for/E⌉·E + group_wait (from the inventory's route), labelled 推算; and the Watchdog route's
+     DMS lower bound (contract deadman-wait, inventory alertmanager.watchdog_route) against X.
 
 A rule whose job has no --job-* value (and is not in --config) uses the defaults; every such row says
 用預設值 and the jobs are listed in the assumptions. Exit code (CI only): 1 when something does not meet
@@ -57,7 +61,8 @@ Other rules the report follows:
   - Subqueries `(...)[R:res]` are ranges: n from the outer function, I = max(res, the inner data interval).
   - Exporter deadline X: --exporter-deadline, else the default of the exporter (--job-exporter, or inferred from the
     metric prefixes of that job's rules), see EXPORTER_DEADLINE.
-  - --prom-version below 2.53: `query_offset` is shown as unavailable.
+  - --prom-version below 2.53: `query_offset` is shown as unavailable. Version unknown: every option using it is
+    marked 「需要 Prometheus ≥ 2.53（版本未知）」, `anchored` 「需要 Prometheus ≥ 3.x 實驗功能（版本未知）」.
   - vmalert with --latency unknown: L = S of the job (conservative), stated as an assumption.
   - Section 5 skips rules that detect absence (absent(), unless, up == 0, absence_covered_by, *Missing names).
   - --inventory env/<name>.inventory.yaml (tools/inventory.py): stack (ruler → --stack, version, evaluation_interval,
@@ -619,6 +624,118 @@ COST_TAU_DOWN = "τ 變小，偶爾慢的 scrape 更容易逾時；或 S 變大�
 COST_TAU_UP = "τ 變大，壞掉的 target 要等更久才判定失敗"
 
 
+CRITICAL = ("critical", "page", "p1", "sev1")
+AM_GROUP_WAIT_DEFAULT = 30.0
+
+
+def notify_checks(a, docs, inv: dict | None) -> list[dict]:
+    """--notify-within: worst-case time from the condition becoming true to the first notification, per critical
+    alert (推算, not measured):
+      Prometheus  S + d + E + O + ⌈for/E⌉·E + group_wait
+      vmalert     S + d + E + max(L, D) + ⌈for/E⌉·E + group_wait
+    S + d: the change waits up to one scrape_interval to be scraped and d more until the sample is written;
+    E: up to one evaluation_interval until the next evaluation sees it; O / max(L, D): the rule reads that much
+    in the past (query_offset; vmalert eval_delay D, or the data latency L when longer); `for` is checked at
+    evaluations, so it takes ⌈for/E⌉·E; group_wait: Alertmanager's first notification of a new group (from the
+    inventory's route for that rule, else the default 30s). A rule whose condition needs several samples (rate
+    over a window) needs more than this; a group that is already open waits group_interval instead."""
+    inv_rules = {r.get("name"): r for r in (inv or {}).get("rules") or []}
+    am_known = isinstance((inv or {}).get("alertmanager"), dict) and "routes" in (inv or {}).get("alertmanager", {})
+    out = []
+    for _, doc in docs:
+        for g in doc.get("groups", []) or []:
+            if g.get("type") not in (None, "", "prometheus"):
+                continue
+            E = dur(g.get("interval")) or a.E
+            O = dur(g.get("query_offset")) if g.get("query_offset") is not None else a.O
+            for r in g.get("rules", []) or []:
+                if "alert" not in r:
+                    continue
+                sev = str((r.get("labels") or {}).get("severity", "")).lower()
+                if sev not in CRITICAL:
+                    continue
+                name = r["alert"]
+                worst, src, n_sel, n_empty = None, "預設", 0, 0
+                for sel in MS.selectors(str(r.get("expr", ""))):
+                    n_sel += 1
+                    job, jsrc, _, nodata = resolve_job(a, sel["matchers"])
+                    if nodata or source_status(a, name, sel["metric"] or ""):
+                        n_empty += 1
+                        continue
+                    P = job_params(a, job)
+                    t = P["S"] + P["d"]
+                    if worst is None or t > worst[0]:
+                        worst, src = (t, P), jsrc
+                if worst is None:
+                    P = job_params(a, None)
+                    worst = (P["S"] + P["d"], P)
+                S, d = worst[1]["S"], worst[1]["d"]
+                fr = dur(r.get("for")) or 0.0
+                for_eff = math.ceil(fr / E - 1e-9) * E if fr else 0.0
+                rt = (inv_rules.get(name) or {}).get("route") or {}
+                gws = [dur(m.get("group_wait")) for m in rt.get("matches") or [] if m.get("group_wait")]
+                if gws:
+                    gw, gw_src = max(gws), "alertmanager.yml（這條 rule 的 route）"
+                else:
+                    gw, gw_src = AM_GROUP_WAIT_DEFAULT, ("Alertmanager 預設" if not am_known else "route 沒有設定，用預設")
+                parts = [("S", S), ("d", d), ("E", E)]
+                if a.stack == "vmalert":
+                    L = a.latency if a.latency is not None else S
+                    parts.append(("max(L, D)", max(L, a.eval_delay)))
+                elif O:
+                    parts.append(("O", O))
+                parts += [("⌈for/E⌉·E", for_eff), ("group_wait", gw)]
+                total = sum(v for _, v in parts)
+                nd = (getattr(a, "nodata_rules", None) or {}).get(name) or \
+                    ("selector 全部沒有資料" if n_sel and n_empty == n_sel else None)
+                out.append({"rule": name, "job_src": src, "parts": parts, "total": total, "gw_src": gw_src,
+                            "defaults": worst[1]["defaults"], "nodata": nd,
+                            "ok": None if nd else total <= a.notify_within,
+                            "formula": " + ".join(f"{k} {fmt(v)}" for k, v in parts) + f" = {fmt(total)}"})
+    return out
+
+
+def dms_check(a, inv: dict | None) -> dict | None:
+    """Watchdog route timings from the inventory: the DMS lower bound (contract deadman-wait) against notify-within."""
+    wr = ((inv or {}).get("alertmanager") or {}).get("watchdog_route") if isinstance((inv or {}).get("alertmanager"), dict) else None
+    if not wr:
+        return None
+    w = wr.get("dms_min_wait_seconds")
+    return dict(wr, ok=(w is not None and w <= a.notify_within))
+
+
+def notify_section(a, nrows: list[dict], dms: dict | None) -> list[str]:
+    X = fmt(a.notify_within)
+    out = [f"\n## 6. 會不會在 {X} 內通知到人（偵測與第一次通知，推算）\n",
+           "**推算**，不是量到的：最壞情況下，從條件成立到 Alertmanager 第一次送出通知要多久。"
+           + ("vmalert：`S + d + E + max(L, D) + ⌈for/E⌉·E + group_wait`。" if a.stack == "vmalert" else
+              "Prometheus：`S + d + E + O + ⌈for/E⌉·E + group_wait`（O 是 `query_offset`，沒有設就是 0）。")
+           + "S + d：變化最多等一個 `scrape_interval` 才被抓到、再 d 才寫入；E：最多一個 `evaluation_interval` 才被評估；"
+             "`for` 只在評估時檢查，要 ⌈for/E⌉·E；`group_wait`：新 group 的第一次通知。"
+             "`rate` 這類要視窗內多個 sample 才超過門檻的 rule 會更久；同一個 group 已經有 alert 在響時，等的是 `group_interval`。"
+             "這裡只算偵測與第一次通知；rule 有沒有載入、route 會不會 page、ruler 停了誰知道，見 summary.md 的端到端結論。\n"]
+    if not nrows:
+        out.append("沒有 severity critical 的 alert rule。")
+    else:
+        out.append(f"| rule | 來源 | 推算（最壞） | ≤ {X}？ | `group_wait` 來源 |\n|---|---|---|---|---|")
+        for n in nrows:
+            ok = "沒有資料，不會響" if n["nodata"] else ("是" if n["ok"] else "**否**")
+            dflt = f"（用預設值：{'、'.join(n['defaults'])}）" if n["defaults"] else ""
+            out.append(f"| `{n['rule']}` | {n['job_src']}{dflt} | {n['formula']} | {ok} | {n['gw_src']} |")
+    if dms:
+        out.append("")
+        verdict_ = "是" if dms["ok"] else "**否**"
+        out.append(f"- **ruler 自己停掉時**（Watchdog → dead man's switch）：契約 "
+                   f"[`deadman-wait`]({SITE}/contracts/#deadman-wait) 要 DMS 等待 > {dms['dms_min_wait']}（{dms['basis']}），"
+                   f"≤ {X}？{verdict_}。"
+                   + ("" if dms["dedicated"] else f"Watchdog 沒有專用 route，繼承 {dms['path']} 的 `repeat_interval` {dms['repeat_interval']}；"
+                      "建議加專用 route（`group_wait: 0s`、`group_interval: 1m`、`repeat_interval: 1m`），範本見 inventory.yaml 的 "
+                      "`alertmanager.watchdog_route.template`。")
+                   + ("" if dms["ok"] else f"即使用專用 route，DMS 最快也要 4 × max(resend, E) + 2m；要在 {X} 內知道 ruler 停了，"
+                                           "靠外部觀察者的 `up`。"))
+    return out
+
+
 def env_checks(a) -> list[tuple]:
     """(text, ok, 建議, contract id or None, 代價) per check. The text always states the actual relation
     (e.g. 「X 15s ≥ τ 10s」), never the wanted one, so a failed row cannot read like a pass."""
@@ -769,6 +886,8 @@ def baseline(a) -> str:
     out.append("\n讀多個 job 的 rule group，E 取這些 S 的最大值；再量 T，確認 `T ≤ 0.8 E`。")
     if not vm and not query_offset_available(a):
         out.append(f"\nPrometheus {a.prom_version_text} 沒有 `query_offset`（要 2.53 以上），只看「無 offset」那欄。")
+    elif not vm and not version_known(a):
+        out.append(f"\n「`query_offset` = d_max」那欄{qo_tag(a)}：確認版本前只把它當成條件式的選項。")
     return "\n".join(out) + "\n"
 
 
@@ -796,6 +915,23 @@ def parse_version(v: str | None) -> tuple | None:
     return tuple(int(x) for x in nums[:3]) if nums else None
 
 
+QO_UNKNOWN = "需要 Prometheus ≥ 2.53（版本未知）"
+ANCHORED_UNKNOWN = "需要 Prometheus ≥ 3.x 實驗功能（版本未知）"
+
+
+def version_known(a) -> bool:
+    return getattr(a, "prom_version", None) is not None
+
+
+def qo_tag(a) -> str:
+    """Prefix for every option that uses `query_offset`: empty when the version is known to have it."""
+    return "" if version_known(a) else f"「{QO_UNKNOWN}」"
+
+
+def anchored_tag(a) -> str:
+    return "" if version_known(a) else f"「{ANCHORED_UNKNOWN}」"
+
+
 def query_offset_available(a) -> bool:
     """`query_offset` / `rule_query_offset` exist from Prometheus 2.53 (docs/tools/baseline.md, p255-query-offset)."""
     v = getattr(a, "prom_version", None)
@@ -806,6 +942,10 @@ SITE = C.SITE_URL if hasattr(C, "SITE_URL") else "https://hahasula.github.io/ale
 COST_A = ("視窗變長，`rate` 對短暫尖峰的反應變慢（突波被稀釋成約 t/R），也可能改變 rule 的語意")
 COST_B = ("`scrape_interval` 變短，scrape 次數與 series 寫入量照比例增加；慢的 exporter 更容易逾時。"
           "`query_offset` 讓每條 rule 都晚這麼久才判斷")
+FOR_RESET_TEST = ("模擬 scrape 失敗一定要用 `stale`（`input_series` 的值寫 `stale`），不要用 `_`：`_` 只是沒有 sample，"
+                  "lookback 內仍看得到前一個值，原本的 rule 也不會重置，證明不了「原本會重置、提案不會」。"
+                  "測試要成對：原本的 rule 在 `stale` 下被重置、提案的 `last_over_time` 在 `stale` 下照常 firing。"
+                  "範本：`docs/tools/templates/for-reset.test.yml`（[說明](https://hahasula.github.io/alert-trust/tools/rule-review/#for-reset-test)）。")
 COST_DEDUP = ("dedup 變小，儲存的 sample 變多；多台 vmagent（HA）時 `-dedup.minScrapeInterval` 要等於 `scrape_interval` 才能去重")
 
 
@@ -922,7 +1062,7 @@ def report(a, rows, checks, assumptions, fors=None, skipped=None) -> str:
                 b = r["opt_b"]
                 s1 = b_text(b["scrape_interval"], r["params"])
                 qo = fmt(b["query_offset"]) if b["query_offset"] is not None else "S"
-                s2 = b_text(b["scrape_interval_with_offset"], r["params"], f"`query_offset` {qo}，") if qo_ok else qo_na
+                s2 = qo_tag(a) + b_text(b["scrape_interval_with_offset"], r["params"], f"`query_offset` {qo}，") if qo_ok else qo_na
                 if r["src"].startswith("recording"):
                     s1, s2 = f"上游 group `interval` 至多 {fmt_max(b['scrape_interval_with_offset'])}", "—"
                 src = r["src"] + (f"；{'；'.join(r['notes'])}" if r.get("notes") else "")
@@ -950,12 +1090,12 @@ def report(a, rows, checks, assumptions, fors=None, skipped=None) -> str:
                 if v is not None and v < (3,):
                     c = f"不可用：Prometheus {a.prom_version_text} 沒有 `anchored`（3.x 實驗功能）"
                 elif "need_anchored" in r:
-                    c = ("可行：`" + r["func"] + "(…[" + fmt(r["R"]) + "] anchored)`，需要 ≥ " + fmt(r["need_anchored"])
+                    c = (anchored_tag(a) + "可行：`" + r["func"] + "(…[" + fmt(r["R"]) + "] anchored)`，需要 ≥ " + fmt(r["need_anchored"])
                          + "；要開 `--enable-feature=promql-extended-range-selectors`，不外推")
                     if r["R"] < r["need_anchored"]:
                         no_d = r["need_anchored"] - max(0.0, r["d"] - r["offset"])
-                        c = (f"單獨不夠（需要 ≥ {fmt(r['need_anchored'])}）；"
-                             + (f"再加 `query_offset` ≥ {fmt(r['d'])} 後需要 ≥ {fmt(no_d)}，"
+                        c = (anchored_tag(a) + f"單獨不夠（需要 ≥ {fmt(r['need_anchored'])}）；"
+                             + (f"再加 `query_offset`{qo_tag(a)} ≥ {fmt(r['d'])} 後需要 ≥ {fmt(no_d)}，"
                                 + ("可行" if r["R"] >= no_d else "仍不夠，要縮短 `scrape_interval`") if qo_ok
                                 else "要縮短 `scrape_interval`（這個版本沒有 `query_offset`）"))
                 else:
@@ -988,10 +1128,11 @@ def report(a, rows, checks, assumptions, fors=None, skipped=None) -> str:
                 so = min(r["opt_b"]["scrape_interval_with_offset"] for r in rs)
                 qo = fmt(max(r["d"] for r in rs)) if (P["measured"] or P.get("assumed") == "τ") else "S"
                 if qo_ok:
-                    out.append(f"| {('job ' + src) if rs[0]['job'] else src} | {b_text(smax, P)} | {qo} | {b_text(so, P)} |")
+                    out.append(f"| {('job ' + src) if rs[0]['job'] else src} | {b_text(smax, P)} | {qo_tag(a)}{qo} | {b_text(so, P)} |")
                 else:
                     out.append(f"| {('job ' + src) if rs[0]['job'] else src} | {b_text(smax, P)} | {qo_na} | — |")
-            out.append("\n`query_offset` 要 Prometheus 2.53 以上（全域 `rule_query_offset` 或 group `query_offset`）；代價是每條 rule 都晚這麼久才判斷。")
+            out.append("\n`query_offset` 要 Prometheus 2.53 以上（全域 `rule_query_offset` 或 group `query_offset`）；代價是每條 rule 都晚這麼久才判斷。"
+                       + ("" if version_known(a) else "**版本未知**：確認 ≥ 2.53 之前，只用「不加 offset」那欄。"))
         if any(r["src"].startswith("recording") for r in bad):
             out.append("- 讀 recording rule 的 rule：調整的是上游 recording rule 所在 group 的 `interval`，不是 `scrape_interval`。")
     if fors or skipped:
@@ -1015,6 +1156,7 @@ def report(a, rows, checks, assumptions, fors=None, skipped=None) -> str:
                    "也能撐過失敗，但會改變判斷（任何一點超過／全部超過）。**代價**：series 真的消失（target 拿掉、exporter 停了）後，"
                    "規則還會成立最多 R。另一個做法 `keep_firing_for` 只在告警已經 firing 後有用（避免 resolve 再 fire），"
                    "幫不了還在 pending 的告警。`--write-fitted` 只寫方案 A 的視窗，不寫這一節的改法。")
+        out.append(f"\n**要用 promtool 驗證時**：{FOR_RESET_TEST}")
     if skipped:
         out.append("\n**不適用**（偵測資料消失的 rule，不建議 `last_over_time`：它會讓真的消失的 series 多 R 才被發現）：\n")
         out.append("| rule | 為什麼不適用 |\n|---|---|")
@@ -1205,6 +1347,8 @@ def main(argv=None) -> int:
     ap.add_argument("--eval-delay", default="30s", help="D：-rule.evalDelay（vmalert，預設 30s）")
     ap.add_argument("--query-step", default="5m", help="vmalert -datasource.queryStep（預設 5m）")
     ap.add_argument("--dedup-interval", help="VictoriaMetrics 的 -dedup.minScrapeInterval；大於 S 時實際間隔用它")
+    ap.add_argument("--notify-within", help="X：使用者要求「X 內通知到人」；列出每條 critical rule 的最壞偵測時間 "
+                                            "S + d + E（+ O／max(L, D)）+ ⌈for/E⌉·E + group_wait（推算）")
     ap.add_argument("--keep-range", action="append", default=[], help="這條 rule 的視窗是刻意選的，不要建議拉長（也可在 rule 加 annotation keep_range: \"true\"）")
     ap.add_argument("--out", required=True)
     ap.add_argument("--write-fitted", help="把方案 A 改好的 rule 寫到這個檔（不動原檔；註解不會保留；第 5 節的改法不寫）")
@@ -1238,6 +1382,7 @@ def main(argv=None) -> int:
     a.job_interval, a.job_duration = kv(a.job_interval), kv(a.job_duration)
     a.timeout, a.p99, a.dedup = dur(a.scrape_timeout), dur(a.scrape_p99), dur(a.dedup_interval)
     a.query_step = dur(a.query_step)
+    a.notify_within = dur(a.notify_within)
     a.job_timeout, a.job_p99, a.exporter_deadline = kv(a.job_timeout), kv(a.job_p99), kv(a.exporter_deadline)
     a.job_failrun = {k: int(v) for k, _, v in (x.partition("=") for x in a.job_failrun)}
     a.job_exporter = {k: v for k, _, v in (x.partition("=") for x in a.job_exporter)}
@@ -1277,9 +1422,14 @@ def main(argv=None) -> int:
     skipped: list = []
     fors = for_checks(a, docs, skipped)
     checks = env_checks(a)
+    nrows, dms = ([], None)
+    if a.notify_within:
+        nrows, dms = notify_checks(a, docs, inv), dms_check(a, inv)
     os.makedirs(a.out, exist_ok=True)
     with open(os.path.join(a.out, "contracts-fit.md"), "w", encoding="utf-8") as f:
         f.write(report(a, rows, checks, assumptions_for(a, rows, fors), fors, skipped) if a.rules else "# 基準值\n")
+        if a.notify_within and a.rules:
+            f.write("\n".join(notify_section(a, nrows, dms)) + "\n")
         if a.baseline:
             f.write("\n" + baseline(a))
     with open(os.path.join(a.out, "contracts-fit.json"), "w", encoding="utf-8") as f:
@@ -1288,7 +1438,12 @@ def main(argv=None) -> int:
                    "env_checks": [{"text": c[0], "ok": c[1], "contract": c[3]} for c in checks],
                    "rows": [{k: r.get(k) for k in ("file", "group", "rule", "metric", "func", "R", "need", "ok", "nodata",
                                                     "job", "contract", "fit_R", "keep")} for r in rows],
-                   "for_checks": [{"rule": x["rule"], "job": x["job"], "R": x["R"]} for x in fors]},
+                   "for_checks": [{"rule": x["rule"], "job": x["job"], "R": x["R"]} for x in fors],
+                   "prom_version": a.prom_version_text or None,
+                   "notify_within": a.notify_within,
+                   "notify": [{k: n[k] for k in ("rule", "total", "ok", "formula", "nodata")} for n in nrows],
+                   "dms": {k: dms[k] for k in ("dms_min_wait", "dms_min_wait_seconds", "ok", "dedicated", "path", "basis")}
+                   if dms else None},
                   f, ensure_ascii=False, indent=1)
     if a.write_fitted:
         groups = [g for _, doc in fitted for g in doc.get("groups", []) or []]

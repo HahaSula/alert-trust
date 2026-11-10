@@ -70,11 +70,16 @@ groups:
           summary: "vmalert 狀態或 recording 結果寫不回去；重啟後 for 會從頭算"
           runbook_url: https://hahasula.github.io/alert-trust/components/vmalert/#state-write
       - alert: MetaGroupSlow
-        expr: max(vmalert_iteration_duration_seconds{quantile="0.9"}) > 24
+        # 每個 group 和自己的 interval 比（vmalert_iteration_interval_seconds 是該 group 的 interval），不同 interval 的 group 都適用
+        expr: |
+          max by (job, instance, group, file) (vmalert_iteration_duration_seconds{quantile="0.9"})
+            / on (job, instance, group, file)
+          max by (job, instance, group, file) (vmalert_iteration_interval_seconds)
+            > 0.8
         for: 30s
         labels: { severity: warning, component: vmalert, tier: "2" }
         annotations:
-          summary: "Group 耗時超過 interval 的 80%（這裡 interval 是 30s）"
+          summary: "Group {{ $labels.group }} 的 p90 耗時超過自己 interval 的 80%（{{ $value | humanizePercentage }}）"
           runbook_url: https://hahasula.github.io/alert-trust/components/vmalert/#group-ratio
       - alert: MetaVLAgentBacklog
         expr: sum(vlagent_remotewrite_pending_data_bytes) > 1000

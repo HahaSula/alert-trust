@@ -66,7 +66,7 @@
 |---|---|---|
 | 預設 S | 1m（Prometheus、VM、Alloy）、30s（operator）、15s（範例、Grafana 假設） | 沒有對錯。選定後 Grafana data source 的 Scrape interval 要改成同一個值，否則 `$__rate_interval` 可能只有 1 × S |
 | `rate` 視窗 | 2 × S（vmalert 文件）、4 × S（Grafana、社群） | Prometheus 契約 `R ≥ (2+k)·I + d`。`k = 1`、`d ≤ S` 時最壞是 `4S`，和 4 × S 一致；2 × S 在 lab 中會間歇回傳空。[^exp-prom-range][^exp-jitter] |
-| τ > S | Prometheus 與 operator 拒絕；vmagent 自動截成 S | 一律自己設 `τ < S`，不要依賴截斷 |
+| τ > S | Prometheus 與 operator 拒絕；vmagent 自動截成 S（`if scrapeTimeout > scrapeInterval` 時改成 `scrapeInterval`，不報錯）[^bl-vmag-timeout-clamp] | 一律自己設 `τ < S`，不要依賴截斷 |
 | S 的上限 | 社群 2m；契約 `I + d < 5m` | 社群的 2m 留了一次失敗的空間；契約只管 lookback。偶爾逾時的 job，用 `(1+k)·I + d < 5m` 檢查比較保守（推論） |
 | E 與 S | 官方預設與範例都讓 `E = S`，但沒有文字要求 | `E < S` 時同一批資料被重算，且 pending 會依相位循環（[契約頁的圖](../contracts.md#range-window)）；`E > S` 只是慢。取 `E = S` |
 | τ 的餘裕 | 沒有官方數字 | 用契約的 80% 預警線反推，見下一節 |

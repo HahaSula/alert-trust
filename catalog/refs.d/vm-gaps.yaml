@@ -204,3 +204,10 @@ refs:
     file: "app/vlstorage/netinsert/netinsert.go"
     line: 220
     url: "https://github.com/VictoriaMetrics/VictoriaLogs/blob/v1.53.0/app/vlstorage/netinsert/netinsert.go#L220"
+  vma-iter-interval:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/group.go"
+    line: 315
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/group.go#L315"

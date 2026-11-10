@@ -25,13 +25,20 @@ the rest. Sections:
                         then keeps depends_on_runtime_labels)), route_label_value_mismatch (close names, e.g.
                         job="etcd" vs kube-etcd), critical_not_paging (critical rules whose only receivers are
                         email / empty), routed_to_empty_receiver (grouped), inhibit_no_equal, dms_route_without_rule
-                        (an alertname="Watchdog" route but no such rule), no_watchdog_rule
+                        (an alertname="Watchdog" route but no such rule), no_watchdog_rule,
+                        watchdog_no_dedicated_route (the Watchdog rule, or the one we propose, falls into a route without
+                        an alertname matcher and inherits its timings; alertmanager.watchdog_route has the timings, the
+                        DMS lower bound of contract deadman-wait and a route template with a valid placeholder URL),
+                        rule_not_applicable (「這條 rule 不適用這個部署」: the rule assumes a feature — multi-target
+                        /probe, heartbeat, semi-sync, Galera, Sentinel, Patroni ... (DEPLOY_NEEDS) — that the config
+                        or answers.features / jobs[].features rule out, or groups by cluster / role that no target has)
   questions             ranked by how many findings / rules the answer changes; at most 3 ask_now
 
 Answers file (env/<name>.sources.yaml) keys read here: job_names, producers, metrics, labels (as in
 check_metric_sources.py), plus version (the ruler's), target_versions.<job> (the database / server version behind a
 scrape job, e.g. mysql: "8.4.13"; check_coverage.py uses it for the cards' `versions`), ruler, external_observer,
-measured.<job>.{d_p99,d_max,up0_count}, keep_range.<rule>. The inventory is facts and questions; advice comes from the later tools.
+measured.<job>.{d_p99,d_max,up0_count}, keep_range.<rule>, features.<job> (list of check_coverage.FEATURES that exist;
+an edited jobs[].features in the --merge inventory counts too). The inventory is facts and questions; advice comes from the later tools.
 """
 from __future__ import annotations
 
@@ -188,6 +195,97 @@ def detects_absence(expr: str, rule: dict) -> dict:
     return d
 
 
+# ---------- deployment mode: does a rule fit how this environment is deployed? ----------
+
+# (feature in check_coverage.FEATURES, regex on metric names, regex on rule name + summary/description)
+DEPLOY_NEEDS = [
+    ("multi-target-probe", None, r"probe.?exporter|multi.?target|多 ?target|代理的所有"),
+    ("heartbeat", r"heartbeat", r"heartbeat"),
+    ("semi-sync", r"semi_?sync|rpl_semi", r"semi.?sync"),
+    ("galera", r"wsrep_", r"galera"),
+    ("group-replication", r"group_replication", r"group.?replication"),
+    ("sentinel", r"^redis_sentinel_|^sentinel_", r"sentinel"),
+    ("patroni", r"^patroni_", r"patroni"),
+]
+FEATURE_TEXT = {"multi-target-probe": "一個 exporter 代理多個 target（/probe、/scrape、__param_target）",
+                "heartbeat": "heartbeat 表（pt-heartbeat 之類）", "semi-sync": "semi-sync replication",
+                "galera": "Galera", "group-replication": "Group Replication", "sentinel": "Redis Sentinel",
+                "patroni": "Patroni"}
+DEPLOY_LABELS = ("cluster", "role")
+_BY = re.compile(r"\b(?:by|on)\s*\(([^)]*)\)")
+
+
+def deployment_needs(name: str, rule: dict, metrics: list[str], expr: str) -> list[dict]:
+    """What the rule assumes about the deployment: features (from DEPLOY_NEEDS) and grouping labels
+    (by / on (cluster|role))."""
+    ann = rule.get("annotations") or {}
+    text = " ".join([name or "", str(ann.get("summary", "")), str(ann.get("description", ""))])
+    out = []
+    for feat, mrx, nrx in DEPLOY_NEEDS:
+        hit_m = [m for m in metrics if mrx and re.search(mrx, m or "", re.I)]
+        if hit_m or (nrx and re.search(nrx, text, re.I)):
+            out.append({"feature": feat, "basis": f"metric {', '.join(sorted(set(hit_m)))}" if hit_m else "rule 名稱／annotation"})
+    grouped = {x.strip() for g in _BY.findall(expr) for x in g.split(",")}
+    for l in DEPLOY_LABELS:
+        if l in grouped:
+            out.append({"label": l, "basis": f"依 `{l}` 分組（by／on）"})
+    return out
+
+
+def deployment_fit(needs: list[dict], jobs: list[dict], features_by_job: dict, ans_labels: dict | None = None,
+                   labels_required: list | None = None) -> dict:
+    """{applies: True|False|"unknown", reasons: [...], ask: [features]} for one rule.
+    jobs: the config jobs the rule reads (load_scrape shape, or inventory jobs). features_by_job: job -> list of
+    features the user says exist (missing job = not answered)."""
+    reasons, ask = [], []
+    ans_labels = ans_labels or {}
+    for n in needs:
+        if "feature" in n:
+            f = n["feature"]
+            names = [j["name"] for j in jobs]
+            listed = [features_by_job[x] for x in names if isinstance(features_by_job.get(x), list)]
+            if names and len(listed) == len(names):
+                import check_coverage as CC
+                if not any(f in CC.expand(fl) for fl in listed):
+                    reasons.append({"basis": "feature", "feature": f, "from": "user",
+                                    "why": f"answers 的 features 沒有 {f}（{FEATURE_TEXT.get(f, f)}）；這條 rule 假設有（{n['basis']}）"})
+                continue
+            if f == "multi-target-probe" and jobs:
+                if all(not j.get("multi_target") for j in jobs):
+                    reasons.append({"basis": "feature", "feature": f, "from": "file",
+                                    "why": "job " + "、".join(names) + " 直接抓每台的 exporter（metrics_path "
+                                           + "、".join(sorted({j.get('metrics_path') or '/metrics' for j in jobs}))
+                                           + "，沒有 `__param_target` relabel）；這條 rule 假設一個 exporter 代理多個 target"})
+                continue
+            ask.append(f)
+        else:
+            l = n["label"]
+            if l in ans_labels:
+                if ans_labels[l].strip().lower() in MS.NO_LABEL:
+                    reasons.append({"basis": "label", "label": l, "from": "user",
+                                    "why": f"{n['basis']}，answers 說沒有 `{l}` label：所有 target 會被算成同一組"})
+                continue
+            if any(x.get("label") == l and x.get("status") == "missing" for x in labels_required or []):
+                reasons.append({"basis": "label", "label": l, "from": "file",
+                                "why": f"要 `{l}` label，config 沒有產生（見「要的 label」）"})
+                continue
+            if not jobs:
+                continue
+            tl = [j.get("target_labels") or {} for j in jobs]
+            if any(l in (t.get("from_static") or {}) or l in (t.get("from_relabel") or []) or t.get("open") for t in tl):
+                continue
+            reasons.append({"basis": "label", "label": l, "from": "file",
+                            "why": f"{n['basis']}，但 job {'、'.join(j['name'] for j in jobs)} 的 target 沒有 `{l}` label"
+                                   f"（config 沒有加；除非 exporter 自己輸出）：所有 target 會被算成同一組"})
+    for x in labels_required or []:
+        if x.get("label") in DEPLOY_LABELS and x.get("status") == "missing" and \
+                not any(r.get("label") == x["label"] for r in reasons):
+            reasons.append({"basis": "label", "label": x["label"], "from": x.get("from") or "file",
+                            "why": f"要 `{x['label']}{x['match']}`，config 沒有產生這個 label"})
+    applies = False if reasons else ("unknown" if ask else True)
+    return {"applies": applies, "reasons": reasons, "ask": sorted(set(ask))}
+
+
 def required_matchers(matchers) -> list[tuple[str, str, str]]:
     """Matchers that need the label to exist with a value (job and __name__ excluded)."""
     out = []
@@ -274,6 +372,9 @@ def load_scrape(path: str, kind: str) -> dict:
             "static_targets": static_targets,
             "sd": sds or ["static_configs"],
             "metrics_path": sc.get("metrics_path", "/metrics"),
+            # one exporter, many targets: /probe or /scrape path, or relabel that moves the target into a URL parameter
+            "multi_target": sc.get("metrics_path", "/metrics") in ("/probe", "/scrape")
+                            or any(str(r.get("target_label", "")).startswith("__param_") for r in relabel),
             "target_labels": {"from_static": {k: sorted(v) for k, v in sorted(static_labels.items())},
                               "from_relabel": relabel_targets, "honor_labels": bool(sc.get("honor_labels")),
                               "open": open_labels},
@@ -724,6 +825,52 @@ def route_label_gaps(e: dict, expr: str, tree: dict, by_job: dict, cfg_jobs: lis
     return cond
 
 
+DMS_ROUTE_TEMPLATE = """route:
+  routes:
+    - matchers: ['alertname="Watchdog"']
+      receiver: deadmans-switch
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 1m
+      continue: false
+receivers:
+  - name: deadmans-switch
+    webhook_configs:
+      - url: https://dms.example.invalid/ping"""
+
+
+def watchdog_route(tree: dict, rules_out: list, stack: dict, ruler: dict) -> dict:
+    """Where the Watchdog alert (the rule in the files, or the one we propose) is routed, its timings, whether the
+    route is dedicated (a child route with an alertname matcher), and the DMS lower bound from contract deadman-wait:
+    4 × max(resend, E) + repeat_interval + group_interval."""
+    wd = next((e for e in rules_out if e["kind"] == "alert" and WATCHDOG_NAME.search(e["name"] or "")), None)
+    if wd is not None and isinstance(wd.get("route"), dict) and wd["route"].get("matches"):
+        rt = wd["route"]
+    else:
+        ext = IU_val(stack.get("external_labels")) or {}
+        rt = route_for(tree, dict({k: v for k, v in ext.items()}, alertname="Watchdog", severity="none", __other__=""))
+    by_path = {n["path"]: n for n in tree["nodes"]}
+    m = next((x for x in rt["matches"] if x["certain"]), rt["matches"][0])
+    node = by_path[m["path"]]
+    dedicated = m["path"] != "route" and any(l == "alertname" for l, _, _ in node["matchers"])
+    E = dur(IU_val(stack.get("evaluation_interval"))) or 60.0
+    resend = 60.0 if ruler.get("value") == "prometheus" else 0.0
+    rep_i, gi = dur(m["repeat_interval"]) or 0.0, dur(m["group_interval"]) or 0.0
+    wait = 4 * max(resend, E) + rep_i + gi
+    return {"rule": wd["name"] if wd else None, "proposed": wd is None, "path": m["path"], "receiver": m["receiver"],
+            "dedicated": dedicated, "group_wait": m["group_wait"], "group_interval": m["group_interval"],
+            "repeat_interval": m["repeat_interval"], "dms_min_wait": fmt(wait), "dms_min_wait_seconds": wait,
+            "basis": f"4 × max(resend {fmt(resend)}, E {fmt(E)}) + repeat_interval {fmt(rep_i)} + group_interval {fmt(gi)}，推算",
+            "contract": "deadman-wait", "template": None if dedicated else DMS_ROUTE_TEMPLATE}
+
+
+def IU_val(node):
+    if isinstance(node, dict):
+        v = node.get("value")
+        return None if v in (None, "unknown") else v
+    return node
+
+
 def _sev_critical(v) -> bool:
     return isinstance(v, str) and v.lower() in ("critical", "page", "p1", "sev1")
 
@@ -818,6 +965,9 @@ def build(a) -> dict:
     producers = {str(k): [str(x) for x in v or []] for k, v in (answers.get("producers") or {}).items()}
     ans_labels = {str(k): str(v) for k, v in (answers.get("labels") or {}).items()}
     measured = answers.get("measured") or {}
+    old_inv = (C._load(a.merge) or {}) if getattr(a, "merge", None) and os.path.exists(a.merge) else {}
+    old_feats = {j["name"]: j["features"] for j in old_inv.get("jobs") or []
+                 if isinstance(j, dict) and isinstance(j.get("features"), dict) and isinstance(j["features"].get("value"), list)}
 
     # ---- rules (first pass: selectors per rule) ----
     rules_out, job_metrics, rule_jobs_used = [], {}, {}
@@ -912,7 +1062,10 @@ def build(a) -> dict:
                 out[k] = V(None, "unknown")
             out["targets"] = None
         else:
-            out.update({k: j[k] for k in ("interval", "timeout", "targets", "sd", "target_labels", "dropped_metrics")})
+            out.update({k: j[k] for k in ("interval", "timeout", "targets", "sd", "metrics_path", "multi_target",
+                                          "target_labels", "dropped_metrics")})
+            if j["static_targets"]:
+                out["static_targets"] = j["static_targets"]
             if j["kept_only_metrics"]:
                 out["kept_only_metrics"] = j["kept_only_metrics"]
             if j["rewrites_job"]:
@@ -951,6 +1104,15 @@ def build(a) -> dict:
                                  "fact": f"job {name}：{ex} 預設期限 {fmt(x)} ≥ scrape_timeout {fmt(tau)}（預設值，未確認 exporter 參數）"})
         else:
             out["exporter_deadline"] = V(None, "unknown")
+        fe = (answers.get("features") or {}).get(name)
+        if isinstance(fe, list):
+            out["features"] = V([str(x).strip().lower() for x in fe], "user",
+                                note="answers.features：這個 job 的 target「有」的功能（沒列的當成沒有）")
+        elif name in old_feats:
+            out["features"] = dict(old_feats[name], **{"from": "user"})
+        else:
+            out["features"] = V(None, "unknown", note="這個 job 的 target 有哪些功能（check_coverage.py 的 FEATURES，"
+                                                     "例如 heartbeat、semi-sync、multi-target-probe）；填清單後 --merge 重跑")
         ms = measured.get(name) or {}
         out["measured"] = ({"d_p99": ms.get("d_p99"), "d_max": ms.get("d_max"), "up0_count": ms.get("up0_count"), "from": "user"}
                            if ms else {"d_p99": None, "d_max": None, "up0_count": None, "from": "unknown"})
@@ -986,6 +1148,9 @@ def build(a) -> dict:
     keep_ans = answers.get("keep_range") or {}
     ext = cfg["external_labels"] if cfg else {}
     fires_by: dict[tuple, list] = {}
+    deploy_bad: dict[tuple, list] = {}
+    deploy_ask: dict[str, list] = {}
+    features_by_job = {j["name"]: j["features"]["value"] for j in jobs_out if isinstance(j.get("features"), dict)}
     route_gaps: dict[tuple, dict] = {}
     route_values: dict[tuple, dict] = {}
     for e in rules_out:
@@ -1055,6 +1220,24 @@ def build(a) -> dict:
                                      f"static 值只有 {st.get('static_values')}" if st.get("static_values") is not None else
                                      "matched job 的 config 沒有產生這個 label")})
         e["labels_required"] = sorted(lr, key=lambda x: x["label"])
+        needs = deployment_needs(name, r, [s["metric"] for s in sels if s["metric"]], r_expr)
+        if needs:
+            djobs = [by_job[j] for j in sorted(rule_jobs_used.get(name, ())) if j in by_job]
+            assumed = None
+            if not djobs and by_job:  # job matcher fits no job: judge the deployment as if it named the closest one
+                close = [c for op, v in e.get("_jm", []) if op == "="
+                         for c in difflib.get_close_matches(v, sorted(by_job), n=1, cutoff=0.6)]
+                if close:
+                    djobs, assumed = [by_job[close[0]]], close[0]
+            fit = deployment_fit(needs, djobs, features_by_job, ans_labels, e["labels_required"])
+            if assumed:
+                for x in fit["reasons"]:
+                    x["why"] += f"（假設 rule 的 job 改成 `{assumed}`）"
+            e["deployment"] = {"needs": needs, "applies": fit["applies"], "reasons": fit["reasons"], "ask": fit["ask"]}
+            for x in fit["reasons"]:
+                deploy_bad.setdefault((x["basis"], x.get("feature") or x.get("label"), x["why"]), []).append(name)
+            for f in fit["ask"]:
+                deploy_ask.setdefault(f, []).append(name)
         # never / always fires
         absent_empty = [s for s in sels if s["in_absent"] and s["empty"]]
         other = [s for s in sels if not s["in_absent"]]
@@ -1123,6 +1306,11 @@ def build(a) -> dict:
             else:
                 e["route"] = V(None, "unknown", note="沒有 alertmanager.yml")
     inv["rules"] = rules_out
+    for (basis, what, why), names in deploy_bad.items():
+        findings.append({"kind": "rule_not_applicable", "basis": basis, basis: what, "rules": names, "reason": why,
+                         "fact": f"這條 rule 不適用這個部署（{len(names)} 條：{', '.join(names[:8])}{' 等' if len(names) > 8 else ''}）："
+                                 f"{why}"})
+    inv["_deploy_ask"] = deploy_ask
     WHY = {"job": "job 對不上", "dropped": "metric 被丟掉", "label": "label 不存在"}
     for (kind, why), names in fires_by.items():
         reason = "、".join(WHY.get(w.strip(), w) for w in why.split(","))
@@ -1285,6 +1473,15 @@ def build(a) -> dict:
                                  "resend_delay": V("1m", "default") if ruler["value"] == "prometheus" else V(None, "unknown"),
                                  "contract": "resend-endsat",
                                  "note": "只記錄數值；EndsAt 與 repeat_interval 的關係見 docs/contracts.md#resend-endsat"}
+        amo["watchdog_route"] = watchdog_route(tree, rules_out, stack, ruler)
+        wr = amo["watchdog_route"]
+        if not wr["dedicated"]:
+            who = f"Watchdog rule `{wr['rule']}`" if wr["rule"] else "建議新增的 Watchdog"
+            findings.append({"kind": "watchdog_no_dedicated_route", "route": wr["path"], "receiver": wr["receiver"],
+                             "fact": f"{who} 在 Alertmanager 沒有專用的 route：會落到 {wr['path']}（→ {wr['receiver']}），"
+                                     f"繼承 `group_wait` {wr['group_wait']}、`group_interval` {wr['group_interval']}、"
+                                     f"`repeat_interval` {wr['repeat_interval']}；dead man's switch 依契約 deadman-wait "
+                                     f"至少要等 {wr['dms_min_wait']} 才能判斷 ruler 停了（{wr['basis']}）"})
         inv["alertmanager"] = amo
     else:
         inv["alertmanager"] = V(None, "unknown", note="沒有 alertmanager.yml")
@@ -1309,6 +1506,7 @@ def build(a) -> dict:
         fl.append(f)
     inv["findings_from_files"] = fl
     inv["questions"] = questions(inv, cfg, am, a, fl)
+    inv.pop("_deploy_ask", None)
     return inv
 
 
@@ -1351,7 +1549,9 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
                    "affects": len(alerts), "answer_key": "--alertmanager"})
     if inv["stack"]["version"]["from"] == "unknown":
         rk = inv["stack"]["ruler"]["value"] or "Prometheus／vmalert"
-        qs.append({"q": f"評估這些 rule 的 {rk} 是哪個版本？",
+        api = ("`curl -s <vmalert>/metrics | grep vm_app_version`" if rk == "vmalert" else
+               "`curl -s <prometheus>/api/v1/status/buildinfo` 與 `curl -s <prometheus>/api/v1/status/flags`")
+        qs.append({"q": f"評估這些 rule 的 {rk} 是哪個版本？請直接貼 {api} 的輸出（唯讀；版本與旗標一次確認）",
                    "changes": ["query_offset／eval_delay 可用與否", "anchored", "samples_needed（vmalert）"],
                    "affects": len(ranged) + 1, "findings": 0, "answer_key": "version"})
     if inv["stack"]["external_observer"]["from"] == "unknown":
@@ -1363,7 +1563,11 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
     jobs_ranged = sorted({j for r in ranged for j in (r["jobs_matched"].get("value") or [])})
     unmeasured = [j["name"] for j in inv["jobs"] if j["name"] in jobs_ranged and j["measured"]["from"] == "unknown"]
     if unmeasured:
-        qs.append({"q": f"{', '.join(unmeasured)} 的 scrape 耗時 p99／最大值與 up==0 次數（7 天）",
+        sel = "|".join(unmeasured)
+        qs.append({"q": f"{', '.join(unmeasured)} 的 scrape 耗時 p99／最大值與 up==0 次數（7 天）：請貼這三個查詢的輸出 "
+                        f"`max by (job) (quantile_over_time(0.99, scrape_duration_seconds{{job=~\"{sel}\"}}[7d]))`、"
+                        f"`max by (job) (max_over_time(scrape_duration_seconds{{job=~\"{sel}\"}}[7d]))`、"
+                        f"`sum by (job) (count_over_time((up{{job=~\"{sel}\"}} == 0)[7d:]))`",
                    "changes": ["scrape_timeout", "range 視窗", "k"], "affects": len(ranged),
                    "findings": cnt("timeout_gt_interval", "exporter_deadline_ge_timeout"), "answer_key": "measured"})
     short = [r["name"] for r in ranged if any(g.get("short") for g in r["ranges"]) and r["keep_range"]["from"] == "unknown"]
@@ -1373,7 +1577,10 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
     hinted = [j for j in inv["jobs"] if j["exporter"]["from"] == "hint"]
     if hinted:
         n = sum(1 for r in rules if set(r["jobs_matched"].get("value") or []) & {j["name"] for j in hinted})
-        qs.append({"q": "確認 exporter：" + "、".join(f"{j['name']} = {j['exporter']['value']}？" for j in hinted) + "（版本與參數）",
+        sel = "|".join(j["name"] for j in hinted)
+        qs.append({"q": "確認 exporter：" + "、".join(f"{j['name']} = {j['exporter']['value']}？" for j in hinted)
+                        + f"請貼 `group by (job, __name__, version) ({{__name__=~\".+_build_info\", job=~\"{sel}\"}})` 的輸出"
+                          "（一次確認 exporter 與版本；參數另外在 inventory.yaml 填）",
                    "changes": ["exporter 期限", "metric 來源", "目錄卡片"], "affects": n,
                    "findings": cnt("exporter_deadline_ge_timeout"), "answer_key": "producers"})
     for f in [f for f in findings if f["kind"] == "route_label_missing"]:
@@ -1389,6 +1596,13 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
                         f"還是要在 rule 的 labels 或 relabel 加？沒有的話 {len(names)} 條 rule 會送到 {'、'.join(recv)}",
                    "changes": ["每條 rule 送到哪個 receiver", "critical 會不會 page"], "affects": len(names),
                    "findings": len(sib) + cnt("critical_not_paging"), "answer_key": f"labels.{f['label']}"})
+    da = inv.get("_deploy_ask") or {}
+    if da:
+        names = sorted({n for v in da.values() for n in v})
+        feats = "、".join(f"{f}（{FEATURE_TEXT.get(f, f)}）" for f in sorted(da))
+        qs.append({"q": f"這個部署有沒有：{feats}？在 inventory.yaml 的 jobs[].features（或 answers 的 `features.<job>: [...]`）"
+                        "列出有的功能，一次填完",
+                   "changes": ["這條 rule 適不適用這個部署"], "affects": len(names), "findings": 0, "answer_key": "features"})
     lbl = {}
     for r in rules:
         for l in r.get("labels_required", []):

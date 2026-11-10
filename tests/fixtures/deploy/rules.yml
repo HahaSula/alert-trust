@@ -1,0 +1,32 @@
+groups:
+  - name: db
+    rules:
+      - alert: DbProbeExporterDown
+        expr: count by (job) (up{job="mysqld"} == 0) / count by (job) (up{job="mysqld"}) > 0.5
+        for: 2m
+        labels: { severity: critical }
+        annotations: { summary: "多 target 模式下多半是共用的 exporter 掛了" }
+      - alert: DbHeartbeatLag
+        expr: mysql_heartbeat_now_timestamp_seconds{job="mysqld"} - mysql_heartbeat_stored_timestamp_seconds{job="mysqld"} > 30
+        for: 1m
+        labels: { severity: warning }
+      - alert: DbSemiSyncOff
+        expr: mysql_global_status_rpl_semi_sync_master_status{job="mysqld"} == 0
+        for: 1m
+        labels: { severity: warning }
+      - alert: DbNoWritable
+        expr: count by (cluster) (mysql_global_variables_read_only{job="mysqld"} == 0) < 1
+        for: 1m
+        labels: { severity: critical }
+      - alert: DbDown
+        expr: mysql_up{job="mysqld"} == 0
+        for: 1m
+        labels: { severity: critical }
+      - alert: Watchdog
+        expr: vector(1)
+        labels: { severity: none }
+  - name: meta
+    rules:
+      - alert: RulerGroupSlow
+        expr: max(vmalert_iteration_duration_seconds{quantile="0.9"}) > 24
+        labels: { severity: warning }

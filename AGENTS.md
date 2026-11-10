@@ -46,7 +46,9 @@ docker run --rm -u $(id -u):$(id -g) -v "$PWD":/docs squidfunk/mkdocs-material:9
 
 ## 檢查使用者的 rule 檔（不走 skill 時也照這個方式）
 
-**輸出是建議，不是判決；第一次回覆就要有建議。**拿到 rule 檔（和 `prometheus.yml`，如果有）後，先跑只需要檔案的工具，把「只看檔案就說得出的結論」連同第一組問題一起回覆，之後每輪回答都更新同一份報告。缺資料時用保守假設先跑完，寫明假設了什麼、補上哪一項會改變結論；不要一開始就要求使用者提供全部資料。每輪最多問 3 題，可以問任何一步的問題，先問會改變最多結論的。
+**輸出是建議，不是判決；第一次回覆就要有建議。**拿到 rule 檔（和 `prometheus.yml`，如果有）後，先跑只需要檔案的工具，把「只看檔案就說得出的結論」連同第一組問題一起回覆，之後每輪回答都更新同一份報告。缺資料時用保守假設先跑完，寫明假設了什麼、補上哪一項會改變結論；不要一開始就要求使用者提供全部資料。每輪最多問 3 個單一問題（題組要拆開算），可以問任何一步的問題，先問會改變最多結論的；版本、旗標這類清單請使用者貼一次唯讀查詢的輸出（例如 `/api/v1/status/buildinfo`、`/api/v1/status/flags`），或填進 `inventory.yaml`。
+
+使用者問「會不會告警／X 分鐘內會不會知道」時，第一句回答「X 內會不會有人被 page」，再分開列偵測（rule 邏輯）、載入（`rule_files`）、路由（Alertmanager）、自我監控（Watchdog／DMS／觀察者）；有時間要求時加 `--notify-within`。版本未知時，`query_offset`、`anchored` 只能標成「需要 Prometheus ≥ 2.53（版本未知）」「需要 Prometheus ≥ 3.x 實驗功能（版本未知）」。提案的設定檔用合法的佔位值（`https://dms.example.invalid/ping`），驗證跑交付的那份。「一次 scrape 失敗會重置 `for`」的 promtool 測試要用 `stale`、不是 `_`（範本 `docs/tools/templates/for-reset.test.yml`）。
 
 先跑一鍵入口，它會先盤點再檢查：`python3 tools/review.py --rules <rule 檔...> [--config prometheus.yml] [--alertmanager alertmanager.yml] --out report`。盤點（`report/inventory.yaml`／`inventory.md`）是所有工具共同的事實基礎，第一次回覆要附上盤點摘要請使用者確認；單獨重跑工具時加 `--inventory report/inventory.yaml`。
 

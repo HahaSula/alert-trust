@@ -1,0 +1,9 @@
+# 例子：Watchdog 沒有專用 route，繼承根的 repeat_interval 3h
+route:
+  receiver: pager
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 3h
+receivers:
+  - name: pager
+    webhook_configs: [{ url: "https://pager.example.invalid/hook" }]

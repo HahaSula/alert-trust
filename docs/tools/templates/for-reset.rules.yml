@@ -1,0 +1,16 @@
+# 範本：沒有 range 的門檻 rule 加 `for` 時，一次 scrape 失敗會不會讓 `for` 重新計時。
+# 和 for-reset.test.yml 一起用：promtool test rules for-reset.test.yml
+# 把兩條 rule 的 expr 換成你的 rule（原本的寫法、提案的 last_over_time 寫法），名稱保留 Original／Proposed 的區別。
+# R（這裡 30s）照 range-window-1sample：R ≥ (1+k)·I + max(0, d − O)；例子用 I = 15s、k = 1、d = 0。
+groups:
+  - name: for-reset-demo
+    interval: 15s
+    rules:
+      - alert: DemoHighOriginal
+        expr: demo_value > 10
+        for: 1m
+        labels: { severity: warning }
+      - alert: DemoHighProposed
+        expr: last_over_time(demo_value[30s]) > 10
+        for: 1m
+        labels: { severity: warning }

@@ -111,12 +111,12 @@ signals:
   - id: group-ratio
     tier: 2
     question: Group 跑得完嗎
-    signal: "`vmalert_iteration_duration_seconds` ÷ group 的 `interval`（預設 `-evaluationInterval`）；已經跳過的次數看 `vmalert_iteration_missed_total`"
-    metrics: [vmalert_iteration_duration_seconds, vmalert_iteration_missed_total]
+    signal: "每個 group 的 `vmalert_iteration_duration_seconds` ÷ 同一個 group 的 `vmalert_iteration_interval_seconds`（該 group 的 `interval`，沒寫時是 `-evaluationInterval`）> 0.8；不同 interval 的 group 各自比。已經跳過的次數看 `vmalert_iteration_missed_total`"
+    metrics: [vmalert_iteration_duration_seconds, vmalert_iteration_interval_seconds, vmalert_iteration_missed_total]
     evaluate_on: observer
     evidence: tested
     source: art-vm
-    refs: [exp-vm-faults, vma-missed]
+    refs: [exp-vm-faults, vma-missed, vma-iter-interval]
     upstream: { status: partial, note: "只有 missed" }
     rules: [rules/victoriametrics/meta.yml#MetaGroupSlow]
     contract: group-within-interval

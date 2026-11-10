@@ -1,0 +1,16 @@
+# 例子：Watchdog 有專用 route
+route:
+  receiver: pager
+  group_wait: 10s
+  repeat_interval: 3h
+  routes:
+    - matchers: ['alertname="Watchdog"']
+      receiver: deadmans-switch
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 1m
+receivers:
+  - name: pager
+    webhook_configs: [{ url: "https://pager.example.invalid/hook" }]
+  - name: deadmans-switch
+    webhook_configs: [{ url: "https://dms.example.invalid/ping" }]

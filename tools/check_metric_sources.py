@@ -17,6 +17,9 @@ Never guesses. For each (rule, metric selector) it reports one status:
                 live): absent() returns 1 all the time, so the alert fires constantly
   job_mismatch  the selector's job matcher matches no scrape job in the config (rule returns nothing);
                 also for {__name__=~"..."} selectors
+  no_source     the metric's prefix names the component that exports it (vmalert_, alertmanager_, prometheus_,
+                vmagent_, vl_, ...; COMPONENT_PREFIX) and none of the jobs the selector can match is that component
+                (job name, static targets and default port all say otherwise): 「沒有來源（config 沒有抓 vmalert）」
   label_mismatch the selector requires a label (role="primary", cluster=...) that cannot exist: up/scrape_*
                 only carry target labels and the config adds none, or the answers file says `labels.<l>: none`
   dropped       metric_relabel_configs in the matching job(s) drop this metric name
@@ -29,7 +32,7 @@ Never guesses. For each (rule, metric selector) it reports one status:
 The catalog (catalog/components, catalog/targets) only suggests which exporter usually produces a
 metric; that is shown as a hint and never counts as a source. The report starts with advice
 (建議 / 代價), not a verdict. Exit code (for CI only): 1 when any row is always_fires, job_mismatch,
-label_mismatch, dropped or live_missing; 2 when only needs_input remains.
+label_mismatch, dropped, live_missing or no_source; 2 when only needs_input remains.
 """
 from __future__ import annotations
 
@@ -238,7 +241,9 @@ def load_config(path: str) -> list[dict]:
         open_labels = [w for w, hit in (("honor_labels", bool(sc.get("honor_labels"))),
                                         ("labelmap", any(r.get("action") == "labelmap" for r in sc.get("relabel_configs") or [])),
                                         ("file_sd_configs", "file_sd_configs" in sc), ("http_sd_configs", "http_sd_configs" in sc)) if hit]
-        jobs.append({"scrape_interval": sc.get("scrape_interval"), "scrape_timeout": sc.get("scrape_timeout"),
+        static_targets = [str(t) for st in sc.get("static_configs") or [] for t in (st or {}).get("targets") or []]
+        jobs.append({"static_targets": static_targets,
+                     "scrape_interval": sc.get("scrape_interval"), "scrape_timeout": sc.get("scrape_timeout"),
                      "target_labels": sorted(l for l in labels if not l.startswith("__")), "open_labels": open_labels,
                      "job": sc.get("job_name"), "metrics_path": sc.get("metrics_path", "/metrics"),
                      "module": (sc.get("params") or {}).get("module"), "sd": sds or ["static_configs"],
@@ -375,7 +380,38 @@ def load_rules(files: list[str]) -> list[dict]:
 
 
 ABSENT_FUNCS = {"absent", "absent_over_time"}
-EMPTY_STATUSES = {"job_mismatch", "dropped", "live_missing", "label_mismatch"}  # selector returns nothing
+EMPTY_STATUSES = {"job_mismatch", "dropped", "live_missing", "label_mismatch", "no_source"}
+# Metric prefixes that name the component that exports them: (component, job/target regex, default ports).
+# A selector with such a prefix whose candidate jobs cannot be that component has no source.
+COMPONENT_PREFIX = [
+    ("vmalert_", "vmalert", r"vmalert", {"8880"}),
+    ("alertmanager_", "alertmanager", r"alertmanager|(^|[-_])am([-_]|$)", {"9093"}),
+    ("prometheus_", "prometheus", r"prometheus", {"9090"}),
+    ("vmagent_", "vmagent", r"vmagent", {"8429"}),
+    ("vm_promscrape_", "vmagent", r"vmagent|victoria|vmsingle", {"8429", "8428"}),
+    ("vl_", "victorialogs", r"victorialogs|vlogs|vlstorage|vlselect|vlinsert", {"9428", "9491", "9481", "9471"}),
+    ("vlagent_", "vlagent", r"vlagent", {"9429"}),
+]
+
+
+def component_of(metric: str | None):
+    for prefix, comp, rx, ports in COMPONENT_PREFIX:
+        if metric and metric.startswith(prefix):
+            return comp, rx, ports
+    return None
+
+
+def job_could_be(job: dict, rx: str, ports: set) -> bool:
+    """False only when the config shows the job is something else: name and every static target fail the
+    component's name / default port, and the targets are all listed (static_configs only)."""
+    if re.search(rx, job["job"] or "", re.I):
+        return True
+    if job.get("open_labels") or job.get("sd") != ["static_configs"] or "static_targets" not in job:
+        return True
+    ts = job.get("static_targets") or []
+    if not ts:
+        return True
+    return any(re.search(rx, t, re.I) or t.rsplit(":", 1)[-1] in ports for t in ts)  # selector returns nothing
 NO_LABEL = {"none", "no", "沒有", "不存在", "false"}
 
 
@@ -481,8 +517,17 @@ def check(rules: list[dict], jobs: list[dict], answers: dict, live: dict | None,
                     else:
                         row.update(status="job_mismatch", detail=f"使用者說來源是 {', '.join(a_jobs)}，selector 對不上")
                 else:
-                    why = "selector 沒有 job 條件，任何 job 都可能" if not jm else "有符合的 job，但不知道它是否輸出這個 metric"
-                    row.update(status="needs_input", ask="producer", detail=why)
+                    comp = component_of(metric)
+                    cands = [by_job[j] for j in matched if j in by_job]
+                    if comp and jobs and not open_set and len(cands) == len(matched) \
+                            and not any(job_could_be(j, comp[1], comp[2]) for j in cands):
+                        row.update(status="no_source",
+                                   detail=f"沒有來源（config 沒有抓 {comp[0]}）：`{metric}` 是 {comp[0]} 自己的 metric，"
+                                          + ("selector 對到的 job（" + ", ".join(matched) + "）" if matched else "沒有 job")
+                                          + f" 都不是 {comp[0]}（job 名稱、target 位址與預設 port 都對不上）")
+                    else:
+                        why = "selector 沒有 job 條件，任何 job 都可能" if not jm else "有符合的 job，但不知道它是否輸出這個 metric"
+                        row.update(status="needs_input", ask="producer", detail=why)
             # non-job labels the selector requires: the config must add them, or the exporter must export them
             if jobs and row["status"] in ("builtin", "confirmed", "live", "needs_input", "job_mismatch") \
                     and not (metric or "").startswith("ALERTS"):
@@ -524,12 +569,12 @@ def check(rules: list[dict], jobs: list[dict], answers: dict, live: dict | None,
     return rows
 
 
-ORDER = ["always_fires", "job_mismatch", "label_mismatch", "dropped", "live_missing", "needs_input", "confirmed", "live",
+ORDER = ["always_fires", "job_mismatch", "no_source", "label_mismatch", "dropped", "live_missing", "needs_input", "confirmed", "live",
          "recording", "builtin"]
-LABEL = {"always_fires": "一直在響", "job_mismatch": "job 對不上", "label_mismatch": "label 不存在",
+LABEL = {"always_fires": "一直在響", "job_mismatch": "job 對不上", "no_source": "沒有來源", "label_mismatch": "label 不存在",
          "dropped": "被 relabel 丟掉", "live_missing": "live 查不到", "needs_input": "要問人", "confirmed": "使用者確認",
          "live": "live 看得到", "recording": "recording rule", "builtin": "內建"}
-ACTION = {"always_fires", "job_mismatch", "label_mismatch", "dropped", "live_missing"}
+ACTION = {"always_fires", "job_mismatch", "label_mismatch", "dropped", "live_missing", "no_source"}
 
 
 def _rules(rows: list[dict]) -> str:
@@ -564,6 +609,12 @@ def advice(rows: list[dict]) -> list[str]:
         ms = sorted({r["metric"] for r in dr})
         out.append(f"- **{_rules(dr)} 不會響**：{', '.join('`' + m + '`' for m in ms)} 被 `metric_relabel_configs` 丟掉。"
                    "**建議**：調整 drop 規則讓它保留，或改用沒被丟掉的 metric。**代價**：保留會增加 series 數。")
+    ns = [r for r in rows if r["status"] == "no_source"]
+    if ns:
+        comps = sorted({component_of(r["metric"])[0] for r in ns if component_of(r["metric"])})
+        out.append(f"- **{_rules(ns)} 不會響**：沒有來源（config 沒有抓 {'、'.join(comps)}）。"
+                   f"**建議**：為 {'、'.join(comps)} 加 scrape job（最好由另一台外部觀察者抓），或把這些 rule 放到有抓它的那台。"
+                   "**代價**：多一個 scrape job；自我監控放在被監控的同一台時，它停了就一起沉默。")
     lv = [r for r in rows if r["status"] == "live_missing"]
     if lv:
         out.append(f"- **{_rules(lv)} 目前查不到資料**（live 快照）。**建議**：確認 exporter 有開對應 collector、job 名稱正確。")

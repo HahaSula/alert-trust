@@ -48,6 +48,10 @@ With --config, a component no scrape job scrapes has no data for signals that re
 whatever the placement. The to-do list is sorted by impact: tier, Watchdog / dead man's switch first, then the
 chain stage of the card (collect → store → query → evaluate → route → receive), then status.
 
+With --inventory, the user's own rules are also checked against the deployment (inventory rules[].deployment,
+re-evaluated with env.yaml targets[].features by job): 「這條 rule 不適用這個部署」 with the reason (feature or
+label), or 需要回答; coverage.json `rules_deployment`, coverage.md 「規則和部署方式對不上」.
+
 Outputs <out>/coverage.json (for AI) and <out>/coverage.md (for people).
 Requires PyYAML (via tools/catalog.py); live queries use the standard library.
 """
@@ -759,6 +763,50 @@ def inventory_rules(env: dict, inv: dict) -> dict[str, list[dict]]:
     return {pick["id"]: [r for g in snap["data"]["groups"] for r in g["rules"] if r.get("type") == "alerting"]}
 
 
+def deployment_rules(env: dict, inv: dict) -> list[dict]:
+    """The user's rules that do not fit this deployment: the inventory's deployment needs (multi-target /probe,
+    heartbeat, semi-sync, ..., grouping by cluster / role) re-checked with env.yaml `features` of the targets
+    (by job). A rule the inventory already found not applicable stays so. 「這條 rule 不適用這個部署」 + reason."""
+    import inventory as INV
+    fb: dict[str, list] = {}
+    for t in list(env.get("targets") or []) + list(env.get("components") or []):
+        raw = t.get("features")
+        if t.get("job") and isinstance(raw, list) and any(answered(x) for x in raw):
+            fb.setdefault(str(t["job"]), []).extend(str(x) for x in raw)
+    jobs = {j["name"]: j for j in inv.get("jobs") or []}
+    for name, j in jobs.items():
+        fe = j.get("features") or {}
+        if name not in fb and isinstance(fe.get("value"), list):
+            fb[name] = list(fe["value"])
+    out = []
+    for r in inv.get("rules") or []:
+        dep = r.get("deployment")
+        if not dep:
+            continue
+        js = [jobs[x] for x in ((r.get("jobs_matched") or {}).get("value") or []) if x in jobs]
+        fit = INV.deployment_fit(dep["needs"], js, fb, None, r.get("labels_required")) if js else \
+            {"applies": dep["applies"], "reasons": dep.get("reasons") or [], "ask": dep.get("ask") or []}
+        reasons = fit["reasons"] or ([] if js else dep.get("reasons") or [])
+        if reasons:
+            out.append({"rule": r["name"], "status": "rule_not_applicable", "reasons": reasons})
+        elif fit["ask"]:
+            out.append({"rule": r["name"], "status": "needs_input", "ask": fit["ask"]})
+    return out
+
+
+def render_deployment(rows: list[dict]) -> str:
+    if not rows:
+        return ""
+    L = ["\n## 規則和部署方式對不上\n", "這些是使用者的 rule，不是卡片訊號：rule 假設的功能或 label 在這個部署裡沒有。"
+         "「不適用」不是「沒有資料」：job 修好了也不會變成有意義的告警。\n", "| rule | 結論 | 原因 |", "|---|---|---|"]
+    for r in rows:
+        if r["status"] == "rule_not_applicable":
+            L.append(f"| `{r['rule']}` | 這條 rule 不適用這個部署 | {'；'.join(x['why'] for x in r['reasons'])} |")
+        else:
+            L.append(f"| `{r['rule']}` | 需要回答 | 有沒有 {'、'.join(r['ask'])}？（env.yaml targets[].features） |")
+    return "\n".join(L) + "\n"
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--env", required=True)
@@ -786,12 +834,13 @@ def main(argv=None) -> int:
     if not a.snapshot and override is None:
         ap.error("要給 --snapshot（或 --inventory）")
     items = evaluate(env, a.snapshot, tiers, a.live, scrape_jobs, override, unscraped)
+    deploy = deployment_rules(env, inv) if inv is not None else []
     os.makedirs(a.out, exist_ok=True)
     with open(os.path.join(a.out, "coverage.json"), "w", encoding="utf-8") as f:
         json.dump({"env": env.get("name"), "generated": time.strftime("%Y-%m-%dT%H:%M:%S"), "tiers": sorted(tiers),
-                   "live": a.live, "items": items}, f, indent=1, ensure_ascii=False)
+                   "live": a.live, "items": items, "rules_deployment": deploy}, f, indent=1, ensure_ascii=False)
     with open(os.path.join(a.out, "coverage.md"), "w", encoding="utf-8") as f:
-        f.write(render_md(env, items, tiers))
+        f.write(render_md(env, items, tiers) + render_deployment(deploy))
     bad = sum(1 for i in items if i["status"] in ACTION)
     print(f"{len(items)} 個訊號，建議先處理 {bad} 個 → {a.out}/coverage.md（「建議先做」）")
     return 0

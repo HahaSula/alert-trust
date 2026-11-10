@@ -14,10 +14,14 @@ Runs, in this order, every tool on the same inventory (each reads it with --inve
   4. tools/fit_contracts.py        → <out>/contracts-fit.md, .json   (uses metric-sources.json; no S / E needed)
   5. tools/check_coverage.py       → <out>/coverage/coverage.md       (only with --env)
 
-and writes <out>/summary.md: 「建議先處理的 3 件事」 ranked as
+and writes <out>/summary.md. It opens with 「會不會（在 X 內）通知到人」: one sentence that answers end to end, then
+detection (rule logic), rule loading (rule_files), routing (Alertmanager) and self-monitoring (Watchdog / DMS /
+observer) separately; --notify-within X (or --env critical.notify_within) adds the worst-case times (推算). Then
+「建議先處理的 3 件事」 ranked as
   1. rules that never fire / always fire (job, label, dropped metric, absent() on nothing)
   2. the monitoring stack itself: no Watchdog / dead man's switch, the ruler or Alertmanager not scraped
   3. critical alerts that will not page (route label no rule has, only email / empty receivers)
+  3b. rules that do not fit this deployment (「這條 rule 不適用這個部署」: feature or label)
   4. time contracts not met (environment, rule windows)
 then the inventory to confirm, the assumptions, and at most 3 next questions (ranked by tools/inventory.py).
 Everything is advice (建議 / 代價), not a verdict. Exit code 0 always (CI: use the single tools).
@@ -82,7 +86,7 @@ def item_firing(inv: dict, ms_rows: list[dict]) -> dict | None:
     never = [r["name"] for r in inv["rules"] if (r.get("fires") or {}).get("value") == "never"]
     always = [r["name"] for r in inv["rules"] if (r.get("fires") or {}).get("value") == "always"]
     always += [r["rule"] for r in ms_rows if r["status"] == "always_fires" and r["rule"] not in always]
-    bad = {"job_mismatch", "label_mismatch", "dropped"}
+    bad = {"job_mismatch", "label_mismatch", "dropped", "no_source"}
     never += [r["rule"] for r in ms_rows if r["status"] in bad and r["rule"] not in never and r["rule"] not in always
               and all(x["status"] in bad | {"builtin", "recording"} for x in ms_rows if x["rule"] == r["rule"])
               and any(x["status"] in bad for x in ms_rows if x["rule"] == r["rule"])]
@@ -120,7 +124,8 @@ def item_stack(inv: dict, cov: list[dict] | None) -> dict | None:
     dms_route = any(x["kind"] == "dms_route_without_rule" for x in f)
     if any(x["kind"] == "no_watchdog_rule" for x in f) and not dms_route:
         parts.append("沒有 Watchdog／dead man's switch")
-        advice.append("加一條一直在響的 `Watchdog`（`vector(1)`），在 Alertmanager 用獨立 route 送到外部 dead man's switch")
+        advice.append("加一條一直在響的 `Watchdog`（`vector(1)`），在 Alertmanager 用獨立 route 送到外部 dead man's switch"
+                      "（提案檔用合法的佔位 URL，例如 `https://dms.example.invalid/ping`，讓 `amtool check-config` 對交付的檔案也通過）")
     for x in f:
         if x["kind"] == "dms_route_without_rule":
             parts.append(f"Alertmanager 有 Watchdog 的 route（→ {x['receiver']}），但給的 rule 檔沒有 Watchdog")
@@ -132,6 +137,13 @@ def item_stack(inv: dict, cov: list[dict] | None) -> dict | None:
     for x in f:
         if x["kind"] == "config_missing":
             parts.append(x["fact"])
+    for x in f:
+        if x["kind"] == "watchdog_no_dedicated_route":
+            wr = (inv.get("alertmanager") or {}).get("watchdog_route") or {}
+            parts.append(f"Watchdog 沒有專用 route（繼承 `repeat_interval` {wr.get('repeat_interval', '—')}，"
+                         f"DMS 至少等 {wr.get('dms_min_wait', '—')}，推算）")
+            advice.append("給 Watchdog 一條專用 route（排在最前面，`group_wait: 0s`、`group_interval: 1m`、`repeat_interval: 1m`），"
+                          "範本見 inventory.yaml 的 `alertmanager.watchdog_route.template`")
     if cov:
         miss = [i for i in cov if i.get("tier") == 1 and i["status"] in CC.ACTION and i.get("signal") in CC.DMS_SIGNALS]
         if miss and not any("Watchdog" in p for p in parts):
@@ -143,6 +155,19 @@ def item_stack(inv: dict, cov: list[dict] | None) -> dict | None:
             "advice": "；".join(advice) or "見 coverage.md",
             "cost": "多一個外部 dead man's switch 服務（或一台觀察者）要維護；Watchdog 的 route 要排在最前面、不要被 inhibit",
             "ref": "inventory.md" + ("、coverage/coverage.md" if cov else "")}
+
+
+def item_deploy(inv: dict) -> dict | None:
+    f = [x for x in inv.get("findings_from_files") or [] if x["kind"] == "rule_not_applicable"]
+    if not f:
+        return None
+    names = [n for x in f for n in x["rules"]]
+    why = "；".join(f"{_names(x['rules'], 4)}：{x['reason']}" for x in f)
+    return {"key": "deploy", "title": f"{len(set(names))} 條 rule 不適用這個部署（不只是沒有資料）",
+            "why": why, "advice": "移除，或改寫成這個部署的版本（例如 per-host exporter 用每台的 `up`；沒有 `cluster` label 時先在 "
+                                  "target 加 label 再用 `by (cluster)`）；功能其實有的話在 inventory.yaml 的 jobs[].features 列出後重跑",
+            "cost": "移除後這個部署沒有對應的訊號；加 label 要同步改 dashboard 與 inhibit 的 `equal`",
+            "ref": "inventory.md 的「只看檔案就知道的事實」"}
 
 
 def item_paging(inv: dict) -> dict | None:
@@ -195,6 +220,21 @@ def item_paging(inv: dict) -> dict | None:
             "ref": "inventory.md 的 Alertmanager"}
 
 
+def offset_options(fit: dict | None) -> str:
+    """Option B text, gated by the ruler version: `query_offset` from Prometheus 2.53, `anchored` 3.x experimental."""
+    stack = (fit or {}).get("stack") or "prometheus"
+    if stack == "vmalert":
+        return "方案 B 改 `scrape_interval`／`eval_delay`"
+    v = FC.parse_version((fit or {}).get("prom_version"))
+    if v is None:
+        return ("方案 B 改 `scrape_interval`；`query_offset`「" + FC.QO_UNKNOWN + "」、`anchored`「" + FC.ANCHORED_UNKNOWN + "」")
+    if v < (2, 53):
+        return "方案 B 改 `scrape_interval`（這個版本沒有 `query_offset`、`anchored`）"
+    if v < (3,):
+        return "方案 B 改 `scrape_interval`／`query_offset`（`anchored` 要 3.x 實驗功能）"
+    return "方案 B 改 `scrape_interval`／`query_offset`；保留視窗時可用 `anchored`（實驗功能）"
+
+
 def item_contracts(fit: dict | None) -> dict | None:
     if not fit:
         return None
@@ -214,7 +254,7 @@ def item_contracts(fit: dict | None) -> dict | None:
         parts.append("（沒有 scrape config，用預設值算的）")
     return {"key": "contracts", "title": "時間契約不成立：" + "；".join(parts),
             "why": "視窗內 sample 不夠時查詢回空、`for` 歸零，尖峰時 alert 晚到或不響",
-            "advice": "見 contracts-fit.md：方案 A 改 rule 視窗、方案 B 改 `scrape_interval`／`query_offset`；短視窗是刻意的就標 keep_range",
+            "advice": f"見 contracts-fit.md：方案 A 改 rule 視窗、{offset_options(fit)}；短視窗是刻意的就標 keep_range",
             "cost": "A 讓 rate 對短暫尖峰反應變慢；B 增加 scrape 量或讓每條 rule 晚判斷", "ref": "contracts-fit.md"}
 
 
@@ -229,8 +269,137 @@ def item_other(inv: dict) -> list[dict]:
 
 
 def rank(inv, ms_rows, fit, cov) -> list[dict]:
-    items = [item_firing(inv, ms_rows), item_stack(inv, cov), item_paging(inv), item_contracts(fit)]
+    items = [item_firing(inv, ms_rows), item_stack(inv, cov), item_paging(inv), item_deploy(inv), item_contracts(fit)]
     return [i for i in items if i] + item_other(inv)
+
+
+# ---------- end to end: will a person be paged (within X)? ----------
+
+def end_to_end(a, inv: dict, fit: dict | None, ms_rows: list[dict]) -> list[str]:
+    """First sentence answers 「X 內會不會 page 到人」 end to end; then the four parts separately: detection (rule
+    logic), rule loading (rule_files), routing (Alertmanager), self-monitoring (Watchdog / DMS / observer)."""
+    X = FC.fmt(a.notify_within) if getattr(a, "notify_within", None) else None
+    f = inv.get("findings_from_files") or []
+    st = inv["stack"]
+    crit = [r["name"] for r in inv["rules"] if r.get("kind") == "alert" and
+            INV._sev_critical((r.get("labels_out") or {}).get("severity"))]
+    no, unk, partial, parts = [], [], [], []
+    # 1. detection
+    nodata = {r["name"] for r in inv["rules"] if (r.get("fires") or {}).get("value") == "never"}
+    bad = {"job_mismatch", "label_mismatch", "dropped", "no_source"}
+    nodata |= {r["rule"] for r in ms_rows if r["status"] in bad and r["rule"] in crit
+               and all(x["status"] in bad | {"builtin", "recording"} for x in ms_rows if x["rule"] == r["rule"])}
+    na = {n for x in f if x["kind"] == "rule_not_applicable" for n in x["rules"]}
+    cnd = [n for n in crit if n in nodata]
+    if not crit:
+        det = "沒有 severity critical 的 alert rule：沒有任何 alert 被標成要 page"
+        no.append("沒有 critical rule")
+    else:
+        det = f"{len(crit)} 條 critical rule；{len(cnd)} 條永遠不會響（{_names(cnd, 4)}）" if cnd else f"{len(crit)} 條 critical rule 都讀得到資料（依檔案）"
+        if len(cnd) == len(crit):
+            no.append("critical rule 全部不會響")
+        elif cnd:
+            partial.append(f"{len(cnd)} 條 critical rule 不會響")
+        nac = [n for n in crit if n in na]
+        if nac:
+            det += f"；{len(nac)} 條不適用這個部署（{_names(nac, 4)}）"
+        if X and fit and fit.get("notify"):
+            nr = [n for n in fit["notify"] if not n.get("nodata")]
+            late = [n for n in nr if n["ok"] is False]
+            worst = max(nr, key=lambda n: n["total"]) if nr else None
+            if worst:
+                det += (f"；推算最壞偵測＋第一次通知 {FC.fmt(worst['total'])}（`{worst['rule']}`：{worst['formula']}，推算）"
+                        + (f"，{len(late)} 條超過 {X}（{_names([n['rule'] for n in late], 4)}）" if late else f"，都在 {X} 內"))
+                if late and len(late) == len(nr):
+                    no.append(f"偵測就超過 {X}")
+                elif late:
+                    partial.append(f"{len(late)} 條偵測超過 {X}")
+        elif X:
+            unk.append("偵測時間（沒有算出來）")
+    parts.append(("偵測（rule 的邏輯）", det))
+    # 2. loading
+    cm = [x["fact"] for x in f if x["kind"] in ("config_missing", "rules_not_loaded") and "rule_files" in x["fact"]]
+    loaded = (st.get("rules_given_are_loaded") or {}).get("value")
+    if cm:
+        load = "；".join(cm)
+        no.append("rule 沒有被載入")
+    elif loaded is True:
+        load = "給的 rule 檔符合 `rule_files` 的 glob（依檔案）"
+    elif loaded is False:
+        load = "給的 rule 檔不符合 `rule_files` 的 glob"
+        no.append("rule 沒有被載入")
+    elif (st.get("rule_files_loaded") or {}).get("from") == "file":
+        load = ("未知：檔名符合 `rule_files` 的 glob（" + ", ".join((st["rule_files_loaded"].get("value") or [])) + "），"
+                "但路徑對不上；請貼 `/api/v1/rules` 輸出裡的 group 名稱確認")
+    else:
+        load = "未知：沒有 config，或 vmalert 用 `-rule` 參數載入（請貼 `/api/v1/rules` 的 group 名稱，或啟動參數）"
+        unk.append("rule 有沒有被載入")
+    parts.append(("載入（`rule_files`／`-rule`）", load))
+    # 3. routing
+    am = inv.get("alertmanager") or {}
+    noalert = [x["fact"] for x in f if x["kind"] == "config_missing" and "alerting" in x["fact"]]
+    routed_bad = set()
+    for x in f:
+        if x["kind"] in ("critical_not_paging", "route_label_missing", "route_label_value_mismatch", "routed_to_empty_receiver"):
+            routed_bad |= {n for n in x.get("rules") or [] if n in crit}
+    if noalert:
+        route = "；".join(noalert)
+        no.append("alert 送不到 Alertmanager")
+    elif "routes" not in am:
+        route = "未知：沒有 alertmanager.yml"
+        unk.append("Alertmanager 路由")
+    elif crit and routed_bad:
+        route = f"{len(routed_bad)}／{len(crit)} 條 critical rule 不會 page（{_names(sorted(routed_bad), 4)}；見下面第 1～3 件）"
+        if len(routed_bad) >= len([n for n in crit if n not in nodata]):
+            no.append("critical 不會 page")
+        else:
+            partial.append(f"{len(routed_bad)} 條 critical rule 不會 page")
+    else:
+        rv = sorted({x for r in inv["rules"] if r["name"] in crit for x in ((r.get("route") or {}).get("receivers") or [])})
+        route = f"critical rule 會送到 {'、'.join(rv) or '—'}（依檔案；receiver 本身會不會通知到人要確認）"
+    parts.append(("路由（Alertmanager）", route))
+    # 4. self-monitoring
+    sm = []
+    if any(x["kind"] == "no_watchdog_rule" for x in f):
+        sm.append("沒有 Watchdog")
+    if any(x["kind"] == "dms_route_without_rule" for x in f):
+        sm.append("有 DMS route 但沒有 Watchdog rule")
+    wr = am.get("watchdog_route") if isinstance(am, dict) else None
+    if wr and not wr.get("dedicated"):
+        sm.append(f"Watchdog 沒有專用 route（繼承 `repeat_interval` {wr['repeat_interval']}）")
+    if wr:
+        sm.append(f"DMS 依契約 deadman-wait 至少等 {wr['dms_min_wait']}（推算）"
+                  + (f"，{'超過' if wr['dms_min_wait_seconds'] > a.notify_within else '在'} {X}{'' if wr['dms_min_wait_seconds'] > a.notify_within else ' 內'}" if X else ""))
+    eo = st.get("external_observer") or {}
+    if eo.get("from") == "unknown":
+        sm.append("外部觀察者未知")
+        unk.append("ruler 停掉時誰知道")
+    elif not IU_true(eo.get("value")):
+        sm.append("沒有外部觀察者")
+    un = inv.get("unscraped_components")
+    if isinstance(un, list) and un:
+        sm.append("沒被抓：" + "、".join(u.get("target") or u["component"] for u in un))
+    parts.append(("自我監控（Watchdog／DMS／觀察者）", "；".join(sm) or "有 Watchdog 與專用 route（依檔案）"))
+    if any(x["kind"] in ("no_watchdog_rule", "dms_route_without_rule") for x in f):
+        partial.append("ruler 或 Alertmanager 停掉時沒有人知道")
+    within = f" {X} 內" if X else ""
+    if no:
+        head = f"**{within.strip() + '，' if X else ''}不會有人被 page**（{'；'.join(dict.fromkeys(no))}）。"
+    elif partial:
+        head = (f"**{within.strip() + '，' if X else ''}只有部分情況會有人被 page**：{'；'.join(dict.fromkeys(partial))}"
+                + (f"；還不知道：{'、'.join(dict.fromkeys(unk))}" if unk else "") + "。")
+    elif unk:
+        head = f"**{within.strip() + '，' if X else ''}還不能確定會不會有人被 page**：{'、'.join(dict.fromkeys(unk))}還不知道。"
+    else:
+        head = f"**推算{within}會有人被 page**（偵測、載入、路由依檔案都成立；receiver 本身與 ruler 停掉的情況見下表）。"
+    L = ["## 會不會" + (f"在 {X} 內" if X else "") + "通知到人（端到端）", "", head, "",
+         "「偵測得到」不等於「會通知到人」：四段都成立才會 page。", "", "| 段 | 依檔案的結論 |", "|---|---|"]
+    L += [f"| {k} | {v} |" for k, v in parts]
+    return L + [""]
+
+
+def IU_true(v) -> bool:
+    return v is True or str(v).strip().lower() in ("yes", "true", "有")
 
 
 # ---------- summary ----------
@@ -238,6 +407,7 @@ def rank(inv, ms_rows, fit, cov) -> list[dict]:
 def summary(a, inv, items, fit, ms_rows, lint_out, cov) -> str:
     L = ["# Rule 檢查摘要", "",
          "輸出是建議，不是判決。缺的資料用保守假設先跑完；回答最後的問題或修改 inventory.yaml 後重跑會更新結論。", "",
+         *end_to_end(a, inv, fit, ms_rows),
          "## 建議先處理的 3 件事", ""]
     if not items:
         L.append("- 只看檔案沒有找到要先處理的項目（還沒確認的部分見最後的問題）。")
@@ -269,7 +439,8 @@ def summary(a, inv, items, fit, ms_rows, lint_out, cov) -> str:
     L += ["", "完整清單：`inventory.md`。", "", "## 假設", ""]
     asm = list((fit or {}).get("assumptions") or [])
     if st.get("version", {}).get("from") == "unknown":
-        asm.insert(0, "ruler 版本未知：`query_offset`（Prometheus 2.53 起）、`anchored`（3.x）當成可用")
+        asm.insert(0, "ruler 版本未知：用到 `query_offset` 的方案標「" + FC.QO_UNKNOWN + "」，`anchored` 標「"
+                   + FC.ANCHORED_UNKNOWN + "」；貼 `/api/v1/status/buildinfo` 的輸出後重跑")
     if (inv.get("alertmanager") or {}).get("from") == "unknown":
         asm.append("沒有 alertmanager.yml：沒有檢查 alert 送到哪裡、會不會 page")
     if not a.config:
@@ -306,8 +477,12 @@ def main(argv=None) -> int:
     ap.add_argument("--merge", help="既有的 inventory（使用者改過的值保留）")
     ap.add_argument("--env", help="env/<name>.yaml：給了才跑覆蓋檢查")
     ap.add_argument("--tiers", default="1")
+    ap.add_argument("--notify-within", help="使用者要求的「X 內通知到人」（例如 5m）；沒給時用 --env 的 critical.notify_within")
     ap.add_argument("--out", required=True)
     a = ap.parse_args(argv)
+    if not a.notify_within and a.env and os.path.exists(a.env):
+        a.notify_within = ((INV.C._load(a.env) or {}).get("critical") or {}).get("notify_within")
+    a.notify_within = FC.dur(a.notify_within) if a.notify_within else None
     os.makedirs(a.out, exist_ok=True)
     inv = run_inventory(a)
     inv_path = os.path.join(a.out, "inventory.yaml")
@@ -316,7 +491,8 @@ def main(argv=None) -> int:
     with open(os.path.join(a.out, "metric-sources.json"), encoding="utf-8") as f:
         ms_rows = json.load(f)["rows"]
     lint_out = lint(a.rules, a.out)
-    rc, txt = _quiet(FC.main, ["--inventory", inv_path, "--sources", os.path.join(a.out, "metric-sources.json"), "--out", a.out])
+    rc, txt = _quiet(FC.main, ["--inventory", inv_path, "--sources", os.path.join(a.out, "metric-sources.json"), "--out", a.out]
+                     + (["--notify-within", FC.fmt(a.notify_within)] if a.notify_within else []))
     fit = None
     fj = os.path.join(a.out, "contracts-fit.json")
     if os.path.exists(fj):

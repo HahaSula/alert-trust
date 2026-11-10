@@ -1,0 +1,49 @@
+# 「一次 scrape 失敗會讓 `for` 重新計時」的測試要成對：原本的 rule 在 `stale` 下被重置，提案的寫法在 `stale` 下照常響。
+#
+# 模擬 scrape 失敗一定要用 `stale`，不要用 `_`：
+#   - scrape 失敗時 Prometheus 寫入 staleness marker，instant selector 在下一次評估立刻變空 → pending 被刪、`for` 從頭算。
+#   - `_` 只是「這個時間點沒有 sample」。lookback（預設 5m）內仍然看得到前一個 sample，原本的 rule 也不會被重置，
+#     所以用 `_` 的測試證明不了「原本會重置、提案不會」。第 3 組測試把這件事寫出來。
+#
+# 時間軸（interval 15s）：0s、15s、30s、45s 有值，60s 失敗一次，75s 起恢復。
+#   原本的 rule：0s 開始 pending，60s 變空、pending 被刪；75s 重新開始，135s 才 firing。
+#   提案的 rule：60s 時 last_over_time(…[30s]) 仍拿到 45s 的值，0s 起算的 `for` 在 60s 滿足，90s 時是 firing。
+rule_files:
+  - for-reset.rules.yml
+evaluation_interval: 15s
+tests:
+  # 1. 一次真正的 scrape 失敗（stale）：原本的 rule 在 90s 還沒 firing（被重置）
+  - interval: 15s
+    input_series:
+      - series: 'demo_value{job="demo", instance="a"}'
+        values: '20x3 stale 20x10'
+    alert_rule_test:
+      - eval_time: 90s
+        alertname: DemoHighOriginal
+        exp_alerts: []
+      - eval_time: 150s
+        alertname: DemoHighOriginal
+        exp_alerts:
+          - exp_labels: { severity: warning, job: demo, instance: a }
+
+  # 2. 同一個失敗：提案的 last_over_time 寫法沒有被重置，90s 已經 firing
+  - interval: 15s
+    input_series:
+      - series: 'demo_value{job="demo", instance="a"}'
+        values: '20x3 stale 20x10'
+    alert_rule_test:
+      - eval_time: 90s
+        alertname: DemoHighProposed
+        exp_alerts:
+          - exp_labels: { severity: warning, job: demo, instance: a }
+
+  # 3. 對照：用 `_`（缺值）時原本的 rule 也沒有被重置，90s 已經 firing。這就是 `_` 不能當成 scrape 失敗的原因。
+  - interval: 15s
+    input_series:
+      - series: 'demo_value{job="demo", instance="a"}'
+        values: '20x3 _ 20x10'
+    alert_rule_test:
+      - eval_time: 90s
+        alertname: DemoHighOriginal
+        exp_alerts:
+          - exp_labels: { severity: warning, job: demo, instance: a }

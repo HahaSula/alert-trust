@@ -23,3 +23,7 @@ labels:
 # 資料庫版本（決定哪些訊號適用；卡片訊號的 versions 欄位）：job → 版本字串。
 target_versions:
   mysql: "8.4.13"
+
+# 每個 job 有哪些功能（決定哪些 rule 適用這個部署；詞彙見 env/env.example.yaml 的 features）。
+features:
+  mysql: [replication-primary]
