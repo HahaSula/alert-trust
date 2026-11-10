@@ -1,0 +1,1184 @@
+# 其他資料庫的版本差異頁（docs/targets/versions/ 的 postgres、mongodb、valkey、etcd、tidb、yugabytedb、clickhouse）用到的原始碼參考。
+# 每一筆都在 tag 上取檔（git show <tag>:<path>）、用關鍵字找出行號（行內含關鍵字），2026-11-10。
+# 版本：PostgreSQL 13.23／14.24／15.19／16.15／17.11／18.6；postgres_exporter v0.20.1；MongoDB 6.0.29／7.0.45／8.0.34／8.2.12；
+# mongodb_exporter v0.54.0；Valkey 7.2.15／8.0.12／8.1.11／9.0.7／9.1.3；Redis 7.2.17／8.2.11／8.10.3；redis_exporter v1.97.0；
+# etcd v3.4.45／v3.5.35／v3.6.16／v3.7.3（CHANGELOG 與維護政策取自 main@d622ec5）；TiDB／TiKV／PD v7.5.8／v8.1.2／v8.5.8；
+# YugabyteDB 2.20.12_FINAL／2024.2.12.0-b45／2025.1.5.0-b103／2025.2.9.0-b70／2026.1.3.0-b100；
+# ClickHouse v25.3.14.14-lts／v25.8.33.6-lts／v26.3.60.2-lts／v26.8.34.13-lts／v26.10.2.103-stable。
+refs:
+  ver-pg16-bgwriter-ckpt:
+    kind: code
+    title: "16：pg_stat_bgwriter 還有 checkpoints_timed 等 checkpoint 欄位"
+    project: "PostgreSQL"
+    version: "16.15"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1110
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/catalog/system_views.sql#L1110"
+  ver-pg17-bgwriter:
+    kind: code
+    title: "17：pg_stat_bgwriter 只剩 buffers_clean、maxwritten_clean、buffers_alloc、stats_reset"
+    project: "PostgreSQL"
+    version: "17.11"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1134
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_views.sql#L1134"
+  ver-pg17-checkpointer:
+    kind: code
+    title: "17：新增 pg_stat_checkpointer（num_timed、num_requested、restartpoints_*）"
+    project: "PostgreSQL"
+    version: "17.11"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1141
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_views.sql#L1141"
+  ver-pg18-checkpointer-done:
+    kind: code
+    title: "18：pg_stat_checkpointer 加 num_done、slru_written"
+    project: "PostgreSQL"
+    version: "18.6"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1161
+    url: "https://github.com/postgres/postgres/blob/REL_18_6/src/backend/catalog/system_views.sql#L1161"
+  ver-pg17-wal-write:
+    kind: code
+    title: "17：pg_stat_wal 還有 wal_write、wal_sync 與時間欄位"
+    project: "PostgreSQL"
+    version: "17.11"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1181
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_views.sql#L1181"
+  ver-pg18-wal:
+    kind: code
+    title: "18：pg_stat_wal 只剩 wal_records、wal_fpi、wal_bytes、wal_buffers_full"
+    project: "PostgreSQL"
+    version: "18.6"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1195
+    url: "https://github.com/postgres/postgres/blob/REL_18_6/src/backend/catalog/system_views.sql#L1195"
+  ver-pg16-io:
+    kind: code
+    title: "16：新增 pg_stat_io"
+    project: "PostgreSQL"
+    version: "16.15"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1122
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/catalog/system_views.sql#L1122"
+  ver-pg18-io-bytes:
+    kind: code
+    title: "18：pg_stat_io 改用 read_bytes／write_bytes／extend_bytes，op_bytes 移除"
+    project: "PostgreSQL"
+    version: "18.6"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1177
+    url: "https://github.com/postgres/postgres/blob/REL_18_6/src/backend/catalog/system_views.sql#L1177"
+  ver-pg18-io-wal:
+    kind: code
+    title: "18：pg_stat_io 多了 object = wal 的列"
+    project: "PostgreSQL"
+    version: "18.6"
+    file: "src/backend/utils/activity/pgstat_io.c"
+    line: 270
+    url: "https://github.com/postgres/postgres/blob/REL_18_6/src/backend/utils/activity/pgstat_io.c#L270"
+  ver-pg13-slot-walstatus:
+    kind: code
+    title: "13：pg_replication_slots 加 wal_status、safe_wal_size"
+    project: "PostgreSQL"
+    version: "13.23"
+    file: "src/backend/catalog/system_views.sql"
+    line: 878
+    url: "https://github.com/postgres/postgres/blob/REL_13_23/src/backend/catalog/system_views.sql#L878"
+  ver-pg16-slot-conflicting:
+    kind: code
+    title: "16：pg_replication_slots 加 conflicting"
+    project: "PostgreSQL"
+    version: "16.15"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1001
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/catalog/system_views.sql#L1001"
+  ver-pg17-slot-invalidation:
+    kind: code
+    title: "17：pg_replication_slots 加 invalidation_reason、inactive_since、failover、synced"
+    project: "PostgreSQL"
+    version: "17.11"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1025
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_views.sql#L1025"
+  ver-pg18-slot-idle-timeout:
+    kind: code
+    title: "18：slot 失效原因多了 idle_timeout"
+    project: "PostgreSQL"
+    version: "18.6"
+    file: "src/backend/replication/slot.c"
+    line: 117
+    url: "https://github.com/postgres/postgres/blob/REL_18_6/src/backend/replication/slot.c#L117"
+  ver-pg18-guc-idle-slot:
+    kind: code
+    title: "18：新設定 idle_replication_slot_timeout"
+    project: "PostgreSQL"
+    version: "18.6"
+    file: "src/backend/utils/misc/guc_tables.c"
+    line: 3109
+    url: "https://github.com/postgres/postgres/blob/REL_18_6/src/backend/utils/misc/guc_tables.c#L3109"
+  ver-pg16-vacuum-progress:
+    kind: code
+    title: "16：pg_stat_progress_vacuum 的 param6 是 max_dead_tuples（筆數）"
+    project: "PostgreSQL"
+    version: "16.15"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1192
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/catalog/system_views.sql#L1192"
+  ver-pg17-vacuum-progress:
+    kind: code
+    title: "17：param6 改成 max_dead_tuple_bytes、param7 dead_tuple_bytes、param8 num_dead_item_ids"
+    project: "PostgreSQL"
+    version: "17.11"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1223
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/catalog/system_views.sql#L1223"
+  ver-pg13-pss:
+    kind: code
+    title: "13：pg_stat_statements 1.8"
+    project: "PostgreSQL"
+    version: "13.23"
+    file: "contrib/pg_stat_statements/pg_stat_statements.control"
+    line: 3
+    url: "https://github.com/postgres/postgres/blob/REL_13_23/contrib/pg_stat_statements/pg_stat_statements.control#L3"
+  ver-pg14-pss:
+    kind: code
+    title: "14：pg_stat_statements 1.9"
+    project: "PostgreSQL"
+    version: "14.24"
+    file: "contrib/pg_stat_statements/pg_stat_statements.control"
+    line: 3
+    url: "https://github.com/postgres/postgres/blob/REL_14_24/contrib/pg_stat_statements/pg_stat_statements.control#L3"
+  ver-pg15-pss:
+    kind: code
+    title: "15：pg_stat_statements 1.10"
+    project: "PostgreSQL"
+    version: "15.19"
+    file: "contrib/pg_stat_statements/pg_stat_statements.control"
+    line: 3
+    url: "https://github.com/postgres/postgres/blob/REL_15_19/contrib/pg_stat_statements/pg_stat_statements.control#L3"
+  ver-pg16-pss:
+    kind: code
+    title: "16：pg_stat_statements 1.10"
+    project: "PostgreSQL"
+    version: "16.15"
+    file: "contrib/pg_stat_statements/pg_stat_statements.control"
+    line: 3
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/contrib/pg_stat_statements/pg_stat_statements.control#L3"
+  ver-pg17-pss:
+    kind: code
+    title: "17：pg_stat_statements 1.11"
+    project: "PostgreSQL"
+    version: "17.11"
+    file: "contrib/pg_stat_statements/pg_stat_statements.control"
+    line: 3
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/contrib/pg_stat_statements/pg_stat_statements.control#L3"
+  ver-pg18-pss:
+    kind: code
+    title: "18：pg_stat_statements 1.12"
+    project: "PostgreSQL"
+    version: "18.6"
+    file: "contrib/pg_stat_statements/pg_stat_statements.control"
+    line: 3
+    url: "https://github.com/postgres/postgres/blob/REL_18_6/contrib/pg_stat_statements/pg_stat_statements.control#L3"
+  ver-pg13-pss-exec-time:
+    kind: code
+    title: "1.8：total_time 拆成 total_plan_time 與 total_exec_time"
+    project: "PostgreSQL"
+    version: "13.23"
+    file: "contrib/pg_stat_statements/pg_stat_statements--1.7--1.8.sql"
+    line: 27
+    url: "https://github.com/postgres/postgres/blob/REL_13_23/contrib/pg_stat_statements/pg_stat_statements--1.7--1.8.sql#L27"
+  ver-pg17-pss-shared-blk:
+    kind: code
+    title: "1.11：blk_read_time 改名 shared_blk_read_time，加 local_blk_*_time、stats_since"
+    project: "PostgreSQL"
+    version: "17.11"
+    file: "contrib/pg_stat_statements/pg_stat_statements--1.10--1.11.sql"
+    line: 41
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/contrib/pg_stat_statements/pg_stat_statements--1.10--1.11.sql#L41"
+  ver-pg18-pss-wal-buffers:
+    kind: code
+    title: "1.12：加 wal_buffers_full、parallel_workers_*"
+    project: "PostgreSQL"
+    version: "18.6"
+    file: "contrib/pg_stat_statements/pg_stat_statements--1.11--1.12.sql"
+    line: 53
+    url: "https://github.com/postgres/postgres/blob/REL_18_6/contrib/pg_stat_statements/pg_stat_statements--1.11--1.12.sql#L53"
+  ver-pg13-wal-keep-size:
+    kind: code
+    title: "13：wal_keep_segments 換成 wal_keep_size"
+    project: "PostgreSQL"
+    version: "13.23"
+    file: "src/backend/utils/misc/guc.c"
+    line: 2646
+    url: "https://github.com/postgres/postgres/blob/REL_13_23/src/backend/utils/misc/guc.c#L2646"
+  ver-pg14-stats-temp-dir:
+    kind: code
+    title: "14：最後一版有 stats_temp_directory（15 統計改放共享記憶體）"
+    project: "PostgreSQL"
+    version: "14.24"
+    file: "src/backend/utils/misc/guc.c"
+    line: 4468
+    url: "https://github.com/postgres/postgres/blob/REL_14_24/src/backend/utils/misc/guc.c#L4468"
+  ver-pg15-defer-cleanup:
+    kind: code
+    title: "15：最後一版有 vacuum_defer_cleanup_age"
+    project: "PostgreSQL"
+    version: "15.19"
+    file: "src/backend/utils/misc/guc.c"
+    line: 2730
+    url: "https://github.com/postgres/postgres/blob/REL_15_19/src/backend/utils/misc/guc.c#L2730"
+  ver-pg16-old-snapshot:
+    kind: code
+    title: "16：最後一版有 old_snapshot_threshold"
+    project: "PostgreSQL"
+    version: "16.15"
+    file: "src/backend/utils/misc/guc_tables.c"
+    line: 3295
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/utils/misc/guc_tables.c#L3295"
+  ver-pg16-reserved:
+    kind: code
+    title: "16：新設定 reserved_connections"
+    project: "PostgreSQL"
+    version: "16.15"
+    file: "src/backend/utils/misc/guc_tables.c"
+    line: 2208
+    url: "https://github.com/postgres/postgres/blob/REL_16_15/src/backend/utils/misc/guc_tables.c#L2208"
+  ver-pgx-bgwriter-17:
+    kind: code
+    title: "stat_bgwriter 在 17 以上改用只有四欄的查詢"
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_bgwriter.go"
+    line: 128
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_bgwriter.go#L128"
+  ver-pgx-checkpointer-off:
+    kind: code
+    title: "stat_checkpointer 預設關閉"
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_checkpointer.go"
+    line: 30
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_checkpointer.go#L30"
+  ver-pgx-checkpointer-before17:
+    kind: code
+    title: "stat_checkpointer 在 17 以下只記 warn、回成功"
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_checkpointer.go"
+    line: 113
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_checkpointer.go#L113"
+  ver-pgx-pss-17:
+    kind: code
+    title: "stat_statements 依伺服器版本（不是 extension 版本）選查詢"
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_statements.go"
+    line: 241
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_statements.go#L241"
+  ver-pgx-pss-shared-blk:
+    kind: code
+    title: "17 以上的查詢讀 shared_blk_read_time"
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_statements.go"
+    line: 211
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_statements.go#L211"
+  ver-pgx-vacuum-param6:
+    kind: code
+    title: "stat_progress_vacuum 直接讀 param6／param7，不分版本"
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_progress_vacuum.go"
+    line: 115
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_progress_vacuum.go#L115"
+  ver-pgx-slots-13:
+    kind: code
+    title: "replication_slots 在 13 以上才查 wal_status、safe_wal_size"
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_replication_slots.go"
+    line: 217
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_replication_slots.go#L217"
+  ver-pgx-statdb-14:
+    kind: code
+    title: "stat_database 的 active_time 只在 14 以上"
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/pg_stat_database.go"
+    line: 251
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/pg_stat_database.go#L251"
+  ver-pgx-version:
+    kind: code
+    title: "每條新連線查一次伺服器版本"
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/instance.go"
+    line: 84
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/instance.go#L84"
+  ver-mg60-ct-section:
+    kind: code
+    title: "6.0：ticket 在 serverStatus.wiredTiger.concurrentTransactions"
+    project: "MongoDB"
+    version: "6.0.29"
+    file: "src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp"
+    line: 615
+    url: "https://github.com/mongodb/mongo/blob/r6.0.29/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L615"
+  ver-mg70-ct-section:
+    kind: code
+    title: "7.0：ticket 仍在 wiredTiger.concurrentTransactions"
+    project: "MongoDB"
+    version: "7.0.45"
+    file: "src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp"
+    line: 588
+    url: "https://github.com/mongodb/mongo/blob/r7.0.45/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L588"
+  ver-mg80-queues-execution:
+    kind: code
+    title: "8.0：ticket 移到 serverStatus.queues.execution"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/admission/queues_server_status_section.cpp"
+    line: 58
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/admission/queues_server_status_section.cpp#L58"
+  ver-mg82-queues-execution:
+    kind: code
+    title: "8.2：同 8.0"
+    project: "MongoDB"
+    version: "8.2.12"
+    file: "src/mongo/db/admission/queues_server_status_section.cpp"
+    line: 56
+    url: "https://github.com/mongodb/mongo/blob/r8.2.12/src/mongo/db/admission/queues_server_status_section.cpp#L56"
+  ver-mg60-ticket-128:
+    kind: code
+    title: "6.0：ticket 數預設固定 128"
+    project: "MongoDB"
+    version: "6.0.29"
+    file: "src/mongo/db/storage/storage_engine_init.cpp"
+    line: 181
+    url: "https://github.com/mongodb/mongo/blob/r6.0.29/src/mongo/db/storage/storage_engine_init.cpp#L181"
+  ver-mg60-semaphore:
+    kind: code
+    title: "6.0：沒開 feature flag 時用 SemaphoreTicketHolder"
+    project: "MongoDB"
+    version: "6.0.29"
+    file: "src/mongo/db/storage/storage_engine_init.cpp"
+    line: 206
+    url: "https://github.com/mongodb/mongo/blob/r6.0.29/src/mongo/db/storage/storage_engine_init.cpp#L206"
+  ver-mg60-semaphore-stats:
+    kind: code
+    title: "6.0：SemaphoreTicketHolder 只輸出 out、available、totalTickets（沒有 queueLength）"
+    project: "MongoDB"
+    version: "6.0.29"
+    file: "src/mongo/util/concurrency/ticketholder.cpp"
+    line: 298
+    url: "https://github.com/mongodb/mongo/blob/r6.0.29/src/mongo/util/concurrency/ticketholder.cpp#L298"
+  ver-mg70-semaphore:
+    kind: code
+    title: "7.0：沒開 featureFlagDeprioritizeLowPriorityOperations 時用 SemaphoreTicketHolder"
+    project: "MongoDB"
+    version: "7.0.45"
+    file: "src/mongo/db/storage/storage_engine_init.cpp"
+    line: 222
+    url: "https://github.com/mongodb/mongo/blob/r7.0.45/src/mongo/db/storage/storage_engine_init.cpp#L222"
+  ver-mg70-depri-flag:
+    kind: code
+    title: "7.0：priority ticket holder 的 feature flag 預設 false"
+    project: "MongoDB"
+    version: "7.0.45"
+    file: "src/mongo/db/storage/storage_engine_feature_flags.idl"
+    line: 37
+    url: "https://github.com/mongodb/mongo/blob/r7.0.45/src/mongo/db/storage/storage_engine_feature_flags.idl#L37"
+  ver-mg70-semaphore-stats:
+    kind: code
+    title: "7.0：queueLength 直接放在 read／write 下（沒有 normalPriority 這層）"
+    project: "MongoDB"
+    version: "7.0.45"
+    file: "src/mongo/util/concurrency/semaphore_ticketholder.cpp"
+    line: 51
+    url: "https://github.com/mongodb/mongo/blob/r7.0.45/src/mongo/util/concurrency/semaphore_ticketholder.cpp#L51"
+  ver-mg70-queue-length:
+    kind: code
+    title: "7.0：queueLength 欄位"
+    project: "MongoDB"
+    version: "7.0.45"
+    file: "src/mongo/util/concurrency/ticketholder.cpp"
+    line: 188
+    url: "https://github.com/mongodb/mongo/blob/r7.0.45/src/mongo/util/concurrency/ticketholder.cpp#L188"
+  ver-mg80-semaphore-normal:
+    kind: code
+    title: "8.0：SemaphoreTicketHolder 也包一層 normalPriority"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/util/concurrency/semaphore_ticketholder.cpp"
+    line: 44
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/util/concurrency/semaphore_ticketholder.cpp#L44"
+  ver-mg70-algo:
+    kind: code
+    title: "7.0：storageEngineConcurrencyAdjustmentAlgorithm 預設 throughputProbing"
+    project: "MongoDB"
+    version: "7.0.45"
+    file: "src/mongo/db/storage/execution_control/concurrency_adjustment_parameters.idl"
+    line: 60
+    url: "https://github.com/mongodb/mongo/blob/r7.0.45/src/mongo/db/storage/execution_control/concurrency_adjustment_parameters.idl#L60"
+  ver-mg70-algo-userset:
+    kind: code
+    title: "7.0：使用者設了 ticket 數就改回固定"
+    project: "MongoDB"
+    version: "7.0.45"
+    file: "src/mongo/db/storage/storage_engine_init.cpp"
+    line: 186
+    url: "https://github.com/mongodb/mongo/blob/r7.0.45/src/mongo/db/storage/storage_engine_init.cpp#L186"
+  ver-mg60-wt-ckpt:
+    kind: code
+    title: "6.0：checkpoint 時間在 transaction 分類"
+    project: "MongoDB"
+    version: "6.0.29"
+    file: "src/third_party/wiredtiger/src/support/stat.c"
+    line: 1624
+    url: "https://github.com/mongodb/mongo/blob/r6.0.29/src/third_party/wiredtiger/src/support/stat.c#L1624"
+  ver-mg70-wt-ckpt:
+    kind: code
+    title: "7.0：checkpoint 時間仍在 transaction 分類"
+    project: "MongoDB"
+    version: "7.0.45"
+    file: "src/third_party/wiredtiger/src/support/stat.c"
+    line: 2001
+    url: "https://github.com/mongodb/mongo/blob/r7.0.45/src/third_party/wiredtiger/src/support/stat.c#L2001"
+  ver-mg80-wt-ckpt:
+    kind: code
+    title: "8.0：checkpoint 統計移到 checkpoint 分類"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/third_party/wiredtiger/src/support/stat.c"
+    line: 1821
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/third_party/wiredtiger/src/support/stat.c#L1821"
+  ver-mg80-wt-ckpt-failed:
+    kind: code
+    title: "8.0：checkpoint 失敗次數"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/third_party/wiredtiger/src/support/stat.c"
+    line: 1843
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/third_party/wiredtiger/src/support/stat.c#L1843"
+  ver-mg60-gle:
+    kind: code
+    title: "6.0：metrics.getLastError.wtimeouts"
+    project: "MongoDB"
+    version: "6.0.29"
+    file: "src/mongo/db/write_concern.cpp"
+    line: 66
+    url: "https://github.com/mongodb/mongo/blob/r6.0.29/src/mongo/db/write_concern.cpp#L66"
+  ver-mg80-gle:
+    kind: code
+    title: "8.0：metrics.getLastError.wtimeouts 仍在"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/write_concern.cpp"
+    line: 83
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/write_concern.cpp#L83"
+  ver-mg82-ismaster:
+    kind: code
+    title: "8.2：isMaster 仍是 hello 的別名"
+    project: "MongoDB"
+    version: "8.2.12"
+    file: "src/mongo/db/repl/replication_info.cpp"
+    line: 139
+    url: "https://github.com/mongodb/mongo/blob/r8.2.12/src/mongo/db/repl/replication_info.cpp#L139"
+  ver-mgx-queues-prefix:
+    kind: code
+    title: "exporter 把 queues.execution 改回 ss_wt_concurrentTransactions 前綴"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/metrics.go"
+    line: 59
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/metrics.go#L59"
+  ver-mgx-merge8:
+    kind: code
+    title: "exporter 合併 8.0 分段的 getDiagnosticData"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/diagnostic_data_collector.go"
+    line: 118
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/diagnostic_data_collector.go#L118"
+  ver-mgx-compat-tickets:
+    kind: code
+    title: "compatible-mode 的 ticket 舊名從新名轉換"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/v1_compatibility.go"
+    line: 447
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/v1_compatibility.go#L447"
+  ver-vk72-redis-version:
+    kind: code
+    title: "Valkey 7.2：INFO 的 redis_version 固定 7.2.4"
+    project: "Valkey"
+    version: "7.2.15"
+    file: "src/version.h"
+    line: 7
+    url: "https://github.com/valkey-io/valkey/blob/7.2.15/src/version.h#L7"
+  ver-vk91-redis-version:
+    kind: code
+    title: "Valkey 9.1：redis_version 仍固定 7.2.4"
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/version.h"
+    line: 17
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/version.h#L17"
+  ver-vk72-redis-mode:
+    kind: code
+    title: "Valkey 7.2：INFO 輸出 redis_mode"
+    project: "Valkey"
+    version: "7.2.15"
+    file: "src/server.c"
+    line: 5502
+    url: "https://github.com/valkey-io/valkey/blob/7.2.15/src/server.c#L5502"
+  ver-vk80-server-mode:
+    kind: code
+    title: "Valkey 8.0：預設輸出 server_mode，extended-redis-compatibility 才是 redis_mode"
+    project: "Valkey"
+    version: "8.0.12"
+    file: "src/server.c"
+    line: 5467
+    url: "https://github.com/valkey-io/valkey/blob/8.0.12/src/server.c#L5467"
+  ver-vk72-backlog:
+    kind: code
+    title: "Valkey 7.2：repl-backlog-size 預設 1mb"
+    project: "Valkey"
+    version: "7.2.15"
+    file: "src/config.c"
+    line: 3224
+    url: "https://github.com/valkey-io/valkey/blob/7.2.15/src/config.c#L3224"
+  ver-vk80-backlog:
+    kind: code
+    title: "Valkey 8.0：repl-backlog-size 預設 10mb"
+    project: "Valkey"
+    version: "8.0.12"
+    file: "src/config.c"
+    line: 3251
+    url: "https://github.com/valkey-io/valkey/blob/8.0.12/src/config.c#L3251"
+  ver-vk72-lazyfree:
+    kind: code
+    title: "Valkey 7.2：lazyfree-* 預設 no"
+    project: "Valkey"
+    version: "7.2.15"
+    file: "src/config.c"
+    line: 3079
+    url: "https://github.com/valkey-io/valkey/blob/7.2.15/src/config.c#L3079"
+  ver-vk80-lazyfree:
+    kind: code
+    title: "Valkey 8.0：lazyfree-* 預設 yes"
+    project: "Valkey"
+    version: "8.0.12"
+    file: "src/config.c"
+    line: 3091
+    url: "https://github.com/valkey-io/valkey/blob/8.0.12/src/config.c#L3091"
+  ver-vk81-commandlog:
+    kind: code
+    title: "Valkey 8.1：slowlog-* 變成 commandlog-* 的別名"
+    project: "Valkey"
+    version: "8.1.11"
+    file: "src/config.c"
+    line: 3339
+    url: "https://github.com/valkey-io/valkey/blob/8.1.11/src/config.c#L3339"
+  ver-vk80-iothreads:
+    kind: code
+    title: "Valkey 8.0：io-threads 預設 1、不能動態改"
+    project: "Valkey"
+    version: "8.0.12"
+    file: "src/config.c"
+    line: 3189
+    url: "https://github.com/valkey-io/valkey/blob/8.0.12/src/config.c#L3189"
+  ver-vk90-iothreads:
+    kind: code
+    title: "Valkey 9.0：io-threads 可用 CONFIG SET 改"
+    project: "Valkey"
+    version: "9.0.7"
+    file: "src/config.c"
+    line: 3323
+    url: "https://github.com/valkey-io/valkey/blob/9.0.7/src/config.c#L3323"
+  ver-vk91-tls-expire:
+    kind: code
+    title: "Valkey 9.1：INFO 加 TLS 憑證到期秒數"
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/server.c"
+    line: 6194
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/server.c#L6194"
+  ver-rd810-backlog:
+    kind: code
+    title: "Redis 8.10：repl-backlog-size 仍是 1mb"
+    project: "Redis"
+    version: "8.10.3"
+    file: "src/config.c"
+    line: 3585
+    url: "https://github.com/redis/redis/blob/8.10.3/src/config.c#L3585"
+  ver-rd810-lazyfree:
+    kind: code
+    title: "Redis 8.10：lazyfree-* 仍是 no"
+    project: "Redis"
+    version: "8.10.3"
+    file: "src/config.c"
+    line: 3410
+    url: "https://github.com/redis/redis/blob/8.10.3/src/config.c#L3410"
+  ver-rd82-sync-attempts:
+    kind: code
+    title: "Redis 8.2：INFO 加 master_total_sync_attempts、master_link_up_since_seconds"
+    project: "Redis"
+    version: "8.2.11"
+    file: "src/server.c"
+    line: 6276
+    url: "https://github.com/redis/redis/blob/8.2.11/src/server.c#L6276"
+  ver-rd810-slowlog-info:
+    kind: code
+    title: "Redis 8.10：INFO 加 slowlog_commands_count 等"
+    project: "Redis"
+    version: "8.10.3"
+    file: "src/server.c"
+    line: 6826
+    url: "https://github.com/redis/redis/blob/8.10.3/src/server.c#L6826"
+  ver-rx-server-mode:
+    kind: code
+    title: "exporter 沒有 redis_mode 時改讀 server_mode"
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/info.go"
+    line: 198
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/info.go#L198"
+  ver-rx-valkey-version:
+    kind: code
+    title: "exporter 有 valkey_version 時加成 label"
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/info.go"
+    line: 214
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/info.go#L214"
+  ver-rx-slowlog:
+    kind: code
+    title: "exporter 一律送 SLOWLOG LEN"
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/slowlog.go"
+    line: 9
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/slowlog.go#L9"
+  ver-et34-livez:
+    kind: code
+    title: "3.4.45 有 /livez、/readyz（3.4.29 起）"
+    project: "etcd"
+    version: "v3.4.45"
+    file: "etcdserver/api/etcdhttp/health.go"
+    line: 43
+    url: "https://github.com/etcd-io/etcd/blob/v3.4.45/etcdserver/api/etcdhttp/health.go#L43"
+  ver-et35-livez:
+    kind: code
+    title: "3.5.35 有 /livez、/readyz（3.5.11 起）"
+    project: "etcd"
+    version: "v3.5.35"
+    file: "server/etcdserver/api/etcdhttp/health.go"
+    line: 46
+    url: "https://github.com/etcd-io/etcd/blob/v3.5.35/server/etcdserver/api/etcdhttp/health.go#L46"
+  ver-et35-active-peers:
+    kind: code
+    title: "3.5：peer 數只有 etcd_network_active_peers"
+    project: "etcd"
+    version: "v3.5.35"
+    file: "server/etcdserver/api/rafthttp/metrics.go"
+    line: 23
+    url: "https://github.com/etcd-io/etcd/blob/v3.5.35/server/etcdserver/api/rafthttp/metrics.go#L23"
+  ver-et36-known-peers:
+    kind: code
+    title: "3.6：新增 etcd_network_known_peers"
+    project: "etcd"
+    version: "v3.6.16"
+    file: "server/etcdserver/api/membership/metrics.go"
+    line: 33
+    url: "https://github.com/etcd-io/etcd/blob/v3.6.16/server/etcdserver/api/membership/metrics.go#L33"
+  ver-et36-alarms:
+    kind: code
+    title: "3.6：新增 etcd_debugging_server_alarms"
+    project: "etcd"
+    version: "v3.6.16"
+    file: "server/etcdserver/apply/metrics.go"
+    line: 23
+    url: "https://github.com/etcd-io/etcd/blob/v3.6.16/server/etcdserver/apply/metrics.go#L23"
+  ver-et36-feature:
+    kind: code
+    title: "3.6：新增 etcd_server_feature_enabled"
+    project: "etcd"
+    version: "v3.6.16"
+    file: "server/etcdserver/metrics.go"
+    line: 145
+    url: "https://github.com/etcd-io/etcd/blob/v3.6.16/server/etcdserver/metrics.go#L145"
+  ver-et37-request-duration:
+    kind: code
+    title: "3.7：新增 etcd_server_request_duration_seconds"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/metrics.go"
+    line: 102
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/metrics.go#L102"
+  ver-et35-enable-v2:
+    kind: code
+    title: "3.5：--enable-v2 標為 deprecated"
+    project: "etcd"
+    version: "v3.5.35"
+    file: "server/etcdmain/config.go"
+    line: 224
+    url: "https://github.com/etcd-io/etcd/blob/v3.5.35/server/etcdmain/config.go#L224"
+  ver-et36-v2depr:
+    kind: code
+    title: "3.6：v2store 預設 write-only"
+    project: "etcd"
+    version: "v3.6.16"
+    file: "server/config/v2_deprecation.go"
+    line: 65
+    url: "https://github.com/etcd-io/etcd/blob/v3.6.16/server/config/v2_deprecation.go#L65"
+  ver-et35-grpc-hist:
+    kind: code
+    title: "3.5：--metrics=extensive 才打開 grpc_server_handling_seconds"
+    project: "etcd"
+    version: "v3.5.35"
+    file: "server/embed/etcd.go"
+    line: 891
+    url: "https://github.com/etcd-io/etcd/blob/v3.5.35/server/embed/etcd.go#L891"
+  ver-et36-grpc-hist:
+    kind: code
+    title: "3.6：改用 go-grpc-middleware，extensive 時加 histogram"
+    project: "etcd"
+    version: "v3.6.16"
+    file: "server/etcdserver/api/v3rpc/grpc.go"
+    line: 104
+    url: "https://github.com/etcd-io/etcd/blob/v3.6.16/server/etcdserver/api/v3rpc/grpc.go#L104"
+  ver-et37-metrics-flag:
+    kind: code
+    title: "--metrics 預設 basic"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/embed/config.go"
+    line: 737
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/embed/config.go#L737"
+  ver-ti-tidb81-memquota:
+    kind: code
+    title: "TiDB 8.1：新增 tidb_server_memory_quota_bytes"
+    project: "TiDB"
+    version: "v8.1.2"
+    file: "pkg/metrics/server.go"
+    line: 382
+    url: "https://github.com/pingcap/tidb/blob/v8.1.2/pkg/metrics/server.go#L382"
+  ver-ti-tikv81-memquota:
+    kind: code
+    title: "TiKV 8.1：新增 tikv_server_memory_quota_bytes"
+    project: "TiKV"
+    version: "v8.1.2"
+    file: "src/server/metrics.rs"
+    line: 470
+    url: "https://github.com/tikv/tikv/blob/v8.1.2/src/server/metrics.rs#L470"
+  ver-ti-tikv75-cpuquota:
+    kind: code
+    title: "TiKV 7.5：只有 cpu_cores_quota，沒有 memory_quota_bytes"
+    project: "TiKV"
+    version: "v7.5.8"
+    file: "src/server/metrics.rs"
+    line: 429
+    url: "https://github.com/tikv/tikv/blob/v7.5.8/src/server/metrics.rs#L429"
+  ver-ti-pd81-memquota:
+    kind: code
+    title: "PD 8.1：新增 pd_service_memory_quota_bytes"
+    project: "PD"
+    version: "v8.1.2"
+    file: "pkg/basicserver/metrics.go"
+    line: 34
+    url: "https://github.com/tikv/pd/blob/v8.1.2/pkg/basicserver/metrics.go#L34"
+  ver-ti-pd75-maxprocs:
+    kind: code
+    title: "PD 7.5：只有 maxprocs"
+    project: "PD"
+    version: "v7.5.8"
+    file: "server/metrics.go"
+    line: 162
+    url: "https://github.com/tikv/pd/blob/v7.5.8/server/metrics.go#L162"
+  ver-ti-rules81-tidb-mem:
+    kind: code
+    title: "8.1 官方規則新增 TiDB_cpu_quota、TiDB_memory_quota"
+    project: "TiDB"
+    version: "v8.1.2"
+    file: "pkg/metrics/alertmanager/tidb.rules.yml"
+    line: 186
+    url: "https://github.com/pingcap/tidb/blob/v8.1.2/pkg/metrics/alertmanager/tidb.rules.yml#L186"
+  ver-ti-rules85-analyze:
+    kind: code
+    title: "8.5 官方規則新增 TiDB_auto_analyze_failed"
+    project: "TiDB"
+    version: "v8.5.8"
+    file: "pkg/metrics/alertmanager/tidb.rules.yml"
+    line: 66
+    url: "https://github.com/pingcap/tidb/blob/v8.5.8/pkg/metrics/alertmanager/tidb.rules.yml#L66"
+  ver-ti-rules81-tikv-mem:
+    kind: code
+    title: "8.1 官方規則新增 TiKV_cpu_quota、TiKV_memory_quota"
+    project: "TiKV"
+    version: "v8.1.2"
+    file: "metrics/alertmanager/tikv.rules.yml"
+    line: 340
+    url: "https://github.com/tikv/tikv/blob/v8.1.2/metrics/alertmanager/tikv.rules.yml#L340"
+  ver-ti-rules81-cop-type:
+    kind: code
+    title: "8.1 官方規則的 coprocessor 等待改成只取 type 為 all"
+    project: "TiKV"
+    version: "v8.1.2"
+    file: "metrics/alertmanager/tikv.rules.yml"
+    line: 113
+    url: "https://github.com/tikv/tikv/blob/v8.1.2/metrics/alertmanager/tikv.rules.yml#L113"
+  ver-ti-rules75-cop:
+    kind: code
+    title: "7.5 官方規則的 coprocessor 等待沒有 type 條件"
+    project: "TiKV"
+    version: "v7.5.8"
+    file: "metrics/alertmanager/tikv.rules.yml"
+    line: 113
+    url: "https://github.com/tikv/tikv/blob/v7.5.8/metrics/alertmanager/tikv.rules.yml#L113"
+  ver-ti-rules81-futurepool:
+    kind: code
+    title: "8.1 的 recording rule 把 futurepool pending 從 rate 改成 avg_over_time"
+    project: "TiKV"
+    version: "v8.1.2"
+    file: "metrics/alertmanager/tikv.accelerate.rules.yml"
+    line: 51
+    url: "https://github.com/tikv/tikv/blob/v8.1.2/metrics/alertmanager/tikv.accelerate.rules.yml#L51"
+  ver-ti-rules81-pd-mem:
+    kind: code
+    title: "8.1 官方規則新增 PD_cpu_quota、PD_memory_quota"
+    project: "PD"
+    version: "v8.1.2"
+    file: "metrics/alertmanager/pd.rules.yml"
+    line: 211
+    url: "https://github.com/tikv/pd/blob/v8.1.2/metrics/alertmanager/pd.rules.yml#L211"
+  ver-ti-pd75-etcd:
+    kind: code
+    title: "PD 7.5：內嵌 etcd 是 commit 950cd5f（etcd v3.4.31）"
+    project: "PD"
+    version: "v7.5.8"
+    file: "go.mod"
+    line: 60
+    url: "https://github.com/tikv/pd/blob/v7.5.8/go.mod#L60"
+  ver-ti-pd81-etcd:
+    kind: code
+    title: "PD 8.1：內嵌 etcd 仍是 v3.4.31"
+    project: "PD"
+    version: "v8.1.2"
+    file: "go.mod"
+    line: 56
+    url: "https://github.com/tikv/pd/blob/v8.1.2/go.mod#L56"
+  ver-ti-pd85-etcd:
+    kind: code
+    title: "PD 8.5：內嵌 etcd v3.5.15"
+    project: "PD"
+    version: "v8.5.8"
+    file: "go.mod"
+    line: 58
+    url: "https://github.com/tikv/pd/blob/v8.5.8/go.mod#L58"
+  ver-yb220-no-hb-delay:
+    kind: code
+    title: "2.20：master 的 cluster metric 只有 live／dead（沒有 max_follower_heartbeat_delay）"
+    project: "YugabyteDB"
+    version: "2.20.12_FINAL"
+    file: "src/yb/master/catalog_manager.cc"
+    line: 576
+    url: "https://github.com/yugabyte/yugabyte-db/blob/2.20.12_FINAL/src/yb/master/catalog_manager.cc#L576"
+  ver-yb242-hb-delay:
+    kind: code
+    title: "2024.2：有 max_follower_heartbeat_delay"
+    project: "YugabyteDB"
+    version: "2024.2.12.0-b45"
+    file: "src/yb/master/catalog_manager.cc"
+    line: 542
+    url: "https://github.com/yugabyte/yugabyte-db/blob/2024.2.12.0-b45/src/yb/master/catalog_manager.cc#L542"
+  ver-yb242-splits:
+    kind: code
+    title: "2024.2：有 outstanding_tablet_splits"
+    project: "YugabyteDB"
+    version: "2024.2.12.0-b45"
+    file: "src/yb/master/tablet_split_manager.cc"
+    line: 136
+    url: "https://github.com/yugabyte/yugabyte-db/blob/2024.2.12.0-b45/src/yb/master/tablet_split_manager.cc#L136"
+  ver-yb220-pg11:
+    kind: code
+    title: "2.20：YSQL 以 PostgreSQL 11.2 為基礎"
+    project: "YugabyteDB"
+    version: "2.20.12_FINAL"
+    file: "src/postgres/configure.in"
+    line: 20
+    url: "https://github.com/yugabyte/yugabyte-db/blob/2.20.12_FINAL/src/postgres/configure.in#L20"
+  ver-yb242-pg11:
+    kind: code
+    title: "2024.2：YSQL 仍是 PostgreSQL 11.2"
+    project: "YugabyteDB"
+    version: "2024.2.12.0-b45"
+    file: "src/postgres/configure.in"
+    line: 20
+    url: "https://github.com/yugabyte/yugabyte-db/blob/2024.2.12.0-b45/src/postgres/configure.in#L20"
+  ver-yb251-pg15:
+    kind: code
+    title: "2025.1：YSQL 改以 PostgreSQL 15.12 為基礎"
+    project: "YugabyteDB"
+    version: "2025.1.5.0-b103"
+    file: "src/postgres/configure.ac"
+    line: 20
+    url: "https://github.com/yugabyte/yugabyte-db/blob/2025.1.5.0-b103/src/postgres/configure.ac#L20"
+  ver-yb220-ysql-conn:
+    kind: code
+    title: "2.20：YSQL 連線 metric（檔名 pgsql_webserver_wrapper.cc）"
+    project: "YugabyteDB"
+    version: "2.20.12_FINAL"
+    file: "src/yb/yql/pggate/webserver/pgsql_webserver_wrapper.cc"
+    line: 66
+    url: "https://github.com/yugabyte/yugabyte-db/blob/2.20.12_FINAL/src/yb/yql/pggate/webserver/pgsql_webserver_wrapper.cc#L66"
+  ver-yb251-ysql-conn:
+    kind: code
+    title: "2025.1：同名 metric，檔案改名 ybc_pg_webserver_wrapper.cc"
+    project: "YugabyteDB"
+    version: "2025.1.5.0-b103"
+    file: "src/yb/yql/pggate/webserver/ybc_pg_webserver_wrapper.cc"
+    line: 70
+    url: "https://github.com/yugabyte/yugabyte-db/blob/2025.1.5.0-b103/src/yb/yql/pggate/webserver/ybc_pg_webserver_wrapper.cc#L70"
+  ver-yb220-stall:
+    kind: code
+    title: "2.20：rocksdb_stall_micros"
+    project: "YugabyteDB"
+    version: "2.20.12_FINAL"
+    file: "src/yb/rocksdb/statistics.h"
+    line: 268
+    url: "https://github.com/yugabyte/yugabyte-db/blob/2.20.12_FINAL/src/yb/rocksdb/statistics.h#L268"
+  ver-yb242-stall:
+    kind: code
+    title: "2024.2：同名，定義移到 util/statistics.cc"
+    project: "YugabyteDB"
+    version: "2024.2.12.0-b45"
+    file: "src/yb/rocksdb/util/statistics.cc"
+    line: 79
+    url: "https://github.com/yugabyte/yugabyte-db/blob/2024.2.12.0-b45/src/yb/rocksdb/util/statistics.cc#L79"
+  ver-yb220-ysql-prefix:
+    kind: code
+    title: "2.20：YSQL 語句延遲前綴 handler_latency_yb_ysqlserver_SQLProcessor_"
+    project: "YugabyteDB"
+    version: "2.20.12_FINAL"
+    file: "src/postgres/contrib/yb_pg_metrics/yb_pg_metrics.c"
+    line: 45
+    url: "https://github.com/yugabyte/yugabyte-db/blob/2.20.12_FINAL/src/postgres/contrib/yb_pg_metrics/yb_pg_metrics.c#L45"
+  ver-yb261-ysql-prefix:
+    kind: code
+    title: "2026.1：延遲前綴不變，另有 yb_ysqlserver_ 前綴的計數"
+    project: "YugabyteDB"
+    version: "2026.1.3.0-b100"
+    file: "src/postgres/yb-extensions/yb_pg_metrics/yb_pg_metrics.c"
+    line: 56
+    url: "https://github.com/yugabyte/yugabyte-db/blob/2026.1.3.0-b100/src/postgres/yb-extensions/yb_pg_metrics/yb_pg_metrics.c#L56"
+  ver-yb220-clock-skew:
+    kind: code
+    title: "2.20：hybrid_clock_skew"
+    project: "YugabyteDB"
+    version: "2.20.12_FINAL"
+    file: "src/yb/server/hybrid_clock.cc"
+    line: 62
+    url: "https://github.com/yugabyte/yugabyte-db/blob/2.20.12_FINAL/src/yb/server/hybrid_clock.cc#L62"
+  ver-ch253-disk-suffix:
+    kind: code
+    title: "25.3：每顆磁碟一個名稱 DiskAvailable_<disk>"
+    project: "ClickHouse"
+    version: "v25.3.14.14-lts"
+    file: "src/Interpreters/ServerAsynchronousMetrics.cpp"
+    line: 242
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v25.3.14.14-lts/src/Interpreters/ServerAsynchronousMetrics.cpp#L242"
+  ver-ch263-disk-suffix:
+    kind: code
+    title: "26.3：仍是 DiskAvailable_<disk>"
+    project: "ClickHouse"
+    version: "v26.3.60.2-lts"
+    file: "src/Interpreters/ServerAsynchronousMetrics.cpp"
+    line: 265
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.3.60.2-lts/src/Interpreters/ServerAsynchronousMetrics.cpp#L265"
+  ver-ch268-disk-label:
+    kind: code
+    title: "26.8：改成 DiskAvailable{disk=...}"
+    project: "ClickHouse"
+    version: "v26.8.34.13-lts"
+    file: "src/Interpreters/ServerAsynchronousMetrics.cpp"
+    line: 405
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.8.34.13-lts/src/Interpreters/ServerAsynchronousMetrics.cpp#L405"
+  ver-ch268-net-label:
+    kind: code
+    title: "26.8：網卡、block device、CPU 等也改成 label"
+    project: "ClickHouse"
+    version: "v26.8.34.13-lts"
+    file: "src/Common/AsynchronousMetrics.cpp"
+    line: 2402
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.8.34.13-lts/src/Common/AsynchronousMetrics.cpp#L2402"
+  ver-ch268-kv-mode:
+    kind: code
+    title: "26.8：asynchronous_metrics_key_values_mode（預設 KeyValues）"
+    project: "ClickHouse"
+    version: "v26.8.34.13-lts"
+    file: "src/Core/ServerSettings.cpp"
+    line: 268
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.8.34.13-lts/src/Core/ServerSettings.cpp#L268"
+  ver-ch258-zk-session:
+    kind: code
+    title: "25.8：只有 ZooKeeperSession，沒有 ZooKeeperSessionExpired"
+    project: "ClickHouse"
+    version: "v25.8.33.6-lts"
+    file: "src/Common/CurrentMetrics.cpp"
+    line: 69
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v25.8.33.6-lts/src/Common/CurrentMetrics.cpp#L69"
+  ver-ch263-zk-expired:
+    kind: code
+    title: "26.3：新增 ZooKeeperSessionExpired"
+    project: "ClickHouse"
+    version: "v26.3.60.2-lts"
+    file: "src/Common/CurrentMetrics.cpp"
+    line: 74
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.3.60.2-lts/src/Common/CurrentMetrics.cpp#L74"
+  ver-ch253-errors:
+    kind: code
+    title: "25.3：/metrics 已輸出 ClickHouseErrorMetric_*"
+    project: "ClickHouse"
+    version: "v25.3.14.14-lts"
+    file: "src/Server/PrometheusMetricsWriter.cpp"
+    line: 62
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v25.3.14.14-lts/src/Server/PrometheusMetricsWriter.cpp#L62"
+  ver-ch253-replicas:
+    kind: code
+    title: "25.3：system.replicas 已有 is_session_expired 等查詢用的欄位"
+    project: "ClickHouse"
+    version: "v25.3.14.14-lts"
+    file: "src/Storages/System/StorageSystemReplicas.cpp"
+    line: 214
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v25.3.14.14-lts/src/Storages/System/StorageSystemReplicas.cpp#L214"
+  ver-ch253-backups:
+    kind: code
+    title: "25.3：system.backups 已有 status、end_time"
+    project: "ClickHouse"
+    version: "v25.3.14.14-lts"
+    file: "src/Storages/System/StorageSystemBackups.cpp"
+    line: 31
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v25.3.14.14-lts/src/Storages/System/StorageSystemBackups.cpp#L31"
+  ver-ch-security:
+    kind: code
+    title: "v26.10.2 的 SECURITY.md：25.* 已不在安全更新範圍，26.3、26.8 LTS 仍支援"
+    project: "ClickHouse"
+    version: "v26.10.2.103-stable"
+    file: "SECURITY.md"
+    line: 26
+    url: "https://github.com/ClickHouse/ClickHouse/blob/v26.10.2.103-stable/SECURITY.md#L26"
+  ver-et-two-stable:
+    kind: code
+    title: "etcd 只維護最新兩個 stable minor"
+    project: "etcd"
+    version: "main@d622ec5（2026-11-10）"
+    file: "Documentation/contributor-guide/branch_management.md"
+    line: 10
+    url: "https://github.com/etcd-io/etcd/blob/d622ec57cf46c119f1a550343c34b26327cead0f/Documentation/contributor-guide/branch_management.md#L10"
+  ver-et-cl35-livez:
+    kind: code
+    title: "CHANGELOG-3.5：v3.5.11 加 /livez、/readyz"
+    project: "etcd"
+    version: "main@d622ec5（2026-11-10）"
+    file: "CHANGELOG/CHANGELOG-3.5.md"
+    line: 442
+    url: "https://github.com/etcd-io/etcd/blob/d622ec57cf46c119f1a550343c34b26327cead0f/CHANGELOG/CHANGELOG-3.5.md#L442"
+  ver-et-cl34-livez:
+    kind: code
+    title: "CHANGELOG-3.4：v3.4.29 加 /livez、/readyz"
+    project: "etcd"
+    version: "main@d622ec5（2026-11-10）"
+    file: "CHANGELOG/CHANGELOG-3.4.md"
+    line: 231
+    url: "https://github.com/etcd-io/etcd/blob/d622ec57cf46c119f1a550343c34b26327cead0f/CHANGELOG/CHANGELOG-3.4.md#L231"
+  ver-et-cl36-v2-removed:
+    kind: code
+    title: "CHANGELOG-3.6：移除 --enable-v2 等 v2 flag"
+    project: "etcd"
+    version: "main@d622ec5（2026-11-10）"
+    file: "CHANGELOG/CHANGELOG-3.6.md"
+    line: 385
+    url: "https://github.com/etcd-io/etcd/blob/d622ec57cf46c119f1a550343c34b26327cead0f/CHANGELOG/CHANGELOG-3.6.md#L385"
+  ver-et-cl36-alarms:
+    kind: code
+    title: "CHANGELOG-3.6：新增 etcd_debugging_server_alarms"
+    project: "etcd"
+    version: "main@d622ec5（2026-11-10）"
+    file: "CHANGELOG/CHANGELOG-3.6.md"
+    line: 475
+    url: "https://github.com/etcd-io/etcd/blob/d622ec57cf46c119f1a550343c34b26327cead0f/CHANGELOG/CHANGELOG-3.6.md#L475"
+  ver-et-cl37-reqdur:
+    kind: code
+    title: "CHANGELOG-3.7：新增 etcd_server_request_duration_seconds"
+    project: "etcd"
+    version: "main@d622ec5（2026-11-10）"
+    file: "CHANGELOG/CHANGELOG-3.7.md"
+    line: 158
+    url: "https://github.com/etcd-io/etcd/blob/d622ec57cf46c119f1a550343c34b26327cead0f/CHANGELOG/CHANGELOG-3.7.md#L158"
+  ver-rx-commandlog-probe:
+    kind: code
+    title: "exporter 先用 COMMAND INFO 確認有沒有 COMMANDLOG"
+    project: "redis_exporter"
+    version: "v1.97.0"
+    file: "exporter/commandlog.go"
+    line: 23
+    url: "https://github.com/oliver006/redis_exporter/blob/v1.97.0/exporter/commandlog.go#L23"
+  ver-vk91-slowlog-len:
+    kind: code
+    title: "Valkey 9.1：SLOWLOG LEN 仍在（沒有標 deprecated）"
+    project: "Valkey"
+    version: "9.1.3"
+    file: "src/commands/slowlog-len.json"
+    line: 6
+    url: "https://github.com/valkey-io/valkey/blob/9.1.3/src/commands/slowlog-len.json#L6"
+  ver-pg14-wal:
+    kind: code
+    title: "14：新增 pg_stat_wal"
+    project: "PostgreSQL"
+    version: "14.24"
+    file: "src/backend/catalog/system_views.sql"
+    line: 1072
+    url: "https://github.com/postgres/postgres/blob/REL_14_24/src/backend/catalog/system_views.sql#L1072"
+  ver-pg14-sessions:
+    kind: code
+    title: "14：pg_stat_database 加 session_time、active_time、sessions_*"
+    project: "PostgreSQL"
+    version: "14.24"
+    file: "src/backend/catalog/system_views.sql"
+    line: 998
+    url: "https://github.com/postgres/postgres/blob/REL_14_24/src/backend/catalog/system_views.sql#L998"
+  ver-pg13-statrep:
+    kind: code
+    title: "13：pg_stat_replication 欄位"
+    project: "PostgreSQL"
+    version: "13.23"
+    file: "src/backend/catalog/system_views.sql"
+    line: 767
+    url: "https://github.com/postgres/postgres/blob/REL_13_23/src/backend/catalog/system_views.sql#L767"
+  ver-pg18-statrep:
+    kind: code
+    title: "18：pg_stat_replication 欄位與 13 相同"
+    project: "PostgreSQL"
+    version: "18.6"
+    file: "src/backend/catalog/system_views.sql"
+    line: 906
+    url: "https://github.com/postgres/postgres/blob/REL_18_6/src/backend/catalog/system_views.sql#L906"
+  ver-pg18-walrcv:
+    kind: code
+    title: "18：pg_stat_wal_receiver 欄位與 13 相同"
+    project: "PostgreSQL"
+    version: "18.6"
+    file: "src/backend/catalog/system_views.sql"
+    line: 945
+    url: "https://github.com/postgres/postgres/blob/REL_18_6/src/backend/catalog/system_views.sql#L945"
+  ver-yb251-ysql-prefix:
+    kind: code
+    title: "2025.1：語句延遲前綴拆成 YSQL_LATENCY_METRIC_PREFIX，另加 yb_ysqlserver_ 前綴"
+    project: "YugabyteDB"
+    version: "2025.1.5.0-b103"
+    file: "src/postgres/yb-extensions/yb_pg_metrics/yb_pg_metrics.c"
+    line: 55
+    url: "https://github.com/yugabyte/yugabyte-db/blob/2025.1.5.0-b103/src/postgres/yb-extensions/yb_pg_metrics/yb_pg_metrics.c#L55"

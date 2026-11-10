@@ -85,30 +85,37 @@ nav:
           - 怎麼監控: targets/postgres.md
           - 監控訊號: components/postgres_exporter.md
           - 原始碼到 metric: targets/postgres-appendix.md
+          - 版本差異: targets/versions/postgres.md
       - Valkey／Redis:
           - 怎麼監控: targets/valkey.md
           - 監控訊號: components/redis_exporter.md
           - 原始碼到 metric: targets/valkey-appendix.md
+          - 版本差異: targets/versions/valkey.md
       - etcd:
           - 怎麼監控: targets/etcd.md
           - 監控訊號: components/etcd.md
           - 原始碼到 metric: targets/etcd-appendix.md
+          - 版本差異: targets/versions/etcd.md
       - TiDB:
           - 怎麼監控: targets/tidb.md
           - 監控訊號: components/tidb.md
           - 原始碼到 metric: targets/tidb-appendix.md
+          - 版本差異: targets/versions/tidb.md
       - YugabyteDB:
           - 怎麼監控: targets/yugabytedb.md
           - 監控訊號: components/yugabytedb.md
           - 原始碼到 metric: targets/yugabytedb-appendix.md
+          - 版本差異: targets/versions/yugabytedb.md
       - ClickHouse:
           - 怎麼監控: targets/clickhouse.md
           - 監控訊號: components/clickhouse.md
           - 原始碼到 metric: targets/clickhouse-appendix.md
+          - 版本差異: targets/versions/clickhouse.md
       - MongoDB:
           - 怎麼監控: targets/mongodb.md
           - 監控訊號: components/mongodb_exporter.md
           - 原始碼到 metric: targets/mongodb-appendix.md
+          - 版本差異: targets/versions/mongodb.md
   - 原理:
       - 信任契約: contracts.md
       - 名詞：設定與 metric: reference/terms.md

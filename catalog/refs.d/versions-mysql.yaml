@@ -1,0 +1,542 @@
+# MySQL／MariaDB 版本差異頁（docs/targets/versions/）的原始碼參考。每一行都用 tag 上的檔案核對過（2026-11-10）。
+# 版本：MySQL 8.0.46、8.4.13、9.7.4；MariaDB 10.6.28、10.11.19、11.4.13、11.8.9、12.3.3；mysqld_exporter v0.21.0；go-sql-driver/mysql v1.10.1。
+refs:
+  ver-my80-show-slave-status:
+    kind: code
+    project: "MySQL"
+    version: "8.0.46"
+    file: "sql/sql_yacc.yy"
+    line: 13857
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.0.46/sql/sql_yacc.yy#L13857"
+  ver-my80-old-names:
+    kind: code
+    project: "MySQL"
+    version: "8.0.46"
+    file: "sql/rpl_replica.cc"
+    line: 3816
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.0.46/sql/rpl_replica.cc#L3816"
+  ver-my84-show-replica-only:
+    kind: code
+    project: "MySQL"
+    version: "8.4.13"
+    file: "sql/sql_yacc.yy"
+    line: 13815
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.13/sql/sql_yacc.yy#L13815"
+  ver-my97-show-replica-only:
+    kind: code
+    project: "MySQL"
+    version: "9.7.4"
+    file: "sql/sql_yacc.yy"
+    line: 14371
+    url: "https://github.com/mysql/mysql-server/blob/mysql-9.7.4/sql/sql_yacc.yy#L14371"
+  ver-my84-sbs-col:
+    kind: code
+    project: "MySQL"
+    version: "8.4.13"
+    file: "sql/rpl_replica.cc"
+    line: 3383
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.13/sql/rpl_replica.cc#L3383"
+  ver-my80-show-slave-hosts:
+    kind: code
+    project: "MySQL"
+    version: "8.0.46"
+    file: "sql/sql_yacc.yy"
+    line: 13673
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.0.46/sql/sql_yacc.yy#L13673"
+  ver-my84-show-replicas:
+    kind: code
+    project: "MySQL"
+    version: "8.4.13"
+    file: "sql/sql_yacc.yy"
+    line: 13638
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.13/sql/sql_yacc.yy#L13638"
+  ver-my80-show-master-status:
+    kind: code
+    project: "MySQL"
+    version: "8.0.46"
+    file: "sql/sql_yacc.yy"
+    line: 13850
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.0.46/sql/sql_yacc.yy#L13850"
+  ver-my84-binary-log-status:
+    kind: code
+    project: "MySQL"
+    version: "8.4.13"
+    file: "sql/sql_yacc.yy"
+    line: 13808
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.13/sql/sql_yacc.yy#L13808"
+  ver-my80-com-show-slave-status:
+    kind: code
+    project: "MySQL"
+    version: "8.0.46"
+    file: "sql/mysqld.cc"
+    line: 4417
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.0.46/sql/mysqld.cc#L4417"
+  ver-my84-com-show-replica-status:
+    kind: code
+    project: "MySQL"
+    version: "8.4.13"
+    file: "sql/mysqld.cc"
+    line: 4529
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.13/sql/mysqld.cc#L4529"
+  ver-my97-slave-open-temp:
+    kind: code
+    project: "MySQL"
+    version: "9.7.4"
+    file: "sql/mysqld.cc"
+    line: 11911
+    url: "https://github.com/mysql/mysql-server/blob/mysql-9.7.4/sql/mysqld.cc#L11911"
+  ver-my80-expire-logs-days:
+    kind: code
+    project: "MySQL"
+    version: "8.0.46"
+    file: "sql/sys_vars.cc"
+    line: 2215
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.0.46/sql/sys_vars.cc#L2215"
+  ver-my84-binlog-expire-seconds:
+    kind: code
+    project: "MySQL"
+    version: "8.4.13"
+    file: "sql/sys_vars.cc"
+    line: 2157
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.13/sql/sys_vars.cc#L2157"
+  ver-my97-log-slave-updates-alias:
+    kind: code
+    project: "MySQL"
+    version: "9.7.4"
+    file: "sql/sys_vars.cc"
+    line: 6048
+    url: "https://github.com/mysql/mysql-server/blob/mysql-9.7.4/sql/sys_vars.cc#L6048"
+  ver-my84-replica-parallel-type:
+    kind: code
+    project: "MySQL"
+    version: "8.4.13"
+    file: "sql/sys_vars.cc"
+    line: 4027
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.13/sql/sys_vars.cc#L4027"
+  ver-my84-semisync-master-plugin:
+    kind: code
+    project: "MySQL"
+    version: "8.4.13"
+    file: "plugin/semisync/CMakeLists.txt"
+    line: 52
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.13/plugin/semisync/CMakeLists.txt#L52"
+  ver-my84-semisync-master-prefix:
+    kind: code
+    project: "MySQL"
+    version: "8.4.13"
+    file: "plugin/semisync/semisync_source_plugin.cc"
+    line: 51
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.13/plugin/semisync/semisync_source_plugin.cc#L51"
+  ver-my97-semisync-plugins:
+    kind: code
+    project: "MySQL"
+    version: "9.7.4"
+    file: "plugin/semisync/CMakeLists.txt"
+    line: 31
+    url: "https://github.com/mysql/mysql-server/blob/mysql-9.7.4/plugin/semisync/CMakeLists.txt#L31"
+  ver-my97-semisync-source-status:
+    kind: code
+    project: "MySQL"
+    version: "9.7.4"
+    file: "plugin/semisync/semisync_source_plugin.cc"
+    line: 416
+    url: "https://github.com/mysql/mysql-server/blob/mysql-9.7.4/plugin/semisync/semisync_source_plugin.cc#L416"
+  ver-my84-native-pw-cached:
+    kind: code
+    project: "MySQL"
+    version: "8.4.13"
+    file: "sql/auth/sql_authentication.cc"
+    line: 1163
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.13/sql/auth/sql_authentication.cc#L1163"
+  ver-my97-no-native-pw:
+    kind: code
+    project: "MySQL"
+    version: "9.7.4"
+    file: "sql/auth/sql_authentication.cc"
+    line: 1203
+    url: "https://github.com/mysql/mysql-server/blob/mysql-9.7.4/sql/auth/sql_authentication.cc#L1203"
+  ver-my-pfs-default-on:
+    kind: code
+    project: "MySQL"
+    version: "8.4.13"
+    file: "sql/sys_vars.cc"
+    line: 529
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.13/sql/sys_vars.cc#L529"
+  ver-my80-gr-exit-readonly:
+    kind: code
+    project: "MySQL"
+    version: "8.0.46"
+    file: "plugin/group_replication/src/plugin.cc"
+    line: 4882
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.0.46/plugin/group_replication/src/plugin.cc#L4882"
+  ver-my84-gr-exit-offline:
+    kind: code
+    project: "MySQL"
+    version: "8.4.13"
+    file: "plugin/group_replication/src/plugin.cc"
+    line: 4937
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.13/plugin/group_replication/src/plugin.cc#L4937"
+  ver-my97-applier-metrics:
+    kind: code
+    project: "MySQL"
+    version: "9.7.4"
+    file: "components/replication_applier_metrics/applier_metrics_pfs_table.cc"
+    line: 43
+    url: "https://github.com/mysql/mysql-server/blob/mysql-9.7.4/components/replication_applier_metrics/applier_metrics_pfs_table.cc#L43"
+  ver-my97-applier-progress:
+    kind: code
+    project: "MySQL"
+    version: "9.7.4"
+    file: "components/replication_applier_metrics/worker_metrics_pfs_table.cc"
+    line: 43
+    url: "https://github.com/mysql/mysql-server/blob/mysql-9.7.4/components/replication_applier_metrics/worker_metrics_pfs_table.cc#L43"
+  ver-my97-gr-fc-stats:
+    kind: code
+    project: "MySQL"
+    version: "9.7.4"
+    file: "components/group_replication_flow_control_stats/group_replication_flow_control_stats.cc"
+    line: 83
+    url: "https://github.com/mysql/mysql-server/blob/mysql-9.7.4/components/group_replication_flow_control_stats/group_replication_flow_control_stats.cc#L83"
+  ver-my97-count-hit-tmp:
+    kind: code
+    project: "MySQL"
+    version: "9.7.4"
+    file: "sql/mysqld.cc"
+    line: 11764
+    url: "https://github.com/mysql/mysql-server/blob/mysql-9.7.4/sql/mysqld.cc#L11764"
+  ver-my80-admin-port:
+    kind: code
+    project: "MySQL"
+    version: "8.0.46"
+    file: "sql/sys_vars.cc"
+    line: 1100
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.0.46/sql/sys_vars.cc#L1100"
+  ver-ex-slave-types:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/slave_status.go"
+    line: 38
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/slave_status.go#L38"
+  ver-ex-slave-loop:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/slave_status.go"
+    line: 90
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/slave_status.go#L90"
+  ver-ex-slave-source-uuid:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/slave_status.go"
+    line: 129
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/slave_status.go#L129"
+  ver-ex-flavor:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/instance.go"
+    line: 65
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/instance.go#L65"
+  ver-ex-version-float:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/instance.go"
+    line: 57
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/instance.go#L57"
+  ver-ex-version-gate:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/exporter.go"
+    line: 206
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/exporter.go#L206"
+  ver-ex-applier-version:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/perf_schema_replication_applier_status_by_worker.go"
+    line: 99
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/perf_schema_replication_applier_status_by_worker.go#L99"
+  ver-ex-slave-hosts-fallback:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/slave_hosts.go"
+    line: 81
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/slave_hosts.go#L81"
+  ver-ex-stmt-8028:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/perf_schema_events_statements.go"
+    line: 229
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/perf_schema_events_statements.go#L229"
+  ver-ex-tablespaces-mariadb:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/info_schema_innodb_sys_tablespaces.go"
+    line: 118
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/info_schema_innodb_sys_tablespaces.go#L118"
+  ver-ex-parse-datetime:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/collector.go"
+    line: 65
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/collector.go#L65"
+  ver-ex-qrt-nil:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/info_schema_query_response_time.go"
+    line: 126
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/info_schema_query_response_time.go#L126"
+  ver-ex-binlog-logbin:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "collector/binlog.go"
+    line: 84
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/collector/binlog.go#L84"
+  ver-ex-readme-grants:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "README.md"
+    line: 26
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/README.md#L26"
+  ver-ex-gsd-sha2:
+    kind: code
+    project: "go-sql-driver/mysql"
+    version: "v1.10.1"
+    file: "auth.go"
+    line: 400
+    url: "https://github.com/go-sql-driver/mysql/blob/v1.10.1/auth.go#L400"
+  ver-mdb-replica-keyword:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/lex.h"
+    line: 540
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/lex.h#L540"
+  ver-mdb106-sbm-col:
+    kind: code
+    project: "MariaDB"
+    version: "10.6.28"
+    file: "sql/slave.cc"
+    line: 3157
+    url: "https://github.com/MariaDB/server/blob/mariadb-10.6.28/sql/slave.cc#L3157"
+  ver-mdb114-sbm-col:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/slave.cc"
+    line: 3234
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/slave.cc#L3234"
+  ver-mdb118-is-slave-status:
+    kind: code
+    project: "MariaDB"
+    version: "11.8.9"
+    file: "sql/sql_show.cc"
+    line: 10735
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.8.9/sql/sql_show.cc#L10735"
+  ver-mdb118-last-event-time:
+    kind: code
+    project: "MariaDB"
+    version: "11.8.9"
+    file: "sql/sql_show.cc"
+    line: 10763
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.8.9/sql/sql_show.cc#L10763"
+  ver-mdb118-all-only-cols:
+    kind: code
+    project: "MariaDB"
+    version: "11.8.9"
+    file: "sql/sql_show.cc"
+    line: 9256
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.8.9/sql/sql_show.cc#L9256"
+  ver-mdb-show-all-slaves:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sql_yacc.yy"
+    line: 14125
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sql_yacc.yy#L14125"
+  ver-mdb-repl-client-alias:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sql_yacc.yy"
+    line: 17558
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sql_yacc.yy#L17558"
+  ver-mdb-slave-monitor-kw:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sql_yacc.yy"
+    line: 17578
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sql_yacc.yy#L17578"
+  ver-mdb1011-slave-status-priv:
+    kind: code
+    project: "MariaDB"
+    version: "10.11.19"
+    file: "sql/privilege.h"
+    line: 520
+    url: "https://github.com/MariaDB/server/blob/mariadb-10.11.19/sql/privilege.h#L520"
+  ver-mdb114-slave-status-priv:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/privilege.h"
+    line: 544
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/privilege.h#L544"
+  ver-mdb1011-binlogs-priv:
+    kind: code
+    project: "MariaDB"
+    version: "10.11.19"
+    file: "sql/privilege.h"
+    line: 465
+    url: "https://github.com/MariaDB/server/blob/mariadb-10.11.19/sql/privilege.h#L465"
+  ver-mdb114-binlogs-priv:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/privilege.h"
+    line: 486
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/privilege.h#L486"
+  ver-mdb114-slave-hosts-priv:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/privilege.h"
+    line: 505
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/privilege.h#L505"
+  ver-mdb114-super-upgrade:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sql_acl.cc"
+    line: 1586
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sql_acl.cc#L1586"
+  ver-mdb-pfs-default-off:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sys_vars.cc"
+    line: 89
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sys_vars.cc#L89"
+  ver-mdb123-pfs-default-off:
+    kind: code
+    project: "MariaDB"
+    version: "12.3.3"
+    file: "sql/sys_vars.cc"
+    line: 90
+    url: "https://github.com/MariaDB/server/blob/mariadb-12.3.3/sql/sys_vars.cc#L90"
+  ver-mdb1011-ibuf-size:
+    kind: code
+    project: "MariaDB"
+    version: "10.11.19"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 1011
+    url: "https://github.com/MariaDB/server/blob/mariadb-10.11.19/storage/innobase/handler/ha_innodb.cc#L1011"
+  ver-mdb114-history-len:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 945
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/handler/ha_innodb.cc#L945"
+  ver-mdb114-max-binlog-total:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sys_vars.cc"
+    line: 1303
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sys_vars.cc#L1303"
+  ver-mdb114-purge-needed:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/sys_vars.cc"
+    line: 1326
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sys_vars.cc#L1326"
+  ver-mdb114-binlog-disk-use:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7664
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7664"
+  ver-mdb114-max-used-conn-time:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7750
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7750"
+  ver-mdb118-tmp-space:
+    kind: code
+    project: "MariaDB"
+    version: "11.8.9"
+    file: "sql/mysqld.cc"
+    line: 7977
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.8.9/sql/mysqld.cc#L7977"
+  ver-mdb118-max-tmp-total:
+    kind: code
+    project: "MariaDB"
+    version: "11.8.9"
+    file: "sql/sys_vars.cc"
+    line: 7421
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.8.9/sql/sys_vars.cc#L7421"
+  ver-mdb123-binlog-engine:
+    kind: code
+    project: "MariaDB"
+    version: "12.3.3"
+    file: "sql/sys_vars.cc"
+    line: 2721
+    url: "https://github.com/MariaDB/server/blob/mariadb-12.3.3/sql/sys_vars.cc#L2721"
+  ver-mdb-pfs-worker-cols:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "storage/perfschema/table_replication_applier_status_by_worker.cc"
+    line: 59
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/perfschema/table_replication_applier_status_by_worker.cc#L59"
+  ver-mdb-slave-running:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7818
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7818"
+  ver-mdb-slaves-running:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7813
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7813"
+  ver-mdb123-semisync-master:
+    kind: code
+    project: "MariaDB"
+    version: "12.3.3"
+    file: "sql/mysqld.cc"
+    line: 8131
+    url: "https://github.com/MariaDB/server/blob/mariadb-12.3.3/sql/mysqld.cc#L8131"
+  ver-mdb123-extra-port:
+    kind: code
+    project: "MariaDB"
+    version: "12.3.3"
+    file: "sql/sys_vars.cc"
+    line: 6964
+    url: "https://github.com/MariaDB/server/blob/mariadb-12.3.3/sql/sys_vars.cc#L6964"
+  ver-mdb-qcache:
+    kind: code
+    project: "MariaDB"
+    version: "11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7792
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7792"

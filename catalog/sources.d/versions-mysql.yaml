@@ -1,0 +1,56 @@
+# MySQL／MariaDB 版本差異頁（docs/targets/versions/）用到的來源。原始碼參考在 catalog/refs.d/versions-mysql.yaml。
+sources:
+  ver-mysql-server-tags:
+    title: mysql/mysql-server 的 tag 列表（選版本用）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/mysql/mysql-server/tags
+    checked: "2026-11-10, 各線最新：mysql-8.0.46、mysql-8.4.13、mysql-9.7.4"
+  ver-mariadb-server-tags:
+    title: MariaDB/server 的 tag 列表（選版本用）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/MariaDB/server/tags
+    checked: "2026-11-10, 各 LTS 線最新：mariadb-10.6.28、10.11.19、11.4.13、11.8.9、12.3.3"
+  ver-mariadb-rest-api:
+    title: MariaDB downloads REST API（每條版本線的狀態、支援類型、EOL 日期）
+    kind: upstream-doc
+    visibility: public
+    url: https://downloads.mariadb.org/rest-api/mariadb/
+    checked: "2026-11-10"
+    note: "LTS：10.6（EOL 2026-07-06）、10.11（2028-02-16）、11.4（2029-05-29）、11.8（2030-02-13）、12.3（2029-06-12）；13.0 是 rolling"
+  ver-mysql-97-releases:
+    title: MySQL 9.7 手冊：MySQL Releases（Innovation 與 LTS）
+    kind: upstream-doc
+    visibility: public
+    url: https://dev.mysql.com/doc/refman/9.7/en/mysql-releases.html
+    checked: "2026-11-10"
+    note: "9.7.x 是 LTS（mysql-9.7-lts-community repo、8.4.x LTS 升 9.7.x LTS）"
+  ver-mysql-97-nutshell:
+    title: MySQL 9.7 手冊：What Is New in MySQL 9.7
+    kind: upstream-doc
+    visibility: public
+    url: https://dev.mysql.com/doc/refman/9.7/en/mysql-nutshell.html
+    checked: "2026-11-10"
+    note: "9.7 移除 replica_parallel_type、group_replication_allow_local_lower_version_join；9.7.4 起有 VERSION_WITH_UPDATE()，VERSION() 仍是三段"
+  ver-mysql-970-relnotes:
+    title: MySQL 9.7.0 release notes
+    kind: upstream-doc
+    visibility: public
+    url: https://dev.mysql.com/doc/relnotes/mysql/9.7/en/news-9-7-0.html
+    checked: "2026-11-10"
+    note: "Replication Applier Metrics、Group Replication Flow Control Statistics、Resource Manager、Primary Election 四個 component 與 Telemetry 從 Enterprise 移到 Community"
+  ver-mysql-gr-exit-action:
+    title: MySQL 8.4 手冊：Group Replication 成員離開群組時的 exit action（READ_ONLY、OFFLINE_MODE、ABORT_SERVER）
+    kind: upstream-doc
+    visibility: public
+    url: https://dev.mysql.com/doc/refman/8.4/en/group-replication-responses-failure-exit.html
+    checked: "2026-11-10"
+    note: "OFFLINE_MODE 會設 offline_mode=ON 與 super_read_only=ON，沒有 CONNECTION_ADMIN 的連線被斷開、新連線被拒。這頁把 READ_ONLY 寫成預設，但 8.4.13 原始碼與 What Is New in 8.4 都是 OFFLINE_MODE"
+  ver-mysqld-exporter-releases:
+    title: mysqld_exporter releases（最新是 v0.21.0）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/prometheus/mysqld_exporter/releases/tag/v0.21.0
+    checked: "2026-11-10, v0.21.0（2026-10-22）是最新 release"
+    note: "0.21.0 的 breaking change：部分 mysql_global_status_* 與 mysql_slave_status_* 從 untyped 改成 counter／gauge（#1099）"
