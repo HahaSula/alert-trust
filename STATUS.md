@@ -45,6 +45,10 @@
 
 ## 進行中
 
+- 工具接上盤點檔（`--inventory`）、路由 label 判斷、`metrics_any`／`key_metrics`、一鍵入口 `tools/review.py`
+- 版本差異調查（從原始碼）：MySQL、MariaDB；PostgreSQL、MongoDB、Valkey／Redis、etcd、TiDB、YugabyteDB、ClickHouse
+- 之後：MySQL 與 MariaDB 拆成兩張卡（各自盤查原始碼）；資料庫卡的 blind_spots 指向主機卡；新增 10 個飽和訊號；更新 rule-review skill；盲測重跑；打 v0.3.0
+- 排定 2026-11-11 01:00：主機卡小實驗（OOM、記憶體接近 limit、唯讀掛載；不用特權容器）
 
 使用者同意的資料庫順序已全部完成；CockroachDB（專有授權）不做。資料庫架構頁依類型分頁：關聯式、記憶體 KV、共識（Raft）、分散式 SQL、分析型、文件型。
 
