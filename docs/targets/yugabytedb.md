@@ -2,7 +2,7 @@
 
 **目標：知道 YugabyteDB 叢集現在能不能服務 YSQL 讀寫（master 有 leader、tablet 有過半副本、時鐘在範圍內、YSQL 還接受連線），以及哪一層、哪一台離不能還有多遠。**YugabyteDB 有兩種 process：yb-master（catalog、tablet 位置、balancer；masters 之間一組 Raft）與 yb-tserver（DocDB 儲存，每個 tablet 一組 Raft，YSQL 與 YCQL 也跑在裡面）。四個 port 各有 `/prometheus-metrics`，沒有 exporter；`/status` 一律回 `{}`，`up` 加上 `/status` 都不夠。這頁依九個面向從大到小排列：叢集 → 可用性 → 複寫 → 資源 → 工作量 → 維護 → 保護 → 容量，最前面是監測自檢。
 
-依據是 YugabyteDB v2026.1.3.0 的原始碼（`gh api .../releases/latest` 回的最新穩定版，commit `f2635f5`；只讀 Apache-2.0 的核心，YugabyteDB Anywhere 的告警範本是 Polyform 授權，只引用名稱與行號），加上一組小實驗：master ×3、tserver ×3（RF=3），停 tserver、停兩台 tserver、停 master leader、停兩台 master、用完 YSQL 連線、postgres_exporter 對 YSQL<span class="at-chip at-ev-tested">實測</span>[^yb-exp]。這台機器的 Docker 容器時鐘比牆鐘慢約 30%，牆鐘還會被 WSL 往回調；秒數以主機 monotonic 時鐘量的 SQL、HTTP 耗時為準，Prometheus 與 YugabyteDB 自己報的秒數只當參考。訊號與規則在[元件卡](../components/yugabytedb.md)，原始碼位置在[附錄](yugabytedb-appendix.md)，機制在[分散式 SQL 架構](../architecture/db-distsql.md#yugabytedb)與[共識（Raft）架構](../architecture/db-raft.md#yugabytedb)。
+依據是 YugabyteDB v2026.1.3.0 的原始碼（`gh api .../releases/latest` 回的最新穩定版，commit `f2635f5`；只讀 Apache-2.0 的核心，YugabyteDB Anywhere 的告警範本是 Polyform 授權，只引用名稱與行號），加上一組小實驗：master ×3、tserver ×3（RF=3），停 tserver、停兩台 tserver、停 master leader、停兩台 master、用完 YSQL 連線、postgres_exporter 對 YSQL<span class="at-chip at-ev-tested">實測</span>[^yb-exp]。這台機器的 Docker 容器時鐘比牆鐘慢約 30%，牆鐘還會被 WSL 往回調；秒數以主機 monotonic 時鐘量的 SQL、HTTP 耗時為準，Prometheus 與 YugabyteDB 自己報的秒數只當參考。訊號與規則在[元件卡](../components/yugabytedb.md)，原始碼位置在[附錄](yugabytedb-appendix.md)，機制在[分散式 SQL 架構](../architecture/db-distsql.md#yugabytedb)與[共識（Raft）架構](../architecture/db-raft.md#yugabytedb)。2.20 到 2026.1 之間的 metric 差異見 [YugabyteDB 各版本的監控差異](versions/yugabytedb.md)。
 
 ## 先講結論
 
@@ -113,6 +113,8 @@ YugabyteDB 的 `/prometheus-metrics` 在每個 sample 後面寫時間戳（毫�
 | master leader 換太多次 | sys catalog 的 `raft_term` 15 分鐘變 ≥ 3 次（例子） | <span class="at-chip at-ev-tested">實測</span>[^yb-c-raft-term] |
 | tablet 沒有 leader、少了副本 | blackbox 比對 `/api/v1/tablet-replication`、`/api/v1/health-check` 的 body | <span class="at-chip at-ev-tested">實測</span>[^yb-m-h-leaderless][^yb-m-h-health-underrep] |
 
+**版本。**`max_follower_heartbeat_delay` 2024.2 才有，YBMasterFollowerHeartbeatDelay 在 2.20 回傳空，只剩 probe 計數[^ver-yb220-no-hb-delay][^ver-yb242-hb-delay]。
+
 **master 失去 quorum 時 YSQL 全停。**tserver 要持有 master leader 給的 YSQL operation lease 才能服務 YSQL；lease 30 秒沒有續約時 tserver 結束 PostgreSQL（`Lease has expired, killing pg sessions`）。[^yb-ysql-lease-flag][^yb-ysql-lease-ttl][^yb-ysql-lease-kill]lab 的順序：停 2 台 master 後 +12 秒已建立的 session 讀取成功、接著的 insert 15 秒 statement timeout；約 30 秒時三台 tserver 同時結束 PostgreSQL，新連線 `Connection refused`、13000 的 `up` 變 0；master 回來後 tserver 收到新的 lease epoch，又清掉所有 pg session。所以 YBYsqlPortDown 在三台同時響，原因是 master，不是 tserver。YCQL 在這時的行為沒有測。<span class="at-chip at-ev-tested">實測</span>[^yb-exp-lease-log][^yb-exp-raw]
 
 **停 master leader。**kill 後 3 秒另一台的 `/api/v1/is-leader` 回 200（`leader_failure_max_missed_heartbeat_periods` 6 × 500ms），同時的一筆 insert 13 秒成功；`raft_term` 1 → 2。<span class="at-chip at-ev-tested">實測</span>[^yb-exp-raw][^yb-c-missed-hb]
@@ -186,6 +188,8 @@ YSQL 是 PostgreSQL 15 的查詢層（`PostgreSQL 15.12-YB-2026.1.3.0`），資�
 | 問題 | 訊號 | 證據 |
 |---|---|---|
 | cluster balancer 開著嗎 {#balancer} | master leader 的 `is_load_balancing_enabled` == 0 持續 30 分鐘（follower 永遠 0）；`outstanding_tablet_splits` 1 小時 > 0（例子） | <span class="at-chip at-ev-tested">實測</span>：leader 1、follower 0[^yb-m-lb-enabled] |
+
+**版本。**`outstanding_tablet_splits` 2024.2 才有，YBTabletSplitsBacklog 在 2.20 回傳空[^ver-yb242-splits]。
 
 ## 資料保護 {#protection}
 

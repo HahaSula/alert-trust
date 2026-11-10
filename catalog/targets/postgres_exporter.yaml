@@ -4,7 +4,7 @@ kind: target
 family: database
 status: draft
 stages: [source]
-versions_checked: ["0.20.1", "PostgreSQL 16.15", "PostgreSQL 17.11"]
+versions_checked: ["0.20.1", "PostgreSQL 16.15", "PostgreSQL 17.11", "PostgreSQL 13.23、14.24、15.19、18.6（版本差異頁，只讀碼）"]
 architecture: architecture/exporters.md
 role: >-
   Exporter 裡有兩套程式：舊的 exporter 套件產生 pg_up、pg_exporter_* 與 queries.yaml 自訂查詢，
@@ -139,13 +139,16 @@ signals:
     question: WAL 產生多少、資料頁是誰寫出去的
     signal: >-
       exporter 沒有查 pg_stat_wal（14 起）與 pg_stat_io（16 起）。自訂查詢輸出 pgq_wal_bytes_total、pgq_wal_fpi_total、pgq_wal_buffers_full_total，
-      以及依 backend_type 加總的 pgq_io_writes_total、pgq_io_fsyncs_total 等。client backend 自己寫出資料頁或 fsync 的比例高，代表 shared_buffers、bgwriter 或 checkpointer 跟不上
+      以及依 backend_type 加總的 pgq_io_writes_total、pgq_io_fsyncs_total 等。client backend 自己寫出資料頁或 fsync 的比例高，代表 shared_buffers、bgwriter 或 checkpointer 跟不上。
+      版本：pg_stat_io 16 以上才有；18 起多了 object = 'wal' 的列，stat_io 查詢用 WHERE object <> 'wal' 排除，pgq_io_* 在 16–18 都只算資料頁。
+      pg_stat_wal 14 以上才有（13 上 pgq_wal_* 的查詢每次失敗）
     metrics: [pgq_wal_bytes_total, pgq_wal_fpi_total, pgq_wal_buffers_full_total, pgq_io_writes_total, pgq_io_fsyncs_total]
     evaluate_on: self
+    applies_when: "query-exporter；PostgreSQL 16 以上（pg_stat_io）"
     silent_failure: 16 以下沒有 pg_stat_io，查詢每次失敗（queries_total{status="error"}），要把該 DSN 從 stat_io 的 databases 拿掉
     evidence: tested
     source: pg-q-lab
-    refs: [pg-q-exp, pg-q-pg16-view-statwal, pg-q-pg17-view-statwal, pg-q-pg16-view-statio, pg-q-pg17-view-statio]
+    refs: [pg-q-exp, pg-q-pg16-view-statwal, pg-q-pg17-view-statwal, pg-q-pg16-view-statio, pg-q-pg17-view-statio, ver-pg16-io, ver-pg18-io-wal, ver-pg18-io-bytes, ver-pg14-wal]
     upstream: { status: no }
     rules: [rules/targets/postgres.yml#PostgresWalBuffersFull, rules/targets/postgres.yml#PostgresBackendsWritingBuffers]
 
@@ -267,12 +270,15 @@ signals:
     tier: 2
     question: 這個版本的 PostgreSQL 真的有輸出規則用到的 metric 嗎
     signal: >-
-      pg_up == 1 但 checkpoint metric（bgwriter 或 checkpointer）都不存在；升級 PostgreSQL 大版本後重新盤點依賴的 metric 名稱
+      pg_up == 1 但 checkpoint metric（bgwriter 或 checkpointer）都不存在；升級 PostgreSQL 大版本後重新盤點依賴的 metric 名稱。
+      版本：17 起 checkpoint 計數只在 pg_stat_checkpointer，exporter 的 stat_checkpointer collector 預設關（不加 --collector.stat_checkpointer 就沒有 pg_stat_checkpointer_*）；
+      開了但伺服器是 16 以下時只記 warn、回報成功。13–18 其他會變的欄位見 PostgreSQL 版本差異頁
     metrics: [pg_stat_bgwriter_checkpoints_timed_total, pg_stat_checkpointer_num_timed_total, pg_static]
     evaluate_on: self
     silent_failure: 17 以上 checkpoint 規則回傳空，collector 仍回報成功
     evidence: code
     source: pg-exporter-collectors
+    refs: [ver-pg16-bgwriter-ckpt, ver-pg17-bgwriter, ver-pg17-checkpointer, ver-pgx-bgwriter-17, ver-pgx-checkpointer-off, ver-pgx-checkpointer-before17]
     upstream: { status: no, note: "mixin 與 awesome 的 TooManyCheckpointsRequested 只用 pg_stat_bgwriter_checkpoints_*" }
     rules: [rules/targets/postgres.yml#PostgresCheckpointMetricsMissing]
 
@@ -308,16 +314,18 @@ signals:
     signal: >-
       pg_replication_slots_active == 0 持續一段時間；保留量看 pg_replication_slots_pg_wal_lsn_diff，
       有設 max_slot_wal_keep_size 時看 safe_wal_size_bytes（負數＝已超過）與 wal_status（reserved → extended → unreserved → lost）。
-      slot 變成 lost 時 pg_wal_lsn_diff 與 safe_wal_size 的 series 會消失，只剩 wal_status{wal_status="lost"}
+      slot 變成 lost 時 pg_wal_lsn_diff 與 safe_wal_size 的 series 會消失，只剩 wal_status{wal_status="lost"}。
+      版本：wal_status、safe_wal_size 13 以上才有（exporter 13 以上才查），12 以下 PostgresReplicationSlotLost 回傳空；
+      18 起 slot 也會因 idle_replication_slot_timeout 失效，exporter 沒有輸出 invalidation_reason（17 起才有），看不出是 timeout
     metrics: [pg_replication_slots_active, pg_replication_slots_pg_wal_lsn_diff, pg_replication_slots_safe_wal_size_bytes, pg_replication_slots_wal_status]
     evaluate_on: self
-    applies_when: replication slot
+    applies_when: "replication slot；PostgreSQL 13 以上（wal_status、safe_wal_size）"
     silent_failure: >-
       用 pg_wal_lsn_diff > X 的保留量規則在 slot lost 時回傳空；沒設 max_slot_wal_keep_size 時 safe_wal_size 根本不存在。
       複本重啟後回報「requested WAL segment has already been removed」，pg_up=1、is_replica=1，只是永遠追不上
     evidence: tested
     source: pg-target-lab
-    refs: [pg-exp-target, pg-c-slots-query, pg-src-wal-avail]
+    refs: [pg-exp-target, pg-c-slots-query, pg-src-wal-avail, ver-pg13-slot-walstatus, ver-pgx-slots-13, ver-pg17-slot-invalidation, ver-pg18-slot-idle-timeout, ver-pg18-guc-idle-slot]
     upstream: { status: partial, note: "mixin 與 awesome 都有 slots_active == 0；都沒有 wal_status 或保留量" }
     rules:
       - rules/targets/postgres.yml#PostgresReplicationSlotInactive
@@ -420,13 +428,14 @@ signals:
     signal: >-
       requested／(requested + timed) 的比例。PostgreSQL 16 以下用 pg_stat_bgwriter_checkpoints_*（預設開），
       17 以上用 pg_stat_checkpointer_num_*（--collector.stat_checkpointer 預設關），規則要用 or 把兩邊接起來。
-      手動 CHECKPOINT、pg_basebackup 也算 requested。16 的複本把 restartpoint 算進 checkpoints_*，17 分到 restartpoints_*
+      手動 CHECKPOINT、pg_basebackup 也算 requested。16 的複本把 restartpoint 算進 checkpoints_*，17 分到 restartpoints_*。
+      版本：17 以上沒有打開 stat_checkpointer collector（預設關）時兩邊都沒有資料，規則回傳空、collector 仍回報成功，由 PostgresCheckpointMetricsMissing 補位
     metrics: [pg_stat_bgwriter_checkpoints_req_total, pg_stat_bgwriter_checkpoints_timed_total, pg_stat_checkpointer_num_requested_total, pg_stat_checkpointer_num_timed_total, pg_settings_max_wal_size_bytes]
     evaluate_on: self
     applies_when: "PostgreSQL 17 以上要打開 --collector.stat_checkpointer"
     evidence: tested
     source: pg-target-lab
-    refs: [pg-exp-target, pg-c-bgwriter-17, pg-c-checkpointer-17, pg-src-checkpointer-view, pg-src-bgwriter16, pg-trace-pg16-ckpt-req, pg-trace-pg17-rstpt-req]
+    refs: [pg-exp-target, pg-c-bgwriter-17, pg-c-checkpointer-17, pg-src-checkpointer-view, pg-src-bgwriter16, pg-trace-pg16-ckpt-req, pg-trace-pg17-rstpt-req, ver-pg17-bgwriter, ver-pg17-checkpointer, ver-pgx-checkpointer-off, ver-pgx-checkpointer-before17]
     upstream: { status: partial, note: "mixin 與 awesome 的 TooManyCheckpointsRequested 只用 bgwriter 名稱，17 以上回傳空" }
     rules: [rules/targets/postgres.yml#PostgresCheckpointsMostlyRequested, rules/targets/postgres.yml#PostgresCheckpointMetricsMissing]
 
@@ -474,7 +483,9 @@ signals:
     signal: >-
       pg_stat_user_tables_n_dead_tup 佔比與 last_autovacuum 距今多久。只涵蓋 DSN 指定的那一個資料庫；
       沒有 bloat 估算，table_size 持續成長只能當間接訊號。VACUUM 跑了但 dead tuple 沒減少，通常是 xmin-horizon 被擋住。
-      其他資料庫：query-exporter 每個資料庫一個 DSN，pgq_tables_over_vacuum_threshold 與前 5 張表的 pgq_table_dead_tuples（database label 區分）
+      其他資料庫：query-exporter 每個資料庫一個 DSN，pgq_tables_over_vacuum_threshold 與前 5 張表的 pgq_table_dead_tuples（database label 區分）。
+      版本：pg_stat_progress_vacuum 的 param6／param7 在 17 起改成 byte（max_dead_tuple_bytes、dead_tuple_bytes），exporter 不分版本照讀，
+      pg_stat_progress_vacuum_max_dead_tuples、_num_dead_tuples 在 17 以上其實是 byte；這裡只用 heap_blks_scanned，不受影響，dashboard 用那兩個要注意
     metrics: [pg_stat_user_tables_n_dead_tup, pg_stat_user_tables_n_live_tup, pg_stat_user_tables_last_autovacuum, pg_stat_user_tables_table_size_bytes, pg_stat_progress_vacuum_heap_blks_scanned, pgq_tables_over_vacuum_threshold, pgq_table_dead_tuples]
     evaluate_on: self
     silent_failure: >-
@@ -482,7 +493,7 @@ signals:
       時整次 scrape 卡住，up 變 0，而且每次 scrape 都留下一條等鎖的連線
     evidence: tested
     source: pg-target-lab
-    refs: [pg-exp-target, pg-exp-target-raw, pg-c-user-tables-size, pg-q-exp]
+    refs: [pg-exp-target, pg-exp-target-raw, pg-c-user-tables-size, pg-q-exp, ver-pg16-vacuum-progress, ver-pg17-vacuum-progress, ver-pgx-vacuum-param6]
     upstream: { status: partial, note: "mixin 的 TablesNotVaccumed 實際上不會響；awesome 的 bloat 規則需要自訂查詢" }
     rules: [rules/targets/postgres.yml#PostgresTooManyDeadTuples, rules/targets/postgres.yml#PostgresTablesNeedVacuum]
 
@@ -562,14 +573,17 @@ signals:
     signal: >-
       平均延遲 = rate(pg_stat_statements_seconds_total) / rate(pg_stat_statements_calls_total)，依 queryid。
       collector 預設關閉，需要 shared_preload_libraries（每一台，包括複本）與 CREATE EXTENSION；
-      只輸出總耗時前 N 名（預設 100）並排除最快的 10%，series 會隨排名進出，沒有百分位數
+      只輸出總耗時前 N 名（預設 100）並排除最快的 10%，series 會隨排名進出，沒有百分位數。
+      版本：exporter 依伺服器版本（不是 extension 版本）選查詢，17 以上讀 shared_blk_read_time（pg_stat_statements 1.11）。
+      pg_upgrade 後要 ALTER EXTENSION pg_stat_statements UPDATE；先查 SELECT extversion FROM pg_extension WHERE extname = 'pg_stat_statements'，
+      伺服器 17 而 extension 還是 1.10 時整個 collector 失敗，pg_scrape_collector_success{collector="stat_statements"} 0（推論）
     metrics: [pg_stat_statements_calls_total, pg_stat_statements_seconds_total, pg_stat_statements_rows_total, pg_scrape_collector_success]
     evaluate_on: inventory
     applies_when: pg_stat_statements
     silent_failure: 沒有 pg_read_all_stats 時只看得到自己的查詢，series 少了大半，collector 仍回報成功
     evidence: tested
     source: pg-target-lab
-    refs: [pg-exp-target, exp-pg, pg-c-statements-default, pg-c-statements-topn, pg-c-statements-pg17]
+    refs: [pg-exp-target, exp-pg, pg-c-statements-default, pg-c-statements-topn, pg-c-statements-pg17, ver-pgx-pss-17, ver-pgx-pss-shared-blk, ver-pg17-pss, ver-pg17-pss-shared-blk]
     upstream: { status: partial, note: "mixin 的 SlowQueries 對 gauge 取 rate，實際上不會響" }
     rules: []
 
@@ -597,7 +611,8 @@ signals:
       每個 queryid 的平均執行時間 rate(pg_stat_statements_seconds_total) / rate(pg_stat_statements_calls_total)；
       執行中、還沒結束的長查詢只能看 pg_stat_activity_max_tx_duration{state="active"} 或 pg_long_running_transactions_oldest_timestamp_seconds。
       需要 shared_preload_libraries、在 DSN 的資料庫 CREATE EXTENSION、--collector.stat_statements（預設關）與 pg_read_all_stats。
-      label 只有 user、datname、queryid；--collector.stat_statements.include_query 另給 pg_stat_statements_query_id{queryid, query}，文字截在 120 字元
+      label 只有 user、datname、queryid；--collector.stat_statements.include_query 另給 pg_stat_statements_query_id{queryid, query}，文字截在 120 字元。
+      版本：pg_upgrade 到 17 後沒有 ALTER EXTENSION pg_stat_statements UPDATE 時整個 collector 失敗（推論；見 pg-stat-statements），先查 extversion
     metrics: [pg_stat_statements_seconds_total, pg_stat_statements_calls_total, pg_stat_statements_rows_total, pg_stat_statements_block_read_seconds_total, pg_stat_activity_max_tx_duration, pg_long_running_transactions_oldest_timestamp_seconds]
     evaluate_on: self
     applies_when: pg_stat_statements
@@ -607,7 +622,7 @@ signals:
       沒有計畫，log_min_duration_statement 與 auto_explain 的 log 都不會變成 metric
     evidence: tested
     source: pg-target-lab
-    refs: [pg-perf-exp, pg-perf-c-stmt-disabled, pg-perf-c-stmt-limit, pg-perf-c-stmt-percentile, pg-perf-c-stmt-labels, pg-perf-c-stmt-querylen, pg-perf-c-stmt-queryid, pg-perf-c-stmt-pg13-query, pg-perf-src-pgss-max, pg-perf-src-duration-log, pg-perf-src-activity-size]
+    refs: [pg-perf-exp, pg-perf-c-stmt-disabled, pg-perf-c-stmt-limit, pg-perf-c-stmt-percentile, pg-perf-c-stmt-labels, pg-perf-c-stmt-querylen, pg-perf-c-stmt-queryid, pg-perf-c-stmt-pg13-query, pg-perf-src-pgss-max, pg-perf-src-duration-log, pg-perf-src-activity-size, ver-pgx-pss-17, ver-pgx-pss-shared-blk]
     upstream: { status: partial, note: "mixin 的 SlowQueries 對 gauge 取 rate；awesome 沒有 per-query 規則" }
     rules:
       - rules/targets/postgres.yml#PostgresSlowStatement

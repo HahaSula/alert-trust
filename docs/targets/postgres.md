@@ -1,6 +1,6 @@
 # PostgreSQL 本體怎麼監控
 
-[元件卡](../components/postgres_exporter.md)回答「exporter 真的有在量嗎」。這頁回答另一個問題：**PostgreSQL 本身該看哪些訊號**，每個訊號從 PostgreSQL 的哪裡來、postgres_exporter v0.20.1 有沒有輸出、要什麼權限、在哪個版本會變。內容依九個面向排列：監測自檢、可用性、工作量、飽和、複寫、叢集與共識、資料維護、資料保護、容量。
+[元件卡](../components/postgres_exporter.md)回答「exporter 真的有在量嗎」。這頁回答另一個問題：**PostgreSQL 本身該看哪些訊號**，每個訊號從 PostgreSQL 的哪裡來、postgres_exporter v0.20.1 有沒有輸出、要什麼權限、在哪個版本會變（13–18 的逐版差異見 [PostgreSQL 各版本的監控差異](versions/postgres.md)）。內容依九個面向排列：監測自檢、可用性、工作量、飽和、複寫、叢集與共識、資料維護、資料保護、容量。
 
 依據是 PostgreSQL 與 exporter 的原始碼，加上幾組小實驗：PostgreSQL 16.15 與 17.11 各一組主從，切斷複寫、停複本、讓 archive 失敗、用完連線、kill 一個 backend、提升複本、把 pg_wal 寫滿<span class="at-chip at-ev-tested">實測</span>[^pg-exp-target]；另一組補 archive 新鮮度、`archive_mode`、資料庫大小與 session 錯誤計數<span class="at-chip at-ev-tested">實測</span>[^pg-asp-exp]。Patroni 與備份工具的部分只讀原始碼，沒有實驗。
 
@@ -159,6 +159,8 @@ slot 一旦 lost，`restart_lsn` 變 NULL，保留量相關的 series 跟著消�
 
 用 slot 的備份工具（pg_receivewal、Barman streaming）停掉時一樣會讓 WAL 在主庫累積，規則同上；archive 見[資料保護](#protection)。
 
+**版本。**`wal_status`、`safe_wal_size` 13 才有（exporter 13 以上才查）；18 起 slot 也會因 `idle_replication_slot_timeout` 失效，`invalidation_reason`（17 起）exporter 沒有輸出，規則看不出失效原因[^ver-pg13-slot-walstatus][^ver-pgx-slots-13][^ver-pg17-slot-invalidation][^ver-pg18-slot-idle-timeout]。
+
 ## 可用性 {#availability}
 
 | 要看什麼 | PostgreSQL 的來源 | exporter metric（collector） | 預設 | 權限／版本 | 證據 |
@@ -195,6 +197,7 @@ CPU、記憶體、OOM kill 與磁碟延遲 postgres_exporter 都沒有，已由 
 - **cache hit 比例只適合畫圖。**OS page cache 命中在 PostgreSQL 眼中也是 read，比例偏低不一定是問題。
 - **16 的複本 checkpoint 數包含 restartpoint。**16 在複本上把 restartpoint 算進 `checkpoints_req`／`checkpoints_timed`，17 分到 `restartpoints_*`；同一條規則在升級前後對複本的意義不同。<span class="at-chip at-ev-code">讀碼</span>[^pg-trace-pg16-ckpt-req][^pg-trace-pg17-rstpt-req]
 - **checkpoint 規則要接兩個名字。**同一個 `CHECKPOINT` 指令，16 讓 `pg_stat_bgwriter_checkpoints_req_total` 加 1，17 讓 `pg_stat_checkpointer_num_requested_total` 加 1；17 的複本另有 `restartpoints_*`。17 沒開 stat_checkpointer 時兩個名字都不存在。<span class="at-chip at-ev-tested">實測</span>[^pg-exp-target]
+- **版本：17 要打開 `--collector.stat_checkpointer`。**這個 collector 預設關；17 上沒開時 checkpoint metric 全部消失、`pg_scrape_collector_success` 也沒有它，不會報錯；開了但伺服器是 16 以下時只記 warn、回報成功。PostgresCheckpointMetricsMissing 負責發現。<span class="at-chip at-ev-code">讀碼</span>[^ver-pgx-checkpointer-off][^ver-pgx-checkpointer-before17][^ver-pg17-checkpointer]
 
 ## 工作量與效能 {#workload}
 
@@ -335,6 +338,8 @@ WAL-G 與 Barman 的做法只是建議的模式，沒有讀它們的原始碼，
 1. **pg_stat_statements**（`--collector.stat_statements`，預設關[^pg-perf-c-stmt-disabled]）。每個 queryid 有 `calls_total`、`seconds_total`、`rows_total`、`block_read_seconds_total`、`block_write_seconds_total`，label 只有 `user`、`datname`、`queryid`[^pg-perf-c-stmt-labels]。平均延遲 = `rate(seconds_total) / rate(calls_total)`；實驗中全表掃描是 0.33～0.45 秒，和直接查的 mean 431 ms 一致。
 2. **pg_stat_activity**：`pg_stat_activity_max_tx_duration{state="active"}` 是執行中交易的最長年齡[^pg-perf-c-activity-maxtx]，`--collector.long_running_transactions` 另有一個不分 label 的最大值。
 
+**版本：pg_upgrade 之後先查 extension 版本。**exporter 依伺服器版本選 pg_stat_statements 的查詢，17 以上讀 `shared_blk_read_time`（1.11 才有）。`pg_upgrade` 到 17 後沒跑 `ALTER EXTENSION pg_stat_statements UPDATE`，extension 還是 1.10，整個 collector 失敗、`pg_scrape_collector_success{collector="stat_statements"}` 0（推論）。檢查：`SELECT extversion FROM pg_extension WHERE extname = 'pg_stat_statements'`。<span class="at-chip at-ev-code">讀碼</span>[^ver-pgx-pss-17][^ver-pgx-pss-shared-blk][^ver-pg17-pss-shared-blk]
+
 限制（實測或讀碼）：
 
 - **執行中的查詢看不到。**pg_stat_statements 在查詢結束時才累加。40 秒的 `pg_sleep` 執行到第 20 秒時，exporter 只有 `max_tx_duration{state="active"}`=18.6 秒，沒有 queryid、沒有文字；結束後才出現 mean=40014 ms。<span class="at-chip at-ev-tested">實測</span>
@@ -443,7 +448,7 @@ postgres_exporter v0.20.1。「預設」指沒有加 `--collector.<name>` 或 `-
 | `pg_stat_user_tables` | stat_user_tables | `n_dead_tup`、`last_autovacuum`、`table_size_bytes` 等 | 開 | — | 只看 DSN 那個資料庫；`pg_table_size()` 會等表鎖 |
 | `pg_statio_user_tables` | statio_user_tables | `heap_blocks_*`、`idx_blocks_*` | 開 | — | — |
 | `pg_statio_user_indexes` | statio_user_indexes | `idx_blks_read_total`、`idx_blks_hit_total` | 關 | — | — |
-| `pg_stat_progress_vacuum` | stat_progress_vacuum | `heap_blks_scanned`、`index_vacuums`、`phase` 等 | 開 | — | — |
+| `pg_stat_progress_vacuum` | stat_progress_vacuum | `heap_blks_scanned`、`index_vacuums`、`phase` 等 | 開 | — | 17 起 `max_dead_tuples`、`num_dead_tuples` 的單位是 byte（exporter 不分版本讀 `param6`／`param7`）[^ver-pg17-vacuum-progress][^ver-pgx-vacuum-param6] |
 | `pg_stat_statements` | stat_statements | `calls_total`、`seconds_total`、`rows_total`、`block_*_seconds_total` | 關 | pg_read_all_stats，否則只看到自己的查詢 | 13 起 `total_exec_time`；17 起 `shared_blk_*_time` |
 | `pg_buffercache_summary()` | buffercache_summary | `pg_buffercache_summary_*` | 關 | extension | 16 起 |
 | `pg_stat_wal`、`pg_stat_io`、`pg_stat_subscription` | 無 | — | — | — | 14／16 起才有的 view 都沒有 collector |
@@ -521,6 +526,7 @@ postgres_exporter v0.20.1。「預設」指沒有加 `--collector.<name>` 或 `-
 - **series 數**（lab，一主一從、4 個資料庫）：一次 /metrics 248 條 `pgq_*`，其中 106 條是 counter 的 `_created`；最多的是 `pgq_io_*`，每個 DSN 每個 metric 10 個 backend_type。label 都有上限：standby 數、backend_type（固定的十幾種）、資料庫數、每個資料庫 5 張表。
 - **會變動的 label**：`pgq_replication_standbys` 的 `state`、`sync_state` 與 `pgq_table_dead_tuples` 的表名會換，所以設了 `expiration`（1m、15m），舊組合會消失。
 - **沒驗證的部分**：PostgreSQL 16 只讀原始碼；18 改了 `pg_stat_wal`／`pg_stat_io` 的欄位，這份設定沒有在 18 跑過。
+- **版本：**18 的 `pg_stat_io` 多了 `object = 'wal'` 的列，`stat_io` 查詢用 `WHERE object <> 'wal'` 排除，`pgq_io_*` 在 16–18 都只算資料頁（16、17 沒有這種列，條件不影響結果）[^ver-pg18-io-wal][^ver-pg16-io]。
 
 ## 建議的 exporter 設定 {#recommended}
 
@@ -533,6 +539,8 @@ postgres_exporter v0.20.1。「預設」指沒有加 `--collector.<name>` 或 `-
 - **外部 metric**：Patroni 的 REST API `/metrics`、pgbackrest_exporter、node_exporter 各自設 job；三者都不經過 postgres_exporter。
 
 ## 版本陷阱（13–17） {#versions}
+
+18 與逐版的欄位比對見 [PostgreSQL 各版本的監控差異](versions/postgres.md)。
 
 | 版本 | 變化 | 對規則的影響 |
 |---|---|---|

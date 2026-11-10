@@ -5,7 +5,7 @@ model: native
 family: database
 status: draft
 stages: [source]
-versions_checked: ["ClickHouse v26.10.2.103-stable（最新 stable；最新 LTS 是 v26.8.34.13-lts；Apache-2.0）", "ClickHouse Keeper v26.10.2.103", "Altinity clickhouse-operator release-0.27.4 的規則與 metrics-exporter（Apache-2.0，只引用）", "query-exporter 5.2.2（clickhouse-sqlalchemy 0.3.2）"]
+versions_checked: ["ClickHouse v26.10.2.103-stable（最新 stable；最新 LTS 是 v26.8.34.13-lts；Apache-2.0）", "ClickHouse Keeper v26.10.2.103", "Altinity clickhouse-operator release-0.27.4 的規則與 metrics-exporter（Apache-2.0，只引用）", "query-exporter 5.2.2（clickhouse-sqlalchemy 0.3.2）", "ClickHouse v25.3.14.14-lts、v25.8.33.6-lts、v26.3.60.2-lts、v26.8.34.13-lts（版本差異頁，只讀碼）"]
 architecture: architecture/db-olap.md
 role: >-
   ClickHouse 叢集有兩種 process：server（MergeTree 表、查詢、ReplicatedMergeTree 的複寫）與 ClickHouse Keeper（Raft／NuRaft，取代 ZooKeeper，
@@ -119,10 +119,11 @@ signals:
     metrics: [up, ClickHouseAsyncMetrics_MaxPartCountForPartition, ClickHouseMetrics_ReadonlyReplica, ClickHouseErrorMetric_ALL, scrape_samples_scraped]
     evaluate_on: self
     silent_failure: >-
-      heavy metric（NumberOfDetachedParts 等）預設就沒有，不能放進這個檢查；asynchronous_metrics_key_values_mode 改成 legacy_names 時 DiskAvailable 變名稱，這條會響
+      heavy metric（NumberOfDetachedParts 等）預設就沒有，不能放進這個檢查。DiskAvailable 兩種名稱都接受（26.8 起 DiskAvailable{disk}；26.3 以前或
+      asynchronous_metrics_key_values_mode 改成 legacy_names 時是 DiskAvailable_<disk>），所以版本或設定改了名稱時這條不響
     evidence: tested
     source: ch-lab
-    refs: [ch-exp-raw, ch-exp-names, ch-prom-expose-defaults, ch-ss-kv-mode, ch-ss-heavy-enable]
+    refs: [ch-exp-raw, ch-exp-names, ch-prom-expose-defaults, ch-ss-kv-mode, ch-ss-heavy-enable, ver-ch253-disk-suffix, ver-ch268-disk-label]
     upstream: { status: no }
     rules:
       - rules/targets/clickhouse.yml#CHMetricFamiliesMissing
@@ -235,13 +236,14 @@ signals:
       delta(ZooKeeperSessionExpired[5m]) > 0 或 increase(ZooKeeperHardwareExceptions[5m]) > 0；現況看 ReadonlyReplica。
       lab：Keeper 失去 quorum 時 ZooKeeperSession 一直是 1（session 物件還在，只是過期），ZooKeeperSessionExpired 從 0 變成 1、再到 3–4，
       Keeper 恢復 150 秒後仍是 3–4、不歸零；所以「< 1」與「> 0」都不能當現況。session 過期後 Replicated 表唯讀、ON CLUSTER DDL 停。
-      system.zookeeper_connection 在這時查詢會卡住超過 30 秒，不放進 SQL 路徑
+      system.zookeeper_connection 在這時查詢會卡住超過 30 秒，不放進 SQL 路徑。
+      版本：ZooKeeperSessionExpired 26.3 以上才有；25.3、25.8 上規則只剩 ZooKeeperHardwareExceptions 那半，session 過期改看 query-exporter 的 chq_replica_session_expired
     metrics: [ClickHouseMetrics_ZooKeeperSessionExpired, ClickHouseProfileEvents_ZooKeeperHardwareExceptions, ClickHouseMetrics_ZooKeeperSession]
     evaluate_on: self
     silent_failure: ZooKeeperSession 在 session 過期時仍是 1；Altinity 的 ZooKeeperSession > 1 只看「太多 session」
     evidence: tested
     source: ch-lab
-    refs: [ch-exp-raw, ch-exp-extra, ch-cm-zksession, ch-rt-expired, ch-rt-setreadonly, alt-zksession]
+    refs: [ch-exp-raw, ch-exp-extra, ch-cm-zksession, ch-rt-expired, ch-rt-setreadonly, alt-zksession, ver-ch258-zk-session, ver-ch263-zk-expired, ver-ch253-replicas]
     upstream: { status: partial, note: "Altinity ClickHouseZooKeeperSession 是 > 1（多個 session），不看過期；ClickHouseZooKeeperHardwareExceptions 看網路錯誤" }
     rules: [rules/targets/clickhouse.yml#CHKeeperSessionLost]
 
@@ -525,12 +527,14 @@ signals:
     question: 每個 disk 還剩多少
     signal: >-
       DiskAvailable / DiskTotal < 10%（例子；DiskTotal 大於 1e18 的遠端 disk 排除）；predict_linear(DiskAvailable[6h], 1 天) < 0。名稱是 26.8 起的 key-value 形式
-      DiskAvailable{disk="default"}（lab 確認；舊的 DiskAvailable_default 沒有）。merge 要預留空間，空間不夠時 merge 停、part 數上升。lab 沒有填滿磁碟
+      DiskAvailable{disk="default"}（lab 確認；舊的 DiskAvailable_default 沒有）。merge 要預留空間，空間不夠時 merge 停、part 數上升。lab 沒有填滿磁碟。
+      版本：26.3 以前（或 legacy_names）是每顆磁碟一個名稱 DiskAvailable_<disk>、DiskTotal_<disk>，規則用 or 加上
+      {__name__=~"ClickHouseAsyncMetrics_DiskAvailable_.+"} 並以 label_replace 轉成 disk label，兩種名稱都能算（替代寫法只讀碼，沒有在 26.3 以前的版本上跑過）
     metrics: [ClickHouseAsyncMetrics_DiskAvailable, ClickHouseAsyncMetrics_DiskTotal]
     evaluate_on: self
     evidence: code
     source: ch-core
-    refs: [ch-sam-disk-available, ch-sam-disk-total, ch-ss-kv-mode, ch-exp-raw, alt-disk]
+    refs: [ch-sam-disk-available, ch-sam-disk-total, ch-ss-kv-mode, ch-exp-raw, alt-disk, ver-ch253-disk-suffix, ver-ch263-disk-suffix, ver-ch268-disk-label, ver-ch268-kv-mode]
     upstream: { status: partial, note: "Altinity ClickHouseDiskUsage：predict_linear(DiskFreeBytes[1d], 86400) < 0（exporter 查 system.disks）" }
     rules: [rules/targets/clickhouse.yml#CHDiskSpaceLow, rules/targets/clickhouse.yml#CHDiskFillingUp]
 

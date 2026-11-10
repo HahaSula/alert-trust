@@ -105,7 +105,7 @@ groups:
         labels: { severity: critical, component: etcd, tier: "1", aspect: cluster }
         annotations:
           summary: "/readyz 探測成功（linearizable read 通過）的 member 少於成員數的過半；成員數取自 etcd 自己的 known_peers，不是 scrape target 數。寫入會停"
-          description: "一個 probe job 對一個叢集。用 /readyz 而不用 has_leader 計數：scrape 失敗時 has_leader 會消失或停在舊值，計數會誤報（lab 情境 D）"
+          description: "一個 probe job 對一個叢集。用 /readyz 而不用 has_leader 計數：scrape 失敗時 has_leader 會消失或停在舊值，計數會誤報（lab 情境 D）。etcd 3.6 以上才有 etcd_network_known_peers，3.4、3.5 上回傳空"
           runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#quorum
       - alert: EtcdLeaderCountWrong
         expr: |
@@ -131,6 +131,7 @@ groups:
         labels: { severity: warning, component: etcd, tier: "2", aspect: cluster }
         annotations:
           summary: "etcd 自己記得的成員數比 Prometheus 抓得到的 member 多：有 member 停了，或沒有加進 scrape 設定"
+          description: "etcd 3.6 以上才有 etcd_network_known_peers，3.4、3.5 上回傳空"
           runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#component-count
       - alert: EtcdPeerRttHigh
         expr: histogram_quantile(0.99, rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[5m])) > 0.15
@@ -249,10 +250,17 @@ groups:
         expr: |
           histogram_quantile(0.99, sum by (job, instance, type, le) (rate(etcd_server_request_duration_seconds_bucket{job="etcd", success="true"}[5m])))
           > 0.15
+          or
+          (
+            histogram_quantile(0.99, sum by (job, instance, grpc_service, grpc_method, le) (rate(grpc_server_handling_seconds_bucket{job="etcd", grpc_type="unary", grpc_method!="Defragment"}[5m])))
+            > 0.15
+          )
+          unless on (job, instance) count by (job, instance) (etcd_server_request_duration_seconds_bucket{job="etcd"})
         for: 10m
         labels: { severity: warning, component: etcd, tier: "3", aspect: workload }
         annotations:
-          summary: "{{ $labels.instance }} 的 {{ $labels.type }} 請求 p99 {{ $value }} 秒（例子：0.15，借用 mixin gRPC 門檻）；這個 histogram 在預設 --metrics=basic 就有"
+          summary: "{{ $labels.instance }} 的 {{ $labels.type }}{{ $labels.grpc_method }} 請求 p99 {{ $value }} 秒（例子：0.15，借用 mixin gRPC 門檻）"
+          description: "etcd_server_request_duration_seconds 3.7 才有，預設 --metrics=basic 就有。3.6 以下（沒有這個 histogram 的 instance）改看 grpc_server_handling_seconds，要 --metrics=extensive 才有資料；basic 時這條回傳空"
           runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#request-latency
 
   - name: etcd-alarms
@@ -265,7 +273,7 @@ groups:
         labels: { severity: critical, component: etcd, tier: "1", aspect: availability }
         annotations:
           summary: "{{ $labels.alarm_type }} alarm 啟動中（由 member {{ $labels.server_id }} 提出）；NOSPACE 時寫入全部被拒，要 compact、defrag 後再 etcdctl alarm disarm"
-          description: "etcd_debugging_server_alarms 是「套用過幾次 activate」的計數，不是 0／1 狀態：重複提出會變 2，disarm 後可能停在 1，重啟的 member 沒有這條、disarm 後變 -1（lab 情境 F）。所以要和 /health 探測一起成立才告警；alarm_type 只拿來標示種類"
+          description: "etcd_debugging_server_alarms 是「套用過幾次 activate」的計數，不是 0／1 狀態：重複提出會變 2，disarm 後可能停在 1，重啟的 member 沒有這條、disarm 後變 -1（lab 情境 F）。所以要和 /health 探測一起成立才告警；alarm_type 只拿來標示種類。這個 metric 3.6 以上才有，3.4、3.5 只剩 EtcdHealthProbeFailing"
           absence_covered_by: "EtcdHealthProbeFailing, EtcdHealthProbeMissing"
           runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#alarms
       - alert: EtcdHealthProbeFailing
@@ -310,6 +318,7 @@ groups:
         labels: { severity: info, component: etcd, tier: "3", aspect: maintenance }
         annotations:
           summary: "{{ $labels.instance }} 沒有開 CompactHashCheck（預設關）；沒有任何檢查會發出 CORRUPT alarm，/readyz 的 data_corruption 一直是 ok"
+          description: "etcd_server_feature_enabled 3.6 以上才有，3.4、3.5 上回傳空"
           runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#corruption-check
           absence_covered_by: "EtcdMetricFamiliesMissing"
 

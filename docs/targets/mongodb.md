@@ -2,7 +2,7 @@
 
 **要監控的是：replica set 裡剛好有一台寫得進去的 primary、secondary 跟得上而且 oplog 夠它追、w:majority 的寫入不會無限等。**對文件型資料庫來說，這三件事最常壞在五個地方：選舉中或失去多數時沒有 primary、多數 secondary 卡住讓 majority commit point 停住、oplog 太短（或被釘住而一直長）、WiredTiger cache 逼得請求自己做 eviction、exporter 本身只輸出了一小部分。這頁依九個面向從大到小排列（叢集 → 複寫 → 可用性 → 資源 → 工作量 → 維護 → 保護 → 容量 → 監測自檢），最後是工具設定與缺口。
 
-[元件卡](../components/mongodb_exporter.md)列出每個訊號與規則；[原始碼到 metric](mongodb-appendix.md)追每個欄位；機制見[文件型架構](../architecture/db-doc.md)與[共識架構的 MongoDB 段](../architecture/db-raft.md#mongodb)。
+[元件卡](../components/mongodb_exporter.md)列出每個訊號與規則；[原始碼到 metric](mongodb-appendix.md)追每個欄位；機制見[文件型架構](../architecture/db-doc.md)與[共識架構的 MongoDB 段](../architecture/db-raft.md#mongodb)；6.0、7.0、8.0、8.2 之間的欄位差異見 [MongoDB 各版本的監控差異](versions/mongodb.md)。
 
 版本：MongoDB 8.0.34（目前的 LTS 系列；SSPL）、Percona mongodb_exporter v0.54.0。8.2.12 與 9.0.4（2026-10 釋出）只查了 OTel metrics 的程式碼。依據是原始碼，加上一個 3 member replica set 的小實驗（`wiredTigerCacheSizeGB` 0.25、oplog 2MB），每個 member 一個 exporter，另有預設旗標、沒有 clusterMonitor、`--collect-all`、multi-target 四種 exporter，並把 PMM v3.10.0 的範本與 awesome-prometheus-alerts 的規則照抄進 Prometheus 看會不會響。<span class="at-chip at-ev-tested">實測</span>[^mg-exp] 這台機器的容器單調時鐘比牆鐘慢約 30%：選舉與降級的秒數比真實環境長，只當量級看，機制以原始碼為準。sharded cluster 沒有做實驗。
 
@@ -105,6 +105,7 @@ MongoDB 8.0 與 8.2 **沒有可以 scrape 的 Prometheus endpoint**。8.2.12 有
 
 - **WiredTiger cache。**dirty 比例到 20%、用量到 95% 時應用執行緒要自己做 eviction；看 `mongodb_ss_wt_cache_tracked_dirty_bytes_in_the_cache`、`mongodb_ss_wt_cache_bytes_currently_in_the_cache` 對 `mongodb_ss_wt_cache_maximum_bytes_configured`，與 `mongodb_ss_wt_cache_application_thread_time_evicting_usecs` 的速率。cache 預設 (RAM − 1GB) × 50%，容器裡要明確設 `--wiredTigerCacheSizeGB`（lab 0.25GB，maximum_bytes 268435456）。lab 的寫入量太小，沒有重現壓力。<span class="at-chip at-ev-code">讀碼</span>[^wt-eviction-defaults][^mg-wt-cache-default][^wt-stat-app-evict]
 - **ticket。**8.0 預設 throughputProbing：初始 ticket 數是 CPU 核心數、在 4～128 間調整。lab（16 核）`mongodb_ss_wt_concurrentTransactions_totalTickets{txn_rw}` 是 16，PMM 的「available < 50」一開機就 firing。要看的是排隊：`mongodb_ss_wt_concurrentTransactions_{read,write}_normalPriority_queueLength`（Atlas 的 Queued Reads／Writes）。<span class="at-chip at-ev-tested">實測</span>[^mg-exp][^mg-ticket-algo][^mg-tp-initial]
+  **版本：**`normalPriority` 這層 8.0 才有；7.0 的排隊數直接在 `read`／`write` 下（`..._read_queueLength`，推論），MongoDBTicketQueue 的 regex 兩種都接受；6.0 預設沒有排隊數、ticket 固定 128，只剩 `globalLock_currentQueue`。<span class="at-chip at-ev-code">讀碼</span>[^ver-mg60-semaphore-stats][^ver-mg70-semaphore-stats][^ver-mg80-semaphore-normal][^ver-mg60-ticket-128]
 - **連線。**`mongodb_ss_connections{conn_type="current"} / (current + available)`；上限是 maxIncomingConnections 與 ulimit 的較小者（lab available 8168）。exporter 預設每次 scrape 建新連線，額滿時它也連不進去。<span class="at-chip at-ev-code">讀碼</span>[^mg-conn-refused][^mx-new-client]
 - **主機層**（swap、IOPS、page fault、CPU steal）不在 serverStatus 裡，用 node_exporter。
 
@@ -122,6 +123,7 @@ TTL monitor 預設每 60 秒一輪（`ttlMonitorSleepSecs`），`mongodb_ss_metr
 ## 資料保護 {#protection}
 
 - **checkpoint：**預設每 60 秒（`syncdelay`），`mongodb_ss_wt_checkpoint_most_recent_time_msecs` 一直很長代表磁碟跟不上；`mongodb_ss_wt_checkpoint_total_failed_number_of_checkpoints` 增加要立刻處理。<span class="at-chip at-ev-code">讀碼</span>[^mg-syncdelay]
+  **版本：**6.0、7.0 的 checkpoint 時間在 `transaction` 分類（`mongodb_ss_wt_txn_transaction_checkpoint_most_recent_time_msecs`，推論），MongoDBCheckpointSlow 用 `or` 兩種都接受；失敗次數只在 8.0 以上有，MongoDBCheckpointFailed 在 6.0、7.0 回傳空。<span class="at-chip at-ev-code">讀碼</span>[^ver-mg60-wt-ckpt][^ver-mg70-wt-ckpt][^ver-mg80-wt-ckpt][^ver-mg80-wt-ckpt-failed]
 - **備份：**MongoDB 沒有內建排程備份；Percona Backup for MongoDB 要 `--collector.pbm`（PMM 有 PBM 範本），其他工具要自己的 metric。
 - **FTDC：**每秒取樣、目錄 250MB 循環覆寫（shard server 在新格式下加倍）。事件後要分析時才拿得到，要確認在持久磁碟。<span class="at-chip at-ev-code">讀碼</span>[^mg-ftdc-dir-size][^mg-ftdc-shard-double]
 

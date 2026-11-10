@@ -203,6 +203,7 @@ groups:
         labels: { severity: warning, component: yugabytedb, tier: "2", aspect: cluster }
         annotations:
           summary: "master leader 已經 {{ $value }} 毫秒沒收到某台 master follower 的回應（例子：10 秒）；master 的 Raft group 少一台，再少一台就失去 quorum"
+          description: "max_follower_heartbeat_delay 2024.2 以上才有，2.20 上這條回傳空"
           runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#master-quorum
           absence_covered_by: "YBMasterLeaderMetricsMissing"
       - alert: YBComponentCountLow
@@ -393,6 +394,7 @@ groups:
         labels: { severity: warning, component: yugabytedb, tier: "3", aspect: maintenance }
         annotations:
           summary: "有 {{ $value }} 個 tablet split 超過 1 小時沒完成（例子）"
+          description: "outstanding_tablet_splits 2024.2 以上才有，2.20 上這條回傳空"
           runbook_url: https://hahasula.github.io/alert-trust/components/yugabytedb/#balancer
           absence_covered_by: "YBMasterLeaderMetricsMissing"
 

@@ -2,7 +2,7 @@
 
 **目標：知道 ClickHouse 叢集現在能不能寫入與查詢（Keeper 有 leader、Replicated 表不是唯讀、part 數離 Too many parts 還遠、mutation 沒有卡住、記憶體與磁碟有餘裕），以及哪一台、哪一張表離不能還有多遠。**ClickHouse 有兩種 process：server（MergeTree 表、查詢、ReplicatedMergeTree 的複寫）與 ClickHouse Keeper（Raft，存複寫 log 與 ON CLUSTER DDL）。兩者都有原生 `/metrics`，但預設是關的；打開後只有全伺服器的數字，每張表的狀態要用 SQL 查 system 表。這頁依九個面向從大到小排列：叢集 → 複寫 → 可用性 → 資源 → 工作量 → 維護 → 保護 → 容量，最前面是監測自檢。
 
-依據是 ClickHouse v26.10.2.103-stable 的原始碼（`gh api .../releases/latest` 回的最新 stable，2026-10-24；最新 LTS 是 v26.8.34.13-lts；Apache-2.0），加上一組小實驗：server ×2（1 shard、2 replicas）、Keeper ×3，做 Too many parts、失敗的 mutation、記憶體與並行上限、Distributed 送出、備份、replica 落後與停機、Keeper 失去 quorum、`<prometheus>` 關掉<span class="at-chip at-ev-tested">實測</span>[^ch-exp]。這台機器的 Docker 容器時鐘比牆鐘慢約 30%；秒數以主機 monotonic 時鐘量的 SQL、HTTP 耗時為準，Prometheus 的 `for` 與 query-exporter 的 interval 只當參考。訊號與規則在[元件卡](../components/clickhouse.md)，原始碼位置在[附錄](clickhouse-appendix.md)，機制在[分析型架構](../architecture/db-olap.md)與[共識（Raft）架構](../architecture/db-raft.md#clickhouse-keeper)。
+依據是 ClickHouse v26.10.2.103-stable 的原始碼（`gh api .../releases/latest` 回的最新 stable，2026-10-24；最新 LTS 是 v26.8.34.13-lts；Apache-2.0），加上一組小實驗：server ×2（1 shard、2 replicas）、Keeper ×3，做 Too many parts、失敗的 mutation、記憶體與並行上限、Distributed 送出、備份、replica 落後與停機、Keeper 失去 quorum、`<prometheus>` 關掉<span class="at-chip at-ev-tested">實測</span>[^ch-exp]。這台機器的 Docker 容器時鐘比牆鐘慢約 30%；秒數以主機 monotonic 時鐘量的 SQL、HTTP 耗時為準，Prometheus 的 `for` 與 query-exporter 的 interval 只當參考。訊號與規則在[元件卡](../components/clickhouse.md)，原始碼位置在[附錄](clickhouse-appendix.md)，機制在[分析型架構](../architecture/db-olap.md)與[共識（Raft）架構](../architecture/db-raft.md#clickhouse-keeper)。25.3 到 26.10 之間的 metric 差異見 [ClickHouse 各版本的監控差異](versions/clickhouse.md)。
 
 ## 先講結論
 
@@ -90,7 +90,7 @@ Keeper 失去 quorum 時的 server（主機時鐘）：+10 秒兩台的表已經
 | 問題 | 做法 | 證據 |
 |---|---|---|
 | `<prometheus>` 沒打開 | 被抓時 connection refused（`up` 0）；和 `/ping` 一起看：`/ping` 1、`up` 0 是設定或 scrape 路徑 | <span class="at-chip at-ev-tested">實測</span>[^ch-prom-http-default] |
-| 子項被關、名稱改了 | `up == 1 unless` MaxPartCountForPartition（async）、ReadonlyReplica（metrics）、RejectedInserts（events）、ErrorMetric_ALL（errors）、DiskAvailable（key-value 形式）；Keeper 用 KeeperIsLeader 等 | <span class="at-chip at-ev-tested">實測</span>：名稱 server 3225、Keeper 632[^ch-exp-names] |
+| 子項被關、名稱改了 | `up == 1 unless` MaxPartCountForPartition（async）、ReadonlyReplica（metrics）、RejectedInserts（events）、ErrorMetric_ALL（errors）、DiskAvailable（`{disk}` 與 `_<disk>` 兩種名稱都接受）；Keeper 用 KeeperIsLeader 等 | <span class="at-chip at-ev-tested">實測</span>：名稱 server 3225、Keeper 632[^ch-exp-names] |
 | job 名稱錯了 | 每個 job 一條 `absent(up{job=...})`；Altinity 沒有 | <span class="at-chip at-ev-code">讀碼</span>[^alt-k-down] |
 | scrape 預算 | server 約 3,900 個 sample、Keeper 1,193；沒有每張表的 series，表多不會變大 | <span class="at-chip at-ev-tested">實測</span> |
 | `/metrics` 會不會被卡 {#endpoint-blocking} | 讀 atomic 計數器與背景算好的 async 快照，scrape 不觸發計算、不拿表或 Keeper 的鎖；lab 各情境都在 0.01 秒內 | <span class="at-chip at-ev-tested">實測</span>[^ch-prom-metric-atomic][^ch-async-getvalues][^ch-async-swap] |
@@ -142,6 +142,8 @@ query-exporter 查詢失敗時保留舊值（和 [PostgreSQL 的自訂查詢](po
 **Keeper 失去 quorum。**lab 停掉 leader 與一台 follower：存活那台 `up` 1、`KeeperIsLeader` 0、`/ready` 503、`ruok` 仍 `imok`、`mntr` 只回一行 `This instance is not currently serving requests`。所以 4lw `ruok` 不能當健康檢查；ZooKeeper 時代常見的 `ruok` probe 在 Keeper 上看不出 quorum。Altinity 的 ClickHouseKeeperLostQuorum 要求 `KeeperIsLeader == 1`，這時回傳空。Keeper 的 Raft 機制見[共識（Raft）架構](../architecture/db-raft.md#clickhouse-keeper)。<span class="at-chip at-ev-tested">實測</span>[^ch-exp-raw][^ch-k-ruok][^ch-k-mntr-inactive][^alt-k-lostquorum]
 
 **server 端的 session 不能看 `ZooKeeperSession`。**Keeper 失去 quorum 的整段時間兩台的 `ZooKeeperSession` 都是 1（session 物件還在，只是過期）；`ZooKeeperSessionExpired` 從 0 變成 1、再到 3–4，Keeper 恢復 150 秒後仍是 3–4，不歸零。所以 `< 1` 不會響、`> 0` 恢復後一直響（第一版規則就是這樣：恢復後 3 分鐘還 firing）。改成看變化量：`delta(ZooKeeperSessionExpired[5m]) > 0` 或 `ZooKeeperHardwareExceptions` 增加；現況看 `ReadonlyReplica`。修改後的規則在 `extra.sh` 重跑：`ZooKeeperSessionExpired` 一樣從 0 變成 3，CHKeeperSessionLost firing；恢復 151 秒時仍 firing（5 分鐘視窗還包含變化，預期在最後一次變化後約 5 分鐘清掉，lab 沒有等到）。<span class="at-chip at-ev-tested">實測</span>[^ch-exp-raw][^ch-exp-extra][^ch-cm-zksession]
+
+**版本。**`ZooKeeperSessionExpired` 26.3 才有；25.3、25.8 上 CHKeeperSessionLost 只剩 `ZooKeeperHardwareExceptions` 那半，session 過期改看自訂查詢的 `chq_replica_session_expired`（`system.replicas.is_session_expired`）[^ver-ch258-zk-session][^ver-ch263-zk-expired][^ver-ch253-replicas]。
 
 ## 複寫 {#replication}
 
@@ -230,6 +232,8 @@ lab 的 `background_pool_size` 是 1（容器 CPU 少），正式環境預設是
 | 每個 disk 的剩餘空間 {#disk-space} | `DiskAvailable / DiskTotal` < 10%（例子；DiskTotal 大於 1e18 的遠端 disk 排除）；`predict_linear(DiskAvailable[6h], 1 天)` < 0 | <span class="at-chip at-ev-code">讀碼</span>[^ch-sam-disk-available][^ch-sam-disk-total] |
 
 26.8 起名稱是 `ClickHouseAsyncMetrics_DiskAvailable{disk="default"}`（lab 確認，`DiskAvailable_default` 0 條）；`asynchronous_metrics_key_values_mode` 設成 `legacy_names` 時反過來。merge 要預留空間，空間不夠時 merge 停、part 數上升。lab 沒有填滿磁碟。<span class="at-chip at-ev-tested">實測</span>（名稱）[^ch-ss-kv-mode][^ch-exp-raw]
+
+**版本。**26.3 以前每顆磁碟一個名稱（`ClickHouseAsyncMetrics_DiskAvailable_default`）。CHDiskSpaceLow、CHDiskFillingUp 用 `or` 加上 `{__name__=~"ClickHouseAsyncMetrics_DiskAvailable_.+"}`，以 `label_replace` 把名稱後綴轉成 `disk` label，兩種名稱都能算；CHMetricFamiliesMissing 也兩種都接受。舊名稱的寫法只讀碼，沒有在 26.3 以前的版本上跑過[^ver-ch253-disk-suffix][^ver-ch263-disk-suffix][^ver-ch268-disk-label][^ver-ch268-kv-mode]。
 
 ## 盲點與補法 {#blind-spots}
 

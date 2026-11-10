@@ -362,6 +362,7 @@ groups:
         labels: { severity: warning, component: tidb, tier: "2", aspect: saturation }
         annotations:
           summary: "{{ $labels.job }} {{ $labels.instance }} 的 RSS 是記憶體上限的 {{ $value | humanizePercentage }}（官方門檻 80%）。TiDB 的上限是 cgroup 或主機記憶體；超過 tidb_server_memory_limit 時 TiDB 會取消最耗記憶體的 SQL"
+          description: "tidb_server_memory_quota_bytes、tikv_server_memory_quota_bytes 8.1 以上才有，7.5 上這條回傳空"
           runbook_url: https://hahasula.github.io/alert-trust/components/tidb/#memory-quota
       - alert: TiDBTsoWaitSlow
         expr: histogram_quantile(0.99, sum by (job, instance, le) (rate(pd_client_cmd_handle_cmds_duration_seconds_bucket{job="tidb", type="wait"}[5m]))) > 0.1

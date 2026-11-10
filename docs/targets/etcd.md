@@ -2,7 +2,7 @@
 
 **目標：知道 etcd 叢集現在能不能寫入、能不能做 linearizable read，以及離不能還有多遠。**etcd 自己提供 `/metrics`，沒有 exporter；所以「抓得到 `/metrics`」只代表 process 回應了 HTTP，不代表叢集健康。這頁依九個面向從大到小排列：叢集與共識 → 可用性 → 複寫 → 資源 → 工作量 → 維護 → 保護 → 容量，最前面是監測自檢。
 
-依據是 etcd v3.7.3 的原始碼（raft 函式庫 v3.7.0），加上一組三台叢集的小實驗：停 leader、停兩台失去 quorum、讓 scrape 失敗、讀取與刪除時量 `/metrics`、寫到 quota<span class="at-chip at-ev-tested">實測</span>[^etcd-exp]。慢磁碟、TLS、learner 沒有實驗，只讀原始碼。這台機器的 Docker 容器時鐘比牆鐘慢約 30%，秒數類的實驗結果以主機時鐘量的為準，其餘只看狀態。訊號與規則在[元件卡](../components/etcd.md)，原始碼位置在[附錄](etcd-appendix.md)，機制在[共識（Raft）架構](../architecture/db-raft.md)。
+依據是 etcd v3.7.3 的原始碼（raft 函式庫 v3.7.0），加上一組三台叢集的小實驗：停 leader、停兩台失去 quorum、讓 scrape 失敗、讀取與刪除時量 `/metrics`、寫到 quota<span class="at-chip at-ev-tested">實測</span>[^etcd-exp]。慢磁碟、TLS、learner 沒有實驗，只讀原始碼。這台機器的 Docker 容器時鐘比牆鐘慢約 30%，秒數類的實驗結果以主機時鐘量的為準，其餘只看狀態。訊號與規則在[元件卡](../components/etcd.md)，原始碼位置在[附錄](etcd-appendix.md)，機制在[共識（Raft）架構](../architecture/db-raft.md)。3.4、3.5、3.6 與 3.7 之間的 metric 差異見 [etcd 各版本的監控差異](versions/etcd.md)。
 
 ## 先講結論
 
@@ -108,6 +108,8 @@ etcd 屬於「資料庫內建端點」模型（見[資料庫監控模型](models
 | peer 網路 | RTT p99 > 0.15 秒；`peer_sent_failures_total` 的 rate。RTT 健康時每 30 秒才觀察一次[^etcd-rafthttp-probe-interval] | <span class="at-chip at-ev-code">讀碼</span> |
 | learner 卡住 | `etcd_server_is_learner == 1` 超過 1 小時（例子） | <span class="at-chip at-ev-code">讀碼</span> |
 
+**版本。**`etcd_network_known_peers` 3.6 才有，EtcdQuorumAtRisk 與 EtcdMembersNotScraped 在 3.4、3.5 回傳空；舊版成員數改用 `etcd_network_active_peers` + 1 或 `up` 計數[^ver-et35-active-peers][^ver-et36-known-peers]。
+
 **為什麼 quorum 用探測計數。**第一版規則數 `has_leader == 1`：`sample_limit` 讓三台 `up=0`、`/readyz` 都正常時，EtcdQuorumAtRisk 與 EtcdLeaderCountWrong 都觸發（一台的 `has_leader` 停在舊值，其他消失）。改版後重跑同樣情境。<span class="at-chip at-ev-tested">實測</span>[^etcd-exp-raw-v1][^etcd-exp-raw]Prometheus 與 blackbox 一起和 etcd 斷開時，改版的規則仍會響，這時 EtcdEndpointDown 也會一起響，代表「看不到」而不是「確定沒有 quorum」。
 
 **Patroni 的 DCS。**PostgreSQL 卡片的 `patroni-dcs` 訊號說「DCS 本身的 quorum 要用它自己的 metric 監控」：用 etcd 當 DCS 時，就是這一節的 quorum、has-leader 與 alarms（NOSPACE 時 Patroni 寫不進 leader key）。
@@ -118,6 +120,8 @@ etcd 屬於「資料庫內建端點」模型（見[資料庫監控模型](models
 |---|---|---|
 | 這台看得到 leader 嗎 | `etcd_server_has_leader == 0` for 1m；只在 raft 狀態改變時更新 | <span class="at-chip at-ev-tested">實測</span>[^etcd-raft-hasleader] |
 | 有 alarm 嗎 | 探 `/health`（任何 alarm 都 503）；`etcd_debugging_server_alarms` 只標示種類，要和 `/health` 失敗同時成立 | <span class="at-chip at-ev-tested">實測</span> |
+
+**版本。**`etcd_debugging_server_alarms` 3.6 才有；3.4、3.5 只剩 `/health` 探測，看不出 alarm 種類[^ver-et36-alarms][^ver-et-cl36-alarms]。
 
 NOSPACE 情境（quota 32MiB，每次寫 200KB；第二次執行）：<span class="at-chip at-ev-tested">實測</span>[^etcd-exp-raw]
 
@@ -163,6 +167,8 @@ etcd 的「複寫」是 raft log：leader 送 entry、過半寫入 WAL 才 commi
 | 提案失敗 | `increase(proposals_failed_total[15m]) > 5`（例子）；失去 quorum 時寫一次後是 1[^etcd-srv-proposal-failed] | <span class="at-chip at-ev-tested">實測</span> |
 | 請求延遲 | `etcd_server_request_duration_seconds` p99（basic 就有）；`grpc_server_handling_seconds` 要 extensive | <span class="at-chip at-ev-tested">實測</span>[^etcd-srv-request-duration] |
 
+**版本。**`etcd_server_request_duration_seconds` 3.7 才有[^ver-et37-request-duration][^ver-et-cl37-reqdur]。EtcdRequestSlow 對沒有這個 histogram 的 instance 改看 `grpc_server_handling_seconds`（unary），3.6 以下要 `--metrics=extensive` 才有資料；預設 basic 時這條在 3.6 以下回傳空[^ver-et35-grpc-hist][^ver-et36-grpc-hist][^ver-et37-metrics-flag]。
+
 哪個 key、哪個 client 慢，`/metrics` 沒有；只有 warning log。
 
 ## 資料維護 {#maintenance}
@@ -172,6 +178,8 @@ etcd 的「複寫」是 raft log：leader 送 entry、過半寫入 WAL 才 commi
 | compaction 有在跑嗎 | 一天內 `compact_revision` 沒變、`current_revision` 有變；`--auto-compaction-retention` 預設 0（關閉）。`compact_revision` 重啟時還原，`db_compaction_last` 重啟歸 0（不要用它算多久沒跑）[^etcd-embed-autocompact][^etcd-compact-rev-restore][^etcd-compaction-last] | <span class="at-chip at-ev-tested">實測</span>：compact 後三台都是 3097 |
 | 要 defrag 嗎 | in_use / total < 0.5 且 in_use > 100MB（mixin）；compaction 不會讓檔案變小 | <span class="at-chip at-ev-tested">實測</span>：defrag 後 DB / quota 從 1.03 降到 0.001 |
 | 有損毀檢查嗎 | `etcd_server_feature_enabled{name="CompactHashCheck"}`；預設 0，InitialCorruptCheck 也是 0 | <span class="at-chip at-ev-tested">實測</span>[^etcd-feat-compacthash][^etcd-feat-initialcorrupt] |
+
+**版本。**`etcd_server_feature_enabled` 3.6 才有，EtcdCorruptionCheckDisabled 在 3.4、3.5 回傳空，只能看啟動參數[^ver-et36-feature]。
 
 ## 資料保護 {#protection}
 

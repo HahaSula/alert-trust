@@ -115,6 +115,7 @@ groups:
         labels: { severity: warning, component: postgres_exporter, tier: "2" }
         annotations:
           summary: "沒有任何 checkpoint metric；PostgreSQL 17 以上要打開 --collector.stat_checkpointer，否則 checkpoint 規則永遠回傳空"
+          description: "17 起 pg_stat_bgwriter 只剩四欄，checkpoint 計數搬到 pg_stat_checkpointer；exporter 的 stat_checkpointer collector 預設關，沒開時 pg_stat_checkpointer_* 不存在、pg_scrape_collector_success 也沒有這個 collector（不會報錯）"
           runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#version-semantics
       - alert: PostgresStandbyWalReceiverMissing
         expr: |
@@ -311,6 +312,7 @@ groups:
         labels: { severity: warning, component: postgres_exporter, tier: "3" }
         annotations:
           summary: "半數以上的 checkpoint 是被 WAL 量逼出來的，max_wal_size 可能太小；17 以上需要 --collector.stat_checkpointer"
+          description: "16 以下用 pg_stat_bgwriter_checkpoints_*（stat_bgwriter 預設開）；17 以上只有 pg_stat_checkpointer_num_*，而 stat_checkpointer collector 預設關，不打開時這條回傳空，由 PostgresCheckpointMetricsMissing 補位"
           runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#checkpoint-pressure
       - alert: PostgresAutovacuumWorkersFull
         expr: |
@@ -750,6 +752,7 @@ groups:
         labels: { severity: info, component: postgres_exporter, tier: "3" }
         annotations:
           summary: "{{ $labels.database }} 一半以上的資料頁寫出是 client backend 自己做的（不是 checkpointer 或 bgwriter）：shared_buffers 或 bgwriter 設定跟不上。pg_stat_io 16 起才有"
+          description: "pgq_io_writes 來自 queries/query-exporter/postgres.yaml 的 stat_io，排除了 18 起的 object = 'wal' 列，所以 16–18 都只算資料頁"
           runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#wal-io-sources
       - alert: PostgresWalBuffersFull
         expr: rate(pgq_wal_buffers_full_total{job="query-exporter"}[15m]) > 1

@@ -5,7 +5,7 @@ family: database
 model: exporter
 status: draft
 stages: [source]
-versions_checked: ["v1.97.0", "Valkey 9.1.3", "Redis 7.2.17", "Redis 8.10.3"]
+versions_checked: ["v1.97.0", "Valkey 9.1.3", "Redis 7.2.17", "Redis 8.10.3", "Valkey 7.2.15、8.0.12、8.1.11、9.0.7 與 Redis 8.2.11（版本差異頁，只讀碼）"]
 architecture: architecture/db-kv.md
 role: >-
   每次 scrape 開一條連線，依序送 INFO ALL、CONFIG GET *、LATENCY、SLOWLOG、COMMANDLOG（叢集再加 CLUSTER INFO，Sentinel 再加 SENTINEL MASTERS／CKQUORUM），
@@ -206,14 +206,16 @@ signals:
     tier: 2
     question: 這個版本真的有輸出規則用到的 metric 嗎
     signal: >-
-      Valkey 的 redis_instance_info 帶 redis_version="7.2.4"（相容用的固定值）與另一個 valkey_version label，版本判斷要用 valkey_version。
+      Valkey 的 redis_instance_info 帶 redis_version="7.2.4"（相容用的固定值；Valkey 7.2.15 到 9.1.3 都一樣）與另一個 valkey_version label，版本判斷要用 valkey_version，
+      沒有這個 label 時才看 redis_version（例：Valkey 8.0 以上是 redis_instance_info{valkey_version=~"([89]|[1-9][0-9])\\..*"}）。
+      Valkey 8.0 起 INFO 是 server_mode，exporter 改讀它填 redis_mode label，redis_instance_info 的 redis_mode 照樣有值。
       預設設定下 Valkey 9.1 比 Redis 7.2 多 36 個名稱（commandlog_*、errors_total、tls_*、scripting_engine_* 等），Redis 8.10 比 7.2 多 26 個（active_clients、io_thread_*、slowlog_commands_*）。
       redis_errors_total 的 series 在第一次出現該錯誤時才建立；redis_latency_spike_* 要 latency-monitor-threshold > 0（預設 0）才有
     metrics: [redis_instance_info, redis_errors_total, redis_latency_spike_duration_seconds, redis_commandlog_slow_length]
     evaluate_on: inventory
     evidence: tested
     source: vk-lab
-    refs: [vk-exp, vk-info-redis-version, rx-instance-info, vk-cfg-latency-threshold, r72-conf-latency, rx-errorstats]
+    refs: [vk-exp, vk-info-redis-version, rx-instance-info, vk-cfg-latency-threshold, r72-conf-latency, rx-errorstats, ver-vk72-redis-version, ver-vk91-redis-version, ver-rx-valkey-version, ver-vk80-server-mode, ver-rx-server-mode]
     upstream: { status: no }
     rules: []
 

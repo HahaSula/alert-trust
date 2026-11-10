@@ -2,7 +2,7 @@
 
 **要監控的是：資料還寫得進去、讀得到最新的、斷掉時有人接手。**對記憶體 KV 來說，這三件事最常壞在五個地方：記憶體碰到 `maxmemory`、持久化（fork）失敗、複本斷線後 full resync、failover 沒發生或發生兩次、主執行緒被一個慢指令卡住。這頁依九個面向從大到小排列（叢集 → 複寫 → 可用性 → 資源 → 工作量 → 維護 → 保護 → 容量），最後是工具設定與缺口。
 
-[元件卡](../components/redis_exporter.md)列出每個訊號與規則；[原始碼到 metric](valkey-appendix.md)追每個 INFO 欄位；機制見[記憶體 KV 架構](../architecture/db-kv.md)。
+[元件卡](../components/redis_exporter.md)列出每個訊號與規則；[原始碼到 metric](valkey-appendix.md)追每個 INFO 欄位；機制見[記憶體 KV 架構](../architecture/db-kv.md)；Valkey 7.2–9.1 與 Redis 7.2、8.x 之間的差異見 [Valkey／Redis 各版本的監控差異](versions/valkey.md)。
 
 版本：Valkey 9.1.3（主要）、Redis 7.2.17（最後的 BSD 授權分支）與 8.10.3（看差異）、redis_exporter v1.97.0。依據是原始碼，加上兩輪小實驗：Valkey 主從加 3 個 Sentinel、Redis 7.2 與 8.10 各一台、每台一個 exporter，製造慢指令、阻塞、maxmemory、exporter 逾時、連線額滿、複本斷線、BGSAVE 失敗、failover、Sentinel 失去多數、script 失敗、key group 掃描。<span class="at-chip at-ev-tested">實測</span>[^vk-exp][^vk-exp2] 這台機器的容器時鐘比牆鐘慢約 30%、而且會跳動：Sentinel 每 25～30 秒進一次 TILT，**failover 與 sdown 在這裡測不到**，相關結論以原始碼為準並標「讀碼」。
 
@@ -190,6 +190,8 @@ exporter 本身的訊號都在[元件卡](../components/redis_exporter.md)。和
 | 淘汰計數的位置 | evict.c | evict.c | db.c | 同一個 INFO 欄位 | <span class="at-chip at-ev-code">讀碼</span>[^vk-evict-count][^r8-evict-count] |
 | import-mode | 有（主節點不淘汰） | 無 | 無 | 開著時 noeviction 以外的政策也不淘汰 | <span class="at-chip at-ev-code">讀碼</span>[^vk-cfg-import-mode] |
 | 預設設定下多出的 metric 名稱 | 比 7.2 多 36 個（errors_total、tls_*、scripting_engine_*…） | — | 比 7.2 多 26 個（active_clients、io_thread_*…） | 跨版本的 dashboard 要容許缺 metric | <span class="at-chip at-ev-tested">實測</span>[^vk-exp] |
+
+**版本。**Valkey 7.2.15 到 9.1.3 的 `redis_version` 都是 7.2.4，用 `redis_instance_info{redis_version=...}` 分版本會把所有 Valkey 當成 7.2.4；exporter 有 `valkey_version` 時把它加成 label，版本判斷先看它（例：`redis_instance_info{valkey_version=~"([89]|[1-9][0-9])\\..*"}` 是 Valkey 8.0 以上），沒有才看 `redis_version`。卡片的告警規則沒有依版本分支[^ver-vk72-redis-version][^ver-vk91-redis-version][^ver-rx-valkey-version]。
 
 ## 建議設定 {#recommended}
 

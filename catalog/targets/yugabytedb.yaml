@@ -5,7 +5,7 @@ model: native
 family: database
 status: draft
 stages: [source]
-versions_checked: ["YugabyteDB v2026.1.3.0（映像 2026.1.3.0-b100，commit f2635f5；核心 Apache-2.0）", "YugabyteDB Anywhere 告警範本 v2026.1.3.0（Polyform，只引用）", "postgres_exporter v0.20.1（對 YSQL）"]
+versions_checked: ["YugabyteDB v2026.1.3.0（映像 2026.1.3.0-b100，commit f2635f5；核心 Apache-2.0）", "YugabyteDB Anywhere 告警範本 v2026.1.3.0（Polyform，只引用）", "postgres_exporter v0.20.1（對 YSQL）", "YugabyteDB 2.20.12、2024.2.12.0、2025.1.5.0、2025.2.9.0（版本差異頁，只讀碼）"]
 architecture: architecture/db-distsql.md
 role: >-
   YugabyteDB 叢集有兩種 process：yb-master（catalog、tablet 位置、balancer；masters 之間一組 Raft）與 yb-tserver（DocDB 儲存，每個 tablet 一組 Raft；
@@ -197,12 +197,13 @@ signals:
     question: master 還有過半嗎
     signal: >-
       拿得到 leader 回應的 master 數（/api/v1/health-check 的 body 有 "dead_nodes"）< floor(預期數 / 2) + 1，預期數寫在規則檔的 yb-params；
-      master leader 的 max_follower_heartbeat_delay > 10 秒（例子）是少了一台。lab：停 2 台 master 後存活那台 up 1、/status {}、/api/v1/is-leader 503、health-check 200 但內容是「Unable to locate leader master」；約 30 秒後 YSQL operation lease（master_ysql_operation_lease_ttl_ms 30 秒）過期，三台 tserver 都把 PostgreSQL 結束：5433 拒絕連線、13000 的 /prometheus-metrics 消失，tserver 的 9000 與 /api/v1/health-check 照常
+      master leader 的 max_follower_heartbeat_delay > 10 秒（例子）是少了一台。lab：停 2 台 master 後存活那台 up 1、/status {}、/api/v1/is-leader 503、health-check 200 但內容是「Unable to locate leader master」；約 30 秒後 YSQL operation lease（master_ysql_operation_lease_ttl_ms 30 秒）過期，三台 tserver 都把 PostgreSQL 結束：5433 拒絕連線、13000 的 /prometheus-metrics 消失，tserver 的 9000 與 /api/v1/health-check 照常。
+      版本：max_follower_heartbeat_delay 2024.2 以上才有，2.20 上 YBMasterFollowerHeartbeatDelay 回傳空，只剩 probe 計數（YBMasterQuorumAtRisk 各版本都能用）
     metrics: [probe_success, max_follower_heartbeat_delay]
     evaluate_on: self
     evidence: tested
     source: yb-lab
-    refs: [yb-exp-raw, yb-exp-lease-log, yb-m-h-redirect-nolist, yb-m-hb-delay, yb-ysql-lease-flag, yb-ysql-lease-ttl, yb-ysql-lease-kill, yba-master-underrep]
+    refs: [yb-exp-raw, yb-exp-lease-log, yb-m-h-redirect-nolist, yb-m-hb-delay, yb-ysql-lease-flag, yb-ysql-lease-ttl, yb-ysql-lease-kill, yba-master-underrep, ver-yb220-no-hb-delay, ver-yb242-hb-delay]
     upstream: { status: partial, note: "YBA MASTER_UNDER_REPLICATED 用 ybp_universe_replication_factor（YBA 平台 metric）" }
     rules: [rules/targets/yugabytedb.yml#YBMasterQuorumAtRisk, rules/targets/yugabytedb.yml#YBMasterFollowerHeartbeatDelay]
 
@@ -432,12 +433,13 @@ signals:
     question: cluster balancer 開著、tablet split 有在完成嗎
     signal: >-
       master leader 的 is_load_balancing_enabled == 0 持續 30 分鐘（follower 永遠 0，所以只看 leader）：under-replicated 的 tablet 不會自動補；
-      outstanding_tablet_splits 持續 1 小時 > 0（例子）
+      outstanding_tablet_splits 持續 1 小時 > 0（例子）。
+      版本：outstanding_tablet_splits 2024.2 以上才有，2.20 上分裂那條（YBTabletSplitsBacklog）回傳空；balancer 那條各版本都能用
     metrics: [is_load_balancing_enabled, outstanding_tablet_splits]
     evaluate_on: self
     evidence: tested
     source: yb-lab
-    refs: [yb-exp-raw, yb-m-lb-enabled, yb-m-split-outstanding]
+    refs: [yb-exp-raw, yb-m-lb-enabled, yb-m-split-outstanding, ver-yb242-splits]
     upstream: { status: no }
     rules: [rules/targets/yugabytedb.yml#YBLoadBalancerDisabled, rules/targets/yugabytedb.yml#YBTabletSplitsBacklog]
 

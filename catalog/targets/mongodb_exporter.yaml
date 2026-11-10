@@ -5,7 +5,7 @@ family: database
 model: exporter
 status: draft
 stages: [source]
-versions_checked: ["MongoDB 8.0.34", "percona/mongodb_exporter v0.54.0", "MongoDB 9.0.4（只查 OTel metrics）", "MongoDB 8.2.12（只查 OTel metrics）"]
+versions_checked: ["MongoDB 8.0.34", "percona/mongodb_exporter v0.54.0", "MongoDB 9.0.4（只查 OTel metrics）", "MongoDB 8.2.12（只查 OTel metrics）", "MongoDB 6.0.29、7.0.45、8.2.12 的 serverStatus 與 WiredTiger（版本差異頁，只讀碼）"]
 architecture: architecture/db-doc.md
 role: >-
   每次 scrape 新建一條連線，依序送 isMaster、getCmdLineOpts、replSetGetConfig、replSetGetStatus（拓撲 label）、ping（mongodb_up），
@@ -312,13 +312,15 @@ signals:
     signal: >-
       排隊數：mongodb_ss_wt_concurrentTransactions_{read,write}_normalPriority_queueLength（Atlas 的 Queued Reads／Writes：0～10 低優先、10+ 高優先），
       等鎖：mongodb_ss_globalLock_currentQueue{count_type}。8.0 預設 throughputProbing，ticket 數從 CPU 核心數開始在 4～128 間調，
-      available 的固定門檻沒有意義；固定值要設 storageEngineConcurrencyAdjustmentAlgorithm=fixedConcurrentTransactions
+      available 的固定門檻沒有意義；固定值要設 storageEngineConcurrencyAdjustmentAlgorithm=fixedConcurrentTransactions。
+      版本：*_normalPriority_queueLength 8.0 以上才有；7.0 是 mongodb_ss_wt_concurrentTransactions_{read,write}_queueLength（推論），規則的 regex 兩種都接受；
+      6.0 預設 SemaphoreTicketHolder 沒有排隊數，ticket 固定 128，只剩 globalLock_currentQueue。7.0 起 ticket 數動態調整
     metrics: [mongodb_ss_wt_concurrentTransactions_read_normalPriority_queueLength, mongodb_ss_wt_concurrentTransactions_write_normalPriority_queueLength, mongodb_ss_wt_concurrentTransactions_available, mongodb_ss_wt_concurrentTransactions_totalTickets, mongodb_ss_globalLock_currentQueue]
     evaluate_on: self
     silent_failure: 實測 16 核的 lab totalTickets 16，PMM 的 available < 50 一開機就 firing；awesome 的 txn_rw_type 對不到
     evidence: tested
     source: mg-lab
-    refs: [mg-exp, mg-ticket-algo, mg-tp-initial, mg-tp-min, mg-tp-max, mg-queues-section, mg-globallock-queue, mx-prefix-queues, pmm-read-tickets, pmm-write-tickets, awe-mg-read-tickets, awe-mg-write-tickets]
+    refs: [mg-exp, mg-ticket-algo, mg-tp-initial, mg-tp-min, mg-tp-max, mg-queues-section, mg-globallock-queue, mx-prefix-queues, pmm-read-tickets, pmm-write-tickets, awe-mg-read-tickets, awe-mg-write-tickets, ver-mg60-semaphore-stats, ver-mg60-ticket-128, ver-mg70-semaphore-stats, ver-mg70-queue-length, ver-mg80-semaphore-normal, ver-mg70-algo]
     upstream: { status: partial, note: "PMM 與 awesome 有 available < 50：前者在動態 ticket 下一直響，後者 label 錯誤" }
     rules: [rules/targets/mongodb.yml#MongoDBTicketQueue, rules/targets/mongodb.yml#MongoDBGlobalLockQueue]
 
@@ -483,12 +485,14 @@ signals:
     question: WiredTiger checkpoint 成功、來得及嗎
     signal: >-
       mongodb_ss_wt_checkpoint_most_recent_time_msecs 與 increase(mongodb_ss_wt_checkpoint_total_failed_number_of_checkpoints)。checkpoint 預設 60 秒一次（syncdelay），
-      兩次之間靠 journal；checkpoint 一直很慢代表磁碟寫入跟不上
+      兩次之間靠 journal；checkpoint 一直很慢代表磁碟寫入跟不上。
+      版本：8.0 起統計在 checkpoint 分類；6.0、7.0 的時間是 mongodb_ss_wt_txn_transaction_checkpoint_most_recent_time_msecs（推論），規則 or 上這個名稱。
+      失敗次數（total_failed_number_of_checkpoints）只在 MongoDB 8.0 以上有，MongoDBCheckpointFailed 在 6.0、7.0 回傳空
     metrics: [mongodb_ss_wt_checkpoint_most_recent_time_msecs, mongodb_ss_wt_checkpoint_total_failed_number_of_checkpoints, mongodb_ss_wt_checkpoint_total_succeed_number_of_checkpoints]
     evaluate_on: self
     evidence: code
     source: mg-src
-    refs: [mg-syncdelay, mg-exp]
+    refs: [mg-syncdelay, mg-exp, ver-mg60-wt-ckpt, ver-mg70-wt-ckpt, ver-mg80-wt-ckpt, ver-mg80-wt-ckpt-failed]
     upstream: { status: no }
     rules: [rules/targets/mongodb.yml#MongoDBCheckpointSlow, rules/targets/mongodb.yml#MongoDBCheckpointFailed]
 

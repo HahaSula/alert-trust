@@ -14,6 +14,8 @@
 # 版本：
 #   sessions_*（pg_stat_database）14 起；pg_stat_wal 14 起；pg_stat_io 16 起；archive_library 15 起（用 current_setting(..., true)，舊版回 NULL 不報錯）。
 #   只在 PostgreSQL 16.15、17.11 讀過原始碼，17.11 跑過 lab。18 把 pg_stat_wal 的 wal_write／wal_sync 移到 pg_stat_io，本檔沒有查那兩欄。
+#   18 的 pg_stat_io 多了 object = 'wal' 的列；stat_io 用 WHERE object <> 'wal' 排除，讓 pgq_io_* 在 16–18 都只算資料頁
+#   （16、17 沒有 wal 列，條件不影響結果）。依據：docs/targets/versions/postgres.md#diff（ver-pg18-io-wal）。
 #   版本不支援的查詢會每次都失敗並累加 queries_total{status="error"}（不是 fatal，不會被移除）；請把那個 DSN 從該查詢的 databases 拿掉。
 #
 # 行為（query-exporter 5.2.2 原始碼，見 docs）：
@@ -142,7 +144,7 @@ metrics:
     type: counter
     description: pg_stat_wal.wal_buffers_full（wal_buffers 滿了而必須寫出的次數）
 
-  # --- pg_stat_io（16+），依 backend_type 加總 object 與 context ---
+  # --- pg_stat_io（16+），依 backend_type 加總 object 與 context（不含 18 起的 object = 'wal'） ---
   pgq_io_reads:
     type: counter
     description: pg_stat_io.reads 的和（次數，不是 byte）
@@ -297,6 +299,7 @@ queries:
              COALESCE(sum(extends), 0) AS pgq_io_extends,
              COALESCE(sum(fsyncs), 0) AS pgq_io_fsyncs
         FROM pg_stat_io
+       WHERE object <> 'wal'
        GROUP BY backend_type
 
   sessions:

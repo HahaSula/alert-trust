@@ -5,7 +5,7 @@ model: native
 family: database
 status: draft
 stages: [source]
-versions_checked: ["etcd v3.7.3", "go.etcd.io/raft v3.7.0"]
+versions_checked: ["etcd v3.7.3", "go.etcd.io/raft v3.7.0", "etcd v3.4.45、v3.5.35、v3.6.16（版本差異頁，只讀碼）"]
 architecture: architecture/db-raft.md
 role: >-
   etcd 自己在 client port（或 --listen-metrics-urls 指定的獨立 listener）提供 /metrics、/health、/livez、/readyz，沒有 exporter 這一層。
@@ -193,13 +193,14 @@ signals:
     signal: >-
       主要訊號是 blackbox 探 /health（任何 alarm 都 503，三台都看得到）。etcd_debugging_server_alarms{alarm_type} 只用來標示種類，
       而且要和 /health 失敗同時成立才告警（gauge 會停在舊值、重啟後消失）。NOSPACE 時 Put、寫入的 Txn、LeaseGrant 回 ErrNoSpace，
-      DeleteRange 照常；/readyz 仍是 200。alarm 要手動 disarm
+      DeleteRange 照常；/readyz 仍是 200。alarm 要手動 disarm。
+      版本：etcd_debugging_server_alarms 3.6 以上才有；3.4、3.5 只剩 /health 探測（EtcdHealthProbeFailing），看不出 alarm 種類
     metrics: [probe_success, etcd_debugging_server_alarms]
     evaluate_on: self
     silent_failure: gauge 重複提出後是 2、disarm 後停在 1（第一次執行）；重啟過的 member 沒有這條、disarm 後變 -1（兩次執行）；mixin 沒有 alarm 規則
     evidence: tested
     source: etcd-lab
-    refs: [etcd-exp-raw, etcd-mvcc-alarm-metric, etcd-alarm-gauge-inc, etcd-alarm-activate-existing, etcd-alarm-store-restore, etcd-capped-put, etcd-h-health-nospace, etcd-srv-nospace-raise]
+    refs: [etcd-exp-raw, etcd-mvcc-alarm-metric, etcd-alarm-gauge-inc, etcd-alarm-activate-existing, etcd-alarm-store-restore, etcd-capped-put, etcd-h-health-nospace, etcd-srv-nospace-raise, ver-et36-alarms, ver-et-cl36-alarms]
     upstream: { status: no, note: "mixin 只有 DB 大小 / quota > 95%，沒有 alarm" }
     rules: [rules/targets/etcd.yml#EtcdAlarmActive, rules/targets/etcd.yml#EtcdHealthProbeFailing, rules/targets/etcd.yml#EtcdHealthProbeMissing]
 
@@ -211,7 +212,8 @@ signals:
     signal: >-
       /readyz 探測成功的 member 數（linearizable read 通過＝這台看得到有 quorum 的 leader）小於 floor(成員數 / 2) + 1；
       成員數取自 etcd 自己的 etcd_network_known_peers（每個成員含自己一條，值 1；含 learner），不是 scrape target 數。
-      不用 has_leader 計數：scrape 失敗時 has_leader 消失或停在舊值，第一版規則因此誤報（實測）。一個 probe job 對一個叢集
+      不用 has_leader 計數：scrape 失敗時 has_leader 消失或停在舊值，第一版規則因此誤報（實測）。一個 probe job 對一個叢集。
+      版本：etcd 3.6 以上才有 etcd_network_known_peers，3.4、3.5 上規則回傳空（不會響）；舊版成員數改用 etcd_network_active_peers + 1 或 up 計數
     metrics: [probe_success, etcd_network_known_peers, etcd_server_has_leader]
     evaluate_on: self
     silent_failure: >-
@@ -220,7 +222,7 @@ signals:
       Prometheus 與 blackbox 一起和 etcd 斷開時這條也會響，要和 EtcdEndpointDown 一起看
     evidence: tested
     source: etcd-lab
-    refs: [etcd-exp-raw, etcd-exp-raw-v1, etcd-member-knownpeers, etcd-h-readyz-linear, dbm-etcd-mixin-insufficient]
+    refs: [etcd-exp-raw, etcd-exp-raw-v1, etcd-member-knownpeers, etcd-h-readyz-linear, dbm-etcd-mixin-insufficient, ver-et35-active-peers, ver-et36-known-peers]
     upstream: { status: partial, note: "mixin etcdInsufficientMembers 用 up == bool 1 對 count(up) 過半" }
     rules: [rules/targets/etcd.yml#EtcdQuorumAtRisk]
 
@@ -260,12 +262,13 @@ signals:
     question: 抓得到的 member 數和 etcd 自己記得的成員數一樣嗎
     signal: >-
       count by (job) (up == 1) 小於 max by (job) (count by (job, Local) (etcd_network_known_peers == 1))。不用另外寫死預期數量：
-      known_peers 由 etcd 的成員表產生（移除的成員設 0）。scrape 設定漏了某台時也會響
+      known_peers 由 etcd 的成員表產生（移除的成員設 0）。scrape 設定漏了某台時也會響。
+      版本：etcd 3.6 以上才有 etcd_network_known_peers，3.4、3.5 上規則回傳空
     metrics: [up, etcd_network_known_peers]
     evaluate_on: self
     evidence: tested
     source: etcd-lab
-    refs: [etcd-exp-raw, etcd-member-knownpeers]
+    refs: [etcd-exp-raw, etcd-member-knownpeers, ver-et35-active-peers, ver-et36-known-peers]
     upstream: { status: partial, note: "mixin etcdMembersDown 看 up 與 peer 送出失敗" }
     rules: [rules/targets/etcd.yml#EtcdMembersNotScraped]
 
@@ -437,12 +440,14 @@ signals:
     question: 請求慢嗎
     signal: >-
       etcd_server_request_duration_seconds（type：Range、ReadonlyTxn、Put、Txn…；basic 就有）p99 > 0.15 秒（例子）。
-      mixin 的 etcdGRPCRequestsSlow 用 grpc_server_handling_seconds，預設 basic 沒有這個 histogram，規則回傳空（實測）
+      mixin 的 etcdGRPCRequestsSlow 用 grpc_server_handling_seconds，預設 basic 沒有這個 histogram，規則回傳空（實測）。
+      版本：etcd_server_request_duration_seconds 3.7 才有；規則 or 上 grpc_server_handling_seconds（unary），3.6 以下要 --metrics=extensive 才有資料，
+      basic 時 3.6 以下這條回傳空
     metrics: [etcd_server_request_duration_seconds_bucket, grpc_server_handling_seconds_bucket]
     evaluate_on: self
     evidence: tested
     source: etcd-lab
-    refs: [etcd-exp-raw, etcd-srv-request-duration, etcd-grpc-histogram-extensive, etcd-mixin-grpcslow]
+    refs: [etcd-exp-raw, etcd-srv-request-duration, etcd-grpc-histogram-extensive, etcd-mixin-grpcslow, ver-et37-request-duration, ver-et-cl37-reqdur, ver-et35-grpc-hist, ver-et36-grpc-hist, ver-et37-metrics-flag]
     upstream: { status: partial, note: "mixin etcdGRPCRequestsSlow 需要 --metrics=extensive" }
     rules: [rules/targets/etcd.yml#EtcdRequestSlow]
 
@@ -482,12 +487,13 @@ signals:
     tier: 3
     question: 有沒有任何機制會發現資料不一致
     signal: >-
-      etcd_server_feature_enabled{name="CompactHashCheck"} == 0（預設關，實測）；InitialCorruptCheck 也預設關。沒開時不會有 CORRUPT alarm
+      etcd_server_feature_enabled{name="CompactHashCheck"} == 0（預設關，實測）；InitialCorruptCheck 也預設關。沒開時不會有 CORRUPT alarm。
+      版本：etcd_server_feature_enabled 3.6 以上才有；3.4、3.5 只能看啟動參數
     metrics: [etcd_server_feature_enabled]
     evaluate_on: self
     evidence: tested
     source: etcd-lab
-    refs: [etcd-exp-raw, etcd-feat-compacthash, etcd-feat-initialcorrupt, etcd-feat-metric]
+    refs: [etcd-exp-raw, etcd-feat-compacthash, etcd-feat-initialcorrupt, etcd-feat-metric, ver-et36-feature]
     upstream: { status: no }
     rules: [rules/targets/etcd.yml#EtcdCorruptionCheckDisabled]
 

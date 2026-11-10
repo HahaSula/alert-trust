@@ -2,7 +2,7 @@
 
 **目標：知道 TiDB 叢集現在能不能執行交易（拿得到 TSO、region 有多數副本），以及哪一層、哪一台離不能還有多遠。**TiDB 叢集有三種 process：PD（排程與 TSO）、TiKV（儲存）、TiDB server（SQL），各自在 status port 提供 `/metrics`，沒有 exporter。三種元件的「健康端點」都不看自己能不能服務，所以 `up` 加上 `/status` 都還不夠。這頁依九個面向從大到小排列：叢集 → 可用性 → 複寫 → 資源 → 工作量 → 維護 → 保護 → 容量，最前面是監測自檢。
 
-依據是 TiDB、TiKV、PD v8.5.8 的原始碼（PD 內嵌 etcd v3.5.15），加上一組小實驗：PD ×3、TiKV ×3、TiDB ×1，停 TiKV、讓 PD leader 抓不到、停 PD leader、停兩台 PD 失去 quorum，並稽核官方規則<span class="at-chip at-ev-tested">實測</span>[^tidb-exp]。`gh api .../releases/latest` 回的是 v7.5.8（最後發布的 LTS 修補版），版本號最高的穩定版是 v8.5.8，以它為準。這台機器的 Docker 容器時鐘比牆鐘慢約 30%，牆鐘還會被 WSL 往回調；秒數以主機時鐘量的 SQL、HTTP 耗時為準，Prometheus 內的時間只當參考。訊號與規則在[元件卡](../components/tidb.md)，原始碼位置在[附錄](tidb-appendix.md)，機制在[分散式 SQL 架構](../architecture/db-distsql.md)與[共識（Raft）架構](../architecture/db-raft.md#tikv)。
+依據是 TiDB、TiKV、PD v8.5.8 的原始碼（PD 內嵌 etcd v3.5.15），加上一組小實驗：PD ×3、TiKV ×3、TiDB ×1，停 TiKV、讓 PD leader 抓不到、停 PD leader、停兩台 PD 失去 quorum，並稽核官方規則<span class="at-chip at-ev-tested">實測</span>[^tidb-exp]。`gh api .../releases/latest` 回的是 v7.5.8（最後發布的 LTS 修補版），版本號最高的穩定版是 v8.5.8，以它為準。這台機器的 Docker 容器時鐘比牆鐘慢約 30%，牆鐘還會被 WSL 往回調；秒數以主機時鐘量的 SQL、HTTP 耗時為準，Prometheus 內的時間只當參考。訊號與規則在[元件卡](../components/tidb.md)，原始碼位置在[附錄](tidb-appendix.md)，機制在[分散式 SQL 架構](../architecture/db-distsql.md)與[共識（Raft）架構](../architecture/db-raft.md#tikv)。7.5、8.1、8.5 之間的 metric 與官方規則差異見 [TiDB 各版本的監控差異](versions/tidb.md)。
 
 ## 先講結論
 
@@ -143,6 +143,8 @@ TiKV 的複寫是每個 Region 一組 Raft（見[共識架構](../architecture/d
 | compaction 待處理量 | `tikv_engine_pending_compaction_bytes{db="kv"}` / `tikv_config_rocksdb{name="soft_pending_compaction_bytes_limit"}` > 0.5（例子，TiKVPendingCompactionNearSoftLimit）；flow control 開著時 CF 的值不超過 flow control 的 soft limit | <span class="at-chip at-ev-code">讀碼</span>[^res-tikv-pending-compaction][^res-tikv-soft-pending-clamp] |
 | CPU quota | `rate(process_cpu_seconds_total[5m])` / `tikv_server_cpu_cores_quota` > 0.8（官方門檻，TiKVCPUNearQuota）；TiKV 的 CPU counter 是整數秒 | <span class="at-chip at-ev-code">讀碼</span>[^res-tikv-cpu-quota-cgroup][^res-tikv-process-cpu-int][^res-tikv-rule-cpu-quota] |
 | FSM mailbox 滿 | `rate(tikv_channel_full_total[10m])` > 0（同官方，TiKVChannelFull）；第一次發生前 metric 不存在 | <span class="at-chip at-ev-code">讀碼</span>[^res-tikv-channel-full-normal][^res-tikv-rule-channel-full] |
+
+**版本。**記憶體 quota metric（`tidb_server_memory_quota_bytes`、`tikv_server_memory_quota_bytes`）8.1 才有，TiDBComponentMemoryNearQuota 在 7.5 回傳空；7.5 只有 CPU quota，記憶體改對 cgroup 上限[^ver-ti-tidb81-memquota][^ver-ti-tikv81-memquota][^ver-ti-tikv75-cpuquota]。
 
 **慢磁碟、write stall、熱點沒有實驗。**這台機器做不了輕量的慢磁碟或寫入壓力；這一節的門檻取自官方規則。熱點 region（PD 的 `pd_hotspot_*`）沒有做成規則，用 ServerIsBusy 與 raftstore 延遲當下游訊號。
 

@@ -65,12 +65,13 @@ groups:
             and on (job, instance) ClickHouseMetrics_ReadonlyReplica
             and on (job, instance) ClickHouseProfileEvents_RejectedInserts
             and on (job, instance) ClickHouseErrorMetric_ALL
-            and on (job, instance) group by (job, instance) (ClickHouseAsyncMetrics_DiskAvailable)
+            and on (job, instance) group by (job, instance) ({__name__=~"ClickHouseAsyncMetrics_DiskAvailable(_.+)?"})
           )
         for: 10m
         labels: { severity: warning, component: clickhouse, tier: "1", aspect: exporter }
         annotations:
-          summary: "{{ $labels.instance }} 的 /metrics 少了一組 metric（<prometheus> 的 asynchronous_metrics／metrics／events／errors 子項被關，或 asynchronous_metrics_key_values_mode 改成 legacy_names 讓 DiskAvailable 變成 DiskAvailable_default）；依賴它們的規則回傳空"
+          summary: "{{ $labels.instance }} 的 /metrics 少了一組 metric（<prometheus> 的 asynchronous_metrics／metrics／events／errors 子項被關）；依賴它們的規則回傳空"
+          description: "DiskAvailable 兩種名稱都接受：26.8 起是 DiskAvailable{disk}，26.3 以前（或 asynchronous_metrics_key_values_mode 改成 legacy_names）是 DiskAvailable_<disk>"
           runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#metric-families-present
       - alert: CHKeeperMetricFamiliesMissing
         expr: |
@@ -217,6 +218,7 @@ groups:
         labels: { severity: critical, component: clickhouse, tier: "1", aspect: cluster }
         annotations:
           summary: "{{ $labels.instance }} 5 分鐘內有 Keeper session 過期或 Keeper 網路錯誤；Replicated 表唯讀、ON CLUSTER DDL 與複寫停止。ZooKeeperSession 在 session 過期時仍是 1，ZooKeeperSessionExpired 恢復後也不歸零，所以用變化量"
+          description: "ZooKeeperSessionExpired 26.3 以上才有；25.x 只剩 ZooKeeperHardwareExceptions 這半，session 過期改看 query-exporter 的 chq_replica_session_expired"
           runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#keeper-session
       - alert: CHKeeperRequestsBacklog
         expr: ClickHouseMetrics_KeeperOutstandingRequests{job="clickhouse-keeper"} > 10
@@ -459,18 +461,31 @@ groups:
     rules:
       - alert: CHDiskSpaceLow
         expr: |
-          ClickHouseAsyncMetrics_DiskAvailable{job="clickhouse-server"}
-          / on (job, instance, disk) (ClickHouseAsyncMetrics_DiskTotal{job="clickhouse-server"} < 1e18) < 0.1
+          (
+              ClickHouseAsyncMetrics_DiskAvailable{job="clickhouse-server"}
+              / on (job, instance, disk) (ClickHouseAsyncMetrics_DiskTotal{job="clickhouse-server"} < 1e18)
+            or
+              label_replace({__name__=~"ClickHouseAsyncMetrics_DiskAvailable_.+", job="clickhouse-server"}, "disk", "$1", "__name__", "ClickHouseAsyncMetrics_DiskAvailable_(.+)")
+              / on (job, instance, disk)
+              (label_replace({__name__=~"ClickHouseAsyncMetrics_DiskTotal_.+", job="clickhouse-server"}, "disk", "$1", "__name__", "ClickHouseAsyncMetrics_DiskTotal_(.+)") < 1e18)
+          ) < 0.1
         for: 10m
         labels: { severity: critical, component: clickhouse, tier: "1", aspect: capacity }
         annotations:
           summary: "{{ $labels.instance }} 的 disk {{ $labels.disk }} 只剩 {{ $value | humanizePercentage }}（例子：10%）；merge 要預留空間，空間不夠時 merge 停、part 數上升"
+          description: "26.8 起名稱是 DiskAvailable{disk}；26.3 以前是每顆磁碟一個名稱 DiskAvailable_<disk>，由 or 後半用 label_replace 把磁碟名稱轉成 disk label"
           runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#disk-space
           absence_covered_by: CHMetricFamiliesMissing
       - alert: CHDiskFillingUp
-        expr: predict_linear(ClickHouseAsyncMetrics_DiskAvailable{job="clickhouse-server"}[6h], 86400) < 0
+        expr: |
+          (
+              predict_linear(ClickHouseAsyncMetrics_DiskAvailable{job="clickhouse-server"}[6h], 86400)
+            or
+              predict_linear(label_replace({__name__=~"ClickHouseAsyncMetrics_DiskAvailable_.+", job="clickhouse-server"}, "disk", "$1", "__name__", "ClickHouseAsyncMetrics_DiskAvailable_(.+)")[6h:5m], 86400)
+          ) < 0
         for: 30m
         labels: { severity: warning, component: clickhouse, tier: "2", aspect: capacity }
         annotations:
           summary: "{{ $labels.instance }} 的 disk {{ $labels.disk }} 照過去 6 小時的速度一天內會滿"
+          description: "26.3 以前的 DiskAvailable_<disk> 名稱各自不同，先 label_replace 成 disk label 再算，所以用 5m 解析度的 subquery（predict_linear 會去掉名稱，直接對多個名稱算會撞 label）"
           runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#disk-space

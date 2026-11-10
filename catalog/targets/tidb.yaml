@@ -5,7 +5,7 @@ model: native
 family: database
 status: draft
 stages: [source]
-versions_checked: ["TiDB v8.5.8", "TiKV v8.5.8", "PD v8.5.8（內嵌 etcd v3.5.15）"]
+versions_checked: ["TiDB v8.5.8", "TiKV v8.5.8", "PD v8.5.8（內嵌 etcd v3.5.15）", "TiDB／TiKV／PD v7.5.8、v8.1.2（版本差異頁，只讀碼）"]
 architecture: architecture/db-distsql.md
 role: >-
   TiDB 叢集有三種 process，各自在 status port 提供 /metrics：PD（client port 2379，含內嵌 etcd 的 etcd_* metric）、TiKV（20180）、TiDB server（10080）。
@@ -349,12 +349,13 @@ signals:
     signal: >-
       process_resident_memory_bytes / tikv_server_memory_quota_bytes（或 tidb_server_memory_quota_bytes）> 0.8（官方門檻）。TiDB 超過 tidb_server_memory_limit（預設 80%）時
       取消最耗記憶體的 SQL，只寫 log、沒有計數 metric；單條 SQL 超過 tidb_mem_quota_query（1GB）時依 tidb_mem_oom_action（CANCEL）。
-      lab：TiKV 映像未去 debug info 時 RSS 貼著 1GB 上限（啟動時解壓 debug info）
+      lab：TiKV 映像未去 debug info 時 RSS 貼著 1GB 上限（啟動時解壓 debug info）。
+      版本：quota metric 8.1 以上才有（tidb_server_memory_quota_bytes、tikv_server_memory_quota_bytes），7.5 上規則回傳空；7.5 改用 cgroup 上限
     metrics: [process_resident_memory_bytes, tikv_server_memory_quota_bytes, tidb_server_memory_quota_bytes]
     evaluate_on: self
     evidence: tested
     source: tidb-lab
-    refs: [tidb-exp-heap, tidb-exp-raw, tikv-m-memquota, tidb-m-memquota, tidb-var-memlimit, tidb-var-oom-action, tidb-memlimit-kill, tikv-rule-memquota, tidb-rule-memquota]
+    refs: [tidb-exp-heap, tidb-exp-raw, tikv-m-memquota, tidb-m-memquota, tidb-var-memlimit, tidb-var-oom-action, tidb-memlimit-kill, tikv-rule-memquota, tidb-rule-memquota, ver-ti-tidb81-memquota, ver-ti-tikv81-memquota, ver-ti-tikv75-cpuquota]
     upstream: { status: yes, note: "TiKV_memory_quota、TiDB_memory_quota（job 寫死）" }
     rules: [rules/targets/tidb.yml#TiDBComponentMemoryNearQuota]
 
