@@ -79,6 +79,7 @@
 - Alertmanager 的長週期例子用 `group_interval` 1h、失敗告警視窗 `[2h]`。
 - Plugin 以 repo 根目錄為來源，skill 才能讀目錄（代價是安裝時帶著 `lab/` 與 `docs/`）。
 - 卡片依 `family` 分組（prometheus、victoriametrics、shared、database）；target 卡的訊號依 9 個 `aspect` 分組：exporter、availability、workload、saturation、replication、cluster、maintenance、protection、capacity。不適用的面向要寫 `not_applicable_aspects` 並附 why 與 refs（例如 PostgreSQL 核心沒有共識機制）。
+- MySQL 與 MariaDB 拆成兩張卡（使用者選擇，2026-11-10）：兩者原始碼不同，各自盤查；版本差異都從原始碼出發。
 - 檢查使用者的 rule 檔時，一律先確認監控體系、每個 metric 的來源（不假定）、基礎設施覆蓋，最後才看時間契約（`rule-review`）。
 - 網站每個分頁只放一種內容：開始使用、監控鏈（只有元件卡，依 alert 鏈順序）、資料庫（總覽＋每個 DB 的怎麼監控／監控訊號／深入頁／原始碼到 metric）、原理（契約、名詞、內部架構、來源）、實驗報告。頁內面向從大到小；深入頁先寫「要監控什麼」再寫工具與缺口。每張 target 卡必須列出 `blind_spots`（exporter 沒輸出／資料庫沒提供／要靠其他元件），資料庫總覽頁由卡片自動產生。
 - 實驗數據不準時改用原始碼佐證。

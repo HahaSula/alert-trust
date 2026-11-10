@@ -141,7 +141,16 @@
 | `--query-offset` | 全域 `rule_query_offset` | — |
 | `--k` | 步驟 8 的最長連續失敗，至少 1 | — |
 
-目前工具還不檢查 τ 與 exporter 的期限（`exporter-deadline`），要另外對照[Exporter 怎麼用這個期限](#defaults)。
+工具還會做這些檢查與調整：
+
+| 項目 | 做法 |
+|---|---|
+| `scrape_timeout` 與 exporter 期限 | `τ < S`、exporter 期限 `X < τ`。exporter 期限沒給時，依 metric 前綴或 `--job-exporter` 用[預設值](#defaults)（redis_exporter 15s、postgres_exporter 1m 不讀 header；mysqld_exporter τ − 0.25s、mongodb_exporter τ − 1s、blackbox τ − 0.5s） |
+| vmagent 截斷 | `--config-kind vmagent`（`--stack vmalert` 時預設）：`τ > S` 時以有效值 `min(τ, S)` 計算截斷與期限，並列出設定值與有效值 |
+| 不知道 d | 用有效 τ（不知道 τ 時用 S），寫在假設裡 |
+| `--baseline` 的下限 | τ ≥ 2s、X ≥ 1s；`d_max` 等於 τ 時標「被截斷」；vmalert 用 `I = max(S, dedup)` 與 `(n+k)·I + max(0, L − D)` |
+| dedup | `-dedup.minScrapeInterval` 大於 S 時，縮短 `scrape_interval` 沒有用，改建議降低 dedup |
+| 版本 | `--prom-version` 低於 2.53 時不建議 `query_offset`；低於 3.x 時不建議 `anchored` |
 
 [^bl-rp-scrape-interval]: 社群：[Robust Perception：Keep it simple, scrape_interval id（Brian Brazil，2017-12-25）](https://www.robustperception.io/keep-it-simple-scrape_interval-id/)
 [^bl-rp-rate-range]: 社群：[Robust Perception：What range should I use with rate()?（Brian Brazil，2019-08-12）](https://www.robustperception.io/what-range-should-i-use-with-rate/)
