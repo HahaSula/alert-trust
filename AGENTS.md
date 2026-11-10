@@ -51,7 +51,7 @@ docker run --rm -u $(id -u):$(id -g) -v "$PWD":/docs squidfunk/mkdocs-material:9
 1. **確認監控體系**：評估這些 rule 的是 Prometheus 還是 vmalert（版本）、資料從哪裡來、有沒有外部觀察者、告警走哪台 Alertmanager。能從檔案判斷就判斷，否則問。寫成 `env/<name>.yaml`。
 2. **每個 metric 的來源**：**不要假定。**使用者給了 Prometheus config 就一定要讀：`python3 tools/check_metric_sources.py --rules <rule 檔...> --config prometheus.yml --out report`。來源只能是 config 的 scrape job、live 快照（`collect.py` 的 `metric_jobs.json`，用 `--live`）或使用者的回答（`--answers env/<name>.sources.yaml`）；目錄卡片只是提示。報告最後的問題逐題問使用者。job 對不上、被 `metric_relabel_configs` 丟掉的 rule 永遠不會響，先回報。
 3. **監控基礎設施的覆蓋**：`python3 tools/rules_to_snapshot.py --out snapshot --ruler <id> <rule 檔...>`，再 `python3 tools/check_coverage.py --env env/<name>.yaml --snapshot snapshot --out report`。先回報第 1 級缺口，例如 scrape 耗時、rule group 跑不完或停止評估、WAL 寫入失敗、送不到 Alertmanager、Watchdog。
-4. **每條 rule 的時間契約**：`python3 tools/fit_contracts.py --rules <rule 檔...> --stack prometheus|vmalert --scrape-interval <S> --scrape-duration <d> --eval-interval <E> --out report`。不合規格時不要只列 FAIL：先說目前規格哪裡不合，列出在目前規格下合格的 rule，再給兩個方向——方案 A 改 rule（最短合格視窗），方案 B 改環境（`scrape_interval` 至多多少、或加 `query_offset`），附代價，讓使用者選。
+4. **每條 rule 的時間契約**：`python3 tools/fit_contracts.py --rules <rule 檔...> --stack prometheus|vmalert --scrape-interval <S> --scrape-duration <d> --eval-interval <E> --out report`。使用者還沒有基準值時先用 `--baseline` 依量到的耗時推出 S、τ、exporter 期限、E、k（`docs/tools/baseline.md`）。不合規格時不要只列 FAIL：先說目前規格哪裡不合，列出在目前規格下合格的 rule，再給兩個方向——方案 A 改 rule（最短合格視窗），方案 B 改環境（`scrape_interval` 至多多少、或加 `query_offset`），附代價，讓使用者選。
 5. **寫法問題**：presence lint、group 擺放。
 
 完整步驟在 `skills/rule-review/SKILL.md`。

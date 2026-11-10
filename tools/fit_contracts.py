@@ -10,7 +10,8 @@
       --scrape-interval 30s --eval-interval 1m --latency 40s --eval-delay 30s --out report
 
 The report answers, in this order (the order a reviewer needs):
-  1. Does the environment itself meet the contracts? (d <= S, T <= E, lookback)  If not: 目前規格不合.
+  1. Does the environment itself meet the contracts? (d <= S, τ < S, X < τ, durations not cut off by τ,
+     p99 <= 0.8τ, E >= S, T <= E, lookback)  If not: 目前規格不合.
   2. Which rules are valid under the current environment.
   3. For each rule that is not: option A, rewrite the rule (smallest window that fits the current
      environment), and option B, keep the rule and change the environment (largest scrape_interval,
@@ -21,6 +22,9 @@ Contracts (docs/contracts.md): Prometheus range-window R >= (2+k)·I + d, or R >
 offset (query_offset + selector offset) >= d; I = S when d <= S, else ceil(d/S)·S. vmalert
 vm-range-window R >= I + L - D. A rule reading a recording rule gets I = that group's interval, d = 0
 (approximation; say so in the review). Numbers you were not given are reported as assumptions.
+
+--baseline prints suggested S, τ, exporter deadline X, E, k and R_min per job from measured
+d_p99 / d_max / failure runs (procedure in docs/tools/baseline.md); --rules is optional then.
 """
 from __future__ import annotations
 
@@ -91,10 +95,16 @@ def eff_interval(S: float, d: float) -> float:
     return S if d <= S else math.ceil(d / S) * S
 
 
-def need_window(a, I: float, d: float, offset: float) -> float:
+def k_for(a, job) -> int:
+    """Tolerated missed scrapes: --k, raised to the longest failure run seen for that job."""
+    return max(a.k, int(a.job_failrun.get(job, 0)))
+
+
+def need_window(a, I: float, d: float, offset: float, k: int | None = None) -> float:
     if a.stack == "vmalert":
         return I + a.latency - a.eval_delay
-    return (2 + a.k) * I + (0 if offset >= d else d)
+    k = a.k if k is None else k
+    return (2 + k) * I + (0 if offset >= d else d)
 
 
 def load(files: list[str]) -> list[tuple[str, dict]]:
@@ -126,6 +136,7 @@ def analyze(a, docs):
                     metric = metric.group(0) if metric else ""
                     R = dur(m.group("r"))
                     off = qoff + (dur(m.group("off")) or 0)
+                    job = None
                     if metric in recorded:
                         S, d, src = recorded[metric], 0.0, f"recording rule（group interval {fmt(recorded[metric])}）"
                     else:
@@ -134,7 +145,10 @@ def analyze(a, docs):
                         d = a.job_duration.get(job, a.d if a.d is not None else S)
                         src = f"job {job}" if job else "預設"
                     I = eff_interval(S, d)
-                    need = need_window(a, I, d, off)
+                    if a.stack == "vmalert" and a.dedup and metric not in recorded:
+                        I = max(I, a.dedup)  # VictoriaMetrics keeps one sample per -dedup.minScrapeInterval
+                    k = k_for(a, job)
+                    need = need_window(a, I, d, off, k)
                     row = {"file": path, "group": g.get("name"), "rule": name, "metric": metric, "R": R, "S": S,
                            "d": d, "I": I, "offset": off, "need": need, "src": src, "ok": R >= need}
                     if not row["ok"]:
@@ -145,8 +159,8 @@ def analyze(a, docs):
                             row["opt_b"] = {"eval_delay": max(0.0, I + a.latency - R),
                                             "scrape_interval": R - a.latency + a.eval_delay}
                         else:
-                            b = {"scrape_interval": (R - d) / (2 + a.k) if R > d else 0.0,
-                                 "scrape_interval_with_offset": R / (2 + a.k), "query_offset": d}
+                            b = {"scrape_interval": (R - d) / (2 + k) if R > d else 0.0,
+                                 "scrape_interval_with_offset": R / (2 + k), "query_offset": d}
                             row["opt_b"] = b
                     rows.append(row)
                 if new_expr != expr:
@@ -162,18 +176,72 @@ def env_checks(a) -> list[tuple[str, bool, str]]:
         jobs[j] = (S, a.job_duration.get(j, a.d if a.d is not None else S))
     for j, d in a.job_duration.items():
         jobs.setdefault(j, (a.job_interval.get(j, a.S), d))
+    for j in set(a.job_timeout) | set(a.exporter_deadline) | set(a.job_p99):
+        jobs.setdefault(j, (a.job_interval.get(j, a.S), a.job_duration.get(j, a.d if a.d is not None else a.job_interval.get(j, a.S))))
     for j, (S, d) in jobs.items():
         who = f"job {j}" if j else "預設"
+        tau = a.job_timeout.get(j, a.timeout)
+        if tau is not None:
+            out.append((f"`scrape_timeout` 小於 `scrape_interval`（{who}）：τ {fmt(tau)} < S {fmt(S)}", tau < S,
+                        "" if tau < S else "Prometheus 會拒絕載入設定；vmagent 會自動截成 S、不報錯。把 τ 設在 S 以下"))
+            if a.d is not None or j in a.job_duration:
+                cut = d >= 0.95 * tau
+                out.append((f"耗時數據沒有被逾時截斷（{who}）：d_max {fmt(d)} < 0.95 × τ", not cut,
+                            "" if not cut else "d_max 幾乎等於 τ，代表有 scrape 逾時，真正的耗時不知道；先看 exporter 自己的耗時 metric，或暫時放寬 τ（仍 < S）再量"))
+            p99 = a.job_p99.get(j, a.p99)
+            if p99 is not None:
+                out.append((f"平常的 scrape 不碰 80% 預警線（{who}）：p99 {fmt(p99)} ≤ 0.8 × τ", p99 <= 0.8 * tau,
+                            "" if p99 <= 0.8 * tau else f"τ 調到 ≥ {fmt(math.ceil(p99 / 0.8))}（仍要 < S），或降低 exporter 耗時"))
+            x = a.exporter_deadline.get(j)
+            if x is not None:
+                out.append((f"exporter 自己的期限小於 τ（{who}）：X {fmt(x)} < τ {fmt(tau)}", x < tau,
+                            "" if x < tau else f"把 exporter 的期限設成 τ − max(1s, 10%) = {fmt(tau - max(1, 0.1 * tau))}；"
+                            "否則 Prometheus 先放棄，`up` 變 0、所有 series 消失，看起來像 exporter 掛了"))
         out.append((f"scrape 在 interval 內完成（{who}）：d {fmt(d)} ≤ S {fmt(S)}", d <= S,
                     "" if d <= S else f"把 `scrape_interval` 調到 ≥ {fmt(nice_up(d))}，或降低 scrape 耗時（exporter 查詢、`scrape_timeout`）"))
         if a.stack == "prometheus":
             I = eff_interval(S, d)
             out.append((f"lookback（{who}）：I + d = {fmt(I + d)} < {fmt(a.lookback)}", I + d < a.lookback,
                         "" if I + d < a.lookback else "沒有 range 的 selector（例如 `up == 0`）會間歇回傳空；縮短 `scrape_interval`"))
+    if a.E < a.S:
+        out.append((f"`evaluation_interval` 不小於 `scrape_interval`：E {fmt(a.E)} ≥ S {fmt(a.S)}", False,
+                    "E < S 時同一批資料被重算，pending 依相位循環；一般取 E = S"))
     if a.T is not None:
         out.append((f"rule group 在 interval 內跑完：T {fmt(a.T)} ≤ E {fmt(a.E)}", a.T <= a.E,
                     "" if a.T <= a.E else f"把貴的 rule 拆到別的 group，或把 group `interval` 調到 ≥ {fmt(nice_up(a.T / 0.8))}"))
     return out
+
+
+STD_INTERVALS = [15, 30, 60, 120, 300]
+
+
+def baseline(a) -> str:
+    """Suggested S / τ / X / E / R_min per job from measured durations (docs/tools/baseline.md, procedure)."""
+    jobs = sorted(set(a.job_duration) | set(a.job_p99) | set(a.job_interval), key=str) or [None]
+    out = ["## 建議的基準值（由量到的耗時推導）\n",
+           "步驟見 [scrape 與 evaluation 的基準值怎麼定](https://hahasula.github.io/alert-trust/tools/baseline/)。"
+           "0.8 是 alert-trust 的預警線，不是官方數字。\n",
+           "| job | 目前 S | d_p99／d_max | 建議 S | τ | exporter 期限 X | E | k | R_min（無 offset） | R_min（`query_offset` = d_max） | lookback |",
+           "|---|---|---|---|---|---|---|---|---|---|---|"]
+    for j in jobs:
+        S0 = a.job_interval.get(j, a.S)
+        dmax = a.job_duration.get(j, a.d)
+        if dmax is None:
+            out.append(f"| {j or '預設'} | {fmt(S0)} | 沒給 | 要先量 d_max | | | | | | | |")
+            continue
+        p99 = a.job_p99.get(j, a.p99) or dmax
+        S = S0 if dmax <= 0.8 * S0 else next((x for x in STD_INTERVALS if dmax <= 0.8 * x), math.ceil(dmax / 0.8))
+        tau = max(math.ceil(dmax / 0.9), math.ceil(p99 / 0.8))  # d_max stays below the 0.95τ cut-off check
+        while tau >= S:
+            S = next((x for x in STD_INTERVALS if x > S), S * 2)
+        X = tau - max(1, 0.1 * tau)
+        k = k_for(a, j)
+        r1, r2 = (2 + k) * S + dmax, (2 + k) * S
+        note = "" if S == S0 else "（調大）"
+        out.append(f"| {j or '預設'} | {fmt(S0)} | {fmt(p99)}／{fmt(dmax)} | {fmt(S)}{note} | {fmt(tau)} | {fmt(X)} | {fmt(S)} | {k} "
+                   f"| {fmt(r1)} → `[{fmt(nice_up(r1))}]` | {fmt(r2)} → `[{fmt(nice_up(r2))}]` | {fmt(S + dmax)} {'< 5m' if S + dmax < a.lookback else '**≥ 5m**'} |")
+    out.append("\n讀多個 job 的 rule group，E 取這些 S 的最大值；再量 T，確認 `T ≤ 0.8 E`。")
+    return "\n".join(out) + "\n"
 
 
 def report(a, rows, checks, assumptions) -> str:
@@ -242,7 +310,7 @@ def report(a, rows, checks, assumptions) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--rules", nargs="+", required=True)
+    ap.add_argument("--rules", nargs="+", default=[], help="rule 檔；只要 --baseline 時可省略")
     ap.add_argument("--stack", choices=["prometheus", "vmalert"], required=True)
     ap.add_argument("--scrape-interval", required=True, help="S：預設的 scrape_interval")
     ap.add_argument("--scrape-duration", help="d：尖峰 scrape 耗時（scrape_duration_seconds）；沒給就假設 d = S")
@@ -250,11 +318,19 @@ def main() -> int:
     ap.add_argument("--job-duration", action="append", default=[], help="job=d，個別 job 的尖峰 scrape 耗時")
     ap.add_argument("--eval-interval", required=True, help="E：evaluation_interval（group 沒寫 interval 時）")
     ap.add_argument("--group-duration", help="T：尖峰 rule group 耗時")
+    ap.add_argument("--scrape-timeout", help="τ：預設的 scrape_timeout")
+    ap.add_argument("--job-timeout", action="append", default=[], help="job=τ")
+    ap.add_argument("--scrape-p99", help="平常的 scrape 耗時（p99）")
+    ap.add_argument("--job-p99", action="append", default=[], help="job=p99")
+    ap.add_argument("--exporter-deadline", action="append", default=[], help="job=X，exporter 自己的查詢期限")
+    ap.add_argument("--job-failrun", action="append", default=[], help="job=N，觀察到的最長連續失敗次數（k 至少取這個）")
+    ap.add_argument("--baseline", action="store_true", help="依量到的耗時輸出建議的 S、τ、X、E、R_min")
     ap.add_argument("--query-offset", default="0s", help="O：全域 rule_query_offset（Prometheus）")
     ap.add_argument("--k", type=int, default=1, help="容忍漏掉幾次 scrape（建議至少 1）")
     ap.add_argument("--lookback", default="5m")
     ap.add_argument("--latency", default="0s", help="L：資料延遲（vmalert）")
     ap.add_argument("--eval-delay", default="30s", help="D：-rule.evalDelay（vmalert，預設 30s）")
+    ap.add_argument("--dedup-interval", help="VictoriaMetrics 的 -dedup.minScrapeInterval；大於 S 時實際間隔用它")
     ap.add_argument("--out", required=True)
     ap.add_argument("--write-fitted", help="把方案 A 改好的 rule 寫到這個檔（不動原檔；註解不會保留）")
     a = ap.parse_args()
@@ -262,6 +338,11 @@ def main() -> int:
     a.S, a.d, a.E, a.O = dur(a.scrape_interval), dur(a.scrape_duration), dur(a.eval_interval), dur(a.query_offset)
     a.T, a.lookback, a.latency, a.eval_delay = dur(a.group_duration), dur(a.lookback), dur(a.latency), dur(a.eval_delay)
     a.job_interval, a.job_duration = kv(a.job_interval), kv(a.job_duration)
+    a.timeout, a.p99, a.dedup = dur(a.scrape_timeout), dur(a.scrape_p99), dur(a.dedup_interval)
+    a.job_timeout, a.job_p99, a.exporter_deadline = kv(a.job_timeout), kv(a.job_p99), kv(a.exporter_deadline)
+    a.job_failrun = {k: int(v) for k, _, v in (x.partition("=") for x in a.job_failrun)}
+    if not a.rules and not a.baseline:
+        ap.error("要給 --rules，或用 --baseline")
     if a.d is None:
         assumptions.append(f"尖峰 scrape 耗時 d 沒給，用最壞情況 d = S（{fmt(a.S)}）")
     if a.T is None:
@@ -272,7 +353,9 @@ def main() -> int:
     checks = env_checks(a)
     os.makedirs(a.out, exist_ok=True)
     with open(os.path.join(a.out, "contracts-fit.md"), "w", encoding="utf-8") as f:
-        f.write(report(a, rows, checks, assumptions))
+        f.write(report(a, rows, checks, assumptions) if a.rules else "# 基準值\n")
+        if a.baseline:
+            f.write("\n" + baseline(a))
     if a.write_fitted:
         groups = [g for _, doc in fitted for g in doc.get("groups", []) or []]
         with open(a.write_fitted, "w", encoding="utf-8") as f:

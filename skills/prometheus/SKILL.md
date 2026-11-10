@@ -76,7 +76,8 @@ argument-hint: "[snapshot-dir] [component-id]"
 | `E` | `rules.json` group 的 `interval`；`T` 是 `group_duration_peak` |
 | `R`、`O`、`F` | 從 `rules.json` 的 `query` 讀 range 與 `offset`；group `queryOffset` 或 `config.json` 的 `rule_query_offset`；`duration` |
 | rule 用到哪些 job | `metric_jobs.json` |
-| `k` | 問使用者，建議至少 1 |
+| `k` | 最長連續失敗次數，至少 1：`sum_over_time((up{job="<job>"} == bool 0)[7d:<S>])` 算次數，連續幾次看 `up` 的圖；沒有資料就問使用者 |
+| `τ`、p99 | `targets.json` 的 `scrapeTimeout`；`quantile_over_time(0.99, scrape_duration_seconds{job="<job>"}[7d])`。`scrape_timeout_seconds` 要設 `extra_scrape_metrics: true` 才有 |
 
 **Prometheus 的視窗契約：**沒有 offset 時 `R ≥ (2+k)·I + d`；`O ≥ d` 時 `R ≥ (2+k)·I`。違反時 `rate` 回傳空、pending 被刪、`for` 歸零，**不報錯**。逐條算邊際，附在報告的邊際總表。
 

@@ -57,6 +57,7 @@ nav:
   - 開始使用:
       - 共同模型與檢查流程: model.md
       - 檢查 rule 檔: tools/rule-review.md
+      - scrape 與 evaluation 的基準值: tools/baseline.md
       - 契約計算器: tools/calculator.md
       - 參與與擴充: contributing.md
   - 監控鏈:

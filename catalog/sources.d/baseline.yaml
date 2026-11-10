@@ -1,0 +1,72 @@
+# 「scrape 與 evaluation 的基準值怎麼定」（docs/tools/baseline.md）用到的文件與社群來源。key 一律以 bl- 開頭。
+# 原始碼行號在 catalog/refs.d/baseline.yaml。
+sources:
+  bl-prom-config-doc:
+    title: Prometheus configuration（global scrape_interval、scrape_timeout、evaluation_interval、rule_query_offset、extra_scrape_metrics）
+    kind: upstream-doc
+    visibility: public
+    url: https://github.com/prometheus/prometheus/blob/v3.16.0/docs/configuration/configuration.md
+    checked: "2026-11-10, v3.16.0"
+  bl-prom-staleness-doc:
+    title: Prometheus querying basics：Staleness（lookback 5 分鐘）
+    kind: upstream-doc
+    visibility: public
+    url: https://github.com/prometheus/prometheus/blob/v3.16.0/docs/querying/basics.md
+    checked: "2026-11-10, v3.16.0"
+  bl-prom-storage-doc:
+    title: Prometheus storage：每個 sample 1–2 bytes、降低 ingest 量的兩個方法
+    kind: upstream-doc
+    visibility: public
+    url: https://github.com/prometheus/prometheus/blob/v3.16.0/docs/storage.md
+    checked: "2026-11-10, v3.16.0"
+  bl-vmagent-doc:
+    title: vmagent 文件（random offset、scrape_timeout_seconds 的 80% 查詢、dedup 要等於 scrape_interval）
+    kind: upstream-doc
+    visibility: public
+    url: https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/docs/victoriametrics/vmagent.md
+    checked: "2026-11-10, v1.155.0"
+  bl-vmalert-doc:
+    title: vmalert 文件：Flapping alerts（lookbehind 視窗至少 2 × scrape_interval）
+    kind: upstream-doc
+    visibility: public
+    url: https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/docs/victoriametrics/vmalert.md
+    checked: "2026-11-10, v1.155.0"
+  bl-operator-types:
+    title: prometheus-operator Prometheus CRD（scrapeInterval、evaluationInterval 預設 30s）
+    kind: upstream-code
+    visibility: public
+    url: https://github.com/prometheus-operator/prometheus-operator/blob/v0.95.1/pkg/apis/monitoring/v1/prometheus_types.go
+    checked: "2026-11-10, v0.95.1"
+  bl-grafana-rate-interval:
+    title: Grafana Prometheus data source：$__rate_interval 的計算方式
+    kind: upstream-doc
+    visibility: public
+    url: https://github.com/grafana/grafana/blob/v13.3.0/docs/sources/datasources/prometheus/template-variables/_index.md
+    checked: "2026-11-10, v13.3.0"
+  bl-grafana-cloud-dpm:
+    title: Grafana Cloud：Adjust data points per minute（Alloy 預設 60s、建議 60s）
+    kind: upstream-doc
+    visibility: public
+    url: https://grafana.com/docs/grafana-cloud/cost-management-and-billing/analyze-costs/reduce-costs/metrics-costs/adjust-data-points-per-minute/
+    checked: "2026-11-10, 線上文件（無版本）"
+  bl-rp-scrape-interval:
+    title: "Robust Perception：Keep it simple, scrape_interval id（Brian Brazil，2017-12-25）"
+    kind: community-doc
+    visibility: public
+    url: https://www.robustperception.io/keep-it-simple-scrape_interval-id/
+    checked: "2026-11-10"
+    note: "社群：10–60s、全組織一個 interval；慢 exporter 另一個 interval，不超過 2m"
+  bl-rp-rate-range:
+    title: "Robust Perception：What range should I use with rate()?（Brian Brazil，2019-08-12）"
+    kind: community-doc
+    visibility: public
+    url: https://www.robustperception.io/what-range-should-i-use-with-rate/
+    checked: "2026-11-10"
+    note: "社群：range 至少 4 × scrape_interval，容忍 1 次失敗的 scrape"
+  bl-sre-workbook:
+    title: "Google SRE Workbook：Alerting on SLOs（multiwindow, multi-burn-rate）"
+    kind: community-doc
+    visibility: public
+    url: https://sre.google/workbook/alerting-on-slos/
+    checked: "2026-11-10"
+    note: "表 5-8：1h／5m、6h／30m、3d／6h；短視窗約為長視窗的 1/12"

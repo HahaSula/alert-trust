@@ -68,6 +68,7 @@ VM 的 `peaks.json` 只有在各元件的 `/metrics` 有被抓進這個 VM 時�
 
 ## 2. Log rule `L ≤ D`
 
+> vmagent 的 `scrape_timeout` 大於 `scrape_interval` 時會**自動截成 S、不報錯**（Prometheus 會拒絕載入）；多台 vmagent 時 `-dedup.minScrapeInterval` 必須等於 `scrape_interval`，`-dedup.minScrapeInterval` 大於某個 job 的 S 時，那個 job 的實際間隔變成 dedup 的值，算視窗要用它（`fit_contracts.py --dedup-interval`）。見 `$AT/docs/tools/baseline.md`。
 > 不合格時不要只列 FAIL：用 `$AT/tools/fit_contracts.py` 給出「目前規格哪裡不合 → 目前合格的 rule → 方案 A 改 rule／方案 B 改環境」，格式見 `$AT/skills/rule-review/SKILL.md` 第 4 步。
 
 `rules.json` 裡 `type: vlogs` 的 group：

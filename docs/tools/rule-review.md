@@ -45,6 +45,8 @@ python3 tools/fit_contracts.py --rules my-rules/*.yml --stack prometheus \
 
 第 4 步的公式見[信任契約](../contracts.md)，也可以用[契約計算器](calculator.md)手動代入數字。
 
+還沒有基準值（不知道 `scrape_interval`、`scrape_timeout` 該設多少）時，先看 [scrape 與 evaluation 的基準值怎麼定](baseline.md)，再用 `fit_contracts.py --baseline` 由量到的耗時推出建議值。
+
 ## 第 4 步：不合規格時給兩個方向
 
 `fit_contracts.py` 的報告不是只列 FAIL，而是照這個順序：

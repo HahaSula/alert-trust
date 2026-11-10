@@ -1,0 +1,325 @@
+# 「scrape 與 evaluation 的基準值怎麼定」（docs/tools/baseline.md）引用的原始碼與上游文件。
+# 每筆都在 tag 上用關鍵字核對過行號（2026-11-10）。key 一律以 bl- 開頭。
+refs:
+  bl-p3-default-interval:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "config/config.go"
+    line: 175
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/config/config.go#L175"
+  bl-p3-default-timeout:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "config/config.go"
+    line: 176
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/config/config.go#L176"
+  bl-p3-default-eval:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "config/config.go"
+    line: 177
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/config/config.go#L177"
+  bl-p3-default-query-offset:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "config/config.go"
+    line: 178
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/config/config.go#L178"
+  bl-p3-global-timeout-check:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "config/config.go"
+    line: 685
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/config/config.go#L685"
+  bl-p3-global-timeout-min:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "config/config.go"
+    line: 688
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/config/config.go#L688"
+  bl-p3-job-timeout-check:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "config/config.go"
+    line: 945
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/config/config.go#L945"
+  bl-p3-job-timeout-min:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "config/config.go"
+    line: 948
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/config/config.go#L948"
+  bl-p3-lookback-flag:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "cmd/prometheus/main.go"
+    line: 647
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/cmd/prometheus/main.go#L647"
+  bl-p3-offset-hash:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "scrape/target.go"
+    line: 185
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/scrape/target.go#L185"
+  bl-p3-timeout-header:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "scrape/scrape.go"
+    line: 833
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/scrape/scrape.go#L833"
+  bl-p3-scrape-ctx:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "scrape/scrape.go"
+    line: 1566
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/scrape/scrape.go#L1566"
+  bl-p3-failed-stale:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "scrape/scrape.go"
+    line: 1611
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/scrape/scrape.go#L1611"
+  bl-p3-up-health:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "scrape/scrape.go"
+    line: 2298
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/scrape/scrape.go#L2298"
+  bl-p3-group-default-itv:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "rules/manager.go"
+    line: 387
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/rules/manager.go#L387"
+  bl-p3-group-query-offset:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "rules/group.go"
+    line: 710
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/rules/group.go#L710"
+  bl-p3-doc-timeout-le:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "docs/configuration/configuration.md"
+    line: 60
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/docs/configuration/configuration.md#L60"
+  bl-p3-doc-extra-metrics:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "docs/configuration/configuration.md"
+    line: 229
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/docs/configuration/configuration.md#L229"
+  bl-p3-doc-query-offset:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "docs/configuration/configuration.md"
+    line: 83
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/docs/configuration/configuration.md#L83"
+  bl-p3-doc-staleness:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "docs/querying/basics.md"
+    line: 564
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/docs/querying/basics.md#L564"
+  bl-p3-doc-bytes-sample:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "docs/storage.md"
+    line: 110
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/docs/storage.md#L110"
+  bl-p3-doc-reduce-series:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "docs/storage.md"
+    line: 119
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/docs/storage.md#L119"
+  bl-p3-example-15s:
+    kind: code
+    project: "Prometheus"
+    version: "v3.16.0"
+    file: "documentation/examples/prometheus.yml"
+    line: 3
+    url: "https://github.com/prometheus/prometheus/blob/v3.16.0/documentation/examples/prometheus.yml#L3"
+  bl-vmag-default-timeout:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "lib/promscrape/config.go"
+    line: 1424
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/lib/promscrape/config.go#L1424"
+  bl-vmag-timeout-clamp:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "lib/promscrape/config.go"
+    line: 932
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/lib/promscrape/config.go#L932"
+  bl-vmag-maxscrapesize:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "lib/promscrape/config.go"
+    line: 89
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/lib/promscrape/config.go#L89"
+  bl-vmag-timeout-header:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "lib/promscrape/client.go"
+    line: 151
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/lib/promscrape/client.go#L151"
+  bl-vm-dedup-flag:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmstorage/main.go"
+    line: 57
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmstorage/main.go#L57"
+  bl-vm-doc-dedup-vmagent:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "docs/victoriametrics/vmagent.md"
+    line: 963
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/docs/victoriametrics/vmagent.md#L963"
+  bl-vm-doc-dedup:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "docs/victoriametrics/README.md"
+    line: 1384
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/docs/victoriametrics/README.md#L1384"
+  bl-vm-doc-timeout-ratio:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "docs/victoriametrics/vmagent.md"
+    line: 753
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/docs/victoriametrics/vmagent.md#L753"
+  bl-vm-doc-random-offset:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "docs/victoriametrics/vmagent.md"
+    line: 412
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/docs/victoriametrics/vmagent.md#L412"
+  bl-vma-doc-flap-window:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "docs/victoriametrics/vmalert.md"
+    line: 1160
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/docs/victoriametrics/vmalert.md#L1160"
+  bl-my-header:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "mysqld_exporter.go"
+    line: 174
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/mysqld_exporter.go#L174"
+  bl-my-offset-default:
+    kind: code
+    project: "mysqld_exporter"
+    version: "v0.21.0"
+    file: "mysqld_exporter.go"
+    line: 39
+    url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/mysqld_exporter.go#L39"
+  bl-pg-coll-timeout-flag:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "cmd/postgres_exporter/main.go"
+    line: 51
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/cmd/postgres_exporter/main.go#L51"
+  bl-pg-ctx-background:
+    kind: code
+    project: "postgres_exporter"
+    version: "v0.20.1"
+    file: "collector/collector.go"
+    line: 198
+    url: "https://github.com/prometheus-community/postgres_exporter/blob/v0.20.1/collector/collector.go#L198"
+  bl-bb-offset-flag:
+    kind: code
+    project: "blackbox_exporter"
+    version: "v0.29.1"
+    file: "main.go"
+    line: 53
+    url: "https://github.com/prometheus/blackbox_exporter/blob/v0.29.1/main.go#L53"
+  bl-bb-header:
+    kind: code
+    project: "blackbox_exporter"
+    version: "v0.29.1"
+    file: "prober/handler.go"
+    line: 281
+    url: "https://github.com/prometheus/blackbox_exporter/blob/v0.29.1/prober/handler.go#L281"
+  bl-bb-default-120:
+    kind: code
+    project: "blackbox_exporter"
+    version: "v0.29.1"
+    file: "prober/handler.go"
+    line: 289
+    url: "https://github.com/prometheus/blackbox_exporter/blob/v0.29.1/prober/handler.go#L289"
+  bl-op-scrape-interval:
+    kind: code
+    project: "prometheus-operator"
+    version: "v0.95.1"
+    file: "pkg/apis/monitoring/v1/prometheus_types.go"
+    line: 336
+    url: "https://github.com/prometheus-operator/prometheus-operator/blob/v0.95.1/pkg/apis/monitoring/v1/prometheus_types.go#L336"
+  bl-op-timeout-reject:
+    kind: code
+    project: "prometheus-operator"
+    version: "v0.95.1"
+    file: "pkg/apis/monitoring/v1/prometheus_types.go"
+    line: 338
+    url: "https://github.com/prometheus-operator/prometheus-operator/blob/v0.95.1/pkg/apis/monitoring/v1/prometheus_types.go#L338"
+  bl-op-eval-interval:
+    kind: code
+    project: "prometheus-operator"
+    version: "v0.95.1"
+    file: "pkg/apis/monitoring/v1/prometheus_types.go"
+    line: 1371
+    url: "https://github.com/prometheus-operator/prometheus-operator/blob/v0.95.1/pkg/apis/monitoring/v1/prometheus_types.go#L1371"
+  bl-graf-rate-interval:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "docs/sources/datasources/prometheus/template-variables/_index.md"
+    line: 150
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/docs/sources/datasources/prometheus/template-variables/_index.md#L150"
+  bl-graf-ds-scrape-default:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "docs/sources/datasources/prometheus/configure/_index.md"
+    line: 133
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/docs/sources/datasources/prometheus/configure/_index.md#L133"
+  bl-graf-min-interval:
+    kind: code
+    project: "Grafana"
+    version: "v13.3.0"
+    file: "conf/defaults.ini"
+    line: 1682
+    url: "https://github.com/grafana/grafana/blob/v13.3.0/conf/defaults.ini#L1682"
