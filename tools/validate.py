@@ -63,8 +63,14 @@ def validate(root: str = C.ROOT) -> tuple[list[str], list[str]]:
         seen_components.add(comp)
         if card.get("family") not in C.FAMILIES:
             errors.append(f"{where}: family {card.get('family')!r} 要是 {', '.join(C.FAMILIES)} 之一")
-        if card.get("architecture") and not os.path.exists(os.path.join(root, "docs", card["architecture"])):
-            errors.append(f"{where}: architecture 頁 {card['architecture']} 不存在")
+        if card.get("architecture"):
+            page, _, anchor = card["architecture"].partition("#")
+            path = os.path.join(root, "docs", page)
+            if not os.path.exists(path):
+                errors.append(f"{where}: architecture 頁 {page} 不存在")
+            elif anchor and ("{#" + anchor + "}") not in open(path, encoding="utf-8").read() \
+                    and f'id="{anchor}"' not in open(path, encoding="utf-8").read():
+                errors.append(f"{where}: architecture 頁 {page} 沒有錨點 #{anchor}")
         if card.get("kind") not in C.KINDS:
             errors.append(f"{where}: kind {card.get('kind')!r} 無效")
         if card.get("status") not in C.STATUS:

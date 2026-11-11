@@ -44,6 +44,7 @@ required_signals:
     question: Exporter 的查詢會不會被鎖或連線上限卡住
     why: PostgreSQL 一張表被 ACCESS EXCLUSIVE 鎖住時，exporter 的查詢排隊等鎖，scrape 逾時、整個 target 消失；MySQL 連線打滿時 exporter 自己也連不進去，mysql_up 變 0、比例類規則回傳空。Exporter 帳號要有查詢逾時與保留連線。
   - id: replication-lag
+    aliases: [replication-semantics]
     min_tier: 2
     question: Replication 延遲量的是真的嗎
     why: 資料庫自己算的延遲在斷線或沒有寫入時會顯示 0（MySQL 的 Seconds_Behind 變成 NULL 不輸出，PostgreSQL 的 pg_replication_lag_seconds 維持 0）。要用 heartbeat 表，或主庫端看得到每台複本。沒有 replication 的服務寫在 not_applicable。
@@ -84,6 +85,7 @@ required_signals_native:
     question: 產生 metric 時會不會被資料庫內部的鎖或忙碌卡住
     why: /metrics 的 handler 若要拿資料庫內部的鎖或排隊，資料庫忙碌時 scrape 逾時、整個 target 消失。依原始碼逐個回答；不會被卡住的寫在 not_applicable 並附原始碼行號。
   - id: replication-lag
+    aliases: [replication-semantics]
     min_tier: 2
     question: Replication 延遲量的是真的嗎
     why: 同 exporter 型。沒有 replication 的服務寫在 not_applicable。

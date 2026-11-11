@@ -5,14 +5,15 @@ family: database
 status: draft
 stages: [source]
 versions_checked: ["0.20.1", "PostgreSQL 16.15", "PostgreSQL 17.11", "PostgreSQL 13.23、14.24、15.19、18.6（版本差異頁，只讀碼）"]
-architecture: architecture/exporters.md
+architecture: architecture/db-relational.md
 role: >-
   Exporter 裡有兩套程式：舊的 exporter 套件產生 pg_up、pg_exporter_* 與 queries.yaml 自訂查詢，
   新的 collector 套件產生大部分 pg_* 與 pg_scrape_collector_*。兩套各自連資料庫、各自記錯誤，互不相通。
   「活著」因此有四層：Prometheus 抓得到 exporter（up）、舊連線還能用（pg_up）、新連線開得起來（collector 有結果）、
   每個 collector 查得到該看的資料（權限、版本、extension）。任何一層壞掉，上一層都可能仍顯示正常。
   訊號依九個面向（aspect）分組：exporter 是監測自檢，其餘八個是 PostgreSQL 本體該看的項目。cluster 面向只在用 Patroni 這類 HA 管理工具時適用，
-  核心 PostgreSQL 沒有共識機制。PG 來源、collector、權限與版本的對照見[PostgreSQL 本體怎麼監控](../targets/postgres.md)。
+  核心 PostgreSQL 沒有共識機制。PG 來源、collector、權限與版本的對照見[PostgreSQL 本體怎麼監控](../targets/postgres.md)；
+  exporter 兩套程式的連線與錯誤處理見 [Exporter 架構](../architecture/exporters.md#postgres-exporter)。
 
 silent_failures:
   - text: >-
@@ -97,11 +98,103 @@ silent_failures:
     source: pg-target-lab
     refs: [pg-exp-target, pg-src-starttime, pg-src-crash-stats, pg-trace-pg16-crash-stats]
 
+# 五段框架 2：正確使用。只寫原始碼推理（code）、本機小實驗（tested）或標明的官方文件（doc）。
+usage:
+  - id: exporter-pg-monitor
+    text: >-
+      exporter 帳號 GRANT pg_monitor。沒有時不報錯：stat_activity 回報成功但看不到別人的 session（長交易顯示 0），
+      只有 wal collector（pg_ls_waldir）失敗
+    evidence: tested
+    refs: [exp-pg, pg-src-activity-privs, pg-trace-pg16-waldir-grant]
+  - id: exporter-replication-privilege
+    text: >-
+      pg_stat_replication 與 pg_stat_wal_receiver 的欄位要 pg_read_all_stats（pg_monitor 含）；沒有時只剩 pid，
+      stat_replication、stat_wal_receiver 回報成功但沒有 series
+    evidence: tested
+    refs: [pg-exp-target, pg-src-walsnd-privs, pg-src-walrcv-privs]
+  - id: database-size-privilege
+    text: 帳號沒有 pg_read_all_stats 又缺某個資料庫的 CONNECT 時，pg_database_size() 報錯，database collector 整個失敗
+    evidence: code
+    refs: [pg-asp-src16-dbsize-acl, pg-asp-src17-dbsize-acl]
+  - id: reserved-connections
+    text: >-
+      16 起 GRANT pg_use_reserved_connections 給 exporter 並設 reserved_connections，連線額滿時 exporter 仍連得進去；
+      16 以下只有 superuser_reserved_connections（只給 superuser）
+    evidence: tested
+    refs: [pg-exp-target, pg-src-reserved, ver-pg16-reserved]
+  - id: exporter-lock-timeout
+    text: >-
+      ALTER ROLE exporter SET lock_timeout = '1s'。實測表被 ACCESS EXCLUSIVE 鎖 30 秒：沒設時 up=0、累積 5 條等鎖連線；
+      設了之後 up=1，只有 stat_user_tables 失敗
+    evidence: tested
+    refs: [pg-exp-target-raw, pg-c-user-tables-size, pg-perf-src-lock-timeout]
+  - id: collection-timeout
+    text: >-
+      --collection-timeout 預設 1m，不讀 Prometheus 的 scrape timeout header，要設得比 scrape_timeout 短；
+      /probe 模式沒有收集逾時
+    evidence: code
+    refs: [pg-timeout-flag, pg-timeout, bl-pg-ctx-background, pg-probe]
+  - id: collectors-to-enable
+    text: >-
+      預設關閉、要明確打開的 collector：database_wraparound、postmaster、long_running_transactions；
+      複本加 stat_wal_receiver；有 pg_stat_statements 時加 stat_statements
+    evidence: code
+    refs: [pg-c-wraparound-default, pg-trace-ex-postmaster-default, pg-trace-ex-longtx-default, pg-c-walrecv-default, pg-c-statements-default]
+  - id: stat-checkpointer-17
+    text: >-
+      PostgreSQL 17 以上加 --collector.stat_checkpointer（預設關），否則 checkpoint metric 全部消失、collector 不報錯；
+      在 16 以下打開只記 warn、沒有資料
+    evidence: tested
+    refs: [pg-exp-target, pg-c-checkpointer-default, ver-pgx-checkpointer-off, ver-pgx-checkpointer-before17, pg-trace-ex-checkpointer-skip]
+  - id: replica-uses-slot
+    text: 複本要用 replication slot（primary_slot_name）；v0.20.1 的 stat_wal_receiver 在 slot_name 為 NULL 時整列跳過
+    evidence: tested
+    refs: [pg-exp-target, pg-c-walrecv-slotnull]
+  - id: cluster-label
+    text: 同一組主從的 target 加同一個 cluster label，才能跨 instance 計數「不在 recovery 的節點」（split brain、沒有主庫）
+    evidence: tested
+    refs: [pg-exp-target]
+  - id: pg-stat-statements-setup
+    text: >-
+      pg_stat_statements 要 shared_preload_libraries、在 DSN 的資料庫 CREATE EXTENSION，帳號要 pg_read_all_stats；
+      沒有權限時只看得到自己的查詢，collector 仍成功
+    evidence: tested
+    refs: [pg-exp-target, pg-c-statements-default]
+  - id: pg-stat-statements-upgrade
+    text: >-
+      exporter 依伺服器版本（不是 extension 版本）選 stat_statements 查詢；pg_upgrade 到 17 後要 ALTER EXTENSION pg_stat_statements UPDATE
+      （沒升到 1.11 時 collector 失敗是推論）
+    evidence: code
+    refs: [ver-pgx-pss-17, ver-pgx-pss-shared-blk, ver-pg17-pss-shared-blk]
+  - id: query-exporter-account
+    text: >-
+      query-exporter 帳號同樣 GRANT pg_monitor。沒有時不報錯：backend_xid age 變 0、同步 standby 數變 0，只有 archive 查詢失敗
+    evidence: tested
+    refs: [pg-q-exp, pg-q-pg17-archstatus-revoke, pg-q-pg17-archstatus-grant, pg-src-walsnd-privs]
+  - id: query-exporter-server-timeout
+    text: query-exporter 的 timeout 是客戶端計時、到期丟掉連線；用 connect-sql 另設 statement_timeout 與 lock_timeout
+    evidence: code
+    refs: [pg-q-qe-wait-for, pg-q-qe-timeout-drop]
+  - id: query-exporter-expiration
+    text: 每列一個 series 的查詢（每台 standby、每張表）要設 expiration；沒有回傳列時不更新，舊值會一直留著
+    evidence: tested
+    refs: [pg-q-exp, pg-q-qe-norows, pg-q-qe-expire]
+  - id: query-exporter-version-dsn
+    text: >-
+      版本不支援的查詢（pg_stat_io 16 起，pg_stat_wal、sessions_* 14 起）每次失敗、不會被移除，要把該 DSN 從那個查詢的 databases 拿掉
+    evidence: code
+    refs: [pg-q-qe-fatal, pg-q-qe-doomed, ver-pg16-io, ver-pg14-wal, ver-pg14-sessions]
+  - id: query-exporter-connections
+    text: query-exporter 每個 DSN 預設一條常駐連線（connection-pool size 1），要算進 max_connections
+    evidence: doc
+    refs: [pg-q-qe-pool-default]
+
 contracts: [exporter-deadline]
 
 signals:
   - id: exporter-up
     aspect: exporter
+    section: observe
     tier: 1
     question: Exporter 抓得到嗎
     signal: 'up{job="postgres"} == 0，加上 absent(up{job="postgres"})；DB 主機不回應時也會落在這裡'
@@ -116,6 +209,7 @@ signals:
 
   - id: custom-queries
     aspect: exporter
+    section: observe
     tier: 1
     question: 自訂查詢（query-exporter）還在更新嗎
     signal: >-
@@ -135,6 +229,7 @@ signals:
 
   - id: wal-io-sources
     aspect: saturation
+    section: misuse
     tier: 3
     question: WAL 產生多少、資料頁是誰寫出去的
     signal: >-
@@ -155,6 +250,7 @@ signals:
 
   - id: db-up
     aspect: availability
+    section: observe
     tier: 1
     question: Exporter 連得到資料庫嗎
     signal: pg_up == 0；只在連線被拒、認證失敗這類快速失敗時出現，要和 exporter-up 一起看
@@ -168,6 +264,7 @@ signals:
 
   - id: collectors-present
     aspect: exporter
+    section: observe
     tier: 1
     question: 新連線開得起來嗎
     signal: up == 1 但 pg_scrape_collector_success 完全沒有 series
@@ -182,6 +279,7 @@ signals:
 
   - id: collector-success
     aspect: exporter
+    section: observe
     tier: 1
     question: 每個 collector 都查得到嗎
     signal: pg_scrape_collector_success == 0（依 collector label 區分）
@@ -196,6 +294,7 @@ signals:
 
   - id: legacy-scrape-error
     aspect: exporter
+    section: observe
     tier: 1
     question: 舊架構的查詢與自訂查詢都成功嗎
     signal: pg_exporter_last_scrape_error == 1；用 queries.yaml 時加上 pg_exporter_user_queries_load_error == 1
@@ -211,6 +310,7 @@ signals:
 
   - id: monitor-privilege
     aspect: exporter
+    section: observe
     tier: 1
     question: Exporter 帳號看得到別人的 session 嗎
     signal: 盤點時確認帳號有 pg_monitor；平時用 wal collector 失敗當代理訊號（pg_ls_waldir 需要 pg_monitor）
@@ -225,6 +325,7 @@ signals:
 
   - id: scrape-budget
     aspect: exporter
+    section: observe
     tier: 2
     question: Scrape 來得及在 scrape_timeout 內完成嗎
     signal: >-
@@ -241,6 +342,7 @@ signals:
 
   - id: series-volume
     aspect: exporter
+    section: observe
     tier: 2
     question: 有沒有一批 metric 安靜地消失
     signal: scrape_samples_scraped 比一小時前少一半以上
@@ -253,6 +355,7 @@ signals:
 
   - id: probe-blast-radius
     aspect: exporter
+    section: observe
     tier: 2
     question: Multi-target exporter 本身活著嗎
     signal: >-
@@ -268,6 +371,7 @@ signals:
 
   - id: version-semantics
     aspect: exporter
+    section: observe
     tier: 2
     question: 這個版本的 PostgreSQL 真的有輸出規則用到的 metric 嗎
     signal: >-
@@ -285,11 +389,14 @@ signals:
 
   - id: replication-semantics
     aspect: replication
+    section: observe
     tier: 2
     question: Replication 延遲量的是真的嗎
     signal: >-
-      不要只看 pg_replication_lag_seconds（複本斷線時是 0）。複本端打開 --collector.stat_wal_receiver，
-      檢查 receiver 存在且 last_msg_receipt_time 夠新（只對用 slot 的複本有效）；主庫端看 pg_stat_replication 有沒有複本、pg_wal_lsn_diff 的位元組落後。細節見 HA 組的 standby-streaming、wal-receiver、replication-lag
+      不要只看 pg_replication_lag_seconds：它在 receive_lsn 等於 replay_lsn 時固定是 0，主庫沒寫入時是 0，複本斷線時也是 0；
+      PostgreSQL 自己的 replay_lag 閒置時清成 NULL，query-exporter 輸出成 0。複本端打開 --collector.stat_wal_receiver，
+      檢查 receiver 存在且 last_msg_receipt_time 夠新（只對用 slot 的複本有效）；主庫端看 pg_stat_replication 那一列還在不在。
+      延遲太大本身看 replication-lag；細節見 standby-streaming、wal-receiver
     metrics:
       - pg_replication_lag_seconds
       - pg_replication_is_replica
@@ -298,18 +405,19 @@ signals:
       - pg_stat_replication_pg_wal_lsn_diff
     evaluate_on: self
     applies_when: replica
+    silent_failure: 複本斷線 40 秒、主庫持續寫入，pg_replication_lag_seconds 一直是 0
     evidence: tested
     source: pg-target-lab
-    refs: [pg-exp-target, pg-c-replication-lag, pg-c-walrecv-slotnull]
+    refs: [pg-exp-target, pg-c-replication-lag, pg-c-walrecv-slotnull, pg-src-lag-clear, pg-q-qe-null-zero, pg-trace-pg17-walsnd-lagnull]
     upstream: { status: partial, note: "mixin 用不存在的 pg_replication_lag；awesome 用 pg_replication_lag_seconds > 5，複本斷線時是 0" }
     rules:
       - rules/targets/postgres.yml#PostgresStandbyWalReceiverMissing
       - rules/targets/postgres.yml#PostgresWalReceiverStale
       - rules/targets/postgres.yml#PostgresPrimaryWithoutStandby
-      - rules/targets/postgres.yml#PostgresReplicationLagBytes
 
   - id: replication-slots
     aspect: replication
+    section: misuse
     tier: 2
     question: 有沒有沒人用的 replication slot 在累積 WAL
     signal: >-
@@ -335,12 +443,13 @@ signals:
       - rules/targets/postgres.yml#PostgresReplicationSlotLost
   - id: wraparound
     aspect: maintenance
+    section: misuse
     tier: 2
     question: XID 與 multixact wraparound 還有多遠
     signal: >-
       pg_database_wraparound_age_datfrozenxid_seconds > 1e9 預警、> 1.5e9 critical（名稱是 seconds，實際是交易數）。
       PostgreSQL 在 2^31 − 4000 萬時開始警告、− 300 萬時拒絕新的 XID（16、17 相同）；multixact 看 datminmxid。
-      collector 預設關閉，沒打開時規則也要響。它量的是凍結進度，不是「現在被誰擋住」，那是 xmin-horizon
+      它量的是凍結進度，不是「現在被誰擋住」，那是 xmin-horizon。collector 預設關閉，有沒有在收集見 wraparound-collected
     metrics: [pg_database_wraparound_age_datfrozenxid_seconds, pg_database_wraparound_age_datminmxid_seconds]
     evaluate_on: self
     evidence: tested
@@ -351,12 +460,29 @@ signals:
       - rules/targets/postgres.yml#PostgresXidWraparoundRisk
       - rules/targets/postgres.yml#PostgresXidWraparoundCritical
       - rules/targets/postgres.yml#PostgresMultixactWraparoundRisk
-      - rules/targets/postgres.yml#PostgresWraparoundNotCollected
+
+  - id: wraparound-collected
+    aspect: maintenance
+    section: observe
+    tier: 2
+    question: XID age 有在收集嗎
+    signal: >-
+      pg_up == 1 unless on(job, instance) pg_database_wraparound_age_datfrozenxid_seconds。
+      --collector.database_wraparound 預設關閉，沒打開時 wraparound 的規則回傳空，collector 也不會報錯
+    metrics: [pg_up, pg_database_wraparound_age_datfrozenxid_seconds]
+    evaluate_on: self
+    silent_failure: 沒有 --collector.database_wraparound 時 wraparound 規則永遠回傳空
+    evidence: code
+    source: pg-exporter-collectors
+    refs: [pg-c-wraparound-default]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有 wraparound 規則" }
+    rules: [rules/targets/postgres.yml#PostgresWraparoundNotCollected]
 
   # ---------- 以下是 PostgreSQL 本體（target-facing）的訊號；頁面依 aspect 分組 ----------
 
   - id: restart-and-crash
     aspect: availability
+    section: misuse
     tier: 2
     question: PostgreSQL 重啟過或經歷 crash recovery 嗎
     signal: >-
@@ -375,6 +501,7 @@ signals:
 
   - id: wal-disk
     aspect: availability
+    section: misuse
     tier: 2
     question: pg_wal 會不會把磁碟寫滿
     signal: >-
@@ -391,6 +518,7 @@ signals:
 
   - id: xmin-horizon
     aspect: maintenance
+    section: misuse
     tier: 2
     question: 有沒有長交易或 idle in transaction 擋住 vacuum
     signal: >-
@@ -411,6 +539,7 @@ signals:
 
   - id: deadlocks-rollbacks
     aspect: workload
+    section: misuse
     tier: 3
     question: deadlock 與 rollback 比例
     signal: increase(pg_stat_database_deadlocks[5m])、rollback 佔交易的比例；兩者都是每個資料庫一條 counter
@@ -425,6 +554,7 @@ signals:
 
   - id: checkpoint-pressure
     aspect: saturation
+    section: misuse
     tier: 3
     question: checkpoint 是不是大多被 WAL 量逼出來的
     signal: >-
@@ -443,6 +573,7 @@ signals:
 
   - id: autovacuum-workers-full
     aspect: saturation
+    section: misuse
     tier: 3
     question: autovacuum worker 是不是一直全部在忙
     signal: >-
@@ -461,6 +592,7 @@ signals:
 
   - id: backend-fsync
     aspect: saturation
+    section: misuse
     tier: 3
     question: checkpoint 的 fsync 慢、或 backend 被迫自己 fsync 嗎
     signal: >-
@@ -480,6 +612,7 @@ signals:
 
   - id: autovacuum
     aspect: maintenance
+    section: misuse
     tier: 3
     question: autovacuum 跟得上嗎（dead tuple、bloat）
     signal: >-
@@ -501,6 +634,7 @@ signals:
 
   - id: lock-blocks-exporter
     aspect: exporter
+    section: observe
     tier: 2
     question: 一個表鎖會不會讓監控整個消失
     signal: >-
@@ -519,6 +653,7 @@ signals:
 
   - id: invalid-indexes
     aspect: maintenance
+    section: misuse
     tier: 3
     question: 有沒有失效或損毀的索引
     signal: >-
@@ -535,6 +670,7 @@ signals:
 
   - id: connection-headroom
     aspect: saturation
+    section: misuse
     tier: 2
     question: 連線還有餘裕嗎（包括留給 exporter 的）
     signal: >-
@@ -553,6 +689,7 @@ signals:
 
   - id: sessions-and-locks
     aspect: saturation
+    section: misuse
     tier: 3
     question: active、idle、等鎖的 session 各有多少
     signal: >-
@@ -570,6 +707,7 @@ signals:
 
   - id: pg-stat-statements
     aspect: exporter
+    section: observe
     tier: 3
     question: 查詢延遲：pg_stat_statements 收得到嗎
     signal: >-
@@ -587,10 +725,11 @@ signals:
     source: pg-target-lab
     refs: [pg-exp-target, exp-pg, pg-c-statements-default, pg-c-statements-topn, pg-c-statements-pg17, ver-pgx-pss-17, ver-pgx-pss-shared-blk, ver-pg17-pss, ver-pg17-pss-shared-blk]
     upstream: { status: partial, note: "mixin 的 SlowQueries 對 gauge 取 rate，實際上不會響" }
-    rules: []
+    rules: [rules/targets/postgres.yml#PostgresStatStatementsMissing]
 
   - id: cache-and-temp
     aspect: saturation
+    section: misuse
     tier: 3
     question: cache hit 與 temp file
     signal: >-
@@ -607,6 +746,7 @@ signals:
   # ---------- 效能與故障情境（lab/targets/postgres/perf）----------
   - id: slow-sql
     aspect: workload
+    section: misuse
     tier: 3
     question: 慢 SQL 找得到嗎
     signal: >-
@@ -628,11 +768,11 @@ signals:
     upstream: { status: partial, note: "mixin 的 SlowQueries 對 gauge 取 rate；awesome 沒有 per-query 規則" }
     rules:
       - rules/targets/postgres.yml#PostgresSlowStatement
-      - rules/targets/postgres.yml#PostgresStatStatementsMissing
       - rules/targets/postgres.yml#PostgresLongRunningTransaction
 
   - id: lock-queue
     aspect: saturation
+    section: misuse
     tier: 3
     question: 鎖等待與 DDL 鎖佇列
     signal: >-
@@ -657,6 +797,7 @@ signals:
 
   - id: throughput-drop
     aspect: workload
+    section: misuse
     tier: 3
     question: TPS／QPS 掉了嗎，原因在哪一層
     signal: >-
@@ -679,6 +820,7 @@ signals:
 
   - id: resource-pressure
     aspect: saturation
+    section: misuse
     tier: 3
     question: CPU、shared_buffers、work_mem、checkpoint 不夠時哪個 metric 先動
     signal: >-
@@ -700,6 +842,7 @@ signals:
 
   - id: oom-crash
     aspect: availability
+    section: misuse
     tier: 2
     question: backend 被 OOM killer 殺掉時看得出來嗎
     signal: >-
@@ -721,6 +864,7 @@ signals:
 
   - id: standby-streaming
     aspect: replication
+    section: misuse
     tier: 2
     question: 主庫看得到每一台複本在 streaming 嗎
     signal: >-
@@ -740,6 +884,7 @@ signals:
 
   - id: wal-receiver
     aspect: replication
+    section: misuse
     tier: 2
     question: 複本端的 WAL receiver 還在收嗎
     signal: >-
@@ -759,25 +904,26 @@ signals:
 
   - id: replication-lag
     aspect: replication
+    section: misuse
     tier: 2
     question: 複本落後多少（位元組與時間）
     signal: >-
-      用主庫端的位元組：pg_stat_replication_pg_wal_lsn_diff（current_wal_lsn − replay_lsn）。
-      時間延遲 pg_replication_lag_seconds 在 receive_lsn 等於 replay_lsn 時固定是 0：主庫沒寫入時是 0，複本斷線時也是 0。
-      exporter 不輸出 write_lag／flush_lag／replay_lag 與 sync_state；要時間延遲就自訂查詢或寫 heartbeat 表。
-      自訂查詢：pgq_replication_replay_lag_seconds 等三個時間延遲，NULL 時 query-exporter 輸出 0；複本斷線後這條 series 在 expiration 後消失
-    metrics: [pg_stat_replication_pg_wal_lsn_diff, pg_replication_lag_seconds, pg_replication_last_replay_seconds, pgq_replication_write_lag_seconds, pgq_replication_flush_lag_seconds, pgq_replication_replay_lag_seconds]
+      用主庫端的位元組：pg_stat_replication_pg_wal_lsn_diff（current_wal_lsn − replay_lsn）> 1GB（例子）。
+      exporter 不輸出 write_lag／flush_lag／replay_lag；時間延遲用自訂查詢 pgq_replication_replay_lag_seconds 等三個（或 heartbeat 表），
+      複本斷線後這條 series 在 expiration 後消失。量的是不是真的（lag_seconds 斷線時是 0）見 replication-semantics
+    metrics: [pg_stat_replication_pg_wal_lsn_diff, pgq_replication_write_lag_seconds, pgq_replication_flush_lag_seconds, pgq_replication_replay_lag_seconds]
     evaluate_on: self
     applies_when: replica
-    silent_failure: 複本斷線 40 秒、主庫持續寫入，pg_replication_lag_seconds 一直是 0
+    silent_failure: 複本斷線時主庫那一列消失，位元組規則回傳空；由 standby-streaming 的 PostgresPrimaryWithoutStandby 補位
     evidence: tested
     source: pg-target-lab
-    refs: [pg-exp-target, pg-c-replication-lag, pg-c-statrep-query, pg-src-lag-clear, pg-q-exp, pg-q-qe-null-zero, pg-q-qe-expire, pg-trace-pg17-walsnd-lagnull]
+    refs: [pg-exp-target, pg-c-statrep-query, pg-q-exp, pg-q-qe-expire]
     upstream: { status: partial, note: "awesome 用 pg_replication_lag_seconds > 5；mixin 用不存在的 pg_replication_lag" }
     rules: [rules/targets/postgres.yml#PostgresReplicationLagBytes, rules/targets/postgres.yml#PostgresReplicationReplayLagHigh]
 
   - id: standby-conflicts
     aspect: replication
+    section: misuse
     tier: 3
     question: 複本上的查詢被 recovery 取消了嗎
     signal: >-
@@ -794,6 +940,7 @@ signals:
 
   - id: sync-replication
     aspect: replication
+    section: misuse
     tier: 2
     question: 同步複寫的 standby 還在嗎
     signal: >-
@@ -811,6 +958,7 @@ signals:
 
   - id: promotion
     aspect: replication
+    section: misuse
     tier: 2
     question: 誰是主庫？有沒有兩個主庫
     signal: >-
@@ -829,6 +977,7 @@ signals:
 
   - id: archiver
     aspect: protection
+    section: misuse
     tier: 2
     question: WAL archive 有在成功嗎
     signal: >-
@@ -847,6 +996,7 @@ signals:
   # workload
   - id: session-errors
     aspect: workload
+    section: misuse
     tier: 3
     question: 連線被斷、FATAL、客戶端沒說再見的 session 有多少
     signal: >-
@@ -868,6 +1018,7 @@ signals:
   # protection
   - id: archive-freshness
     aspect: protection
+    section: misuse
     tier: 2
     question: PITR 能回到多近的時間點（WAL archive 新不新）
     signal: >-
@@ -889,6 +1040,7 @@ signals:
 
   - id: archive-config
     aspect: protection
+    section: misuse
     tier: 2
     question: archive_mode 真的開著嗎
     signal: >-
@@ -907,6 +1059,7 @@ signals:
 
   - id: backup-freshness
     aspect: protection
+    section: misuse
     tier: 2
     question: 最近一次成功的 base backup 是多久以前
     signal: >-
@@ -915,7 +1068,7 @@ signals:
       WAL-G、Barman 沒有對等的 exporter 時，在備份 job 成功後用 node_exporter textfile collector 寫一個「最後成功時間」gauge，
       規則對 time() − 它告警，並對它 absent() 告警。備份工具若用 replication slot（pg_receivewal、Barman streaming），
       slot 停用時 WAL 會在主庫累積，接到 replication-slots
-    metrics: [pgbackrest_backup_since_last_completion_seconds, pgbackrest_exporter_status, pgbackrest_wal_archive_status]
+    metrics: [pgbackrest_backup_since_last_completion_seconds, pgbackrest_wal_archive_status]
     evaluate_on: self
     applies_when: "用 pgBackRest（pgbackrest_exporter）；其他備份工具改成自己的最後成功時間 metric"
     silent_failure: >-
@@ -925,11 +1078,29 @@ signals:
     source: pg-pgbackrest-exporter
     refs: [pg-asp-pbe-since-last, pg-asp-pbe-since-last-calc, pg-asp-pbe-exporter-status, pg-asp-pbe-wal-status]
     upstream: { status: no, note: "mixin 與 awesome 的 postgres 規則都沒有備份；pgbackrest_exporter 的 repo 有 dashboard，沒有附 alert 規則" }
-    rules: [rules/targets/postgres.yml#PostgresBackupTooOld, rules/targets/postgres.yml#PostgresBackupExporterFailing]
+    rules: [rules/targets/postgres.yml#PostgresBackupTooOld]
+
+  - id: backup-exporter-status
+    aspect: protection
+    section: observe
+    tier: 2
+    question: 備份新鮮度的 metric 還在嗎
+    signal: >-
+      pgbackrest_exporter_status == 0 或 absent(pgbackrest_exporter_status)。pgbackrest_exporter 讀不到 pgbackrest info 或整個不存在時，
+      backup-freshness 的規則回傳空
+    metrics: [pgbackrest_exporter_status]
+    evaluate_on: self
+    applies_when: "用 pgBackRest（pgbackrest_exporter）"
+    evidence: code
+    source: pg-pgbackrest-exporter
+    refs: [pg-asp-pbe-exporter-status]
+    upstream: { status: no, note: "pgbackrest_exporter 的 repo 沒有附 alert 規則" }
+    rules: [rules/targets/postgres.yml#PostgresBackupExporterFailing]
 
   # capacity
   - id: database-growth
     aspect: capacity
+    section: misuse
     tier: 3
     question: 資料庫與表的大小怎麼成長
     signal: >-
@@ -947,11 +1118,12 @@ signals:
 
   - id: disk-forecast
     aspect: capacity
+    section: misuse
     tier: 2
     question: 資料目錄的磁碟幾天後寫滿
     signal: >-
       postgres_exporter 看不到磁碟剩餘空間。用 node_exporter 的 node_filesystem_avail_bytes 對資料目錄（與 pg_wal、tablespace 各自的掛載點）做 predict_linear，
-      同時要求剩餘比例已經偏低，避免剛清完空間時的誤報；mountpoint 不對時規則回傳空，所以另配 absent()。
+      同時要求剩餘比例已經偏低，避免剛清完空間時的誤報；mountpoint 不對時規則回傳空，由 data-disk-monitored 補位。
       pg_wal 的突發成長（archive 失敗、slot）看 wal-disk，線性預測來不及
     metrics: [node_filesystem_avail_bytes, node_filesystem_size_bytes, pg_wal_size_bytes, pg_database_size_bytes]
     evaluate_on: self
@@ -960,10 +1132,28 @@ signals:
     source: pg-node-exporter-fs
     refs: [pg-asp-ne-avail, pg-asp-ne-size]
     upstream: { status: no, note: "mixin 與 awesome 的 postgres 規則沒有；node_exporter 的通用磁碟規則不知道哪個掛載點是資料目錄" }
-    rules: [rules/targets/postgres.yml#PostgresDataDiskFullSoon, rules/targets/postgres.yml#PostgresDataDiskNotMonitored]
+    rules: [rules/targets/postgres.yml#PostgresDataDiskFullSoon]
+
+  - id: data-disk-monitored
+    aspect: capacity
+    section: observe
+    tier: 2
+    question: 資料目錄所在檔案系統的 metric 抓得到嗎
+    signal: >-
+      absent(node_filesystem_avail_bytes{mountpoint="<資料目錄>"})。postgres_exporter 看不到磁碟；node_exporter 的 job 或 mountpoint 不對時
+      disk-forecast 的規則回傳空
+    metrics: [node_filesystem_avail_bytes]
+    evaluate_on: self
+    applies_when: "同一台主機有 node_exporter"
+    evidence: code
+    source: pg-node-exporter-fs
+    refs: [pg-asp-ne-avail]
+    upstream: { status: no }
+    rules: [rules/targets/postgres.yml#PostgresDataDiskNotMonitored]
 
   - id: connection-trend
     aspect: capacity
+    section: misuse
     tier: 3
     question: 連線數的長期趨勢會不會碰到 max_connections
     signal: >-
@@ -980,6 +1170,7 @@ signals:
   # cluster：只在用 Patroni 時適用
   - id: patroni-up
     aspect: cluster
+    section: observe
     tier: 2
     question: 每個 Patroni 節點的 REST API 抓得到嗎
     signal: >-
@@ -996,6 +1187,7 @@ signals:
 
   - id: patroni-leader
     aspect: cluster
+    section: misuse
     tier: 2
     question: 每個 Patroni 叢集剛好有一個 leader 嗎
     signal: >-
@@ -1014,6 +1206,7 @@ signals:
 
   - id: patroni-dcs
     aspect: cluster
+    section: misuse
     tier: 2
     question: 每個節點還連得到 DCS 嗎
     signal: >-
@@ -1032,6 +1225,7 @@ signals:
 
   - id: patroni-paused
     aspect: cluster
+    section: misuse
     tier: 3
     question: 自動 failover 是不是被關掉了
     signal: patroni_is_paused == 1 持續超過維護時間（例子：1 小時）；pause 期間主庫掛掉不會自動 failover
@@ -1046,6 +1240,7 @@ signals:
 
   - id: patroni-timeline
     aspect: cluster
+    section: misuse
     tier: 3
     question: failover 之後每個節點都跟上新的 timeline 了嗎
     signal: >-
@@ -1077,6 +1272,7 @@ blind_spots:
     category: exporter
     why: exporter 沒有查；同步 standby 消失時 commit 會卡住
     workaround: 自訂查詢 `pg_stat_replication.sync_state`
+    options: "建議：query-exporter 查 sync_state 與 synchronous_standby_names（PostgresSyncStandbyMissing）"
     section: targets/postgres.md#blind-spots
     covered_by:
       tool: "query-exporter 5.2.2"
@@ -1088,6 +1284,7 @@ blind_spots:
     category: exporter
     why: exporter 沒有輸出；閒置時會變 NULL
     workaround: 自訂查詢，或 heartbeat 表
+    options: "建議：query-exporter 查 pg_stat_replication 的三個 lag（PostgresReplicationReplayLagHigh），或 heartbeat 表"
     section: targets/postgres.md#blind-spots
     covered_by:
       tool: "query-exporter 5.2.2"
@@ -1099,6 +1296,7 @@ blind_spots:
     category: exporter
     why: exporter 沒有輸出
     workaround: 自訂查詢 `max(age(backend_xid))`、`max(age(xmin))`
+    options: "建議：query-exporter 查 backend_xid／slot xmin／prepared xacts 的 age（PostgresXminHorizonHeld）"
     section: targets/postgres.md#blind-spots
     covered_by:
       tool: "query-exporter 5.2.2"
@@ -1110,6 +1308,7 @@ blind_spots:
     category: exporter
     why: enum 與字串設定不輸出；關掉 archive 時看起來和剛啟動一樣
     workaround: 盤點時檢查，或自訂查詢輸出 0／1
+    options: "建議：query-exporter 把 archive 設定與 .ready 檔數輸出成數字（PostgresArchiveModeOff 等四條）"
     section: targets/postgres.md#blind-spots
     covered_by:
       tool: "query-exporter 5.2.2"
@@ -1121,6 +1320,7 @@ blind_spots:
     category: exporter
     why: exporter 沒有查
     workaround: 自訂查詢 `pg_index`、`pg_stat_database.checksum_failures`、`pg_control_checkpoint()`；排程 amcheck
+    options: "建議：query-exporter 查 pg_index、checksum_failures、pg_control_checkpoint()；排程 amcheck"
     section: targets/postgres.md#blind-spots
     covered_by:
       tool: "query-exporter 5.2.2"
@@ -1132,6 +1332,7 @@ blind_spots:
     category: exporter
     why: exporter 沒有查
     workaround: 自訂查詢（`sessions_*` 從 14 起有）
+    options: "建議：query-exporter 查這三個 view（版本：pg_stat_io 16 起，其餘 14 起）"
     section: targets/postgres.md#blind-spots
     covered_by:
       tool: "query-exporter 5.2.2"
@@ -1143,6 +1344,7 @@ blind_spots:
     category: exporter
     why: stat_user_tables 只看 DSN 那一個資料庫
     workaround: 每個資料庫各設一個 DSN，或用 `/probe`
+    options: "建議：query-exporter 每個資料庫一個 DSN（PostgresTablesNeedVacuum），或 postgres_exporter 的 /probe"
     section: targets/postgres.md#blind-spots
     covered_by:
       tool: "query-exporter 5.2.2"
@@ -1154,16 +1356,19 @@ blind_spots:
     category: database
     why: 沒有任何 view 或函式計數 ERROR；pg_stat_database 只有 xact_rollback（含應用主動 ROLLBACK）與 sessions_fatal（只算連線層級），query-exporter 這類查詢工具補不了
     workaround: log 管線計數（log_min_messages、VictoriaLogs 或 mtail 依 SQLSTATE 計數）
+    options: "建議：log 管線依 SQLSTATE 計數（VictoriaLogs、mtail）；metric 補不了"
     section: targets/postgres.md#blind-spots
   - what: 叢集共識（leader、quorum）
     category: database
     why: 核心 PostgreSQL 沒有共識機制
     workaround: Patroni 的 `/metrics`（`patroni-cluster` 規則組）
+    options: "建議：用 Patroni 時看它的 /metrics（patroni-cluster 規則組）"
     section: targets/postgres.md#cluster
   - what: 磁碟剩餘空間、檔案系統唯讀
     category: other
     why: 不在資料庫裡；WAL 寫滿就停機，唯讀時寫入失敗但空間看起來正常
     workaround: node_exporter 的 `node_filesystem_avail_bytes`、`node_filesystem_readonly`；本卡的 PostgresDataDiskFullSoon 指定資料目錄的 mountpoint。主機層規則只讀碼，host lab 之後排程
+    options: "建議：node_exporter 的 filesystem metric，指定資料目錄的 mountpoint（PostgresDataDiskFullSoon）"
     section: targets/postgres.md#capacity
     covered_by:
       tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"
@@ -1175,6 +1380,7 @@ blind_spots:
     category: other
     why: postgres_exporter 沒有行程 CPU，也沒有 fsync 延遲（PG 17 起連 buffers_backend_fsync 都沒有）；OOM kill 在資料庫裡只看得到 postmaster 重啟所有 backend
     workaround: node_exporter 的 PSI、MemAvailable、vmstat 與磁碟時間；容器用 cAdvisor 的節流、working set 與 OOM 事件。主機層規則只讀碼，host lab 之後排程
+    options: "建議：主機與容器資源卡（node_exporter、cAdvisor）的規則"
     section: targets/postgres.md#saturation
     covered_by:
       tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"
@@ -1186,9 +1392,11 @@ blind_spots:
     category: database
     why: 主機層只知道「被 kill 了」；每條連線的 work_mem、hash 與 sort 用量沒有加總上限，被 kill 的 PID 與當時的查詢只在 server log，metric 沒有
     workaround: log 管線抓 postmaster 的 "terminated by signal 9" 那一行與後面的查詢文字；cgroup 上限要留給 shared_buffers 以外的記憶體
+    options: "建議：log 管線抓 \"terminated by signal 9\" 與其後的查詢文字"
     section: targets/postgres.md#saturation
   - what: base backup 的新鮮度
     category: other
     why: 沒有備份時 archive 再正常也還原不了
     workaround: pgbackrest_exporter；WAL-G、Barman 用 textfile
+    options: "建議：pgbackrest_exporter（PostgresBackupTooOld）；WAL-G、Barman 用 textfile 寫最後成功時間"
     section: targets/postgres.md#protection

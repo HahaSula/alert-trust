@@ -187,7 +187,7 @@ groups:
         labels: { severity: info, component: postgres_exporter, tier: "2" }
         annotations:
           summary: "沒有收集 XID age（--collector.database_wraparound 預設關閉）"
-          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#wraparound
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#wraparound-collected
       - alert: PostgresConnectionsNearLimit
         expr: |
           sum by (job, instance) (pg_stat_activity_count{job="postgres"})
@@ -455,7 +455,7 @@ groups:
         labels: { severity: info, component: postgres_exporter, tier: "3" }
         annotations:
           summary: "沒有 pg_stat_statements metric：--collector.stat_statements 沒開、extension 沒建在 DSN 的資料庫，或 shared_preload_libraries 沒載入；這時沒有任何 per-query 延遲可看"
-          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#slow-sql
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#pg-stat-statements
 
   # ---------- PostgreSQL 本體：資料保護（protection）。lab/targets/postgres/aspects ----------
   # 備份工具的規則假設 pgbackrest_exporter（woblerr）在 job="pgbackrest"；WAL-G、Barman 請改成自己輸出的「最後成功時間」metric。
@@ -503,7 +503,7 @@ groups:
         labels: { severity: warning, component: postgres_exporter, tier: "2" }
         annotations:
           summary: "pgbackrest_exporter 讀不到 pgbackrest info，或整個不存在；這時備份新鮮度規則回傳空"
-          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#backup-freshness
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#backup-exporter-status
 
   # ---------- PostgreSQL 本體：容量（capacity） ----------
   # 磁碟規則假設 node_exporter 在 job="node"、資料目錄掛在 /var/lib/postgresql；請換成實際的 job 與 mountpoint。
@@ -536,7 +536,7 @@ groups:
         labels: { severity: warning, component: postgres_exporter, tier: "2" }
         annotations:
           summary: "找不到 PostgreSQL 資料目錄所在檔案系統的 node_exporter metric（job 或 mountpoint 不對）；postgres_exporter 本身看不到磁碟剩餘空間"
-          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#disk-forecast
+          runbook_url: https://hahasula.github.io/alert-trust/components/postgres_exporter/#data-disk-monitored
 
   # ---------- 叢集與共識（cluster）：只在用 Patroni 時適用 ----------
   # 核心 PostgreSQL 沒有共識與自動選主；Patroni 把 leader lock 放在 DCS（etcd、Consul、ZooKeeper、Kubernetes）。
