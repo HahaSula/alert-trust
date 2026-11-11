@@ -76,12 +76,84 @@ silent_failures:
     source: mg-lab
     refs: [mg-exp, mx-describe-ctx, mx-topo-rsstate, awe-mg-primarychanged]
 
+# 五段框架 2：正確使用。只寫原始碼推理（code）、本機小實驗（tested）或標明的官方文件（doc）。
+usage:
+  - id: collector-flags
+    text: >-
+      exporter 預設什麼 collector 都不開（lab 只有 46 個 sample）；要 --collector.diagnosticdata --collector.replicasetstatus --compatible-mode，
+      少一個這張卡一半的規則回傳空
+    evidence: tested
+    refs: [mg-exp, mx-flag-diag, mx-flag-rs, mx-flag-compat, mx-general-always, mx-register-diag]
+  - id: exporter-account
+    text: >-
+      exporter 帳號要 admin 的 clusterMonitor 加 local 的 read。少了前者 getDiagnosticData 被拒、serverStatus 全部消失（sample 6108 → 49）而 mongodb_up 仍是 1；
+      少了後者 oplog window 消失
+    evidence: tested
+    refs: [mg-exp, mg-diag-auth, mg-diag-auth-oplog, mx-oplog-find, mx-oplog-warn]
+  - id: log-level-warn
+    text: --log.level 至少 warn：getDiagnosticData 與 oplog 讀取失敗只記 warn，預設 error 看不到
+    evidence: tested
+    refs: [mg-exp, mx-diag-warn, mx-oplog-warn, mx-flag-loglevel]
+  - id: exporter-per-member
+    text: >-
+      每個 member 一個 exporter（--mongodb.uri 指向那一台）。/scrapeall 依序抓每個 URI、每個都給完整期限，兩台同時連不上時整個請求逾時、三台的 metric 一起消失
+    evidence: tested
+    refs: [mg-exp, mg-exp-a, mx-scrapeall-loop, mx-scrapeall-timeout]
+  - id: cluster-label
+    text: target 加 cluster=<replica set 名稱>；角色與選舉規則依它分組，因為 rs_nm 在 exporter 連不上時不存在、mongodb_up 也沒有這個 label
+    evidence: tested
+    refs: [mg-exp, mx-up-desc, mx-topo-rsnm]
+  - id: scrape-timeout-budget
+    text: >-
+      exporter 的查詢期限是 scrape_timeout − --web.timeout-offset（1 秒），期限過了之後的 collector 直接跳過（up=1、sample 變少）；
+      scrape_timeout 要讓這個期限大於一次正常 scrape
+    evidence: tested
+    refs: [mg-exp, mx-handler-header, mx-handler-offset, mx-describe-ctx]
+  - id: collstats-limit
+    text: collStats／indexStats 只列重要的 namespace 或另開長間隔的 job，並設 --collector.collstats-limit；查詢在 Describe 時依序對每個 collection 執行
+    evidence: code
+    refs: [mx-flag-collstats-limit, mx-describe-collect, mx-flag-discovering]
+  - id: wt-cache-size
+    text: 容器裡明確設 --wiredTigerCacheSizeGB；預設 (RAM − 1GB) × 50% 依主機 RAM 算
+    evidence: code
+    refs: [mg-wt-cache-default]
+  - id: ticket-thresholds
+    text: >-
+      7.0 起預設 throughputProbing，ticket 數從 CPU 核心數開始動態調整，available 的固定門檻沒有意義（PMM 的 < 50 在 16 核 lab 一開機就響）；
+      要固定值就改 fixedConcurrentTransactions
+    evidence: tested
+    refs: [mg-exp, mg-ticket-algo, mg-tp-initial, ver-mg70-algo, ver-mg70-algo-userset]
+  - id: write-concern-wtimeout
+    text: >-
+      沒有 arbiter 時預設 write concern 是 majority、wtimeout 0（無限等）。寫入要設 wtimeout，逾時才會回 WriteConcernFailed 並算進 getLastError.wtimeouts
+    evidence: tested
+    refs: [mg-exp, mg-wc-implicit, mg-wc-notimeout]
+  - id: oplog-size
+    text: oplog 大小依「secondary 要能離線多久 × 寫入量」設 --oplogSize；預設是可用空間的 5%，至少 990MB、最多 50GB
+    evidence: code
+    refs: [mg-oplog-user-size, mg-oplog-5pct, mg-oplog-min, mg-oplog-max]
+  - id: query-maxtimems
+    text: 查詢設 maxTimeMS；被中止時才會算進 metrics.operation.killedDueToMaxTimeMSExpired，沒設的長查詢一直跑、沒有計數
+    evidence: code
+    refs: [mg-curop-maxtimems]
+  - id: currentop-metrics
+    text: >-
+      要看執行中的長操作就開 --collector.currentopmetrics（預設關），--collector.currentopmetrics-slow-time 決定多久算慢（預設 5m）；
+      輸出 mongodb_currentop_query_uptime，label 含 opid、ns
+    evidence: code
+    refs: [mx-flag-currentop, mx-flag-currentop-slow, mx-currentop-uptime]
+  - id: ftdc-persistent
+    text: 確認 dbPath 下的 diagnostic.data 在持久磁碟；目錄上限 250MB 循環覆寫
+    evidence: code
+    refs: [mg-ftdc-dir-size]
+
 contracts: [exporter-deadline]
 
 signals:
   # ---------- exporter：監測自檢 ----------
   - id: exporter-up
     aspect: exporter
+    section: observe
     tier: 1
     question: Exporter 抓得到嗎
     signal: >-
@@ -98,6 +170,7 @@ signals:
 
   - id: collectors-present
     aspect: exporter
+    section: observe
     tier: 1
     question: Exporter 連得上時，serverStatus 這一大類 metric 還在嗎
     signal: >-
@@ -114,6 +187,7 @@ signals:
 
   - id: collector-success
     aspect: exporter
+    section: observe
     tier: 1
     question: replSetGetStatus 與 oplog 這兩組也成功嗎
     signal: >-
@@ -130,6 +204,7 @@ signals:
 
   - id: scrape-budget
     aspect: exporter
+    section: observe
     tier: 2
     question: Scrape 來得及在 scrape_timeout 內完成嗎
     signal: >-
@@ -147,6 +222,7 @@ signals:
 
   - id: exporter-query-timeout
     aspect: exporter
+    section: observe
     tier: 2
     question: 伺服器忙、卡住或連線額滿時，exporter 會不會跟著看不到
     signal: >-
@@ -165,6 +241,7 @@ signals:
 
   - id: probe-blast-radius
     aspect: exporter
+    section: observe
     tier: 2
     question: Multi-target 時，壞的是 exporter 還是 member
     signal: >-
@@ -182,6 +259,7 @@ signals:
 
   - id: version-semantics
     aspect: exporter
+    section: observe
     tier: 2
     question: 規則用的 metric 名稱與 label 在這個版本真的存在嗎
     signal: >-
@@ -200,6 +278,7 @@ signals:
   # ---------- availability ----------
   - id: db-up
     aspect: availability
+    section: observe
     tier: 1
     question: Exporter 連得到 mongod 嗎
     signal: >-
@@ -216,6 +295,7 @@ signals:
 
   - id: restart
     aspect: availability
+    section: misuse
     tier: 2
     question: 重啟過嗎
     signal: >-
@@ -230,6 +310,7 @@ signals:
 
   - id: majority-writes
     aspect: availability
+    section: misuse
     tier: 2
     question: w:majority 的寫入會不會一直等
     signal: >-
@@ -247,6 +328,7 @@ signals:
   # ---------- workload ----------
   - id: op-latency
     aspect: workload
+    section: misuse
     tier: 3
     question: 讀、寫、指令的平均延遲
     signal: >-
@@ -261,6 +343,7 @@ signals:
 
   - id: cursors
     aspect: workload
+    section: misuse
     tier: 3
     question: cursor 有沒有大量逾時或累積
     signal: >-
@@ -275,6 +358,7 @@ signals:
 
   - id: asserts
     aspect: workload
+    section: misuse
     tier: 3
     question: 有沒有 regular／warning assert
     signal: >-
@@ -288,9 +372,34 @@ signals:
     upstream: { status: no }
     rules: [rules/targets/mongodb.yml#MongoDBRegularAsserts]
 
+  - id: bad-queries
+    aspect: workload
+    section: misuse
+    tier: 3
+    question: 客戶端送了沒用到 index、沒有上限或跑太久的查詢嗎
+    signal: >-
+      serverStatus 只有全實例的總數，沒有逐查詢資料。沒用到 index：rate(mongodb_ss_metrics_queryExecutor_scannedObjects)（docsExamined）對
+      rate(mongodb_ss_metrics_document{doc_op_type="returned"})（nreturned）的比例變大、mongodb_ss_metrics_queryExecutor_collectionScans_total 增加；
+      queryExecutor_scanned 是 keysExamined。不能用 index 排序：mongodb_ss_metrics_operation_scanAndOrder。
+      跑太久：killedDueToMaxTimeMSExpired（只在客戶端設了 maxTimeMS 時）；--collector.currentopmetrics 的 mongodb_currentop_query_uptime{ns,op,desc}
+      列出執行超過 slow-time（預設 5m）的操作。沒有上限的查詢：open cursor 累積與 getMore 次數（cursors 訊號、mongodb_ss_metrics_commands_getMore_total）。
+      症狀端：op-latency、tickets（排隊）、wt-cache（應用執行緒做 eviction）。
+      名稱在 lab 的 8.0.34 都存在（currentop 只有 fsync_lock_state，因為沒有超過 5 分鐘的操作）；比例門檻與「collection scan 造成延遲」都是推論，沒有實驗
+    metrics: [mongodb_ss_metrics_queryExecutor_scannedObjects, mongodb_ss_metrics_queryExecutor_scanned, mongodb_ss_metrics_document, mongodb_ss_metrics_queryExecutor_collectionScans_total, mongodb_ss_metrics_operation_scanAndOrder, mongodb_ss_metrics_operation_killedDueToMaxTimeMSExpired, mongodb_ss_metrics_commands_getMore_total, mongodb_currentop_query_uptime]
+    evaluate_on: self
+    silent_failure: >-
+      比例是整個實例的平均：一個 collection scan 會被大量用 index 的查詢稀釋；計數器在操作結束時才加，執行中的長查詢只在 currentop 看得到，
+      而 currentopmetrics 預設關
+    evidence: inferred
+    source: mg-src
+    refs: [mg-exp-names, mg-curop-docs-examined, mg-curop-keys-examined, mg-curop-returned, mg-curop-scanandorder, mg-curop-maxtimems, mx-doc-label, mx-flag-currentop, mx-flag-currentop-slow, mx-currentop-uptime]
+    upstream: { status: no, note: "PMM 與 awesome 都沒有 scanned／returned 或 collection scan 的規則" }
+    rules: []
+
   # ---------- saturation ----------
   - id: wt-cache
     aspect: saturation
+    section: misuse
     tier: 2
     question: WiredTiger cache 是不是逼得應用執行緒自己做 eviction
     signal: >-
@@ -307,6 +416,7 @@ signals:
 
   - id: tickets
     aspect: saturation
+    section: misuse
     tier: 2
     question: 操作在排隊等 ticket 或鎖嗎
     signal: >-
@@ -326,6 +436,7 @@ signals:
 
   - id: connections
     aspect: saturation
+    section: misuse
     tier: 2
     question: 連線還有餘裕嗎
     signal: >-
@@ -342,6 +453,7 @@ signals:
   # ---------- replication ----------
   - id: role-detection
     aspect: replication
+    section: misuse
     tier: 2
     question: 每個 replica set 剛好有一台可寫入的 primary 嗎
     signal: >-
@@ -358,26 +470,46 @@ signals:
     upstream: { status: partial, note: "PMM 與 awesome 都有 no primary（avg／sum == 0）；都沒有 > 1" }
     rules: [rules/targets/mongodb.yml#MongoDBNoPrimary, rules/targets/mongodb.yml#MongoDBMultiplePrimaries]
 
-  - id: replication-lag
+  - id: replication-semantics
     aspect: replication
+    section: observe
     tier: 2
     question: Replication 延遲量的是真的嗎
     signal: >-
-      --compatible-mode 的 mongodb_mongod_replset_member_replication_lag{self="1"}：|自己的 optimeDate − PRIMARY 的 optimeDate|，秒為單位。
-      每個 secondary 被每個 exporter 各報一次（lab 3 份，差 1～4 秒），取 self="1"。沒有 compatible mode 時用 mongodb_rs_members_optimeDate（毫秒）在同一個 instance 內相減。
-      閒置時 primary 每 10 秒寫一筆 noop，延遲不會因為沒有寫入而停在 0。沒有 primary 時整組消失，另一條規則檢查「SECONDARY 但沒有延遲數字」
-    metrics: [mongodb_mongod_replset_member_replication_lag, mongodb_rs_members_optimeDate, mongodb_rs_myState]
+      延遲只在 replSetGetStatus 裡看得到 PRIMARY 時才輸出；沒有 primary（選舉中、3 台停 2 台）時整組消失，DOWN 的 member optime 被清成 0、它的 series 也消失。
+      規則檢查「SECONDARY 但沒有延遲數字」。每個 secondary 被每個 exporter 各報一次（lab 3 份，差 1～4 秒），要取 self="1"。
+      閒置時 primary 每 10 秒寫一筆 noop，延遲不會因為沒有寫入而停在 0，但會在 0 與 10 之間跳
+    metrics: [mongodb_mongod_replset_member_replication_lag, mongodb_rs_myState]
     evaluate_on: self
     applies_when: replica set
-    silent_failure: 實測 m3 fsyncLock 35 秒：自報 26、primary 看 31、m2 看 35；閒置時在 0 與 10 之間跳。kill 兩個 secondary 後（前一次執行）延遲 series 0 條；awesome 的 on (set) 永遠回傳空
+    silent_failure: kill 兩個 secondary 後（前一次執行）延遲 series 0 條，「lag > N」回傳空；awesome 的 on (set) 永遠回傳空
     evidence: tested
     source: mg-lab
-    refs: [mg-exp, mx-compat-gotprimary, mx-compat-lag, mx-compat-abs, mx-compat-self, mg-rs-optimedate, mg-set-down-optime, mg-noop-interval, pmm-lag, awe-mg-lag]
-    upstream: { status: partial, note: "PMM 的 lag 在 Prometheus 是語法錯誤（MetricsQL 才能跑）；awesome 的 on (set) 對不到 label" }
-    rules: [rules/targets/mongodb.yml#MongoDBReplicationLag, rules/targets/mongodb.yml#MongoDBReplicationLagUnknown]
+    refs: [mg-exp, mx-compat-gotprimary, mx-compat-lag, mx-compat-self, mg-set-down-optime, mg-noop-interval, awe-mg-lag]
+    upstream: { status: no, note: "awesome 的 on (set) 對不到 label" }
+    rules: [rules/targets/mongodb.yml#MongoDBReplicationLagUnknown]
+
+  - id: replication-lag
+    aspect: replication
+    section: misuse
+    tier: 2
+    question: secondary 落後 primary 太多嗎
+    signal: >-
+      --compatible-mode 的 mongodb_mongod_replset_member_replication_lag{self="1"}：|自己的 optimeDate − PRIMARY 的 optimeDate|，秒為單位。
+      沒有 compatible mode 時用 mongodb_rs_members_optimeDate（毫秒）在同一個 instance 內相減。量得準不準見 replication-semantics
+    metrics: [mongodb_mongod_replset_member_replication_lag, mongodb_rs_members_optimeDate]
+    evaluate_on: self
+    applies_when: replica set
+    silent_failure: 實測 m3 fsyncLock 35 秒：自報 26、primary 看 31、m2 看 35
+    evidence: tested
+    source: mg-lab
+    refs: [mg-exp, mx-compat-lag, mx-compat-abs, mx-compat-self, mg-rs-optimedate, pmm-lag]
+    upstream: { status: partial, note: "PMM 的 lag 在 Prometheus 是語法錯誤（MetricsQL 才能跑）" }
+    rules: [rules/targets/mongodb.yml#MongoDBReplicationLag]
 
   - id: oplog-window
     aspect: replication
+    section: misuse
     tier: 2
     question: oplog 能讓 secondary 離線多久
     signal: >-
@@ -396,6 +528,7 @@ signals:
 
   - id: majority-commit-lag
     aspect: replication
+    section: misuse
     tier: 2
     question: majority commit point 有沒有停住
     signal: >-
@@ -414,6 +547,7 @@ signals:
   # ---------- cluster ----------
   - id: member-health
     aspect: cluster
+    section: misuse
     tier: 2
     question: 每個 member 在其他 member 眼中健康嗎
     signal: >-
@@ -430,6 +564,7 @@ signals:
 
   - id: elections
     aspect: cluster
+    section: misuse
     tier: 2
     question: 最近有沒有選舉、選得太頻繁嗎
     signal: >-
@@ -448,6 +583,7 @@ signals:
 
   - id: sharding-balancer
     aspect: cluster
+    section: misuse
     tier: 3
     question: sharded cluster 的 chunk 搬移是不是太頻繁、balancer 有沒有開
     signal: >-
@@ -465,6 +601,7 @@ signals:
   # ---------- maintenance ----------
   - id: ttl-monitor
     aspect: maintenance
+    section: misuse
     tier: 3
     question: TTL monitor 有在跑嗎
     signal: >-
@@ -481,6 +618,7 @@ signals:
   # ---------- protection ----------
   - id: checkpoint
     aspect: protection
+    section: misuse
     tier: 2
     question: WiredTiger checkpoint 成功、來得及嗎
     signal: >-
@@ -499,6 +637,7 @@ signals:
   # ---------- capacity ----------
   - id: oplog-growth
     aspect: capacity
+    section: misuse
     tier: 2
     question: oplog 有沒有長到超過設定大小
     signal: >-
@@ -515,6 +654,7 @@ signals:
 
   - id: disk-usage
     aspect: capacity
+    section: misuse
     tier: 2
     question: dbPath 所在的檔案系統快滿了嗎
     signal: >-
@@ -528,36 +668,74 @@ signals:
     upstream: { status: partial, note: "PMM 有 fsUsedSize / fsTotalSize > 85%，前提是開了 dbstats" }
     rules: [rules/targets/mongodb.yml#MongoDBDiskSpaceLow]
 
+# 不正確的請求：客戶端送了寫法不好的查詢時，看得到什麼、看不到什麼。
+bad_queries:
+  - case: collection scan、缺 index
+    signals: [bad-queries, op-latency, wt-cache, tickets]
+    visible: >-
+      rate(mongodb_ss_metrics_queryExecutor_scannedObjects) 對 rate(mongodb_ss_metrics_document{doc_op_type="returned"}) 的比例變大、
+      queryExecutor_collectionScans_total 增加；症狀是 opLatencies、ticket 排隊、應用執行緒做 eviction
+    not_visible: 哪個 namespace、哪種 query shape、執行計畫（只在 profiler 與 slow query log）
+    refs: [mg-exp-names, mg-curop-docs-examined, mg-curop-keys-examined, mg-curop-returned, mx-doc-label]
+  - case: 不能用 index 排序（記憶體內排序）
+    signals: [bad-queries]
+    visible: mongodb_ss_metrics_operation_scanAndOrder 增加（計畫裡有 SORT stage）
+    not_visible: 哪個查詢、排序用了多少記憶體
+    refs: [mg-curop-scanandorder, mg-exp-names]
+  - case: 沒有上限的查詢（大結果集、cursor 一直開著）
+    signals: [bad-queries, cursors]
+    visible: mongodb_ss_metrics_cursor_open 累積、getMore 次數、cursor 閒置 10 分鐘後的 timedOut
+    not_visible: 單一查詢回傳多少位元組、是哪個應用
+    refs: [mg-exp-names, mg-cursor-timeout, mg-cursor-timedout]
+  - case: 長時間執行的操作或持有鎖
+    signals: [bad-queries, tickets, exporter-query-timeout]
+    visible: >-
+      --collector.currentopmetrics 的 mongodb_currentop_query_uptime{ns,op}（超過 slow-time，預設 5m）；設了 maxTimeMS 時 killedDueToMaxTimeMSExpired；
+      globalLock_currentQueue；持有 global 鎖時 exporter 只回 44 個 sample、mongodb_up 不存在（實測 sleep lock:w 12 秒）
+    not_visible: currentopmetrics 沒開時執行中的操作；沒設 maxTimeMS 的長查詢沒有計數
+    refs: [mx-flag-currentop, mx-flag-currentop-slow, mx-currentop-uptime, mg-curop-maxtimems, mg-exp, mg-sleep-global]
+  - case: 大文件、接近 16MB 上限
+    signals: [bad-queries]
+    visible: 只有 collstats collector 的每個 collection 平均大小（lab 的 --collect-all 有 avgObjSize）
+    not_visible: 文件大小的分布、哪一筆大；serverStatus 沒有這類計數
+    refs: [mx-flag-collectall, mg-exp]
+
 blind_spots:
   - what: 每個查詢的慢查詢、執行計畫、collection scan
     category: database
     why: serverStatus 只有總數（opLatencies、queryExecutor.scanned）；逐查詢資料在 profiler（system.profile）與 slow query log，profiler 預設關
     workaround: "`--collector.profile`（只算 system.profile 的筆數）、slow query log 進 log 管線，或 PMM Query Analytics"
+    options: "建議：slow query log 進 log 管線；或 PMM Query Analytics；profiler 只在需要時短暫打開"
     section: targets/mongodb.md#blind-spots
   - what: collection 與 index 層級的大小、延遲與使用率
     category: exporter
     why: 要 --collector.collstats／indexstats 加 --discovering-mode 或列出 namespace，每次 scrape 對每個 collection 跑 $collStats／$indexStats，成本依 collection 數成長
     workaround: "只列重要的 namespace（`--mongodb.collstats-colls`），並用 `--collector.collstats-limit` 設上限；或另開一個長 scrape_interval 的 job"
+    options: "建議：--mongodb.collstats-colls 只列重要的 namespace，設 --collector.collstats-limit，或長間隔的獨立 job"
     section: targets/mongodb.md#blind-spots
   - what: sharded cluster（mongos、config server、balancer、chunk 分布）
     category: other
     why: lab 只有 replica set；exporter 的 sharding metric 只在 mongos 上、compatible mode 才有，沒有驗證
     workaround: 每個 shard 的每個 member 各一個 exporter、每個 mongos 一個；balancer 的狀態另用 `sh.status()` 定期檢查
+    options: "建議：每個 shard member 與 mongos 各一個 exporter；balancer 狀態用 sh.status() 定期檢查（未驗證）"
     section: targets/mongodb.md#cluster
   - what: FTDC（diagnostic.data）保留了多久、在不在持久磁碟
     category: database
     why: 目錄上限 250MB 循環覆寫，能涵蓋多久依負載；exporter 讀的是 getDiagnosticData 的最新樣本，不是檔案
     workaround: 盤點時確認 dbPath 在持久磁碟、`diagnosticDataCollectionDirectorySizeMB` 夠大；事件後先複製目錄
+    options: "建議：盤點 dbPath 在持久磁碟、diagnosticDataCollectionDirectorySizeMB 夠大；事件後先複製目錄"
     section: targets/mongodb.md#protection
   - what: 備份有沒有成功
     category: other
     why: MongoDB 沒有內建排程備份；Percona Backup for MongoDB 要 `--collector.pbm`，mongodump／檔案快照要自己的 metric
     workaround: "`--collector.pbm`（PMM 的 PBM 範本）或備份工具的 textfile"
+    options: "建議：--collector.pbm 或備份工具的 textfile metric"
     section: targets/mongodb.md#protection
   - what: 主機記憶體、swap、磁碟延遲、CPU、OOM kill
     category: other
     why: 不在 serverStatus 裡（`systemMetrics` 只在 Linux 的 FTDC 有一部分）；Atlas 的 IOPS、swap、steal 建議都是主機層
     workaround: node_exporter 與 cAdvisor。主機層規則只讀碼，host lab 之後排程
+    options: "已補：node_exporter 與 cAdvisor 的記憶體、swap、磁碟延遲、CPU、OOM 規則（主機層只讀碼）"
     section: targets/mongodb.md#saturation
     covered_by:
       tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"
@@ -569,9 +747,29 @@ blind_spots:
     category: other
     why: node_exporter 只看得到完成的 IO 數與時間，不知道雲端磁碟的 IOPS 上限；steal 有 node_cpu_seconds_total{mode="steal"}，主機層卡片沒有規則
     workaround: 雲端供應商的磁碟 metric；steal 用 rate(node_cpu_seconds_total{mode="steal"}) 畫圖
+    options: "建議：雲端供應商的磁碟 metric；steal 用 node_cpu_seconds_total{mode=\"steal\"} 畫圖"
     section: targets/mongodb.md#saturation
   - what: 憑證到期、版本漏洞
     category: other
     why: TLS 沒開時 `security.SSLServerCertificateExpirationDate` 不存在；PMM 的 CVE 範本用 `mongodb_version_info`（compatible mode）
     workaround: blackbox 的 TLS 探測；版本另外盤點
+    options: "建議：blackbox 的 TLS 探測；版本另外盤點"
     section: targets/mongodb.md#protection
+  - what: 哪個 namespace、哪種查詢形狀造成 collection scan 或 scanned／returned 偏高
+    category: database
+    why: queryExecutor、document、scanAndOrder 都是全實例的計數器（bad-queries 訊號），沒有 namespace 或 query shape；逐查詢的 docsExamined、planSummary 只在 profiler 與 slow query log
+    workaround: slow query log 進 log 管線；或 --collector.profile 只看 system.profile 的筆數
+    options: "建議：slow query log 進 log 管線；--collector.profile 只算 system.profile 筆數"
+    section: targets/mongodb.md#workload
+  - what: 大文件（接近 16MB 上限）與過大的回應
+    category: database
+    why: serverStatus 沒有文件大小的分布；collstats collector 的 avgObjSize（lab 的 --collect-all 有）只是每個 collection 的平均
+    workaround: slow query log 的回應大小；或應用端在寫入前檢查大小
+    options: "建議：slow query log 的回應大小；應用端在寫入前檢查文件大小"
+    section: targets/mongodb.md#workload
+  - what: 執行中的長操作（currentopmetrics 沒開時）
+    category: exporter
+    why: 計數器在操作結束時才加；--collector.currentopmetrics 預設關，開了也只列超過 slow-time（預設 5m）的操作
+    workaround: 開 --collector.currentopmetrics 並調短 slow-time；或定期 db.currentOp() 進 log 管線
+    options: "建議：開 --collector.currentopmetrics 並調短 slow-time；或定期 db.currentOp() 進 log 管線"
+    section: targets/mongodb.md#workload

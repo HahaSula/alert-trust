@@ -76,12 +76,80 @@ silent_failures:
     source: vk-lab
     refs: [vk-exp, rx-kg-scan, rx-kg-memusage, rx-kg-loop]
 
+# 五段框架 2：正確使用。只寫原始碼推理（code）、本機小實驗（tested）或標明的官方文件（doc）。
+usage:
+  - id: connection-timeout
+    text: >-
+      --connection-timeout（連線、讀、寫共用，預設 15s）設得比 scrape_timeout 短。實測 2s：伺服器忙 7 秒時 exporter 2.2 秒回應、up=1、redis_up=0、
+      err label 帶原因；預設值時 Prometheus 先放棄，up=0、redis_up 消失
+    evidence: tested
+    refs: [vk-exp, rx-flag-timeout, rx-dial-timeouts]
+  - id: exporter-acl-config
+    text: >-
+      exporter 帳號的 ACL 要允許 CONFIG（CONFIG GET）；沒有時不報錯，redis_up=1、last_scrape_error=0，所有 redis_config_*（maxclients、maxmemory…）消失
+    evidence: tested
+    refs: [vk-exp2, rx-config-get, rx-config-get-silent]
+  - id: script-read-only
+    text: >-
+      --script 搭配 --lua-script-read-only；script 出錯時 exporter 把 redis_up 設成 0，要另看 redis_script_result（1 成功、0 錯誤、2 空結果）
+    evidence: tested
+    refs: [vk-exp, rx-lua-err-up, rx-lua-result0, rx-lua-ro]
+  - id: heartbeat-key
+    text: >-
+      要秒數的複寫延遲：主節點每秒 SET at:heartbeat <unix 秒>，複本端 exporter 加 --check-single-keys=db0=at:heartbeat
+    evidence: tested
+    refs: [vk-exp2]
+  - id: key-groups-separate-job
+    text: >-
+      --check-key-groups 每次 scrape 掃整個 keyspace（每批 1000 個 key 一個不可中斷的 EVALSHA），只放在長 scrape_interval 的獨立 job 或複本上；
+      --skip-checkkeys-for-role-master 不跳過 key group。實測 40 萬個 key 時 slowlog 128 筆全被它佔滿
+    evidence: tested
+    refs: [vk-exp, rx-kg-loop, rx-kg-scan, rx-flag-skip-master, rx-flag-batch]
+  - id: cluster-label
+    text: >-
+      同一組主從的 target 加同一個 cluster label，主節點計數依它分組、依 run_id 去重；awesome 的 count() 不分組，同一台被三個 job 抓時算成 3
+    evidence: tested
+    refs: [vk-exp, awe-missing-master, awe-multi-master]
+  - id: sentinel-exporter
+    text: 每台 Sentinel 各一個 exporter（redis.addr 指向 26379，job="sentinel"），才有 CKQUORUM、ok_sentinels 與 sentinel_tilt
+    evidence: tested
+    refs: [vk-exp, vk-exp2, rx-sen-section, rx-sen-ckquorum]
+  - id: latency-monitor-threshold
+    text: latency-monitor-threshold 預設 0（關閉），不打開就沒有 redis_latency_spike_* series
+    evidence: tested
+    refs: [vk-exp, vk-cfg-latency-threshold, r72-conf-latency, vdoc-latmon-enable]
+  - id: maxmemory-policy
+    text: >-
+      設 maxmemory（預設 0，比例規則會除以 0）並選政策：noeviction 與「沒有 TTL key 的 volatile-*」不淘汰，碰到上限直接拒絕寫入；
+      實測 allkeys-lru 才淘汰
+    evidence: tested
+    refs: [vk-exp, vk-evict-noeviction, vk-evict-nothing, vdoc-lru-volatile, rx-map-maxmemory]
+  - id: repl-backlog-size
+    text: >-
+      repl-backlog-size 依「斷線多久 × 寫入速率」設；預設 Valkey 10MB、Redis 7.2／8.10 1MB。實測 1MB backlog、斷線 25 秒寫 3MB 就 full resync
+    evidence: tested
+    refs: [vk-exp, vk-cfg-backlog, r72-cfg-backlog, r8-cfg-backlog]
+  - id: maxclients-headroom
+    text: maxclients 要留餘裕：Valkey 沒有保留給監控的連線，額滿時 exporter 也被拒，連線數 metric 正好在那段時間沒有資料
+    evidence: tested
+    refs: [vk-exp, vk-maxclients-reject, vk-cfg-maxclients]
+  - id: stop-writes-on-bgsave-error
+    text: >-
+      stop-writes-on-bgsave-error 預設 yes：BGSAVE 失敗後寫入與 PING 都回 MISCONF，redis_up 仍是 1；要知道這個行為，並監控 redis_rdb_last_bgsave_status
+    evidence: tested
+    refs: [vk-exp, vk-misconf-cond, vk-cfg-stop-writes, vk-misconf-ping]
+  - id: persistence-and-autorestart
+    text: 主節點沒有持久化又會被自動重啟時，重啟後的空資料會同步到所有複本；兩者不要同時成立
+    evidence: doc
+    refs: [vdoc-admin-persistence]
+
 contracts: [exporter-deadline]
 
 signals:
   # ---------- exporter：監測自檢 ----------
   - id: exporter-up
     aspect: exporter
+    section: observe
     tier: 1
     question: Exporter 抓得到嗎
     signal: >-
@@ -98,6 +166,7 @@ signals:
 
   - id: collectors-present
     aspect: exporter
+    section: observe
     tier: 1
     question: INFO 成功時，CONFIG 這組 metric 還在嗎
     signal: >-
@@ -115,6 +184,7 @@ signals:
 
   - id: collector-success
     aspect: exporter
+    section: observe
     tier: 1
     question: 這次 scrape 有沒有出錯（含 --script）
     signal: >-
@@ -131,6 +201,7 @@ signals:
 
   - id: scrape-budget
     aspect: exporter
+    section: observe
     tier: 2
     question: Scrape 來得及在 scrape_timeout 內完成嗎
     signal: >-
@@ -148,6 +219,7 @@ signals:
 
   - id: probe-blast-radius
     aspect: exporter
+    section: observe
     tier: 2
     question: Multi-target exporter 本身活著嗎
     signal: >-
@@ -165,6 +237,7 @@ signals:
 
   - id: exporter-query-timeout
     aspect: exporter
+    section: observe
     tier: 2
     question: 伺服器忙或連線額滿時，exporter 會不會跟著看不到
     signal: >-
@@ -184,6 +257,7 @@ signals:
 
   - id: key-scan-cost
     aspect: exporter
+    section: observe
     tier: 2
     question: --check-keys／--check-key-groups 會不會拖慢伺服器
     signal: >-
@@ -203,6 +277,7 @@ signals:
 
   - id: version-semantics
     aspect: exporter
+    section: observe
     tier: 2
     question: 這個版本真的有輸出規則用到的 metric 嗎
     signal: >-
@@ -222,6 +297,7 @@ signals:
   # ---------- availability ----------
   - id: db-up
     aspect: availability
+    section: observe
     tier: 1
     question: Exporter 連得到 Valkey、INFO 回得來嗎
     signal: >-
@@ -237,6 +313,7 @@ signals:
 
   - id: writes-rejected
     aspect: availability
+    section: misuse
     tier: 2
     question: 伺服器活著，但寫入被拒絕嗎
     signal: >-
@@ -254,6 +331,7 @@ signals:
 
   - id: restart
     aspect: availability
+    section: misuse
     tier: 2
     question: 重啟過嗎？正在載入資料嗎
     signal: >-
@@ -271,6 +349,7 @@ signals:
   # ---------- workload ----------
   - id: slow-commands
     aspect: workload
+    section: misuse
     tier: 3
     question: 有沒有慢指令或延遲尖峰
     signal: >-
@@ -291,6 +370,7 @@ signals:
 
   - id: keyspace-hit-ratio
     aspect: workload
+    section: misuse
     tier: 3
     question: 讀取命中率（當 cache 用時）
     signal: >-
@@ -304,9 +384,35 @@ signals:
     upstream: { status: no }
     rules: [rules/targets/valkey.yml#ValkeyKeyspaceHitRatioLow]
 
+  - id: bad-commands
+    aspect: workload
+    section: misuse
+    tier: 3
+    question: 客戶端送了會卡住主執行緒或撐大記憶體的指令嗎（KEYS、大 HGETALL／SMEMBERS、長 Lua、大 key、沒有 TTL）
+    signal: >-
+      這些都沒有專門的 metric，只能從下列痕跡推：
+      依指令看——redis_commands_total{cmd}、redis_commands_duration_seconds_total{cmd} 與 redis_commands_latencies_usec{cmd}（latency-tracking 預設開）中
+      keys、hgetall、smembers、lrange、eval／evalsha 的次數與耗時；
+      執行太久——slowlog／commandlog（slow-commands）、主執行緒 CPU（main-thread），以及 exporter 自己的 INFO 排在後面（exporter-query-timeout，實測用 DEBUG SLEEP 7 代替長指令）；
+      請求或回應太大——Valkey 8.1 起 commandlog 的 large-request／large-reply（redis_commandlog_large_request_length、redis_commandlog_large_reply_length），
+      回應撐爆 output buffer 時 output-buffer-disconnects；
+      沒有 TTL——redis_db_keys − redis_db_keys_expiring；noeviction 或 volatile-*（沒有 TTL key）時碰到 maxmemory 直接拒絕寫入（maxmemory-eviction、writes-rejected）。
+      這些 metric 的名稱在 lab 的 Valkey 9.1.3 都存在；「依指令名稱就能找到壞指令」是推論，沒有實際送 KEYS 或大 HGETALL 測過
+    metrics: [redis_commands_total, redis_commands_duration_seconds_total, redis_commands_latencies_usec_bucket, redis_commandlog_large_request_length, redis_commandlog_large_reply_length, redis_db_keys, redis_db_keys_expiring]
+    evaluate_on: self
+    silent_failure: >-
+      slowlog／commandlog 只記執行時間，不含排隊等待；exporter 只輸出長度、最後一筆的 id 與耗時，看不到是哪個 key、哪個 client。
+      exporter 的 key group EVALSHA 也會進 slowlog，把應用的條目擠掉
+    evidence: inferred
+    source: vk-lab
+    refs: [vk-exp-names, vk-cfg-latency-tracking, vk-cfg-commandlog-slower, rx-cmdlog, rx-slowlog-len, rx-slowlog-lastid, vk-evict-nothing, vdoc-lru-volatile, vk-exp]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有依指令或 commandlog 的規則" }
+    rules: []
+
   # ---------- saturation ----------
   - id: maxmemory-eviction
     aspect: saturation
+    section: misuse
     tier: 2
     question: 記憶體碰到 maxmemory 時，是淘汰還是拒絕寫入
     signal: >-
@@ -327,6 +433,7 @@ signals:
 
   - id: fragmentation
     aspect: saturation
+    section: misuse
     tier: 3
     question: RSS 和 used_memory 差多少（碎片、swap）
     signal: >-
@@ -342,6 +449,7 @@ signals:
 
   - id: connections
     aspect: saturation
+    section: misuse
     tier: 2
     question: 連線還有餘裕嗎
     signal: >-
@@ -359,6 +467,7 @@ signals:
 
   - id: blocked-clients
     aspect: saturation
+    section: misuse
     tier: 3
     question: 有多少客戶端卡在阻塞指令
     signal: >-
@@ -374,6 +483,7 @@ signals:
 
   - id: main-thread
     aspect: saturation
+    section: misuse
     tier: 3
     question: 主執行緒的 CPU 用滿了嗎
     signal: >-
@@ -390,6 +500,7 @@ signals:
 
   - id: output-buffer-disconnects
     aspect: saturation
+    section: misuse
     tier: 2
     question: 有 client 或複本因為 output buffer 超過上限被斷線嗎
     signal: >-
@@ -408,6 +519,7 @@ signals:
   # ---------- replication ----------
   - id: replication-link
     aspect: replication
+    section: misuse
     tier: 2
     question: 複本和主節點的連線還在嗎、斷了多久
     signal: >-
@@ -424,28 +536,47 @@ signals:
     upstream: { status: partial, note: "awesome 有 master_link_up == 0；mixin 沒有" }
     rules: [rules/targets/valkey.yml#ValkeyReplicaLinkDown, rules/targets/valkey.yml#ValkeyReplicaLinkDownLong]
 
-  - id: replication-lag
+  - id: replication-semantics
     aspect: replication
+    section: observe
     tier: 2
     question: Replication 延遲量的是真的嗎
     signal: >-
-      位元組：主節點端 redis_master_repl_offset − redis_connected_slave_offset_bytes{slave_ip}。秒：Valkey／Redis 沒有「最後套用時間」，
-      slaveN 那一行的 lag 是距上次 REPLCONF ACK 幾秒（每秒一次），不是資料延遲。真正的秒數要靠 heartbeat key：主節點每秒 SET at:heartbeat <unix 秒>，
-      複本端 exporter --check-single-keys=db0=at:heartbeat，time() − redis_key_value（實測平常 2.5～3.2 秒、斷線 20 秒時 25 秒）。
-      斷線的複本在主節點 INFO 整列消失，所以還要看 redis_connected_slaves 有沒有變少
-    metrics: [redis_master_repl_offset, redis_connected_slave_offset_bytes, redis_connected_slave_lag_seconds, redis_connected_slaves, redis_slave_repl_offset, redis_key_value]
+      秒：Valkey／Redis 沒有「最後套用時間」，slaveN 那一行的 lag 是距上次 REPLCONF ACK 幾秒（每秒一次），不是資料延遲；
+      ACK 超過 10 秒沒更新代表 offset 數字已經舊了。真正的秒數要靠 heartbeat key（見 replication-lag）。
+      斷線的複本在主節點 INFO 整列消失，它的 lag 與 offset series 跟著不見，所以要看 redis_connected_slaves 有沒有比一小時內的最大值少
+    metrics: [redis_connected_slave_lag_seconds, redis_connected_slaves]
     evaluate_on: self
     applies_when: 主從複寫
     silent_failure: >-
       實測複本斷線：主節點的 connected_slave_lag_seconds 與 offset 整條消失、connected_slaves 0；「lag > N」規則回傳空。Sentinel 的 ok_slaves 18 秒後仍是 1
     evidence: tested
     source: vk-lab
-    refs: [vk-exp, vk-exp2, vk-info-slave-lag, vk-info-slave-line, rx-slave-lag, rx-map-master-offset]
-    upstream: { status: partial, note: "awesome 用 delta(connected_slaves) 與 changes()；沒有位元組或秒數延遲" }
-    rules: [rules/targets/valkey.yml#ValkeyReplicationLagBytes, rules/targets/valkey.yml#ValkeyReplicaCountDropped, rules/targets/valkey.yml#ValkeyReplicaAckStale, rules/targets/valkey.yml#ValkeyReplicationHeartbeatLag]
+    refs: [vk-exp, vk-exp2, vk-info-slave-lag, vk-info-slave-line, rx-slave-lag]
+    upstream: { status: partial, note: "awesome 用 delta(connected_slaves) 與 changes()" }
+    rules: [rules/targets/valkey.yml#ValkeyReplicaCountDropped, rules/targets/valkey.yml#ValkeyReplicaAckStale]
+
+  - id: replication-lag
+    aspect: replication
+    section: misuse
+    tier: 2
+    question: 複本落後主節點太多嗎
+    signal: >-
+      位元組：主節點端 redis_master_repl_offset − redis_connected_slave_offset_bytes{slave_ip}，接近 repl-backlog-size 時重連會變成 full resync。
+      秒：heartbeat key，主節點每秒 SET at:heartbeat <unix 秒>，複本端 exporter --check-single-keys=db0=at:heartbeat，time() − redis_key_value
+      （實測平常 2.5～3.2 秒、斷線 20 秒時 25 秒）。延遲量得準不準見 replication-semantics
+    metrics: [redis_master_repl_offset, redis_connected_slave_offset_bytes, redis_slave_repl_offset, redis_key_value]
+    evaluate_on: self
+    applies_when: 主從複寫
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp, vk-exp2, rx-map-master-offset]
+    upstream: { status: no, note: "awesome 與 mixin 都沒有位元組或秒數延遲" }
+    rules: [rules/targets/valkey.yml#ValkeyReplicationLagBytes, rules/targets/valkey.yml#ValkeyReplicationHeartbeatLag]
 
   - id: full-resync
     aspect: replication
+    section: misuse
     tier: 2
     question: 斷線重連有沒有變成 full resync
     signal: >-
@@ -465,6 +596,7 @@ signals:
 
   - id: role-detection
     aspect: replication
+    section: misuse
     tier: 2
     question: 每組主從剛好有一台主節點嗎
     signal: >-
@@ -486,6 +618,7 @@ signals:
   # ---------- cluster：Sentinel 或 Valkey Cluster ----------
   - id: sentinel-quorum
     aspect: cluster
+    section: misuse
     tier: 2
     question: Sentinel 還能做 failover 嗎
     signal: >-
@@ -503,14 +636,31 @@ signals:
     refs: [vk-exp, vk-exp2, vk-sen-quorum, vk-sen-ckquorum, vk-sen-tilt, vk-sen-info-tilt, rx-sen-ckquorum, rx-sen-oksentinels-init, rx-sen-status, rx-sen-section, vdoc-sentinel-ckquorum, vdoc-sentinel-tilt]
     upstream: { status: no, note: "mixin 與 awesome 都沒有 Sentinel 規則" }
     rules:
-      - rules/targets/valkey.yml#ValkeySentinelMissing
       - rules/targets/valkey.yml#ValkeySentinelNoQuorum
       - rules/targets/valkey.yml#ValkeySentinelPeersDown
       - rules/targets/valkey.yml#ValkeySentinelMasterDown
-      - rules/targets/valkey.yml#ValkeySentinelTilt
+
+  - id: sentinel-observed
+    aspect: cluster
+    section: observe
+    tier: 2
+    question: Sentinel 有被抓到、它回報的狀態是現在的嗎
+    signal: >-
+      absent(up{job="sentinel"} == 1)：沒有任何一台 Sentinel 被抓到時，Sentinel 規則全部回傳空。redis_sentinel_tilt == 1：TILT 期間 Sentinel 照常收資料但不判斷 sdown、
+      不做 failover，redis_sentinel_master_status 停在 ok，看起來一切正常
+    metrics: [up, redis_sentinel_tilt, redis_sentinel_master_status]
+    evaluate_on: self
+    applies_when: Sentinel
+    silent_failure: 實測 TILT 期間主節點被 pause 45 秒，master_status 一直是 ok、config-epoch 不變、沒有 failover
+    evidence: tested
+    source: vk-lab
+    refs: [vk-exp2, vk-sen-tilt, vk-sen-info-tilt, vdoc-sentinel-tilt]
+    upstream: { status: no, note: "mixin 與 awesome 都沒有 Sentinel 規則" }
+    rules: [rules/targets/valkey.yml#ValkeySentinelMissing, rules/targets/valkey.yml#ValkeySentinelTilt]
 
   - id: cluster-state
     aspect: cluster
+    section: misuse
     tier: 2
     question: Valkey Cluster 的 slot 都有人負責嗎
     signal: >-
@@ -529,6 +679,7 @@ signals:
   # ---------- maintenance ----------
   - id: expire-cycle
     aspect: maintenance
+    section: misuse
     tier: 3
     question: 過期 key 有被及時清掉嗎
     signal: >-
@@ -544,6 +695,7 @@ signals:
   # ---------- protection ----------
   - id: rdb-persistence
     aspect: protection
+    section: misuse
     tier: 2
     question: RDB 快照成功嗎？失敗時寫入還進得來嗎
     signal: >-
@@ -565,6 +717,7 @@ signals:
 
   - id: aof-persistence
     aspect: protection
+    section: misuse
     tier: 2
     question: AOF 寫入、fsync、rewrite 成功嗎
     signal: >-
@@ -581,6 +734,7 @@ signals:
 
   - id: fork-latency
     aspect: protection
+    section: misuse
     tier: 3
     question: fork 花多久、copy-on-write 吃多少記憶體
     signal: >-
@@ -598,6 +752,7 @@ signals:
   # ---------- capacity ----------
   - id: memory-growth
     aspect: capacity
+    section: misuse
     tier: 3
     question: 記憶體與 key 數的成長會不會碰到 maxmemory
     signal: >-
@@ -617,11 +772,47 @@ not_applicable_aspects:
       Cluster 的 PFAIL／FAIL、多數派判斷都在各自的程式裡，核心的主從複寫只有 REPLICAOF 與 PSYNC。這時「誰是主節點」由 replication 面向的 role-detection 回答
     refs: [vk-sen-sdown, vk-sen-quorum, vk-cl-minority, vk-info-role]
 
+# 不正確的請求：客戶端送了寫法不好的指令時，看得到什麼、看不到什麼。
+bad_queries:
+  - case: KEYS、大集合的 HGETALL／SMEMBERS／LRANGE 這類 O(N) 指令
+    signals: [bad-commands, slow-commands, main-thread, exporter-query-timeout]
+    visible: >-
+      redis_commands_latencies_usec{cmd}、redis_commands_duration_seconds_total{cmd} 依指令名稱的耗時；slowlog last_id 增加、
+      redis_last_slow_execution_duration_seconds；主執行緒 CPU 接近 1 核；指令夠長時 exporter 的 INFO 排在後面（實測 DEBUG SLEEP 7：up=0 或 redis_up=0）
+    not_visible: 哪個 key、哪些參數、哪個 client（exporter 只送 SLOWLOG LEN 與 SLOWLOG GET 1）
+    refs: [vk-exp, vk-exp-names, vk-cfg-latency-tracking, rx-slowlog-len, rx-slowlog-lastid, rx-flag-timeout]
+  - case: Lua script 長時間佔住主執行緒
+    signals: [bad-commands, exporter-query-timeout, slow-commands, main-thread]
+    visible: >-
+      執行中只看得到 exporter 自己被卡住（up=0，或 --connection-timeout 較短時 redis_up=0 帶 err）；結束後 eval／evalsha 的耗時與 slowlog 條目
+      （實測 exporter 的 key group EVALSHA 每批 1.2～2ms 也會進 slowlog）
+    not_visible: script 還在跑多久、內容是什麼；BUSY 錯誤是否出現在 redis_errors_total 沒有依據
+    refs: [vk-exp, rx-flag-timeout, rx-dial-timeouts, rx-kg-loop]
+  - case: 大 key、大請求與大回應
+    signals: [bad-commands, output-buffer-disconnects, key-scan-cost]
+    visible: >-
+      Valkey 8.1 起 commandlog 的 large-request／large-reply 長度；回應撐爆 client-output-buffer-limit 時 redis_client_output_buffer_limit_disconnections_total 增加；
+      開了 --check-key-groups 時 redis_key_group_memory_usage_bytes
+    not_visible: 是哪個 key 大（Valkey 9.1 沒有 INFO KEYSIZES；key group 每次 scrape 掃整個 keyspace）
+    refs: [vk-exp-names, rx-cmdlog, res-vk-cobl-incr, rx-kg-memusage, r8-info-keysizes]
+  - case: 寫入沒有 TTL，又用 noeviction 或 volatile-*
+    signals: [bad-commands, maxmemory-eviction, writes-rejected, memory-growth]
+    visible: >-
+      redis_db_keys − redis_db_keys_expiring；碰到 maxmemory 時 redis_errors_total{err="OOM"} 出現、evicted_keys 一直是 0（實測 noeviction 與沒有 TTL key 的 volatile-lru）
+    not_visible: 哪些 key 沒有 TTL
+    refs: [vk-exp, vk-evict-nothing, vk-evict-noeviction, vdoc-lru-volatile, vk-oom-reject]
+  - case: 大量阻塞指令（BLPOP、XREAD BLOCK）在等
+    signals: [blocked-clients]
+    visible: redis_blocked_clients 與 redis_total_blocking_keys（實測一個 BLPOP：兩者都是 1）
+    not_visible: 等的是哪個 key、哪個 client
+    refs: [vk-exp, vk-info-blocked, rx-map-blocked]
+
 blind_spots:
   - what: 複本斷線多久（`master_link_down_since_seconds`）、`min_slaves_good_slaves`、`total_forks`
     category: exporter
     why: INFO 有，exporter 的對照表沒有這幾個欄位
     workaround: "`--script` 讀 INFO replication／stats"
+    options: "已補：valkey-extra.lua（--script）讀 INFO replication／stats"
     section: targets/valkey.md#blind-spots
     covered_by:
       tool: "redis_exporter v1.97.0 --script"
@@ -633,6 +824,7 @@ blind_spots:
     category: database
     why: Valkey／Redis 只記 offset，沒有「最後套用的寫入時間」；slaveN 的 lag 是距上次 ACK 幾秒
     workaround: heartbeat key（主節點每秒寫入時間，複本端讀）
+    options: "已補：主節點每秒寫 heartbeat key，複本端 --check-single-keys 讀取"
     section: targets/valkey.md#blind-spots
     covered_by:
       tool: "redis_exporter v1.97.0 --check-single-keys"
@@ -644,6 +836,7 @@ blind_spots:
     category: database
     why: Valkey 9.1 沒有 key 大小分布（Redis 8 才有 INFO KEYSIZES）；只能逐 key 用 MEMORY USAGE
     workaround: "`--check-key-groups`（每次 scrape 掃整個 keyspace，大實例用獨立的長間隔 job 或只在複本上跑）；或離線分析 RDB"
+    options: "建議：長間隔的獨立 job 跑 --check-key-groups；Redis 8 用 INFO KEYSIZES；或離線分析 RDB"
     section: targets/valkey.md#blind-spots
     covered_by:
       tool: "redis_exporter v1.97.0 --check-key-groups"
@@ -655,31 +848,37 @@ blind_spots:
     category: exporter
     why: CONFIG GET 失敗只記 debug log，沒有成功指標
     workaround: "`redis_up == 1 unless redis_config_maxclients`（ValkeyConfigMetricsMissing）"
+    options: "已補：ValkeyConfigMetricsMissing（redis_up == 1 unless redis_config_maxclients）"
     section: targets/valkey.md#exporter
   - what: Sentinel 的 TILT 次數與持續時間、每台複本在 Sentinel 眼中的狀態
     category: exporter
     why: INFO sentinel 有 sentinel_total_tilt、sentinel_tilt_since_seconds，exporter 只輸出 sentinel_tilt；Sentinel 不能跑 Lua，`--script` 補不了
     workaround: Sentinel log 的 +tilt、+sdown 事件（log 管線計數）
+    options: "建議：log 管線計數 Sentinel 的 +tilt、+sdown 事件"
     section: targets/valkey.md#cluster
   - what: Cluster 每個節點的 flags 與 link 狀態
     category: exporter
     why: exporter 只送 CLUSTER INFO（彙總）；CLUSTER NODES 只用在 /discover-cluster-nodes
     workaround: 每個節點都抓，比較 cluster_known_nodes、cluster_size；或 `--script` 執行 CLUSTER NODES（未實測）
+    options: "建議：每個節點都抓並比較 cluster_known_nodes；或 --script 跑 CLUSTER NODES（未實測）"
     section: targets/valkey.md#cluster
   - what: 熱 key
     category: database
     why: Valkey 9.1 沒有逐 key 的存取計數；LFU 政策下 OBJECT FREQ 要逐 key 查
     workaround: "`valkey-cli --hotkeys`（掃 keyspace，離峰時跑）或應用端統計"
+    options: "建議：離峰跑 valkey-cli --hotkeys，或應用端統計"
     section: targets/valkey.md#blind-spots
   - what: 主節點沒有持久化又會自動重啟
     category: database
     why: save 與 appendonly 是設定字串，exporter 只輸出數字型設定；重啟後空資料會同步到所有複本
     workaround: 盤點時檢查；`--include-config-metrics` 會輸出 redis_config_key_value（含所有設定，基數高）
+    options: "建議：盤點 save／appendonly 與自動重啟設定；--include-config-metrics 基數高"
     section: targets/valkey.md#protection
   - what: swap、RSS 接近主機或 cgroup 上限、OOM kill
     category: other
     why: 不在 INFO 裡；maxmemory 只限制資料，RSS 還有 fragmentation、client buffer 與 fork 的 copy-on-write
     workaround: node_exporter（`node_memory_*`、`node_vmstat_*`）與 cAdvisor 的容器記憶體。主機層規則只讀碼，host lab 之後排程
+    options: "已補：node_exporter 與 cAdvisor 的記憶體、swap、OOM 規則（主機層只讀碼）"
     section: targets/valkey.md#saturation
     covered_by:
       tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"
@@ -691,11 +890,13 @@ blind_spots:
     category: other
     why: vm.overcommit_memory 與 transparent_hugepage 不在 INFO 裡，主機層規則也沒有；fork 失敗與延遲尖峰常來自這些。主機層只知道行程被 kill，分不出是資料、client buffer 還是 fork 的 copy-on-write
     workaround: 盤點時檢查 /proc/sys/vm/overcommit_memory 與 /sys/kernel/mm/transparent_hugepage/enabled；事後對照 redis_mem_clients_normal、redis_mem_clients_slaves 與 fork-latency 訊號
+    options: "建議：盤點 overcommit_memory 與 THP；事後對照 client buffer 與 fork 訊號"
     section: targets/valkey.md#saturation
   - what: RDB／AOF 所在磁碟的剩餘空間、檔案系統唯讀
     category: other
     why: 不在 INFO 裡；寫滿時 BGSAVE 失敗、寫入被拒
     workaround: node_exporter 的 `node_filesystem_avail_bytes`、`node_filesystem_readonly`；mountpoint 要改成資料目錄。主機層規則只讀碼，host lab 之後排程
+    options: "已補：node_exporter 檔案系統規則，mountpoint 改成資料目錄（主機層只讀碼）"
     section: targets/valkey.md#protection
     covered_by:
       tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"
@@ -707,4 +908,23 @@ blind_spots:
     category: other
     why: rdb_last_save_time 只代表本機寫了檔案
     workaround: 備份工具自己的 metric 或 textfile
+    options: "建議：備份工具自己的 metric 或 textfile"
     section: targets/valkey.md#protection
+  - what: 慢指令或大請求是誰送的（slowlog／commandlog 條目裡的指令、參數與 client）
+    category: exporter
+    why: exporter 只送 SLOWLOG LEN 與 SLOWLOG GET 1（只取 id 與耗時），COMMANDLOG 只讀各類長度（讀碼 exporter/slowlog.go、commandlog.go）；條目內容不輸出
+    workaround: 定期執行 SLOWLOG GET／COMMANDLOG GET 送進 log 管線（未實測）
+    options: "建議：定期 SLOWLOG GET／COMMANDLOG GET 送進 log 管線（未實測）"
+    section: targets/valkey.md#workload
+  - what: 還在執行中的長指令或 Lua script
+    category: database
+    why: slowlog 記的是執行時間，指令結束才看得到；執行中只看得到 exporter 自己的 INFO 被卡住（exporter-query-timeout）。推論，沒有用長 Lua 測過
+    workaround: 用 exporter-query-timeout 與 main-thread 訊號間接判斷；事後看 slowlog
+    options: "建議：看 exporter-query-timeout 與 main-thread 訊號；事後查 slowlog"
+    section: targets/valkey.md#workload
+  - what: 哪些 key 沒有 TTL
+    category: database
+    why: INFO keyspace 只有每個 db 的 keys 與 expires 總數（redis_db_keys、redis_db_keys_expiring），沒有逐 key 資訊
+    workaround: 離峰時 SCAN 加 TTL 抽樣，或離線分析 RDB
+    options: "建議：離峰 SCAN 加 TTL 抽樣，或離線分析 RDB"
+    section: targets/valkey.md#capacity

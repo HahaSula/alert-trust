@@ -291,7 +291,7 @@ groups:
         labels: { severity: warning, component: etcd, tier: "1", aspect: availability }
         annotations:
           summary: "沒有 /health 探測結果；NOSPACE alarm 在 member 重啟後只剩這條路看得到"
-          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#alarms
+          runbook_url: https://hahasula.github.io/alert-trust/components/etcd/#alarm-visibility
 
   - name: etcd-maintenance
     rules:

@@ -139,7 +139,7 @@ groups:
         labels: { severity: warning, component: mongodb_exporter, tier: "2", aspect: replication }
         annotations:
           summary: "{{ $labels.instance }} 是 SECONDARY 但沒有延遲數字：exporter 只在看得到 PRIMARY 時才算延遲，沒有 primary 或看不到 primary 時整條消失"
-          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#replication-lag
+          runbook_url: https://hahasula.github.io/alert-trust/components/mongodb_exporter/#replication-semantics
       - alert: MongoDBMemberUnhealthy
         expr: count by (cluster, member_idx) (mongodb_rs_members_health{job="mongodb"} == 0) > 0
         for: 1m

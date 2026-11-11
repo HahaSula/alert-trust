@@ -1,0 +1,215 @@
+# 五段框架遷移（Valkey、MongoDB、etcd）新增的參考：既有 lab 輸出的 metric 名稱清單。
+# names 類只證明「這個名稱在 lab 的版本有輸出」，不證明語意；code 類是在 tag 上取檔逐行核對。
+refs:
+  vk-exp-names:
+    kind: experiment
+    title: "Valkey lab：Valkey 9.1.3（e-vk1）經 redis_exporter v1.97.0 輸出的 metric 名稱清單"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/valkey/results/names-e-vk1.txt"
+  mg-exp-names:
+    kind: experiment
+    title: "MongoDB lab：MongoDB 8.0.34 經 mongodb_exporter v0.54.0（diagnosticdata、replicasetstatus、compatible-mode）輸出的 metric 名稱清單"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/mongodb/results/names-mongodb.txt"
+  etcd-exp-names:
+    kind: experiment
+    title: "etcd lab：etcd v3.7.3 /metrics（--metrics=basic）的 metric 名稱清單"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/etcd/results/names-etcd-3.7.3.txt"
+  mg-curop-returned:
+    kind: code
+    title: "metrics.document.returned：每個操作結束時加上 nreturned"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/curop_metrics.cpp"
+    line: 118
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/curop_metrics.cpp#L118"
+  mg-curop-keys-examined:
+    kind: code
+    title: "metrics.queryExecutor.scanned：加上 keysExamined（掃過的 index key）"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/curop_metrics.cpp"
+    line: 120
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/curop_metrics.cpp#L120"
+  mg-curop-docs-examined:
+    kind: code
+    title: "metrics.queryExecutor.scannedObjects：加上 docsExamined（讀過的文件）"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/curop_metrics.cpp"
+    line: 121
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/curop_metrics.cpp#L121"
+  mg-curop-scanandorder:
+    kind: code
+    title: "metrics.operation.scanAndOrder：計畫裡有 SORT stage（不能用 index 排序）就加 1"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/curop_metrics.cpp"
+    line: 122
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/curop_metrics.cpp#L122"
+  mg-curop-maxtimems:
+    kind: code
+    title: "metrics.operation.killedDueToMaxTimeMSExpired：操作超過 maxTimeMS 被中止"
+    project: "MongoDB"
+    version: "8.0.34"
+    file: "src/mongo/db/curop_metrics.cpp"
+    line: 72
+    url: "https://github.com/mongodb/mongo/blob/r8.0.34/src/mongo/db/curop_metrics.cpp#L72"
+  mx-doc-label:
+    kind: code
+    title: "serverStatus.metrics.document.* 合成一個 metric，label doc_op_type"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/metrics.go"
+    line: 108
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/metrics.go#L108"
+  mx-flag-currentop:
+    kind: code
+    title: "--collector.currentopmetrics（預設關）"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "main.go"
+    line: 65
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/main.go#L65"
+  mx-flag-currentop-slow:
+    kind: code
+    title: "--collector.currentopmetrics-slow-time 預設 5m"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "main.go"
+    line: 82
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/main.go#L82"
+  mx-currentop-uptime:
+    kind: code
+    title: "mongodb_currentop_query_uptime{opid,op,desc,database,collection,ns}：執行超過 slow-time 的操作，值是 microsecs_running"
+    project: "mongodb_exporter"
+    version: "v0.54.0"
+    file: "exporter/currentop_collector.go"
+    line: 123
+    url: "https://github.com/percona/mongodb_exporter/blob/v0.54.0/exporter/currentop_collector.go#L123"
+  etcd-mvcc-watch-stream:
+    kind: code
+    title: "etcd_debugging_mvcc_watch_stream_total：watch stream 數（gauge）"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/storage/mvcc/metrics.go"
+    line: 73
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/storage/mvcc/metrics.go#L73"
+  etcd-mvcc-watcher:
+    kind: code
+    title: "etcd_debugging_mvcc_watcher_total：watcher 數（gauge）"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/storage/mvcc/metrics.go"
+    line: 82
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/storage/mvcc/metrics.go#L82"
+  etcd-mvcc-slow-watcher:
+    kind: code
+    title: "etcd_debugging_mvcc_slow_watcher_total：還沒同步完的慢 watcher 數"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/storage/mvcc/metrics.go"
+    line: 91
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/storage/mvcc/metrics.go#L91"
+  etcd-mvcc-pending-events:
+    kind: code
+    title: "etcd_debugging_mvcc_pending_events_total：等著送出的 event 數"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/storage/mvcc/metrics.go"
+    line: 109
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/storage/mvcc/metrics.go#L109"
+  etcd-mvcc-unsynced-inc:
+    kind: code
+    title: "watcher 的 channel 滿、event 送不出去時改列為 victim，slow_watcher 加 1"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/storage/mvcc/watchable_store.go"
+    line: 484
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/storage/mvcc/watchable_store.go#L484"
+  etcd-mvcc-put-size:
+    kind: code
+    title: "etcd_debugging_mvcc_total_put_size_in_bytes：這台看過的 put 的 key＋value 大小總和"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/storage/mvcc/metrics.go"
+    line: 284
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/storage/mvcc/metrics.go#L284"
+  etcd-txn-range-duration:
+    kind: code
+    title: "etcd_server_range_duration_seconds：txn.Range 的延遲"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/txn/metrics.go"
+    line: 48
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/txn/metrics.go#L48"
+  etcd-lease-granted:
+    kind: code
+    title: "etcd_debugging_lease_granted_total"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/lease/metrics.go"
+    line: 25
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/lease/metrics.go#L25"
+  etcd-lease-revoked:
+    kind: code
+    title: "etcd_debugging_lease_revoked_total"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/lease/metrics.go"
+    line: 32
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/lease/metrics.go#L32"
+  etcd-lease-expired:
+    kind: code
+    title: "etcd_debugging_server_lease_expired_total"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/metrics.go"
+    line: 114
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/metrics.go#L114"
+  etcd-max-request-bytes:
+    kind: code
+    title: "--max-request-bytes 預設 1.5MiB"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/embed/config.go"
+    line: 67
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/embed/config.go#L67"
+  etcd-max-txn-ops:
+    kind: code
+    title: "--max-txn-ops 預設 128"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/embed/config.go"
+    line: 64
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/embed/config.go#L64"
+  etcd-request-too-large:
+    kind: code
+    title: "提案序列化後超過 MaxRequestBytes 時回 ErrRequestTooLarge"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/etcdserver/v3_server.go"
+    line: 1099
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/etcdserver/v3_server.go#L1099"
+  etcd-grpc-too-large-code:
+    kind: code
+    title: "request is too large 的 gRPC code 是 InvalidArgument"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "api/v3rpc/rpctypes/error.go"
+    line: 56
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/api/v3rpc/rpctypes/error.go#L56"
+  etcd-grpc-too-many-ops-code:
+    kind: code
+    title: "too many operations in txn request 的 gRPC code 是 InvalidArgument"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "api/v3rpc/rpctypes/error.go"
+    line: 28
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/api/v3rpc/rpctypes/error.go#L28"
+  etcd-warn-unary-duration:
+    kind: code
+    title: "--warning-unary-request-duration 預設 300ms（超過只寫 warning log）"
+    project: "etcd"
+    version: "v3.7.3"
+    file: "server/embed/config.go"
+    line: 66
+    url: "https://github.com/etcd-io/etcd/blob/v3.7.3/server/embed/config.go#L66"

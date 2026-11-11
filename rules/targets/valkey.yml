@@ -248,7 +248,7 @@ groups:
         labels: { severity: warning, component: redis_exporter, tier: "2", aspect: replication }
         annotations:
           summary: "主節點的複本比一小時內的最大值少；斷線的複本在 INFO 裡整列消失，它的 lag 規則跟著回傳空"
-          runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#replication-lag
+          runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#replication-semantics
       - alert: ValkeyReplicationLagBytes
         expr: |
           redis_master_repl_offset{job="valkey"}
@@ -271,7 +271,7 @@ groups:
         labels: { severity: warning, component: redis_exporter, tier: "2", aspect: replication }
         annotations:
           summary: "複本 {{ $labels.slave_ip }} 超過 10 秒沒有回報 offset（lag 是「距上次 REPLCONF ACK 幾秒」，不是資料延遲）"
-          runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#replication-lag
+          runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#replication-semantics
       - alert: ValkeyFullResync
         expr: increase(redis_replica_resyncs_full{job="valkey"}[10m]) > 0
         labels: { severity: warning, component: redis_exporter, tier: "2", aspect: replication }
@@ -319,7 +319,7 @@ groups:
         labels: { severity: critical, component: redis_exporter, tier: "2", aspect: cluster }
         annotations:
           summary: "沒有任何一台 Sentinel 抓得到；Sentinel 規則全部回傳空。不用 Sentinel 的環境刪掉這一組"
-          runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#sentinel-quorum
+          runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#sentinel-observed
       - alert: ValkeySentinelNoQuorum
         expr: redis_sentinel_master_ckquorum_status{job="sentinel"} == 0
         for: 1m
@@ -351,7 +351,7 @@ groups:
         labels: { severity: warning, component: redis_exporter, tier: "2", aspect: cluster }
         annotations:
           summary: "Sentinel 進入 TILT（時鐘跳動或程序被暫停超過 2 秒）：照常收資訊，但不做 failover"
-          runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#sentinel-quorum
+          runbook_url: https://hahasula.github.io/alert-trust/components/redis_exporter/#sentinel-observed
           absence_covered_by: "ValkeySentinelMissing"
       - alert: ValkeyClusterStateFail
         expr: redis_cluster_state{job="valkey"} == 0

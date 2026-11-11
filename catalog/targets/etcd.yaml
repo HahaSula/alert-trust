@@ -84,10 +84,64 @@ silent_failures:
     source: etcd-lab
     refs: [etcd-exp-raw, etcd-raft-leaderchanges, etcd-compaction-last]
 
+# 五段框架 2：正確使用。只寫原始碼推理（code）、本機小實驗（tested）或標明的官方文件（doc）。
+usage:
+  - id: probe-readyz
+    text: >-
+      blackbox 探每個 member 的 /readyz，probe job 把 instance relabel 成和 job="etcd" 相同的 host:port；沒有 leader 時 /readyz 要等 ReqTimeout
+      （預設 7 秒）才回 503，blackbox timeout 較短時以逾時失敗
+    evidence: tested
+    refs: [etcd-exp-raw, etcd-h-readyz-linear, etcd-h-readcheck-ctx, etcd-read-timeout, etcd-srv-reqtimeout]
+  - id: probe-health
+    text: 另探 /health：/readyz 不看 NOSPACE（實測寫入全被拒時仍 200），/health 對任何 alarm 都回 503
+    evidence: tested
+    refs: [etcd-exp-raw, etcd-h-readyz-corrupt, etcd-h-health-alarms, etcd-h-health-nospace]
+  - id: probe-exclude-learner
+    text: learner 的 /readyz 一定失敗；探測清單排除 learner，或用 /readyz?exclude=non_learner
+    evidence: code
+    refs: [etcd-h-readyz-learner]
+  - id: metrics-listener
+    text: --listen-metrics-urls 開一個只放 /metrics 與健康端點的 listener，抓取與探測不需要 client mTLS
+    evidence: code
+    refs: [etcd-embed-metrics-mux, dbm-etcd-listen-metrics]
+  - id: metrics-level
+    text: >-
+      預設 --metrics=basic 沒有 grpc_server_handling_seconds；3.7 用 etcd_server_request_duration_seconds（basic 就有），3.6 以下要延遲 histogram 就開 extensive
+    evidence: tested
+    refs: [etcd-exp-raw, etcd-grpc-histogram-extensive, etcd-srv-request-duration, ver-et37-request-duration, ver-et35-grpc-hist, ver-et36-grpc-hist]
+  - id: sample-limit
+    text: sample_limit 要比實際大（lab 每台約 1,600 個 sample，basic）；設太小時整次 scrape 失敗、up=0，/readyz 照樣正常
+    evidence: tested
+    refs: [etcd-exp-raw]
+  - id: one-job-per-cluster
+    text: 一個 job（與一個 probe job）對一個叢集；mixin 與這裡的規則都用 job 當叢集 label，混了兩個叢集時 leader 數會大於 1
+    evidence: code
+    refs: [etcd-mixin-clusterlabel, etcd-mixin-selector]
+  - id: auto-compaction
+    text: 設 --auto-compaction-retention（預設 0，關閉）；不設時舊 revision 一直留著，DB 只會長大
+    evidence: code
+    refs: [etcd-embed-autocompact]
+  - id: quota-and-disarm
+    text: >-
+      --quota-backend-bytes 預設 2GiB，比的是檔案大小；碰到 quota 後 compact 加 defrag 不會解除 NOSPACE，要 etcdctl alarm disarm（實測）
+    evidence: tested
+    refs: [etcd-exp-raw, etcd-quota-default, etcd-embed-quota-flag, etcd-quota-available, etcd-capped-put]
+  - id: corruption-check
+    text: CompactHashCheck 與 InitialCorruptCheck 預設關、--corrupt-check-time 預設 0；不打開就不會有 CORRUPT alarm
+    evidence: tested
+    refs: [etcd-exp-raw, etcd-feat-compacthash, etcd-feat-initialcorrupt]
+  - id: request-size-limits
+    text: >-
+      --max-request-bytes（預設 1.5MiB）與 --max-txn-ops（預設 128）是請求大小的上限；超過時回 gRPC InvalidArgument，
+      不在 mixin 與 EtcdGrpcErrorRate 的失敗 code 清單裡
+    evidence: code
+    refs: [etcd-max-request-bytes, etcd-max-txn-ops, etcd-request-too-large, etcd-grpc-too-large-code, etcd-grpc-too-many-ops-code, etcd-mixin-grpcfail]
+
 signals:
   # ---------- 監測自檢（抓取本身） ----------
   - id: endpoint-up
     aspect: exporter
+    section: observe
     tier: 1
     question: 抓得到 /metrics 嗎
     signal: 'up{job="etcd"} == 0，加上 absent(up{job="etcd"})；member 停機時它的所有 etcd_* 一起消失'
@@ -102,6 +156,7 @@ signals:
 
   - id: health-second-path
     aspect: exporter
+    section: observe
     tier: 1
     question: 抓得到 /metrics，就代表 etcd 健康嗎
     signal: >-
@@ -125,6 +180,7 @@ signals:
 
   - id: metric-families-present
     aspect: exporter
+    section: observe
     tier: 1
     question: 該有的 metric 都還在嗎
     signal: >-
@@ -140,6 +196,7 @@ signals:
 
   - id: scrape-budget
     aspect: exporter
+    section: observe
     tier: 2
     question: Scrape 來得及在期限內完成、內容沒有超過上限嗎
     signal: >-
@@ -155,6 +212,7 @@ signals:
 
   - id: endpoint-blocking
     aspect: exporter
+    section: observe
     tier: 2
     question: 產生 /metrics 時會不會被 etcd 內部的鎖卡住
     signal: >-
@@ -173,6 +231,7 @@ signals:
   # ---------- 可用性 ----------
   - id: has-leader
     aspect: availability
+    section: misuse
     tier: 1
     question: 這台 member 看得到 leader 嗎
     signal: >-
@@ -188,6 +247,7 @@ signals:
 
   - id: alarms
     aspect: availability
+    section: misuse
     tier: 1
     question: 有沒有 alarm 讓寫入被拒（NOSPACE）或資料被判定損毀（CORRUPT）
     signal: >-
@@ -202,11 +262,30 @@ signals:
     source: etcd-lab
     refs: [etcd-exp-raw, etcd-mvcc-alarm-metric, etcd-alarm-gauge-inc, etcd-alarm-activate-existing, etcd-alarm-store-restore, etcd-capped-put, etcd-h-health-nospace, etcd-srv-nospace-raise, ver-et36-alarms, ver-et-cl36-alarms]
     upstream: { status: no, note: "mixin 只有 DB 大小 / quota > 95%，沒有 alarm" }
-    rules: [rules/targets/etcd.yml#EtcdAlarmActive, rules/targets/etcd.yml#EtcdHealthProbeFailing, rules/targets/etcd.yml#EtcdHealthProbeMissing]
+    rules: [rules/targets/etcd.yml#EtcdAlarmActive, rules/targets/etcd.yml#EtcdHealthProbeFailing]
+
+  - id: alarm-visibility
+    aspect: availability
+    section: observe
+    tier: 1
+    question: alarm 的狀態看得到、看到的是現在的嗎
+    signal: >-
+      /health 探測要存在（absent(probe_success{job="etcd-health"})）：/readyz 不看 NOSPACE，沒有 /health 探測時 NOSPACE 只剩 etcd_debugging_server_alarms。
+      這個 gauge 不是狀態：它是 activate／deactivate 套用過幾次的累計，重啟過的 member 沒有這條、disarm 後可能停在 1 或變 -1，所以只能當 /health 失敗時的種類標示。
+      版本：etcd_debugging_server_alarms 3.6 以上才有
+    metrics: [probe_success, etcd_debugging_server_alarms]
+    evaluate_on: self
+    silent_failure: 實測兩次執行中 NOSPACE 期間重啟的 member 都沒有這條 series（寫入仍被拒），disarm 後變成 -1
+    evidence: tested
+    source: etcd-lab
+    refs: [etcd-exp-raw, etcd-exp-raw-v1, etcd-h-readyz-corrupt, etcd-h-health-alarms, etcd-alarm-gauge-inc, etcd-alarm-activate-existing, etcd-alarm-store-restore, ver-et36-alarms]
+    upstream: { status: no, note: "mixin 只用 /metrics，沒有 alarm 規則" }
+    rules: [rules/targets/etcd.yml#EtcdHealthProbeMissing]
 
   # ---------- 叢集與共識 ----------
   - id: quorum
     aspect: cluster
+    section: misuse
     tier: 1
     question: 看得到 leader 的 member 還有過半嗎
     signal: >-
@@ -229,6 +308,7 @@ signals:
 
   - id: role-detection
     aspect: cluster
+    section: misuse
     tier: 2
     question: 每個叢集剛好有一個 leader 嗎
     signal: >-
@@ -244,6 +324,7 @@ signals:
 
   - id: leader-changes
     aspect: cluster
+    section: misuse
     tier: 2
     question: leader 換得太頻繁嗎
     signal: >-
@@ -259,6 +340,7 @@ signals:
 
   - id: component-count
     aspect: cluster
+    section: observe
     tier: 2
     question: 抓得到的 member 數和 etcd 自己記得的成員數一樣嗎
     signal: >-
@@ -276,6 +358,7 @@ signals:
 
   - id: peer-network
     aspect: cluster
+    section: misuse
     tier: 2
     question: member 之間的通訊慢或斷了嗎
     signal: >-
@@ -291,6 +374,7 @@ signals:
 
   - id: learner
     aspect: cluster
+    section: misuse
     tier: 3
     question: 有 learner 卡著沒升級嗎
     signal: etcd_server_is_learner == 1 超過 1 小時（例子）；learner 不算 quorum，它的 /readyz 一定失敗
@@ -303,14 +387,31 @@ signals:
     rules: [rules/targets/etcd.yml#EtcdLearnerNotPromoted]
 
   # ---------- 複寫 ----------
+  - id: replication-semantics
+    aspect: replication
+    section: observe
+    tier: 2
+    question: Replication 延遲量的是真的嗎
+    signal: >-
+      etcd 沒有輸出每個 follower 的 match index，只能比較各 member 的 etcd_server_proposals_committed_total 與 etcd_server_proposals_applied_total。
+      兩個名字有 _total 但都是 gauge（值是 raft index），不能用 rate 當 counter。沒有寫入時兩者一起停，差值是 0，這是真的沒有落後，
+      不是 PostgreSQL 那種「閒置顯示 0」；被分割的 follower 的 committed 不再前進，所以要拿叢集內最大的 committed 比，不能只看自己的
+    metrics: [etcd_server_proposals_committed_total, etcd_server_proposals_applied_total]
+    evaluate_on: self
+    evidence: code
+    source: etcd-server
+    refs: [etcd-raft-committed, etcd-srv-applied]
+    upstream: { status: no }
+    rules: []
+
   - id: replication-lag
     aspect: replication
+    section: misuse
     tier: 2
     question: 每台 member 套用的進度跟得上叢集嗎
     signal: >-
       max by (job) (etcd_server_proposals_committed_total) − 每台的 etcd_server_proposals_applied_total > 5000（例子，等於預設 snapshot-catchup-entries）。
-      兩個名字有 _total 但都是 gauge（值是 raft index），不能用 rate 當 counter。沒有寫入時兩者一起停，差值是 0，這是真的沒有落後；
-      被分割的 follower 的 committed 不再前進，差值由其他 member 的 committed 撐大
+      落後超過這個數時 follower 只能收整份 snapshot（snapshot-transfer）。量得準不準見 replication-semantics
     metrics: [etcd_server_proposals_committed_total, etcd_server_proposals_applied_total]
     evaluate_on: self
     evidence: code
@@ -321,6 +422,7 @@ signals:
 
   - id: snapshot-transfer
     aspect: replication
+    section: misuse
     tier: 3
     question: 落後太多的 follower 能用 snapshot 追上嗎
     signal: >-
@@ -337,6 +439,7 @@ signals:
   # ---------- 資源與飽和 ----------
   - id: wal-fsync
     aspect: saturation
+    section: misuse
     tier: 2
     question: WAL fsync 夠快嗎
     signal: >-
@@ -352,6 +455,7 @@ signals:
 
   - id: backend-commit
     aspect: saturation
+    section: misuse
     tier: 2
     question: backend（bbolt）commit 夠快嗎
     signal: >-
@@ -367,6 +471,7 @@ signals:
 
   - id: slow-apply
     aspect: saturation
+    section: misuse
     tier: 2
     question: apply 或 heartbeat 被拖慢了嗎
     signal: >-
@@ -382,6 +487,7 @@ signals:
 
   - id: proposals-pending
     aspect: saturation
+    section: misuse
     tier: 2
     question: 提案在排隊嗎
     signal: etcd_server_proposals_pending > 100 for 5m（例子）；送出後等 commit 的數量，quorum 失去或磁碟慢時累積
@@ -395,6 +501,7 @@ signals:
 
   - id: fd-headroom
     aspect: saturation
+    section: misuse
     tier: 2
     question: file descriptor 夠嗎
     signal: os_fd_used / os_fd_limit > 0.8；每條 client 與 peer 連線各占一個
@@ -408,6 +515,7 @@ signals:
   # ---------- 工作量 ----------
   - id: grpc-errors
     aspect: workload
+    section: misuse
     tier: 2
     question: client 請求失敗的比例高嗎
     signal: >-
@@ -423,6 +531,7 @@ signals:
 
   - id: proposals-failed
     aspect: workload
+    section: misuse
     tier: 2
     question: 提案失敗多嗎
     signal: >-
@@ -438,6 +547,7 @@ signals:
 
   - id: request-latency
     aspect: workload
+    section: misuse
     tier: 3
     question: 請求慢嗎
     signal: >-
@@ -453,9 +563,35 @@ signals:
     upstream: { status: partial, note: "mixin etcdGRPCRequestsSlow 需要 --metrics=extensive" }
     rules: [rules/targets/etcd.yml#EtcdRequestSlow]
 
+  - id: bad-requests
+    aspect: workload
+    section: misuse
+    tier: 3
+    question: 客戶端送了大範圍讀取、大量 watch、過大的值或大量 lease 嗎
+    signal: >-
+      都沒有依 client 或 key 的 metric，只能看全 member 的總量。
+      大範圍讀取：etcd_server_range_duration_seconds 與 etcd_server_request_duration_seconds{type="Range"} 的 p99、rate(etcd_mvcc_range_total)；
+      lab 讀整個 prefix（每次 8.5MB）時 /metrics 不受影響（endpoint-blocking），慢的是請求本身。
+      大量 watch：etcd_debugging_mvcc_watcher_total、watch_stream_total；送不出去的 watcher 改列 victim、slow_watcher_total 增加，pending_events_total 累積。
+      過大的值：rate(etcd_debugging_mvcc_total_put_size_in_bytes) / rate(etcd_mvcc_put_total) 是平均 put 大小；超過 --max-request-bytes（預設 1.5MiB）
+      或 --max-txn-ops（預設 128）的請求回 InvalidArgument，不在 EtcdGrpcErrorRate 的 code 清單裡，要另看 grpc_server_handled_total{grpc_code="InvalidArgument"}。
+      lease 暴增：rate(etcd_debugging_lease_granted_total)、revoked_total 與 etcd_debugging_server_lease_expired_total。
+      後果在別的訊號：db-quota、db-growth（大值與沒 compaction）、backend-commit、proposals-pending。
+      名稱在 lab 的 v3.7.3（basic）都存在；門檻與「哪個 metric 先動」是推論，沒有實驗
+    metrics: [etcd_server_range_duration_seconds_bucket, etcd_mvcc_range_total, etcd_debugging_mvcc_watcher_total, etcd_debugging_mvcc_watch_stream_total, etcd_debugging_mvcc_slow_watcher_total, etcd_debugging_mvcc_pending_events_total, etcd_debugging_mvcc_total_put_size_in_bytes, etcd_mvcc_put_total, grpc_server_handled_total, etcd_debugging_lease_granted_total, etcd_debugging_lease_revoked_total, etcd_debugging_server_lease_expired_total]
+    evaluate_on: self
+    silent_failure: >-
+      過大或 op 太多的請求是 InvalidArgument，mixin 與 EtcdGrpcErrorRate 都不算；watch 與 lease 的 metric 是整個 member 的總數，看不出是哪個 client
+    evidence: inferred
+    source: etcd-server
+    refs: [etcd-exp-names, etcd-exp-raw, etcd-txn-range-duration, etcd-srv-request-duration, etcd-mvcc-watcher, etcd-mvcc-watch-stream, etcd-mvcc-slow-watcher, etcd-mvcc-unsynced-inc, etcd-mvcc-pending-events, etcd-mvcc-put-size, etcd-max-request-bytes, etcd-max-txn-ops, etcd-request-too-large, etcd-grpc-too-large-code, etcd-grpc-too-many-ops-code, etcd-lease-granted, etcd-lease-revoked, etcd-lease-expired, etcd-mixin-grpcfail]
+    upstream: { status: no, note: "mixin 沒有 watch、lease 或請求大小的規則；grpc 失敗規則不含 InvalidArgument" }
+    rules: []
+
   # ---------- 資料維護 ----------
   - id: compaction
     aspect: maintenance
+    section: misuse
     tier: 3
     question: 舊 revision 有在 compaction 嗎
     signal: >-
@@ -471,6 +607,7 @@ signals:
 
   - id: defrag
     aspect: maintenance
+    section: misuse
     tier: 3
     question: DB 檔案裡空著的空間多到該 defrag 嗎
     signal: >-
@@ -486,6 +623,7 @@ signals:
 
   - id: corruption-check
     aspect: maintenance
+    section: observe
     tier: 3
     question: 有沒有任何機制會發現資料不一致
     signal: >-
@@ -503,6 +641,7 @@ signals:
   # ---------- 容量 ----------
   - id: db-quota
     aspect: capacity
+    section: misuse
     tier: 1
     question: DB 檔案離 quota 多遠
     signal: >-
@@ -519,6 +658,7 @@ signals:
 
   - id: db-growth
     aspect: capacity
+    section: misuse
     tier: 2
     question: 依目前成長多久會碰到 quota
     signal: predict_linear(etcd_mvcc_db_total_size_in_bytes[4h], 4h) > quota（mixin）
@@ -538,37 +678,75 @@ not_applicable_aspects:
       備份要靠外部執行 etcdctl snapshot save，新鮮度見 blind_spots。
     refs: [etcd-srv-snapshot-count, etcd-srv-snapshot-catchup, etcd-rafthttp-snapfail]
 
+# 不正確的請求：客戶端送了寫法不好的請求時，看得到什麼、看不到什麼。
+bad_queries:
+  - case: 大範圍 range request（讀整個 prefix）
+    signals: [bad-requests, request-latency, endpoint-blocking]
+    visible: >-
+      etcd_server_range_duration_seconds 與 etcd_server_request_duration_seconds{type="Range"} 的 p99 上升；
+      實測 4 條執行緒讀 8.5MB 的 prefix 時 /metrics 耗時不變，慢的是請求本身
+    not_visible: 哪個 prefix、哪個 client、回應多大
+    refs: [etcd-exp-raw, etcd-txn-range-duration, etcd-srv-request-duration]
+  - case: 大量 watch，或 client 讀 watch 太慢
+    signals: [bad-requests]
+    visible: etcd_debugging_mvcc_watcher_total、watch_stream_total 增加；送不出去的 watcher 改列 victim，slow_watcher_total 與 pending_events_total 累積
+    not_visible: 哪個 client 開的、watch 哪個 key
+    refs: [etcd-exp-names, etcd-mvcc-watcher, etcd-mvcc-watch-stream, etcd-mvcc-slow-watcher, etcd-mvcc-unsynced-inc, etcd-mvcc-pending-events]
+  - case: 過大的值或 op 太多的 txn
+    signals: [bad-requests, grpc-errors, db-quota, db-growth]
+    visible: >-
+      rate(total_put_size_in_bytes) / rate(etcd_mvcc_put_total) 是平均 put 大小；超過 --max-request-bytes（1.5MiB）或 --max-txn-ops（128）時
+      grpc_server_handled_total{grpc_code="InvalidArgument"} 增加，這個 code 不在 EtcdGrpcErrorRate 與 mixin 的清單裡
+    not_visible: 單一 key 的值多大、哪些 key 最大
+    refs: [etcd-mvcc-put-size, etcd-max-request-bytes, etcd-max-txn-ops, etcd-request-too-large, etcd-grpc-too-large-code, etcd-grpc-too-many-ops-code, etcd-mixin-grpcfail]
+  - case: lease 大量建立或過期（lease storm）
+    signals: [bad-requests]
+    visible: rate(etcd_debugging_lease_granted_total)、revoked_total 與 etcd_debugging_server_lease_expired_total
+    not_visible: 目前有多少 lease、是哪個 client 建的
+    refs: [etcd-exp-names, etcd-lease-granted, etcd-lease-revoked, etcd-lease-expired]
+  - case: 持續寫入但沒有 compaction，把 DB 撐到 quota
+    signals: [compaction, db-quota, alarms]
+    visible: compact_revision 一天沒變；DB / quota 上升；到 quota 後 /health 503、寫入回 database space exceeded（實測）
+    not_visible: 哪個 client 的寫入佔最多
+    refs: [etcd-exp-raw, etcd-embed-autocompact, etcd-quota-available, etcd-capped-put]
+
 # 目前無法監控的範圍。category：exporter（資料庫有、exporter 沒輸出；native 模型下指「etcd 有這個資訊、/metrics 沒輸出」）、database（資料庫本身沒提供）、other（要靠其他元件）。
 blind_spots:
   - what: 備份（etcdctl snapshot save）的新鮮度與可還原性
     category: other
     why: etcd 沒有內建備份，/metrics 的 snapshot 都是 raft snapshot
     workaround: 備份工作成功後寫 textfile metric（例如 etcd_backup_last_success_timestamp_seconds），由 node_exporter 輸出；定期還原測試
+    options: "建議：備份工作成功後寫 textfile metric 並對新鮮度告警；定期演練還原"
     section: targets/etcd.md#protection
   - what: TLS 憑證到期（client、peer、metrics listener）
     category: database
     why: etcd 3.7.3 沒有任何憑證相關的 metric（讀碼：server 的 metric 名稱沒有 cert、tls、expir）
     workaround: blackbox 的 tls／http module 探 2379、2380，看 probe_ssl_earliest_cert_expiry；client-cert-auth 開著時 probe 要帶 client 憑證
+    options: "建議：blackbox 的 tls 探測 2379、2380 看 probe_ssl_earliest_cert_expiry"
     section: targets/etcd.md#blind-spots
   - what: 每個 follower 的 raft 進度（match index、inflight）
     category: exporter
     why: leader 的 raft tracker 有每個 follower 的進度，/metrics 沒有輸出；只能用各 member 的 committed／applied 推算
     workaround: 比較各 member 的 etcd_server_proposals_applied_total（replication-lag 訊號）
+    options: "建議：比較各 member 的 proposals_applied_total（replication-lag 訊號）"
     section: targets/etcd.md#replication
   - what: alarm 在 member 重啟後的狀態
     category: exporter
     why: etcd_debugging_server_alarms 只在 apply alarm 請求時更新，重啟時不從 alarm store 重建
     workaround: blackbox 探 /health（任何 alarm 都 503），或定期 etcdctl alarm list
+    options: "建議：blackbox 探 /health；或定期 etcdctl alarm list"
     section: targets/etcd.md#availability
   - what: 慢請求與大請求的內容（哪個 key、哪個 client）
     category: database
     why: 只有 warning log（apply request took too long），沒有依 key 或 client 的 metric
     workaround: log 管線（VictoriaLogs 等）計數 "apply request took too long"；Kubernetes 的 apiserver 端 metric
+    options: "建議：log 管線計數 \"apply request took too long\"；Kubernetes 用 apiserver 端 metric"
     section: targets/etcd.md#workload
   - what: 磁碟剩餘空間、檔案系統唯讀
     category: other
     why: quota 只限制 DB 檔案；WAL 與 snapshot 檔也在 data-dir，磁碟滿的情況 quota 管不到（磁碟滿時 etcd 的行為未驗證）
     workaround: node_exporter 的 node_filesystem_avail_bytes、node_filesystem_readonly；mountpoint 要改成 data-dir。主機層規則只讀碼，host lab 之後排程
+    options: "已補：node_exporter 檔案系統規則，mountpoint 改成 data-dir（主機層只讀碼）"
     section: targets/etcd.md#capacity
     covered_by:
       tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"
@@ -580,4 +758,17 @@ blind_spots:
     category: database
     why: CompactHashCheck、InitialCorruptCheck 預設關，--corrupt-check-time 預設 0；不開就沒有任何檢查
     workaround: 打開 CompactHashCheck（feature gate），並監控 corruption-check 訊號
+    options: "建議：打開 CompactHashCheck（feature gate），並監控 corruption-check 訊號"
     section: targets/etcd.md#maintenance
+  - what: 哪個 client 開了大量 watch、lease 或送大範圍讀取
+    category: database
+    why: watcher、watch_stream、lease 與 range 的 metric 都是整個 member 的總數（bad-requests 訊號），沒有 client 或 key prefix label
+    workaround: Kubernetes 的 apiserver 端 metric；或 log 管線計數超過 --warning-unary-request-duration（預設 300ms）的 warning
+    options: "建議：apiserver 端 metric；或 log 管線計數 warning-unary-request-duration 的 warning"
+    section: targets/etcd.md#workload
+  - what: 單一 key 的值有多大、哪些 key 最大
+    category: database
+    why: 只有 total_put_size_in_bytes（累計），沒有值大小的分布；過大的請求被拒時只剩 InvalidArgument 的 gRPC 計數
+    workaround: 離峰時用 etcdctl get --prefix --keys-only 加抽樣；或應用端在寫入前檢查大小
+    options: "建議：離峰時抽樣 key 大小；應用端在寫入前檢查值的大小"
+    section: targets/etcd.md#workload

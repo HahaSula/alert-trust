@@ -50,7 +50,7 @@
 
 ## 進行中
 
-- 五段框架遷移（架構 → 正確使用 → 正確觀測 → 不正確使用時的觀測 → 目前無法觀測的痕跡）：第 1 步卡片欄位與驗證完成；第 2 步逐張卡標 `section`、補 `usage`、精簡 blind_spots；第 3 步 `map.yaml` 與網站；第 4 步 skill 依元件分、上層匯集、拆 plugin；第 5 步盲測重跑
+- 五段框架遷移（架構 → 正確使用 → 正確觀測 → 不正確使用時的觀測 → 目前無法觀測的痕跡）：第 1 步卡片欄位與驗證完成；第 2 步 19 張卡都已標 `section`、補 `usage`、blind_spots 加 `options`（`bad_queries` 已有 MySQL、MariaDB、Valkey、MongoDB、etcd，其餘補齊中）；第 3 步 `map.yaml` 與網站；第 4 步 skill 依元件分、上層匯集、拆 plugin；第 5 步盲測重跑
 
 使用者同意的資料庫順序已全部完成；CockroachDB（專有授權）不做。資料庫架構頁依類型分頁：關聯式、記憶體 KV、共識（Raft）、分散式 SQL、分析型、文件型。
 
@@ -79,6 +79,7 @@
 21. **契約複查的後續**：`resend-endsat` 的續送間隔已在 `lab/alert-delivery` 量到 20–23s（符合 P 公式）；`d > S` 時 `I ≈ d` 仍只讀碼；`repeat_interval` 剛好是 `group_interval` 整數倍時多等一個 tick 只讀碼（這台 VM 的單調時鐘每 30s 慢約 2–9%，量不出來）；Grafana Alerting 的續送是否同樣「嚴格大於」才送未查。
 22. **資源調查的後續**：各 target 卡的 blind_spots 改成 `covered_by` 主機卡；`#proposed` 表的 10 個飽和訊號；host 卡要不要新的 family；target-pattern 要不要加「主機層存在」。（主機卡小 lab 已完成：記憶體接近 limit、OOM 的主機部分、唯讀掛載實測；容器 OOM 計數在 WSL2 不增加、唯讀 remount 未測。）
 23. **拆卡後續**：MySQL／MariaDB lab 的 compose 仍掛 `rules/targets/mysql.yml`，重跑 MariaDB 要改掛 `mariadb.yml`；新規則 `MariaDBBinlogNotPurged` 與 thread-cache、pending-fsyncs 訊號沒有 lab；MySQL 側多數參考仍釘在 8.4.7。
+24. **五段遷移時沒有依據而沒寫的「正確使用」**：Prometheus `--query.max-samples`、VM `-search.max*`；Valkey 的 KEYS 改 SCAN、Lua 逾時、slowlog-max-len；MongoDB 建 index、16MB 上限、slowms；etcd 備份、watch／lease 用法；PostgreSQL auto-discover、query-exporter cache_seconds。etcd 請求過大回 InvalidArgument，現有錯誤率規則與 mixin 都不算這個 code。
 
 ## 已做的決定
 
