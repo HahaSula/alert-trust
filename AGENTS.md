@@ -65,7 +65,7 @@ docker run --rm -u $(id -u):$(id -g) -v "$PWD":/docs squidfunk/mkdocs-material:9
 
 ## 五段框架
 
-每張卡都回答：1 架構（會留下哪些痕跡）、2 正確使用（`usage`，只寫原始碼推理、本機小實驗或標明的官方文件）、3 正確觀測（訊號 `section: observe`）、4 不正確使用時的觀測（`section: misuse`）、5 目前無法觀測的痕跡（`blind_spots`，方案 `options` 一行點到為止）。範圍只到 exporter／endpoint 實際輸出的那一層，不往下挖（例如主機只到 node_exporter、kube-state-metrics）。格式見 `docs/contributing.md#五段框架`。
+每張卡都回答：1 架構（會留下哪些痕跡）、2 正確使用（`usage`，只寫原始碼推理、本機小實驗或標明的官方文件）、3 正確觀測（訊號 `section: observe`）、4 不正確使用時的觀測（`section: misuse`，包含寫得不好的查詢：DB 的 SQL／命令、監控系統的 PromQL／MetricsQL／LogsQL 與 rule）、5 目前無法觀測的痕跡（`blind_spots`，方案 `options` 一行點到為止）。範圍只到 exporter／endpoint 實際輸出的那一層，不往下挖（例如主機只到 node_exporter、kube-state-metrics）。格式見 `docs/contributing.md#五段框架`。
 
 ## 證據規則（最重要）
 
