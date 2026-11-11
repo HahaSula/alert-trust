@@ -257,7 +257,7 @@ groups:
         labels: { severity: warning, component: clickhouse, tier: "2", aspect: replication }
         annotations:
           summary: "{{ $labels.instance }} 看 {{ $labels.table }} 只有 {{ $value }} 個 active replica，少於 total_replicas；倖存那台的 absolute_delay 仍是 0"
-          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#replication-lag
+          runbook_url: https://hahasula.github.io/alert-trust/components/clickhouse/#replication-semantics
       - alert: CHReplicationQueueFailing
         expr: max by (instance, table) (chq_replication_queue_failing{job="clickhouse-sql"}) > 0
         for: 15m

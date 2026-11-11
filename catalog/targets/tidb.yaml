@@ -63,10 +63,89 @@ silent_failures:
     source: tidb-lab
     refs: [tidb-exp-heap, tikv-backtrace-loader]
 
+# 正確使用：只寫原始碼推理（code）、本機小實驗（tested）或官方文件（doc），依據都在 refs。
+usage:
+  - id: pd-probe-readyz
+    text: >-
+      PD 的 blackbox 探測打內嵌 etcd 的 /readyz；/pd/api/v1/health 與 /ping 永遠 200，不能用。/readyz 沒有 quorum 時逾時（lab 12 秒），blackbox timeout 比它短時以逾時算失敗
+    evidence: tested
+    refs: [tidb-exp-raw, pd-h-health, pd-memberlist-nonlinear, pd-etcd-readyz-linear]
+  - id: tidb-tikv-health-metric
+    text: >-
+      TiDB 的 /status 只看關機旗標、TiKV 的 /status 一律空的 200；TiDB 要搭配 time() − tidb_domain_lease_expire_time，TiKV 要搭配 PD 看到的 store 狀態
+    evidence: tested
+    refs: [tidb-exp-raw, tidb-h-status-health, tikv-h-status, tidb-lease-expire-set]
+  - id: probe-instance-relabel
+    text: >-
+      probe job 把 instance relabel 成和 /metrics target 相同的 host:port，三方交叉的規則才對得起來（設定見 lab/targets/tidb/prom/prometheus.base.yml）
+    evidence: tested
+    refs: [tidb-exp]
+  - id: job-absent
+    text: >-
+      每個 job（pd、tikv、tidb）各一條 absent(up{job=...})；官方規則把 job 寫死，名稱不同時安靜
+    evidence: tested
+    refs: [tidb-exp-raw, tidb-rule-memabnormal]
+  - id: expected-counts
+    text: >-
+      PD 與 TiDB 的預期台數寫在規則檔的 tidb-params（recording rule）；PD 內嵌的 etcd 3.5.15 沒有 etcd_network_known_peers。TiKV 對 PD 記得的 store 數，不必寫死
+    evidence: tested
+    refs: [tidb-exp-names, pd-etcd-version, pd-m-cluster-status]
+  - id: sample-limit
+    text: >-
+      TiKV 的 sample 數隨 region leader 數成長（lab：leader 那台 27,249，其他 13,119），sample_limit 要留空間
+    evidence: tested
+    refs: [tidb-exp-raw]
+  - id: official-rules-fixes
+    text: >-
+      沿用官方規則時要改：apply 執行緒用 name=~"apply_.*"、pd_regions_status 的 type 用連字號、拿掉 etcd_server_is_leader 前提改用 max by (job)；tikv_pd_heartbeat_tick_total、tidb_monitor_keep_alive_total 在 v8.5.8 不存在
+    evidence: tested
+    refs: [tidb-exp-raw, tikv-rule-apply, pd-rule-miss, pd-region-miss-label, pd-rule-down, tikv-rule-leader-drops, tidb-rule-keepalive]
+  - id: rules-version-match
+    text: >-
+      官方規則檔要和叢集同一條版本線：8.1 起 coprocessor 等待只取 type="all"，記憶體 quota 規則用的 metric 8.1 才有
+    evidence: code
+    refs: [ver-ti-rules81-cop-type, ver-ti-rules81-tidb-mem, ver-ti-tidb81-memquota]
+  - id: memory-quota-75
+    text: >-
+      7.5 沒有 tidb_server_memory_quota_bytes、tikv_server_memory_quota_bytes（TiDBComponentMemoryNearQuota 回傳空），記憶體改對 cgroup 上限
+    evidence: code
+    refs: [ver-ti-tidb81-memquota, ver-ti-tikv81-memquota, ver-ti-tikv75-cpuquota]
+  - id: store-down-time
+    text: >-
+      max-store-down-time 預設 30 分鐘，Down 之後 PD 才補副本；告警在 Disconnected（20 秒）與 Unhealthy（10 分鐘）就要響，不要只看 store_down_count
+    evidence: tested
+    refs: [tidb-exp-raw, pd-store-status-order, pd-store-disconnect, pd-store-unhealthy, pd-store-down-default]
+  - id: tikv-image-debuginfo
+    text: >-
+      TiKV v8.5.8 映像帶壓縮的 debug info，啟動時解壓進記憶體（heap profile 約 1.9GB）；記憶體上限小時先 strip debug info（lab 用 objcopy --strip-debug 後約 160MB），否則 memory quota 規則一直響
+    evidence: tested
+    refs: [tidb-exp-heap, tikv-backtrace-loader]
+  - id: sql-memory-limits
+    text: >-
+      tidb_server_memory_limit 預設 80%，超過時取消最耗記憶體的 SQL、只寫 log；單條 SQL 由 tidb_mem_quota_query 與 tidb_mem_oom_action（預設 CANCEL）限制。被取消的語句沒有專屬的計數 metric
+    evidence: code
+    refs: [tidb-var-memlimit, tidb-var-oom-action, tidb-memlimit-kill]
+  - id: token-limit
+    text: >-
+      token-limit 預設 1000（同時執行的語句），max-server-connections 預設 0（不限制）；TiDBTokensNearLimit 的 900 是對預設值，改了 token-limit 要一起改
+    evidence: code
+    refs: [tidb-cfg-token-limit, tidb-cfg-max-conn]
+  - id: slow-log-threshold
+    text: >-
+      slow query metric 只記超過 tidb_slow_log_threshold 的語句；門檻改了，TiDBSlowQueries 的數量意義跟著變
+    evidence: code
+    refs: [tidb-m-slow-query]
+  - id: gc-life-time
+    text: >-
+      tidb_gc_life_time 預設 10 分鐘；沒有結束的交易、停掉但沒移除的 TiCDC changefeed 或 BR 任務會讓 GC safe point 停住
+    evidence: code
+    refs: [tidb-gc-lifetime-default, tidb-gc-run-job, pd-gc-safepoint]
+
 signals:
   # ---------- 監測自檢（抓取本身） ----------
   - id: endpoint-up
     aspect: exporter
+    section: observe
     tier: 1
     question: 三種元件的 /metrics 都抓得到嗎
     signal: >-
@@ -86,6 +165,7 @@ signals:
 
   - id: health-second-path
     aspect: exporter
+    section: observe
     tier: 1
     question: 抓得到 /metrics，就代表元件能服務嗎
     signal: >-
@@ -113,6 +193,7 @@ signals:
 
   - id: metric-families-present
     aspect: exporter
+    section: observe
     tier: 1
     question: 該有的 metric 都還在嗎
     signal: >-
@@ -130,6 +211,7 @@ signals:
 
   - id: scrape-budget
     aspect: exporter
+    section: observe
     tier: 2
     question: Scrape 來得及在期限內完成、內容沒有超過上限嗎
     signal: >-
@@ -145,6 +227,7 @@ signals:
 
   - id: endpoint-blocking
     aspect: exporter
+    section: observe
     tier: 2
     question: 產生 /metrics 時會不會被元件內部的鎖或忙碌卡住
     signal: >-
@@ -161,6 +244,7 @@ signals:
   # ---------- 叢集 ----------
   - id: role-detection
     aspect: cluster
+    section: observe
     tier: 1
     question: 剛好有一台 PD leader，而且抓得到它嗎
     signal: >-
@@ -177,6 +261,7 @@ signals:
 
   - id: pd-quorum
     aspect: cluster
+    section: misuse
     tier: 1
     question: PD 還有過半嗎
     signal: >-
@@ -192,6 +277,7 @@ signals:
 
   - id: component-count
     aspect: cluster
+    section: observe
     tier: 2
     question: PD／TiKV／TiDB 每種的台數對嗎
     signal: >-
@@ -207,6 +293,7 @@ signals:
 
   - id: leader-changes
     aspect: cluster
+    section: misuse
     tier: 2
     question: PD leader 換得太頻繁、或內嵌 etcd 的磁碟太慢嗎
     signal: >-
@@ -223,6 +310,7 @@ signals:
 
   - id: region-health
     aspect: cluster
+    section: misuse
     tier: 1
     question: 有 region 少了副本或副本沒回應嗎
     signal: >-
@@ -244,6 +332,7 @@ signals:
   # ---------- 可用性 ----------
   - id: store-state
     aspect: availability
+    section: misuse
     tier: 1
     question: PD 看每台 TiKV 是什麼狀態
     signal: >-
@@ -263,6 +352,7 @@ signals:
 
   - id: tso-available
     aspect: availability
+    section: misuse
     tier: 1
     question: TiDB 拿得到 TSO 嗎
     signal: >-
@@ -279,6 +369,7 @@ signals:
   # ---------- 複寫 ----------
   - id: replication-lag
     aspect: replication
+    section: misuse
     tier: 2
     question: follower 副本跟得上 region leader 嗎
     signal: >-
@@ -295,6 +386,7 @@ signals:
   # ---------- 資源與飽和 ----------
   - id: raftstore-latency
     aspect: saturation
+    section: misuse
     tier: 2
     question: TiKV 的 raft append、commit、apply 夠快嗎
     signal: >-
@@ -316,6 +408,7 @@ signals:
 
   - id: write-stall
     aspect: saturation
+    section: misuse
     tier: 1
     question: RocksDB 有 write stall 嗎
     signal: max_over_time(tikv_engine_write_stall{type="write_stall_max"}[5m]) > 0；L0 檔案或待 compaction 的量太多時寫入被減速或停止。lab 沒有觸發
@@ -329,11 +422,13 @@ signals:
 
   - id: server-busy
     aspect: saturation
+    section: misuse
     tier: 2
     question: TiKV 忙到拒絕請求嗎
     signal: >-
       TiDB 端 rate(tidb_tikvclient_region_err_total{type="server_is_busy"}[5m]) > 1（例子）：scheduler 待寫入量超過門檻（SchedTooBusy）、write stall、read pool 滿都會讓 TiKV 回 ServerIsBusy；
-      TiKV 端 scheduler latch 等待 p99 > 1 秒（官方門檻）是同一批 key 排隊。lab 沒有觸發
+      TiKV 端 scheduler latch 等待 p99 > 1 秒（官方門檻）是同一批 key 排隊。lab 沒有觸發。
+      壞用法：連續遞增主鍵把寫入集中在最後一個 region（架構頁的熱點），在 TiDB 端就是這個 server_is_busy 與 backoff；是哪張表要查 PD 的 hot region（見盲點）
     metrics: [tidb_tikvclient_region_err_total, tikv_scheduler_latch_wait_duration_seconds_bucket]
     evaluate_on: self
     evidence: code
@@ -344,11 +439,13 @@ signals:
 
   - id: memory-quota
     aspect: saturation
+    section: misuse
     tier: 2
     question: TiKV、TiDB 的記憶體離上限多遠
     signal: >-
       process_resident_memory_bytes / tikv_server_memory_quota_bytes（或 tidb_server_memory_quota_bytes）> 0.8（官方門檻）。TiDB 超過 tidb_server_memory_limit（預設 80%）時
       取消最耗記憶體的 SQL，只寫 log、沒有計數 metric；單條 SQL 超過 tidb_mem_quota_query（1GB）時依 tidb_mem_oom_action（CANCEL）。
+      所以吃記憶體的壞 SQL（大 JOIN、大結果集）被取消時，/metrics 只看得到 RSS 對 quota 的比例；被取消的語句是否算進 query-errors 的 Error 沒有驗證。
       lab：TiKV 映像未去 debug info 時 RSS 貼著 1GB 上限（啟動時解壓 debug info）。
       版本：quota metric 8.1 以上才有（tidb_server_memory_quota_bytes、tikv_server_memory_quota_bytes），7.5 上規則回傳空；7.5 改用 cgroup 上限
     metrics: [process_resident_memory_bytes, tikv_server_memory_quota_bytes, tidb_server_memory_quota_bytes]
@@ -362,6 +459,7 @@ signals:
 
   - id: tso-wait
     aspect: saturation
+    section: misuse
     tier: 2
     question: 等 TSO 等很久嗎
     signal: >-
@@ -377,6 +475,7 @@ signals:
 
   - id: pending-compaction
     aspect: saturation
+    section: misuse
     tier: 2
     question: TiKV 待 compaction 的量接近 soft limit 了嗎
     signal: >-
@@ -393,6 +492,7 @@ signals:
 
   - id: cpu-quota
     aspect: saturation
+    section: misuse
     tier: 2
     question: TiKV 的 CPU 用量接近 quota 了嗎
     signal: >-
@@ -409,6 +509,7 @@ signals:
 
   - id: channel-full
     aspect: saturation
+    section: misuse
     tier: 2
     question: raftstore／apply 的 FSM mailbox 滿了嗎
     signal: >-
@@ -426,6 +527,7 @@ signals:
   # ---------- 工作量 ----------
   - id: query-errors
     aspect: workload
+    section: misuse
     tier: 2
     question: 語句失敗的比例高嗎
     signal: >-
@@ -441,6 +543,7 @@ signals:
 
   - id: query-latency
     aspect: workload
+    section: misuse
     tier: 3
     question: 語句慢嗎
     signal: tidb_server_handle_query_duration_seconds p99 > 1 秒（官方門檻）。lab：PD 失去 quorum 後官方 TiDB_query_duration firing
@@ -454,11 +557,13 @@ signals:
 
   - id: slow-queries
     aspect: workload
+    section: misuse
     tier: 3
     question: 慢查詢多嗎
     signal: >-
       increase(tidb_server_slow_query_process_duration_seconds_count[10m]) > 100（例子）；只記超過 tidb_slow_log_threshold（預設 300ms）的語句。
-      內容看 slow query log 或 INFORMATION_SCHEMA.SLOW_QUERY、statements_summary
+      內容看 slow query log 或 INFORMATION_SCHEMA.SLOW_QUERY、statements_summary。
+      壞 SQL（全表掃描、缺索引、大結果集）在 /metrics 只會以這個數量與 query-latency 的延遲出現，看不出是哪一條、掃了多少（見盲點）
     metrics: [tidb_server_slow_query_process_duration_seconds_count]
     evaluate_on: self
     evidence: code
@@ -469,6 +574,7 @@ signals:
 
   - id: connections
     aspect: workload
+    section: misuse
     tier: 2
     question: 連線數與同時執行的語句接近上限嗎
     signal: >-
@@ -483,6 +589,7 @@ signals:
 
   - id: txn-conflicts
     aspect: workload
+    section: misuse
     tier: 2
     question: 交易衝突或 backoff 多嗎
     signal: >-
@@ -498,6 +605,7 @@ signals:
 
   - id: critical-errors
     aspect: workload
+    section: misuse
     tier: 2
     question: 有 panic 或 critical error 嗎
     signal: >-
@@ -513,6 +621,7 @@ signals:
   # ---------- 資料維護 ----------
   - id: gc-progress
     aspect: maintenance
+    section: misuse
     tier: 3
     question: GC safe point 有在前進嗎
     signal: >-
@@ -529,6 +638,7 @@ signals:
 
   - id: ddl-and-stats
     aspect: maintenance
+    section: misuse
     tier: 3
     question: DDL 排隊或統計資訊更新失敗嗎
     signal: tidb_ddl_waiting_jobs > 5（官方門檻）；tidb_statistics_auto_analyze_total{type="failed"} 增加
@@ -543,6 +653,7 @@ signals:
   # ---------- 資料保護 ----------
   - id: log-backup
     aspect: protection
+    section: misuse
     tier: 3
     question: log backup（PITR）的 checkpoint 跟得上嗎
     signal: >-
@@ -558,6 +669,7 @@ signals:
   # ---------- 容量 ----------
   - id: storage-space
     aspect: capacity
+    section: misuse
     tier: 2
     question: 每台 TiKV 與整個叢集的空間夠嗎
     signal: >-
@@ -577,41 +689,52 @@ blind_spots:
     category: other
     why: BR 是外部工具，全量備份沒有常駐的 metric；只有 log backup 有 checkpoint
     workaround: 備份工作成功後寫 textfile metric 給 node_exporter；定期還原演練
+    options: "建議：備份工作成功後寫 textfile metric 給 node_exporter；定期還原演練"
     section: targets/tidb.md#protection
   - what: SQL 層是否真的能執行交易（端到端）
     category: database
     why: TiDB /status 不看 PD 與 TiKV；select 1 不需要 TSO，PD 失去 quorum 時仍成功（lab）
     workaround: 外部 SQL probe 定期在測試表做一次寫入與讀取（例如 query-exporter 或 blackbox 之外的 SQL probe），對失敗告警
+    options: "建議：外部 SQL probe 定期讀寫測試表（select 1 不夠）"
     section: targets/tidb.md#health-second-path
-  - what: 哪一條 SQL 造成負載（statements_summary、slow query、Top SQL）
+  - what: 哪一條 SQL 造成負載、是哪一種壞 SQL（全表掃描、大交易、被記憶體上限取消的語句）
     category: exporter
-    why: /metrics 只有彙總；語句層要查 INFORMATION_SCHEMA 或 TiDB Dashboard，Top SQL 要 ng-monitoring
+    why: >-
+      /metrics 只有彙總：slow-queries 的數量、query-latency、query-errors、memory-quota 的比例、txn-conflicts 的 backoff、gc-progress 的長交易。
+      執行計畫、掃描列數、交易大小與被取消的是哪一條，只在 statements_summary、slow query log（INFORMATION_SCHEMA.SLOW_QUERY）與 TiDB log；
+      超過 tidb_server_memory_limit 被取消的 SQL 只寫 log（讀碼）。Top SQL 要 ng-monitoring
     workaround: query-exporter 彙總 statements_summary 後輸出（未實測）
+    options: "建議：查 statements_summary、INFORMATION_SCHEMA.SLOW_QUERY；要告警時用 query-exporter 彙總（未實測）"
     section: targets/tidb.md#workload
-  - what: 熱點 region
+  - what: 熱點 region（例如連續遞增主鍵造成的寫入熱點）
     category: exporter
     why: PD 有 hot region 統計（pd_hotspot_*、pd_hotcache_status），沒有做成規則；門檻依負載而定
     workaround: 用 server-busy 與 raftstore-latency 當下游訊號；PD 的 hot region API
+    options: "建議：先看 server-busy、raftstore-latency；確認時查 PD 的 hot region API"
     section: targets/tidb.md#saturation
   - what: TiFlash、TiCDC、TiProxy
     category: other
     why: 不在這次範圍；各自有 /metrics 與官方規則（TiCDC changefeed 停住也會擋住 GC safe point）
     workaround: 用到時另做卡片；至少把它們的 up 與 absent 加上
+    options: "建議：用到時另做卡片；至少加上 up 與 absent"
     section: targets/tidb.md#blind-spots
   - what: TLS 憑證到期
     category: database
     why: 三種元件的 /metrics 都沒有憑證到期的 metric（讀碼：metric 名稱沒有 cert、tls、expir）
     workaround: blackbox 的 tls module 探各 port 的 probe_ssl_earliest_cert_expiry
+    options: "建議：blackbox tls module 的 probe_ssl_earliest_cert_expiry"
     section: targets/tidb.md#blind-spots
   - what: PD leader 抓不到時的叢集狀態
     category: exporter
     why: store／region 狀態只有 PD leader 算，follower 沒有可替代的值
     workaround: TiDBPDLeaderMetricsMissing 讓「看不到」本身會響；必要時用 pd-ctl 或 /pd/api/v1/stores 查
+    options: "建議：TiDBPDLeaderMetricsMissing 讓「看不到」本身告警；必要時用 pd-ctl 查"
     section: targets/tidb.md#cluster
   - what: 時鐘偏移
     category: other
     why: PD 只在 leader 的系統時間往回跳時記 pd_tso_events{type="system_time_slow"}；TiKV、TiDB 之間的時鐘差沒有 metric
     workaround: node_exporter 的 node_timex_offset_seconds、node_timex_sync_status（每台對自己的時間來源；兩台之間的差最多是兩台 offset 相加）。主機層規則只讀碼，host lab 之後排程
+    options: "建議：node_exporter 的 node_timex_*（HostClockNotSynchronised、HostClockOffsetHigh）"
     section: targets/tidb.md#blind-spots
     covered_by:
       tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"

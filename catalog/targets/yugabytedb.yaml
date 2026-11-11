@@ -6,7 +6,7 @@ family: database
 status: draft
 stages: [source]
 versions_checked: ["YugabyteDB v2026.1.3.0（映像 2026.1.3.0-b100，commit f2635f5；核心 Apache-2.0）", "YugabyteDB Anywhere 告警範本 v2026.1.3.0（Polyform，只引用）", "postgres_exporter v0.20.1（對 YSQL）", "YugabyteDB 2.20.12、2024.2.12.0、2025.1.5.0、2025.2.9.0（版本差異頁，只讀碼）"]
-architecture: architecture/db-distsql.md
+architecture: architecture/db-distsql.md#yugabytedb
 role: >-
   YugabyteDB 叢集有兩種 process：yb-master（catalog、tablet 位置、balancer；masters 之間一組 Raft）與 yb-tserver（DocDB 儲存，每個 tablet 一組 Raft；
   YSQL 的 PostgreSQL 程序與 YCQL 也跑在裡面）。四個 port 各有 /prometheus-metrics：master 7000、tserver 9000、YSQL 13000、YCQL 12000。
@@ -76,10 +76,89 @@ silent_failures:
     source: yb-lab
     refs: [yb-exp-raw, yb-m-h-underrep-running, yb-m-h-health-underrep]
 
+# 正確使用：只寫原始碼推理（code）、本機小實驗（tested）或官方文件（doc），依據都在 refs。
+usage:
+  - id: honor-timestamps
+    text: >-
+      四個 job 都設 honor_timestamps: false（或 track_timestamps_staleness: true）；預設下停掉的節點的值留 5 分鐘，lab 出現假的「兩個 leader」。用 false 重跑沒有做
+    evidence: tested
+    refs: [yb-exp-raw, yb-prom-honor-ts, yb-prom-track-ts-staleness, yb-prom-track-ts-config]
+  - id: four-ports
+    text: >-
+      抓四個 port 的 /prometheus-metrics：master 7000、tserver 9000、YSQL 13000、YCQL 12000；YSQL 與 YCQL 和 9000 分開失敗，每個 job 各一條 absent
+    evidence: tested
+    refs: [yb-exp-raw, yb-h-prom-register]
+  - id: master-probe-body
+    text: >-
+      master 的 /api/v1/health-check 要比對 body（有 "dead_nodes" 才是拿到 leader 的回應）；follower 轉送失敗時仍回 200。/status 一律 {}，不能當探測
+    evidence: tested
+    refs: [yb-exp-raw, yb-m-h-redirect-nolist, yb-h-status]
+  - id: is-leader-probe
+    text: >-
+      每台 master 探 /api/v1/is-leader（leader 200、其他 503），成功數不是 1 就告警
+    evidence: tested
+    refs: [yb-exp-raw, yb-m-h-isleader, yb-m-h-isleader-503]
+  - id: leader-only-metrics
+    text: >-
+      num_tablet_servers_live／dead、is_load_balancing_enabled 只有 master leader 寫（follower 是 0）：用 max by (job)，並搭配 leader 抓不到時的告警
+    evidence: tested
+    refs: [yb-exp-raw, yb-m-bg-report, yb-m-bg-reset]
+  - id: expected-counts
+    text: >-
+      master 預期數寫在規則檔的 yb-params；tserver 對 master leader 記得的 live + dead，不必寫死
+    evidence: tested
+    refs: [yb-exp-raw, yb-m-num-live, yb-m-num-dead]
+  - id: metrics-url-params
+    text: >-
+      URL 參數 metrics=、priority_regex=、max_metric_entries= 會濾掉 metric，不要濾掉規則用的名稱；表多時用 version=v2 的 table allowlist 限制 sample 數
+    evidence: code
+    refs: [yb-h-prom-v2, yb-h-prom-maxentries-flag]
+  - id: clock-skew-crash
+    text: >-
+      fail_on_out_of_range_clock_skew 預設 true：skew 超過 max_clock_skew_usec（500ms）時有交易表的 tserver FATAL（lab：牆鐘往回 7 秒，三台同時 crash）；主機時鐘同步另用 node_exporter 看
+    evidence: tested
+    refs: [yb-exp-clock, yb-clk-fail-flag, yb-clk-max-skew, yb-clk-fatal]
+  - id: ysql-lease
+    text: >-
+      enable_ysql_operation_lease 預設 true：master 失去 quorum 約 30 秒後 YSQL 全停，所以 master quorum 的告警也是 YSQL 可用性的告警
+    evidence: tested
+    refs: [yb-exp-raw, yb-exp-lease-log, yb-ysql-lease-flag, yb-ysql-lease-ttl]
+  - id: ysql-max-connections
+    text: >-
+      ysql_max_connections 是每台 tserver 各自的（預設 0，由 PostgreSQL 決定）；enable_ysql_conn_mgr 預設 false
+    evidence: code
+    refs: [yb-ysql-maxconn, yb-connmgr]
+  - id: postgres-exporter-flags
+    text: >-
+      對 YSQL 用 postgres_exporter v0.20.1 時加 --no-collector.stat_replication --no-collector.settings；stat_replication 的查詢卡住，每次 scrape 多一條 backend，幾十秒內用光連線
+    evidence: tested
+    refs: [yb-exp-raw, yb-exp-pgexp, pgexp-statrepl-default, pgexp-statrepl-query, pgexp-settings-query]
+  - id: postgres-metrics-skip
+    text: >-
+      PostgreSQL 的儲存、複寫、vacuum 類訊號（pg_database_size_bytes、n_live_tup、pg_replication_lag_seconds）在 YSQL 是 0，不要搬過來；改看 follower_lag_ms 與 tserver 的 metric
+    evidence: tested
+    refs: [yb-exp-raw, yb-exp-pgexp]
+  - id: memory-limits
+    text: >-
+      hard limit 預設主機記憶體 × 0.85、soft 是 hard 的 85%；mem_tracker_server 不含 YSQL 的 PostgreSQL backend（lab：容器約 400MB、mem_tracker 4–9MB）
+    evidence: tested
+    refs: [yb-exp-raw, yb-mem-hard, yb-mem-soft]
+  - id: version-metrics
+    text: >-
+      2.20 沒有 max_follower_heartbeat_delay 與 outstanding_tablet_splits：YBMasterFollowerHeartbeatDelay、YBTabletSplitsBacklog 回傳空，只剩 probe 計數與 balancer 規則
+    evidence: code
+    refs: [ver-yb220-no-hb-delay, ver-yb242-hb-delay, ver-yb242-splits]
+  - id: tablet-guardrail
+    text: >-
+      ts_supportable_tablet_peers 是 -1 時沒有 guardrail（lab 是 -1），YBTabletPeersNearLimit 不會響
+    evidence: tested
+    refs: [yb-exp-raw, yb-ts-supportable]
+
 signals:
   # ---------- 監測自檢（抓取本身） ----------
   - id: endpoint-up
     aspect: exporter
+    section: observe
     tier: 1
     question: 四個 port 的 /prometheus-metrics 都抓得到嗎
     signal: >-
@@ -101,6 +180,7 @@ signals:
 
   - id: health-second-path
     aspect: exporter
+    section: observe
     tier: 1
     question: 抓得到 /prometheus-metrics，就代表元件能服務嗎
     signal: >-
@@ -127,6 +207,7 @@ signals:
 
   - id: metric-families-present
     aspect: exporter
+    section: observe
     tier: 1
     question: 該有的 metric 都還在嗎
     signal: >-
@@ -144,6 +225,7 @@ signals:
 
   - id: scrape-budget
     aspect: exporter
+    section: observe
     tier: 2
     question: Scrape 來得及在期限內完成、內容沒有超過上限嗎
     signal: >-
@@ -159,6 +241,7 @@ signals:
 
   - id: endpoint-blocking
     aspect: exporter
+    section: observe
     tier: 2
     question: 產生 /prometheus-metrics 時會不會被元件內部的鎖或忙碌卡住
     signal: >-
@@ -175,6 +258,7 @@ signals:
   # ---------- 叢集 ----------
   - id: role-detection
     aspect: cluster
+    section: observe
     tier: 1
     question: 剛好有一台 master leader，而且抓得到它嗎
     signal: >-
@@ -193,6 +277,7 @@ signals:
 
   - id: master-quorum
     aspect: cluster
+    section: misuse
     tier: 1
     question: master 還有過半嗎
     signal: >-
@@ -209,6 +294,7 @@ signals:
 
   - id: component-count
     aspect: cluster
+    section: observe
     tier: 2
     question: master 與 tserver 的台數對嗎
     signal: >-
@@ -224,6 +310,7 @@ signals:
 
   - id: leader-changes
     aspect: cluster
+    section: misuse
     tier: 2
     question: master leader 換得太頻繁嗎
     signal: >-
@@ -239,6 +326,7 @@ signals:
 
   - id: tablet-health
     aspect: cluster
+    section: misuse
     tier: 1
     question: 有 tablet 沒有 leader 或少了副本嗎
     signal: >-
@@ -260,6 +348,7 @@ signals:
   # ---------- 可用性 ----------
   - id: tserver-liveness
     aspect: availability
+    section: misuse
     tier: 1
     question: master 看每台 tserver 是 live 還是 dead
     signal: >-
@@ -275,6 +364,7 @@ signals:
 
   - id: ysql-available
     aspect: availability
+    section: misuse
     tier: 1
     question: YSQL 還接受新連線嗎
     signal: >-
@@ -290,6 +380,7 @@ signals:
   # ---------- 複寫 ----------
   - id: replication-lag
     aspect: replication
+    section: misuse
     tier: 2
     question: tablet follower 跟得上 leader 嗎
     signal: >-
@@ -306,6 +397,7 @@ signals:
   # ---------- 資源與飽和 ----------
   - id: clock-skew
     aspect: saturation
+    section: misuse
     tier: 1
     question: 時鐘偏移離 crash 還有多遠
     signal: >-
@@ -322,6 +414,7 @@ signals:
 
   - id: memory
     aspect: saturation
+    section: misuse
     tier: 2
     question: 記憶體離 soft limit 多遠、有沒有因此拒絕寫入
     signal: >-
@@ -338,6 +431,7 @@ signals:
 
   - id: write-stall
     aspect: saturation
+    section: misuse
     tier: 1
     question: DocDB（RocksDB）在拒絕或延遲寫入嗎
     signal: >-
@@ -352,6 +446,7 @@ signals:
 
   - id: wal-fsync
     aspect: saturation
+    section: misuse
     tier: 2
     question: Raft WAL 的 fsync 夠快嗎
     signal: >-
@@ -367,6 +462,7 @@ signals:
 
   - id: rpc-queue-overflow
     aspect: saturation
+    section: misuse
     tier: 2
     question: RPC 請求因為 service 佇列滿被丟掉了嗎
     signal: >-
@@ -383,11 +479,14 @@ signals:
   # ---------- 工作量 ----------
   - id: connections
     aspect: workload
+    section: misuse
     tier: 2
     question: YSQL 連線數接近上限嗎
     signal: >-
       yb_ysqlserver_connection_total / yb_ysqlserver_max_connection_total > 0.8；上限 ysql_max_connections 是每台 tserver 各自的（預設 0，由 PostgreSQL 決定）。
-      YCQL 看 12000 的 rpc_connections_alive
+      YCQL 看 12000 的 rpc_connections_alive。
+      壞用法：連線風暴（每個請求開新連線、pool 設太大）先讓這個比例上升，到上限後由 ysql-available 的 over_limit 計數；enable_ysql_conn_mgr 預設 false，
+      上限是每台各自的，連線集中在少數 tserver 時只有那幾台會滿（lab：tserver-1 滿、tserver-2 照常）
     metrics: [yb_ysqlserver_connection_total, yb_ysqlserver_max_connection_total, rpc_connections_alive]
     evaluate_on: self
     evidence: tested
@@ -398,10 +497,12 @@ signals:
 
   - id: query-latency
     aspect: workload
+    section: misuse
     tier: 3
     question: YSQL 語句與 tserver 寫入慢嗎
     signal: >-
-      handler_latency_yb_ysqlserver_SQLProcessor_{Select,Insert,Update,Delete}Stmt 的平均 > 100ms（例子）；tserver Write RPC 平均 > 500ms（YBA 預設）。只有 sum 與 count
+      handler_latency_yb_ysqlserver_SQLProcessor_{Select,Insert,Update,Delete}Stmt 的平均 > 100ms（例子）；tserver Write RPC 平均 > 500ms（YBA 預設）。只有 sum 與 count。
+      壞 SQL（全表掃描、跨 tablet 的交易）只會讓這裡的平均上升，分不出是哪一種、哪一條（見盲點）
     metrics: [handler_latency_yb_ysqlserver_SQLProcessor_SelectStmt_sum, handler_latency_yb_tserver_TabletServerService_Write_sum]
     evaluate_on: self
     evidence: code
@@ -412,6 +513,7 @@ signals:
 
   - id: postgres-carryover
     aspect: workload
+    section: observe
     tier: 3
     question: PostgreSQL 的 exporter 與指標在 YSQL 上能用嗎
     signal: >-
@@ -429,6 +531,7 @@ signals:
   # ---------- 資料維護 ----------
   - id: balancer
     aspect: maintenance
+    section: misuse
     tier: 3
     question: cluster balancer 開著、tablet split 有在完成嗎
     signal: >-
@@ -446,6 +549,7 @@ signals:
   # ---------- 容量 ----------
   - id: capacity
     aspect: capacity
+    section: misuse
     tier: 2
     question: 每台 tserver 的 tablet 數離上限多遠
     signal: >-
@@ -471,16 +575,19 @@ blind_spots:
     category: other
     why: 資料庫沒有備份新鮮度的 metric；YBA 的備份告警用 YBA 自己的 ybp_* metric
     workaround: 備份工作成功後寫 textfile metric 給 node_exporter；定期還原演練
+    options: "建議：備份工作成功後寫 textfile metric 給 node_exporter；定期還原演練"
     section: targets/yugabytedb.md#blind-spots
   - what: xCluster（跨叢集複寫）延遲
     category: other
     why: 要兩個叢集；YBA 的 REPLICATION_LAG、SAFETIME_LAG 用 tserver 的 xCluster metric（consumer_safe_time_lag），這次沒有實測
     workaround: 用到 xCluster 時另做訊號，至少抓 consumer 端的 safe time lag
+    options: "建議：用到 xCluster 時另做訊號，至少抓 consumer 端的 safe time lag"
     section: targets/yugabytedb.md#blind-spots
   - what: 磁碟空間、檔案系統唯讀
     category: other
     why: /prometheus-metrics 的 drive 類 metric 只有寫入量與 fsync 時間，沒有剩餘空間（lab 名稱清單）
     workaround: node_exporter 的 node_filesystem_avail_bytes（YBA 的 NODE_DISK_USAGE 也是）；mountpoint 要改成 fs_data_dirs。主機層規則只讀碼，host lab 之後排程
+    options: "建議：node_exporter 的檔案系統規則，mountpoint 對 fs_data_dirs"
     section: targets/yugabytedb.md#capacity
     covered_by:
       tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"
@@ -492,16 +599,21 @@ blind_spots:
     category: database
     why: /status 永遠 {}；tcp probe 在連線用完時仍成功；tablet leaderless 時 YSQL 照常接受連線，讀取 20 秒逾時（lab）
     workaround: 外部 SQL probe 定期在測試表做一次寫入與讀取（YBA 的 DB_WRITE_READ_TEST_ERROR 就是這個做法）
+    options: "建議：外部 SQL probe 定期在測試表寫入並讀回"
     section: targets/yugabytedb.md#health-second-path
-  - what: 哪一條 SQL 造成負載（pg_stat_statements、ASH）
+  - what: 哪一條 SQL 造成負載、是哪一種壞 SQL（全表掃描、跨 tablet 的交易）
     category: exporter
-    why: /prometheus-metrics 只有彙總；語句層要查 pg_stat_statements 或 yb_active_session_history
+    why: >-
+      /prometheus-metrics 只有彙總：query-latency 的平均延遲（只有 sum 與 count）、connections 與 ysql-available 的連線數與被拒次數。
+      是不是全表掃描、一筆交易碰了幾個 tablet，要查 pg_stat_statements、EXPLAIN 或 yb_active_session_history；跨 tablet 交易的 metric 這次沒有讀碼確認
     workaround: query-exporter 彙總後輸出（未實測）
+    options: "建議：查 pg_stat_statements、yb_active_session_history；要告警時用 query-exporter 彙總（未實測）"
     section: targets/yugabytedb.md#workload
   - what: 時鐘同步本身
     category: other
     why: hybrid_clock_skew 只在別台的 hybrid time 比我快時才有值；本機時鐘跳太多時 process 直接 FATAL，metric 來不及抓
     workaround: node_exporter 的 node_timex_offset_seconds、node_timex_sync_status。主機層規則只讀碼，host lab 之後排程
+    options: "建議：node_exporter 的 node_timex_*（HostClockNotSynchronised、HostClockOffsetHigh）"
     section: targets/yugabytedb.md#clock-skew
     covered_by:
       tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"
@@ -513,9 +625,11 @@ blind_spots:
     category: database
     why: /prometheus-metrics 沒有憑證到期的 metric；YBA 的 *_CERT_EXPIRY 用 YBA 健康檢查的 ybp_health_check_* metric
     workaround: blackbox 的 tls module 探各 port 的 probe_ssl_earliest_cert_expiry
+    options: "建議：blackbox tls module 的 probe_ssl_earliest_cert_expiry"
     section: targets/yugabytedb.md#blind-spots
   - what: master leader 抓不到時的叢集狀態
     category: exporter
     why: num_tablet_servers_*、is_load_balancing_enabled 只有 leader 寫，follower 是 0
     workaround: YBMasterLeaderMetricsMissing 讓「看不到」本身會響；必要時用 yb-admin 或 /api/v1/tablet-servers 查
+    options: "建議：YBMasterLeaderMetricsMissing；必要時用 yb-admin 或 /api/v1/tablet-servers 查"
     section: targets/yugabytedb.md#cluster
