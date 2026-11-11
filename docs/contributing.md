@@ -2,7 +2,7 @@
 
 這頁說明怎麼新增一個元件或 target、怎麼引用證據、怎麼加實驗。給 AI agent 的完整指引在 repo 根目錄的 `AGENTS.md`。
 
-## 五段框架
+## 五段框架 {#five-sections}
 
 每張卡（監控系統或被監控的 target）都回答同樣的五段。範圍的界線是深度：只到 exporter 或 endpoint 實際輸出的那一層。
 

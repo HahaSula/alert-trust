@@ -683,6 +683,51 @@ signals:
     upstream: { status: yes, note: "TiKV_low_space、TiKV_space_used_more_than_80%" }
     rules: [rules/targets/tidb.yml#TiKVStoreLowSpace, rules/targets/tidb.yml#TiDBClusterSpaceHigh]
 
+# 寫得不好的 SQL：每一種壞用法對應到哪些 misuse 訊號、看得到什麼、/metrics 看不到什麼。
+bad_queries:
+  - case: 全表掃描、缺索引
+    signals: [slow-queries, query-latency]
+    visible: >-
+      increase(tidb_server_slow_query_process_duration_seconds_count)：超過 tidb_slow_log_threshold（預設 300ms）的語句數；
+      tidb_server_handle_query_duration_seconds 的 p99
+    not_visible: 哪一條、掃了多少列、執行計畫（在 statements_summary、INFORMATION_SCHEMA.SLOW_QUERY，見 blind_spots）
+    refs: [tidb-m-slow-query, tidb-m-handle-query, dbm-tidb-rules-query]
+  - case: 連續遞增主鍵造成的寫入熱點
+    signals: [server-busy, txn-conflicts, raftstore-latency]
+    visible: >-
+      TiDB 端 tidb_tikvclient_region_err_total{type="server_is_busy"} 與 backoff 增加；TiKV 端 scheduler latch 等待變長（讀碼，lab 沒有觸發）
+    not_visible: 是哪張表、哪個 region（PD 的 hot region 統計沒有做成規則，見 blind_spots）
+    refs: [tikv-sched-too-busy, cg-server-busy-label, cg-m-region-err, cg-m-backoff]
+  - case: 大交易、長交易
+    signals: [gc-progress, memory-quota]
+    visible: >-
+      tidb_executor_ongoing_txn_duration_seconds 超過 1 小時；GC safe point（pd_gc_gc_safepoint）不前進；TiDB 的 RSS 對 quota 的比例
+    not_visible: 交易的大小（寫入多少 key、多少位元組）、是哪個 session（見 blind_spots）
+    refs: [tidb-m-ongoing-txn, pd-gc-safepoint, tidb-gc-lifetime-default, tidb-m-memquota]
+  - case: 鎖衝突（多個交易改同一批列）
+    signals: [txn-conflicts, query-errors]
+    visible: >-
+      依 type 分的 tidb_tikvclient_backoff_seconds_count：txnLock／txnLockFast 是鎖衝突；write conflict 在 tidb_server_execute_error_total{type="kv:9007"}
+    not_visible: 衝突的是哪些 key、哪兩個交易
+    refs: [cg-m-backoff, tidb-rule-backoff, tidb-m-execute-error-label]
+  - case: 撞到記憶體上限被取消的 SQL（大 JOIN、大結果集）
+    signals: [memory-quota, query-errors]
+    visible: process_resident_memory_bytes ÷ tidb_server_memory_quota_bytes（8.1 以上才有 quota metric）
+    not_visible: >-
+      被取消的次數與語句：超過 tidb_server_memory_limit 時只寫 log、沒有計數 metric；單條超過 tidb_mem_quota_query 時依 tidb_mem_oom_action；
+      被取消的語句是否算進 query-errors 沒有驗證
+    refs: [tidb-var-memlimit, tidb-var-oom-action, tidb-memlimit-kill, tidb-m-memquota, ver-ti-tidb81-memquota]
+  - case: DDL 排隊
+    signals: [ddl-and-stats]
+    visible: tidb_ddl_waiting_jobs > 5（官方門檻）
+    not_visible: 排在前面的是哪一個 DDL、為什麼慢：/metrics 只有數量
+    refs: [tidb-rule-ddl]
+  - case: 連線風暴（每個請求開新連線）
+    signals: [connections]
+    visible: tidb_server_tokens 對 token-limit（預設 1000）；tidb_server_connections 對 max-server-connections（預設 0，不限制）
+    not_visible: 被拒絕的連線次數（本卡沒有對應 metric）、連線來自哪個應用
+    refs: [tidb-m-tokens, tidb-m-connections, tidb-cfg-token-limit, tidb-cfg-max-conn]
+
 # 目前無法監控的範圍。category：exporter（native 模型下指「元件有這個資訊、/metrics 沒輸出」）、database（資料庫本身沒提供）、other（要靠其他元件）。
 blind_spots:
   - what: 全量備份（BR）的新鮮度與可還原性

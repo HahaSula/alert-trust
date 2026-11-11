@@ -570,6 +570,37 @@ not_applicable_aspects:
       YBA 的 BACKUP_FAILURE、PITR_CONFIG_FAILURE 用 ybp_* 平台 metric。見 blind_spots。
     refs: [yba-pitr, yb-m-num-live, yb-m-lb-enabled]
 
+# 寫得不好的 SQL：每一種壞用法對應到哪些 misuse 訊號、看得到什麼、/prometheus-metrics 看不到什麼。
+bad_queries:
+  - case: 全表掃描、缺索引
+    signals: [query-latency]
+    visible: handler_latency_yb_ysqlserver_SQLProcessor_SelectStmt 的平均（只有 sum 與 count）上升
+    not_visible: 是不是全表掃描、是哪一條（pg_stat_statements、EXPLAIN，見 blind_spots）
+    refs: [yb-exp-names, yba-ysql-avg]
+  - case: 跨 tablet 的交易
+    signals: [query-latency]
+    visible: Insert／Update／Delete 語句與 tserver Write RPC 的平均延遲上升
+    not_visible: 一筆交易碰了幾個 tablet；跨 tablet 交易的 metric 沒有讀碼確認（見 blind_spots）
+    refs: [yb-exp-names, yba-write-latency]
+  - case: 連線風暴（每個請求開新連線、pool 設太大）
+    signals: [connections, ysql-available]
+    visible: >-
+      yb_ysqlserver_connection_total ÷ max_connection_total 先上升，到上限後 yb_ysqlserver_connection_over_limit_total 增加；
+      lab（ysql_max_connections 12）：tserver-1 的 over_limit 1 分鐘增加 7.3、tcp probe 仍是 1、tserver-2 照常
+    not_visible: 連線來自哪個應用；上限是每台 tserver 各自的，看整體平均會漏掉單台打滿
+    refs: [yb-exp-raw, yb-ysql-m-overlimit, yb-ysql-m-conn, yb-ysql-maxconn, yb-connmgr]
+  - case: 大批次寫入（大 INSERT、COPY）壓垮 DocDB
+    signals: [write-stall, rpc-queue-overflow, memory]
+    visible: >-
+      majority_sst_files_rejections、rocksdb_stall_micros、rpcs_queue_overflow 增加；leader／operation_memory_pressure_rejections（讀碼，lab 沒有觸發）
+    not_visible: 是哪一條語句、哪張表
+    refs: [yb-sst-rej, yb-sst-hard, res-yb-queue-overflow, yb-mem-leader-rej]
+  - case: 鎖衝突與長交易
+    signals: [query-latency]
+    visible: 只有語句平均延遲
+    not_visible: 交易衝突、鎖等待與交易年齡：本卡沒有找到對應 metric（見 blind_spots）
+    refs: [yb-exp-names]
+
 blind_spots:
   - what: 備份與 PITR 的新鮮度、可還原性
     category: other
@@ -601,11 +632,12 @@ blind_spots:
     workaround: 外部 SQL probe 定期在測試表做一次寫入與讀取（YBA 的 DB_WRITE_READ_TEST_ERROR 就是這個做法）
     options: "建議：外部 SQL probe 定期在測試表寫入並讀回"
     section: targets/yugabytedb.md#health-second-path
-  - what: 哪一條 SQL 造成負載、是哪一種壞 SQL（全表掃描、跨 tablet 的交易）
+  - what: 哪一條 SQL 造成負載、是哪一種壞 SQL（全表掃描、跨 tablet 的交易、鎖衝突與長交易）
     category: exporter
     why: >-
       /prometheus-metrics 只有彙總：query-latency 的平均延遲（只有 sum 與 count）、connections 與 ysql-available 的連線數與被拒次數。
-      是不是全表掃描、一筆交易碰了幾個 tablet，要查 pg_stat_statements、EXPLAIN 或 yb_active_session_history；跨 tablet 交易的 metric 這次沒有讀碼確認
+      是不是全表掃描、一筆交易碰了幾個 tablet，要查 pg_stat_statements、EXPLAIN 或 yb_active_session_history；跨 tablet 交易的 metric 這次沒有讀碼確認；
+      交易衝突、鎖等待與交易年齡在本卡沒有找到對應 metric
     workaround: query-exporter 彙總後輸出（未實測）
     options: "建議：查 pg_stat_statements、yb_active_session_history；要告警時用 query-exporter 彙總（未實測）"
     section: targets/yugabytedb.md#workload

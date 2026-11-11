@@ -322,6 +322,33 @@ signals:
     upstream: { status: no }
     rules: []
 
+# 寫得不好的 rule 查詢：每一種壞用法對應到哪些訊號、看得到什麼、/metrics 看不到什麼。
+bad_queries:
+  - case: Rule 的查詢比 interval 慢、但在 `evaluation_timeout` 內
+    signals: [eval-within-interval]
+    visible: >-
+      grafana_alerting_schedule_rule_evaluations_missed_total{reason="slow_evaluation"} 增加（帶 rule 標題；lab 25s 的資料來源約 90 秒內加 5），
+      狀態一直是 Alerting、health ok、沒有 failure
+    not_visible: 送出的資料已舊了一個評估時間，EndsAt 寬限變短（lab 從約 110s 降到約 84s），metric 不顯示
+    refs: [exp-graf-slow, graf-eval-drop, graf-missed-slow, graf-metric-missed]
+  - case: Rule 的查詢比 `evaluation_timeout`（預設 30s）慢
+    signals: [eval-within-interval, evaluation-failures]
+    visible: >-
+      一次 evaluation 重試 3 次約 95 秒；lab 45s 的資料來源約 150 秒內 failures_total 只加 1、missed 加 12，
+      外部 Alertmanager 先把 alert 標成 resolved
+    not_visible: 是哪一條 rule（耗時 histogram 與 failures_total 只有 org label，見 blind_spots）
+    refs: [exp-graf-slow, graf-eval-timeout, graf-default-timeout, graf-default-attempts, graf-eval-failures]
+  - case: 大量短 interval 的 rule 讓 scheduler 落後
+    signals: [scheduler-behind]
+    visible: grafana_alerting_scheduler_behind_seconds > 10（一個 tick）；每個 tick 都要先讀資料庫的 rule 版本（讀碼）
+    not_visible: 是哪一批 rule 造成
+    refs: [graf-tick-behind, graf-metric-behind, graf-tick-fetch-rules]
+  - case: 查詢回空或失敗時設成 OK、KeepLast
+    signals: [state-settings, error-nodata-states]
+    visible: grafana_alerting_alerts{state="error"|"nodata"} 只涵蓋設成 Error、NoData 的 rule；設定本身要盤點 noDataState、execErrState
+    not_visible: 設成 OK、Alerting、KeepLast 的 rule 遇到資料消失時沒有任何 metric（見 blind_spots）
+    refs: [exp-graf-modes, graf-nodata-ok, graf-err-ok, graf-metric-alerts]
+
 blind_spots:
   - what: 設成 OK、Alerting、KeepLast 的 rule 遇到資料消失（NoData）
     category: exporter

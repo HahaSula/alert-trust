@@ -6,6 +6,18 @@
 
 8.0、8.4 LTS、9.7 LTS 之間的差異（metric 改名、認證、semi-sync plugin、Group Replication 預設值）從原始碼整理在 [MySQL 各版本的監控差異](versions/mysql.md)，只讀碼。
 
+## 五段導覽 {#five-sections}
+
+本頁依面向寫成；對應到[五段框架](../map.md)的位置如下，元件卡已依五段排列。
+
+| 段落 | 元件卡 | 本頁 |
+|---|---|---|
+| 1 架構 | [架構頁](../architecture/db-relational.md)、[元件卡](../components/mysql.md#architecture) | — |
+| 2 正確使用 | [元件卡](../components/mysql.md#usage) | [建議的設定](#recommended)、[用自訂查詢補上](#custom-queries)、[版本差異](#versions) |
+| 3 正確觀測 | [元件卡](../components/mysql.md#observe) | [監測自檢](#exporter) |
+| 4 不正確使用時的觀測 | [元件卡](../components/mysql.md#misuse)、[寫得不好的查詢](../components/mysql.md#bad-query-table) | [九個面向一覽](#aspects)、[效能與故障情境](#performance) |
+| 5 目前無法觀測的痕跡 | [元件卡](../components/mysql.md#blind) | [盲點與補法](#blind-spots)、[Exporter 覆蓋矩陣](#coverage) |
+
 ## 先講結論
 
 1. **連線打滿時，連線數規則會消失。**max_connections 用完時 exporter 的一般帳號也收到 Error 1040，`mysql_up` 變 0，`threads_connected` 消失，「連線數 / max_connections > 0.8」回傳空。看得到的只有 `mysql_up` 規則，以及連線降下來之後 `connection_errors_total{error="max_connections"}` 的增加量。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql-ha][^mysql-conn-reserved]

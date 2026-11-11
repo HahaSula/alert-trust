@@ -173,6 +173,15 @@ signals:
       - rules/victoriametrics/meta.yml#MetaVMTooManyRestarts
       - rules/victoriametrics/meta.yml#MetaVMUncleanShutdown
 
+# 寫得不好的 MetricsQL：每一種壞用法對應到哪些訊號、看得到什麼、/metrics 看不到什麼。
+bad_queries:
+  - case: 昂貴的查詢（高基數、長時間範圍）佔滿 vmselect 的併發
+    signals: [query-saturation]
+    visible: vm_concurrent_select_limit_timeout_total 增加（排隊超過上限時間的查詢數）
+    not_visible: >-
+      是哪一條查詢；-search.maxQueryDuration、-search.maxUniqueTimeseries、-search.maxSamplesPerQuery 超限時有沒有 metric 沒有讀碼確認（見 blind_spots）
+    refs: [vms-queue, vms-maxconc]
+
 blind_spots:
   - what: 哪一條查詢佔滿 vmselect 的併發、或觸發 -search.max* 上限
     category: exporter

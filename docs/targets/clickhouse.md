@@ -4,6 +4,18 @@
 
 依據是 ClickHouse v26.10.2.103-stable 的原始碼（`gh api .../releases/latest` 回的最新 stable，2026-10-24；最新 LTS 是 v26.8.34.13-lts；Apache-2.0），加上一組小實驗：server ×2（1 shard、2 replicas）、Keeper ×3，做 Too many parts、失敗的 mutation、記憶體與並行上限、Distributed 送出、備份、replica 落後與停機、Keeper 失去 quorum、`<prometheus>` 關掉<span class="at-chip at-ev-tested">實測</span>[^ch-exp]。這台機器的 Docker 容器時鐘比牆鐘慢約 30%；秒數以主機 monotonic 時鐘量的 SQL、HTTP 耗時為準，Prometheus 的 `for` 與 query-exporter 的 interval 只當參考。訊號與規則在[元件卡](../components/clickhouse.md)，原始碼位置在[附錄](clickhouse-appendix.md)，機制在[分析型架構](../architecture/db-olap.md)與[共識（Raft）架構](../architecture/db-raft.md#clickhouse-keeper)。25.3 到 26.10 之間的 metric 差異見 [ClickHouse 各版本的監控差異](versions/clickhouse.md)。
 
+## 五段導覽 {#five-sections}
+
+本頁依面向寫成；對應到[五段框架](../map.md)的位置如下，元件卡已依五段排列。
+
+| 段落 | 元件卡 | 本頁 |
+|---|---|---|
+| 1 架構 | [架構頁](../architecture/db-olap.md)、[元件卡](../components/clickhouse.md#architecture) | [監控模型](#model) |
+| 2 正確使用 | [元件卡](../components/clickhouse.md#usage) | [用自訂查詢補上](#custom-queries) |
+| 3 正確觀測 | [元件卡](../components/clickhouse.md#observe) | [監測自檢](#exporter)、[三方交叉](#health-second-path)、[metric 消失與 scrape 預算](#exporter-scrape) |
+| 4 不正確使用時的觀測 | [元件卡](../components/clickhouse.md#misuse)、[寫得不好的查詢](../components/clickhouse.md#bad-query-table) | [九個面向一覽](#aspects) |
+| 5 目前無法觀測的痕跡 | [元件卡](../components/clickhouse.md#blind) | [盲點與補法](#blind-spots) |
+
 ## 先講結論
 
 1. **原生 `/metrics` 預設是關的，卡片以「打開它」為前提。**預設 `config.xml` 的 `<prometheus>` 在註解裡；沒打開時 9363 不 listen，Prometheus 看到 connection refused，和 process 停掉一樣。打開後只有 `system.metrics`、`events`、`asynchronous_metrics`、`errors` 的全伺服器數字。<span class="at-chip at-ev-tested">實測</span>[^ch-cfg-prom-commented][^ch-prom-handler][^ch-exp-raw]

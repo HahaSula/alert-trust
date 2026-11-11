@@ -7,7 +7,7 @@
 
 Checks: required fields and enums, unique ids, every source/contract/rule reference resolves,
 every alerting rule has a runbook_url that points at an existing signal, every contract has an
-anchor in docs/contracts.md, the optional `versions` field on signals ({min, max, note, refs}; min inclusive,
+anchor in docs/contracts.md, catalog/map.yaml is current and every card has a plugin (build_map.py), the optional `versions` field on signals ({min, max, note, refs}; min inclusive,
 max exclusive; refs must exist) and the rule annotation `alert_trust_min_version` (a version string).
 """
 from __future__ import annotations
@@ -18,6 +18,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import build_map as M  # noqa: E402
 import catalog as C  # noqa: E402
 
 
@@ -143,6 +144,7 @@ def validate(root: str = C.ROOT) -> tuple[list[str], list[str]]:
         if tier not in ("1", "2", "3"):
             errors.append(f"{ref}: labels.tier 要是字串 \"1\"、\"2\" 或 \"3\"")
 
+    errors += M.check_map(components, os.path.join(root, "catalog", "map.yaml"))
     if no_section:
         warnings.append(f"{no_section} 個訊號還沒有 section（observe／misuse），五段框架遷移中")
     PENDING_ASPECTS.clear()

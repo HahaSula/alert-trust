@@ -6,6 +6,18 @@
 
 10.6、10.11、11.4、11.8、12.3 五條 LTS 線的差異（權限、replica 狀態欄位、binlog purge、performance_schema）從原始碼整理在 [MariaDB 各版本的監控差異](versions/mariadb.md)，只讀碼；lab 跑的是 11.4.13。查詢與 session 分析在 [ASH 頁](mariadb-ash.md)。
 
+## 五段導覽 {#five-sections}
+
+本頁依面向寫成；對應到[五段框架](../map.md)的位置如下，元件卡已依五段排列。
+
+| 段落 | 元件卡 | 本頁 |
+|---|---|---|
+| 1 架構 | [架構頁](../architecture/db-relational.md)、[元件卡](../components/mariadb.md#architecture) | — |
+| 2 正確使用 | [元件卡](../components/mariadb.md#usage) | [建議的設定](#recommended)、[用自訂查詢補上](#custom-queries) |
+| 3 正確觀測 | [元件卡](../components/mariadb.md#observe) | [監測自檢](#exporter) |
+| 4 不正確使用時的觀測 | [元件卡](../components/mariadb.md#misuse)、[寫得不好的查詢](../components/mariadb.md#bad-query-table) | [九個面向一覽](#aspects)、[效能與故障情境](#performance) |
+| 5 目前無法觀測的痕跡 | [元件卡](../components/mariadb.md#blind) | [盲點與補法](#blind-spots)、[Exporter 覆蓋矩陣](#coverage) |
+
 ## 先講結論
 
 1. **照 exporter README 給權限，replica 上的 replication metric 會整組消失。**MariaDB 的 `REPLICATION CLIENT` 只等於 `BINLOG MONITOR`，`SHOW SLAVE STATUS` 要 `SLAVE MONITOR`；11.0 起 `SUPER` 也不涵蓋。缺少時 `slave_status` 的 `collector_success` 是 0，所有 replication 規則回傳空。<span class="at-chip at-ev-tested">實測</span>[^exp-mysql]<span class="at-chip at-ev-code">讀碼</span>[^ver-mdb-repl-client-alias][^ver-mdb114-slave-status-priv][^ver-mdb114-super-upgrade]

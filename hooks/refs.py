@@ -101,8 +101,31 @@ def inline_figures(markdown: str) -> str:
     return FIGURE.sub(repl, markdown)
 
 
+# ---------- plugin table from catalog/map.yaml ----------
+MAP_PLUGINS = re.compile(r"^<!-- map: plugins -->$", re.M)
+
+
+def map_plugins_table(markdown: str, src_uri: str) -> str:
+    """Render the plugin → cards table from the generated catalog/map.yaml, so the page never goes stale."""
+    if not MAP_PLUGINS.search(markdown):
+        return markdown
+    with open(os.path.join(ROOT, "catalog", "map.yaml"), encoding="utf-8") as f:
+        m = yaml.safe_load(f)
+    up = "../" * src_uri.count("/")
+    rows = ["| Plugin | 涵蓋的卡片 | 依賴 | 正確使用 | 正確觀測 | 不正確使用 | 寫得不好的查詢 | 無法觀測 |",
+            "|---|---|---|---|---|---|---|---|"]
+    for name, p in m["plugins"].items():
+        cards = [(cid, m["cards"][cid]) for cid in p["cards"]]
+        n = {k: sum(len(c[k]) for _, c in cards) for k in ("usage", "observe", "misuse", "bad_queries", "blind")}
+        links = "、".join(f"[{c['name']}]({up}{c['page']})" for _, c in cards)
+        dep = "、".join(f"`{d}`" for d in p.get("depends", [])) or "—"
+        rows.append(f"| `{name}` | {links} | {dep} | {n['usage']} | {n['observe']} | {n['misuse']} | {n['bad_queries']} | {n['blind']} |")
+    return MAP_PLUGINS.sub(lambda _: "\n".join(rows), markdown)
+
+
 _terms_hook = on_page_markdown
 
 
 def on_page_markdown(markdown, page, config, files):  # noqa: F811 - adds figures before the other hooks
-    return _terms_hook(inline_figures(markdown), page, config, files)
+    markdown = map_plugins_table(inline_figures(markdown), page.file.src_uri)
+    return _terms_hook(markdown, page, config, files)

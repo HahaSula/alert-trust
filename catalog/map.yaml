@@ -1,0 +1,1472 @@
+# 產生的檔案，不要手改：由 tools/build_map.py（tools/build_pages.py 會呼叫）從 catalog/components、catalog/targets 產生。
+# Skill 讀這份決定元件屬於哪個 plugin、每段有哪些項目；tools/validate.py 會檢查它是否過期。
+# 卡片 id → 頁面 docs/components/<id>.md；每段的錨點見 sections[].anchor，訊號的錨點就是訊號 id。
+sections:
+- id: architecture
+  title: 架構
+  field: architecture
+  anchor: architecture
+- id: usage
+  title: 正確使用
+  field: usage
+  anchor: usage
+- id: observe
+  title: 正確觀測
+  field: signals[section=observe]
+  anchor: observe
+- id: misuse
+  title: 不正確使用時的觀測
+  field: signals[section=misuse], bad_queries
+  anchor: misuse
+- id: blind
+  title: 目前無法觀測的痕跡
+  field: blind_spots
+  anchor: blind
+plugins:
+  alert-trust-core:
+    title: 監控鏈
+    cards:
+    - prometheus
+    - vmagent
+    - victoriametrics
+    - victorialogs
+    - vmalert
+    - alertmanager
+    - thanos
+    - grafana_alerting
+    - observer
+  alert-trust-host:
+    title: 主機與容器
+    cards:
+    - host
+    depends:
+    - alert-trust-core
+  alert-trust-mysql:
+    title: MySQL
+    cards:
+    - mysql
+    depends:
+    - alert-trust-core
+  alert-trust-mariadb:
+    title: MariaDB
+    cards:
+    - mariadb
+    depends:
+    - alert-trust-core
+  alert-trust-postgresql:
+    title: PostgreSQL
+    cards:
+    - postgres_exporter
+    depends:
+    - alert-trust-core
+  alert-trust-valkey:
+    title: Valkey／Redis
+    cards:
+    - redis_exporter
+    depends:
+    - alert-trust-core
+  alert-trust-mongodb:
+    title: MongoDB
+    cards:
+    - mongodb_exporter
+    depends:
+    - alert-trust-core
+  alert-trust-etcd:
+    title: etcd
+    cards:
+    - etcd
+    depends:
+    - alert-trust-core
+  alert-trust-tidb:
+    title: TiDB
+    cards:
+    - tidb
+    depends:
+    - alert-trust-core
+  alert-trust-yugabytedb:
+    title: YugabyteDB
+    cards:
+    - yugabytedb
+    depends:
+    - alert-trust-core
+  alert-trust-clickhouse:
+    title: ClickHouse
+    cards:
+    - clickhouse
+    depends:
+    - alert-trust-core
+cards:
+  prometheus:
+    name: Prometheus
+    kind: infra
+    plugin: alert-trust-core
+    page: components/prometheus.md
+    architecture: architecture/prometheus.md
+    usage:
+    - scrape-timeout
+    - scrape-within-interval
+    - range-window
+    - query-offset
+    - lookback
+    - group-layout
+    - query-concurrency
+    - query-timeout
+    - resend-endsat
+    - notifier-queue
+    - retention-config
+    - restart-gap
+    - gomaxprocs-251
+    - extra-scrape-metrics
+    - k8s-selectors
+    observe:
+    - prometheus-down
+    - watchdog
+    - job-freshness
+    - known-true-canary
+    - rule-group-running
+    - rule-failures
+    - notify-to-alertmanager
+    - crash-loop
+    - config-reload
+    misuse:
+    - rule-group-ratio
+    - notify-early-warning
+    - wal-write-failed
+    - for-reset
+    - scrape-ratio
+    - query-slots
+    - tsdb-maintenance
+    - size-retention
+    - disk-free
+    - memory-limit
+    - root-cause
+    bad_queries:
+    - case: 昂貴的查詢（高基數或大量 regex 的 selector、長 range、subquery）
+      signals:
+      - query-slots
+      - rule-group-ratio
+      - memory-limit
+    - case: 查詢排隊或執行超過 `--query.timeout`、撞到 `--query.max-samples`
+      signals:
+      - rule-failures
+      - query-slots
+    - case: 昂貴的 recording rule 和關鍵 alert 放在同一個 group
+      signals:
+      - rule-group-ratio
+    - case: Recording rule 讓 series 暴增
+      signals:
+      - rule-group-ratio
+      - memory-limit
+    - case: Range 相對 `scrape_interval` 太短、或 selector 對不到
+      signals:
+      - for-reset
+    - case: 長時間範圍的查詢佔住 block reader
+      signals:
+      - tsdb-maintenance
+    blind:
+    - 哪一條 rule 或哪一個查詢造成查詢負載
+    - Recording rule 造成的 series 暴增來自哪一條
+    - 永遠回空的 rule（視窗太短、selector 對不到）
+    - 長查詢佔住 block reader 讓 reload 停住
+    - OOM 或 crash loop 的原因
+    - 查詢撞到 `--query.max-samples` 的是哪一條、撞的是哪一個上限
+  thanos:
+    name: Thanos
+    kind: infra
+    plugin: alert-trust-core
+    page: components/thanos.md
+    architecture: architecture/thanos.md
+    usage:
+    - strict-endpoints
+    - partial-strategy
+    - upload-retention
+    - store-sync-delay
+    - ruler-query-offset
+    - ruler-resend
+    - ruler-as-endpoint
+    - receive-quorum
+    observe:
+    - components-up
+    - store-endpoints
+    - rule-eval-failures
+    - rule-notify
+    - data-watchdog
+    - sidecar-prometheus
+    - sidecar-upload
+    - receive-replication
+    - rule-partial-warnings
+    - partial-response-strategy
+    - shipper-failures
+    - store-sync
+    - query-dedup
+    - query-strict-endpoints
+    - ruler-own-data
+    misuse:
+    - compact-halted
+    - rule-group-ratio
+    - compact-singleton
+    - receive-hashring
+    - query-errors
+    - compact-backlog
+    - compact-has-run
+    bad_queries:
+    - case: Ruler 的查詢扇出到所有 store、時間範圍太長
+      signals:
+      - rule-group-ratio
+      - rule-eval-failures
+    - case: Rule group 用 warn 策略，store 回錯時用不完整的資料判斷
+      signals:
+      - rule-partial-warnings
+      - partial-response-strategy
+    blind:
+    - Ruler 查詢失敗的原因（querier 停機還是 store 全部消失）
+    - 哪一條查詢讓 querier 扇出變慢、哪個 store 拖慢
+    - 上傳前就被 Prometheus 刪掉的 block
+    - 不同 job 名稱的兩個 compactor 寫同一個 bucket
+  vmagent:
+    name: vmagent
+    kind: infra
+    plugin: alert-trust-core
+    page: components/vmagent.md
+    architecture: architecture/vmagent.md
+    usage:
+    - scrape-timeout-clamp
+    - scrape-within-interval
+    - max-scrape-size
+    - disk-buffer-limit
+    - keep-disk-queue
+    - remote-write-queues
+    observe:
+    - vmagent-down
+    - job-freshness
+    - data-dropped
+    - remote-write-retries
+    - scrape-health
+    misuse:
+    - buffer-time-to-full
+    - scrape-ratio
+    bad_queries: []
+    blind:
+    - 補回的資料 rule 不會補判
+    - Buffer 丟掉的是哪一段時間的資料
+  victoriametrics:
+    name: VictoriaMetrics single／cluster
+    kind: infra
+    plugin: alert-trust-core
+    page: components/victoriametrics.md
+    architecture: architecture/victoriametrics.md
+    usage:
+    - replication-factor
+    - deny-partial-response
+    - skip-slow-replicas
+    - drop-on-overload
+    - latency-offset
+    - select-concurrency
+    - min-free-disk
+    observe:
+    - components-up
+    - partial-results
+    - storage-reachable
+    - restarts
+    misuse:
+    - read-only
+    - disk-space
+    - query-saturation
+    - rows-dropped
+    bad_queries:
+    - case: 昂貴的查詢（高基數、長時間範圍）佔滿 vmselect 的併發
+      signals:
+      - query-saturation
+    blind:
+    - 哪一條查詢佔滿 vmselect 的併發、或觸發 -search.max* 上限
+    - Partial response 少的是哪些 series
+  victorialogs:
+    name: VictoriaLogs＋vlagent
+    kind: infra
+    plugin: alert-trust-core
+    page: components/victorialogs.md
+    architecture: architecture/victorialogs.md
+    usage:
+    - log-rule-window
+    - canary-filter
+    - ingest-content-type
+    - cluster-partial
+    observe:
+    - components-up
+    - log-freshness
+    - ingested
+    - storage-reachable
+    misuse:
+    - read-only
+    - vlagent-backlog
+    - disk-space
+    - query-load
+    bad_queries:
+    - case: 大時間範圍或沒有過濾條件的 LogsQL 佔滿 vlselect
+      signals:
+      - query-load
+    - case: Canary 用 `* | stats count()` 沒加 `filter c:>0`
+      signals:
+      - log-freshness
+    - case: Log rule 沒寫 `_time`，log 延遲超過 eval_delay + interval
+      signals:
+      - log-freshness
+    blind:
+    - 查詢故障期間進來的 log 事件
+    - 全部 vlstorage 停時 vlinsert 記憶體裡的緩衝
+    - 哪一條 LogsQL 查詢佔用了 vlselect 的併發
+    - Log 延遲超過 eval_delay + interval 而漏掉的事件
+  vmalert:
+    name: vmalert
+    kind: infra
+    plugin: alert-trust-core
+    page: components/vmalert.md
+    architecture: architecture/vmalert.md
+    usage:
+    - eval-delay
+    - range-window
+    - query-step
+    - watchdog-resend
+    - notifier-timeout
+    - group-concurrency
+    - results-limit
+    - state-restore
+    - state-write-queue
+    - operator-selector
+    observe:
+    - vmalert-down
+    - watchdog
+    - rule-errors
+    - notifier-errors
+    - rules-loaded
+    - state-write
+    - resolve-settings
+    - config-reload
+    misuse:
+    - group-ratio
+    - results-limit
+    bad_queries:
+    - case: Rule 回傳太多結果（高基數的 by、沒有聚合的 selector）
+      signals:
+      - results-limit
+      - rule-errors
+    - case: 昂貴的 MetricsQL 讓 vmselect 飽和或觸發 -search.max* 上限
+      signals:
+      - rule-errors
+      - group-ratio
+    - case: 昂貴的 recording rule 和關鍵 alert 放在同一個 group
+      signals:
+      - group-ratio
+    - case: 視窗相對資料間隔與 eval_delay 太短，rule 永遠回空
+      signals:
+      - rules-loaded
+    blind:
+    - 哪一條 rule 的查詢讓 vmselect 飽和或觸發 -search.max* 上限
+    - 重啟後 `for` 有沒有還原成功
+    - 視窗太短而永遠回空的 rule
+  grafana_alerting:
+    name: Grafana Alerting
+    kind: infra
+    plugin: alert-trust-core
+    page: components/grafana_alerting.md
+    architecture: architecture/grafana-alerting.md
+    usage:
+    - nodata-error-state
+    - provisioning-defaults
+    - datasource-alert-route
+    - external-alertmanager
+    - evaluation-timeout
+    - interval-vs-tick
+    - endsat-dms
+    - ha-peers
+    - persistent-database
+    observe:
+    - grafana-down
+    - watchdog
+    - evaluations-running
+    - evaluation-failures
+    - state-settings
+    - error-nodata-states
+    - datasource-alert-routing
+    - alertmanager-choice
+    - external-send
+    - embedded-notify
+    - endsat-grace
+    - state-restore
+    - rule-store-db
+    misuse:
+    - eval-within-interval
+    - scheduler-behind
+    - ha-mode
+    bad_queries:
+    - case: Rule 的查詢比 interval 慢、但在 `evaluation_timeout` 內
+      signals:
+      - eval-within-interval
+    - case: Rule 的查詢比 `evaluation_timeout`（預設 30s）慢
+      signals:
+      - eval-within-interval
+      - evaluation-failures
+    - case: 大量短 interval 的 rule 讓 scheduler 落後
+      signals:
+      - scheduler-behind
+    - case: 查詢回空或失敗時設成 OK、KeepLast
+      signals:
+      - state-settings
+      - error-nodata-states
+    blind:
+    - 設成 OK、Alerting、KeepLast 的 rule 遇到資料消失（NoData）
+    - 哪一條 rule 的查詢慢或失敗
+    - Grafana 資料庫讀不到或寫不進去
+    - 內建與外部 Alertmanager 都送不到
+    - 啟動時沒讀回 alert state
+  alertmanager:
+    name: Alertmanager
+    kind: infra
+    plugin: alert-trust-core
+    page: components/alertmanager.md
+    architecture: architecture/alertmanager.md
+    usage:
+    - failure-window
+    - watchdog-route
+    - repeat-on-tick
+    - group-by
+    - empty-group-by
+    - resolve-timeout
+    - failure-reason
+    - smtp-version
+    - ha-peer-timeout
+    - gomaxprocs-flag
+    observe:
+    - alertmanager-down
+    - delivery-failing
+    - end-to-end
+    - config-reload
+    - crash-loop
+    misuse:
+    - attempts-failing
+    - cluster-health
+    - state-persistence
+    bad_queries: []
+    blind:
+    - SMTP 不回應時卡住的 aggregation group
+    - Alert store 往 dispatcher 的 channel 佔用率
+    - 存活探測看不出通知已經送不出去
+    - 單機當機時最後一次快照之後的 silence 變更
+  observer:
+    name: 外部觀察者與 dead man's switch
+    kind: architecture
+    plugin: alert-trust-core
+    page: components/observer.md
+    architecture: null
+    usage:
+    - federate-series
+    - deadman-wait
+    - probe-content
+    - k8s-from-outside
+    observe:
+    - failure-domain
+    - separate-alert-path
+    - own-deadman
+    - scrapes-all-infra
+    - deadman-wait
+    - federation
+    - k8s-sources
+    misuse: []
+    bad_queries: []
+    blind:
+    - Meta 與被監控對象是否真的在不同故障域
+    - 外部 dead man's switch 服務本身停機
+  host:
+    name: 主機與容器資源
+    kind: infra
+    plugin: alert-trust-host
+    page: components/host.md
+    architecture: architecture/db-resources.md#host-layer
+    usage:
+    - node-mixin-selector
+    - cadvisor-labels
+    - cadvisor-process-metrics
+    - psi-sources
+    - memory-limit-source
+    - readonly-rule
+    - memory-limit-threshold
+    observe:
+    - exporter-up
+    - collector-success
+    misuse:
+    - disk-space
+    - filesystem-readonly
+    - oom-kills
+    - container-memory-limit
+    - memory-available
+    - swap-activity
+    - cpu-saturation
+    - container-cpu-throttling
+    - disk-latency
+    - disk-busy
+    - fd-headroom
+    - clock-sync
+    - network-errors
+    - process-threads-cpu
+    bad_queries: []
+    blind:
+    - 容器的 OOM kill 次數（cgroup 路徑不一致時）
+    - 被 OOM kill 後沒有重啟的容器
+    - 單次 IO 的延遲尖峰（fsync 慢）
+    - 哪個行程在用 IO 或 page cache
+  clickhouse:
+    name: ClickHouse（server 與 ClickHouse Keeper；內建 <prometheus> /metrics＋SQL 查 system 表）
+    kind: target
+    plugin: alert-trust-clickhouse
+    page: components/clickhouse.md
+    guide: targets/clickhouse.md
+    architecture: architecture/db-olap.md
+    usage:
+    - enable-prometheus
+    - prometheus-subitems
+    - heavy-metrics
+    - kv-metric-names
+    - replicas-status-verbose
+    - keeper-ready-probe
+    - native-events
+    - qe-dsn-per-server
+    - qe-account
+    - qe-no-zookeeper-connection
+    - qe-stagger-interval
+    - qe-expiration-freshness
+    - parts-threshold-from-sql
+    - memory-settings
+    - thread-pool-params
+    - insert-batching
+    - max-concurrent-queries
+    - backups-after-restart
+    observe:
+    - endpoint-up
+    - health-second-path
+    - metric-families-present
+    - scrape-budget
+    - endpoint-blocking
+    - sql-path
+    - role-detection
+    - component-count
+    - replication-semantics
+    misuse:
+    - keeper-quorum
+    - keeper-session
+    - keeper-latency
+    - replica-readonly
+    - replication-lag
+    - replication-queue
+    - distributed-queue
+    - writes-rejected
+    - query-admission
+    - parts-pressure
+    - memory
+    - global-thread-pool
+    - failed-queries
+    - error-counters
+    - merge-pool
+    - mutations
+    - detached-parts
+    - backups
+    - data-integrity
+    - disk-space
+    bad_queries:
+    - case: 大量小 insert（每次幾列）或 partition key 太細，part 數暴增
+      signals:
+      - parts-pressure
+      - writes-rejected
+      - merge-pool
+    - case: 對大表頻繁 ALTER UPDATE／DELETE（mutation）
+      signals:
+      - mutations
+      - merge-pool
+    - case: 撞到 max_memory_usage 的查詢（大 GROUP BY、JOIN、排序）
+      signals:
+      - memory
+      - failed-queries
+    - case: 沒有條件或 LIMIT 的大 SELECT
+      signals:
+      - memory
+      - query-admission
+      - global-thread-pool
+    - case: 查詢風暴（並行查詢超過 max_concurrent_queries）
+      signals:
+      - query-admission
+    - case: 透過 Distributed 表非同步寫入，目的 shard 收不下
+      signals:
+      - distributed-queue
+    - case: ON CLUSTER DDL 在 Keeper 排隊
+      signals:
+      - keeper-latency
+    blind:
+    - 每張表的唯讀、延遲、佇列、active replica 數（system.replicas）
+    - mutation 失敗與卡住（system.mutations）
+    - 被伺服器移走的 part（system.detached_parts 的 reason）
+    - 哪一張表的 part 太多、目前的 parts_to_delay_insert
+    - Distributed 送出失敗的原因與哪一張表
+    - 原生 BACKUP 的結果與新鮮度
+    - 端到端能不能寫入（真的 insert 一列）
+    - 哪一條查詢造成負載、是哪一種壞查詢（沒有條件的大 SELECT、撞到 max_memory_usage 的查詢、對大表的 mutation）
+    - TLS 憑證到期
+    - 慢磁碟、磁碟滿、檔案系統唯讀
+    - Keeper 慢、ON CLUSTER DDL 佇列卡住
+  etcd:
+    name: etcd（內建 /metrics）
+    kind: target
+    plugin: alert-trust-etcd
+    page: components/etcd.md
+    guide: targets/etcd.md
+    architecture: architecture/db-raft.md
+    usage:
+    - probe-readyz
+    - probe-health
+    - probe-exclude-learner
+    - metrics-listener
+    - metrics-level
+    - sample-limit
+    - one-job-per-cluster
+    - auto-compaction
+    - quota-and-disarm
+    - corruption-check
+    - request-size-limits
+    observe:
+    - endpoint-up
+    - health-second-path
+    - metric-families-present
+    - scrape-budget
+    - endpoint-blocking
+    - alarm-visibility
+    - component-count
+    - replication-semantics
+    - corruption-check
+    misuse:
+    - has-leader
+    - alarms
+    - quorum
+    - role-detection
+    - leader-changes
+    - peer-network
+    - learner
+    - replication-lag
+    - snapshot-transfer
+    - wal-fsync
+    - backend-commit
+    - slow-apply
+    - proposals-pending
+    - fd-headroom
+    - grpc-errors
+    - proposals-failed
+    - request-latency
+    - bad-requests
+    - compaction
+    - defrag
+    - db-quota
+    - db-growth
+    bad_queries:
+    - case: 大範圍 range request（讀整個 prefix）
+      signals:
+      - bad-requests
+      - request-latency
+      - endpoint-blocking
+    - case: 大量 watch，或 client 讀 watch 太慢
+      signals:
+      - bad-requests
+    - case: 過大的值或 op 太多的 txn
+      signals:
+      - bad-requests
+      - grpc-errors
+      - db-quota
+      - db-growth
+    - case: lease 大量建立或過期（lease storm）
+      signals:
+      - bad-requests
+    - case: 持續寫入但沒有 compaction，把 DB 撐到 quota
+      signals:
+      - compaction
+      - db-quota
+      - alarms
+    blind:
+    - 備份（etcdctl snapshot save）的新鮮度與可還原性
+    - TLS 憑證到期（client、peer、metrics listener）
+    - 每個 follower 的 raft 進度（match index、inflight）
+    - alarm 在 member 重啟後的狀態
+    - 慢請求與大請求的內容（哪個 key、哪個 client）
+    - 磁碟剩餘空間、檔案系統唯讀
+    - 資料損毀
+    - 哪個 client 開了大量 watch、lease 或送大範圍讀取
+    - 單一 key 的值有多大、哪些 key 最大
+  mariadb:
+    name: mysqld_exporter＋MariaDB
+    kind: target
+    plugin: alert-trust-mariadb
+    page: components/mariadb.md
+    guide: targets/mariadb.md
+    architecture: architecture/db-relational.md
+    usage:
+    - exporter-account-grants
+    - super-not-enough-11
+    - slave-hosts-privilege
+    - exporter-connection-budget
+    - timeout-offset
+    - exporter-lock-wait-timeout
+    - collectors-to-enable
+    - performance-schema-on
+    - no-applier-by-worker
+    - query-response-time-plugin
+    - galera-wsrep-on
+    - connection-admin-limit
+    - extra-port
+    - heartbeat-writer
+    - cluster-label
+    - binlog-purge-standalone
+    - long-query-time
+    - statements-digest-limit
+    - ddl-lock-wait-timeout
+    - metadata-lock-info
+    - query-exporter-account
+    - query-exporter-expiration
+    observe:
+    - exporter-up
+    - db-up
+    - collectors-present
+    - collector-success
+    - custom-queries
+    - probe-blast-radius
+    - exporter-grants
+    - exporter-query-timeout
+    - collector-set
+    - scrape-budget
+    - db-up-flapping
+    - replica-status-present
+    - replication-semantics
+    - backup-metric-present
+    - ash-sampler
+    misuse:
+    - restarts
+    - crash-oom
+    - disk-space
+    - long-transactions
+    - undo-history
+    - deadlocks
+    - connections
+    - thread-cache
+    - user-connection-limits
+    - lock-waits
+    - slow-queries
+    - innodb-pressure
+    - pending-fsyncs
+    - tmp-tables
+    - table-open-cache
+    - aborted-connects
+    - throughput-drop
+    - metadata-locks
+    - slow-sql-visibility
+    - statement-errors
+    - buffer-pool-misses
+    - replication-running
+    - replication-error
+    - replication-lag
+    - replica-read-only
+    - role-detection
+    - primary-writable
+    - gtid-consistency
+    - semi-sync
+    - galera-state
+    - galera-quorum
+    - galera-flow-control
+    - force-recovery
+    - table-fragmentation
+    - corruption-signals
+    - binlog-pitr
+    - durability-settings
+    - backup-freshness
+    - autoinc-exhaustion
+    - connection-headroom
+    - binlog-growth
+    - data-growth
+    - active-sessions
+    bad_queries:
+    - case: 全表掃描、缺索引
+      signals:
+      - slow-queries
+      - slow-sql-visibility
+      - buffer-pool-misses
+      - throughput-drop
+    - case: 長交易（開了不 commit）
+      signals:
+      - long-transactions
+      - undo-history
+      - metadata-locks
+    - case: 查詢造成的 row lock 爭用與 deadlock
+      signals:
+      - lock-waits
+      - deadlocks
+      - statement-errors
+      - throughput-drop
+      - active-sessions
+    - case: 暫存表落到磁碟
+      signals:
+      - tmp-tables
+      - slow-sql-visibility
+    - case: 回傳大量資料的查詢
+      signals:
+      - slow-sql-visibility
+    - case: DDL 卡在長交易後面（metadata lock）
+      signals:
+      - metadata-locks
+      - throughput-drop
+    - case: 連線風暴（短連線反覆連線、斷線）
+      signals:
+      - connections
+      - aborted-connects
+      - connection-headroom
+      - thread-cache
+      - db-up
+    blind:
+    - 連線打滿當下的連線數
+    - errant GTID
+    - Metadata lock 的細節（誰擋住誰）
+    - Replica 的錯誤訊息與錯誤名稱
+    - 執行中語句的 digest、長尾延遲、CPU 時間
+    - 每帳號、每查詢統計（performance_schema 關著時）
+    - 頁面損毀
+    - 真正的寫入是否成功
+    - 磁碟剩餘空間、檔案系統唯讀
+    - 行程 CPU、記憶體、OOM kill、fsync／磁碟延遲
+    - 備份是否成功、多新
+    - 慢查詢的執行計畫、參數值與 slow log 原文
+    - Row lock 的阻擋者（誰擋住誰）
+    - 語句錯誤是哪一個錯誤碼
+  mongodb_exporter:
+    name: mongodb_exporter＋MongoDB
+    kind: target
+    plugin: alert-trust-mongodb
+    page: components/mongodb_exporter.md
+    guide: targets/mongodb.md
+    architecture: architecture/db-doc.md
+    usage:
+    - collector-flags
+    - exporter-account
+    - log-level-warn
+    - exporter-per-member
+    - cluster-label
+    - scrape-timeout-budget
+    - collstats-limit
+    - wt-cache-size
+    - ticket-thresholds
+    - write-concern-wtimeout
+    - oplog-size
+    - query-maxtimems
+    - currentop-metrics
+    - ftdc-persistent
+    observe:
+    - exporter-up
+    - collectors-present
+    - collector-success
+    - scrape-budget
+    - exporter-query-timeout
+    - probe-blast-radius
+    - version-semantics
+    - db-up
+    - replication-semantics
+    misuse:
+    - restart
+    - majority-writes
+    - op-latency
+    - cursors
+    - asserts
+    - bad-queries
+    - wt-cache
+    - tickets
+    - connections
+    - role-detection
+    - replication-lag
+    - oplog-window
+    - majority-commit-lag
+    - member-health
+    - elections
+    - sharding-balancer
+    - ttl-monitor
+    - checkpoint
+    - oplog-growth
+    - disk-usage
+    bad_queries:
+    - case: collection scan、缺 index
+      signals:
+      - bad-queries
+      - op-latency
+      - wt-cache
+      - tickets
+    - case: 不能用 index 排序（記憶體內排序）
+      signals:
+      - bad-queries
+    - case: 沒有上限的查詢（大結果集、cursor 一直開著）
+      signals:
+      - bad-queries
+      - cursors
+    - case: 長時間執行的操作或持有鎖
+      signals:
+      - bad-queries
+      - tickets
+      - exporter-query-timeout
+    - case: 大文件、接近 16MB 上限
+      signals:
+      - bad-queries
+    blind:
+    - 每個查詢的慢查詢、執行計畫、collection scan
+    - collection 與 index 層級的大小、延遲與使用率
+    - sharded cluster（mongos、config server、balancer、chunk 分布）
+    - FTDC（diagnostic.data）保留了多久、在不在持久磁碟
+    - 備份有沒有成功
+    - 主機記憶體、swap、磁碟延遲、CPU、OOM kill
+    - 磁碟 IOPS 是否到雲端磁碟的配額、CPU steal
+    - 憑證到期、版本漏洞
+    - 哪個 namespace、哪種查詢形狀造成 collection scan 或 scanned／returned 偏高
+    - 大文件（接近 16MB 上限）與過大的回應
+    - 執行中的長操作（currentopmetrics 沒開時）
+  mysql:
+    name: mysqld_exporter＋MySQL
+    kind: target
+    plugin: alert-trust-mysql
+    page: components/mysql.md
+    guide: targets/mysql.md
+    architecture: architecture/db-relational.md
+    usage:
+    - exporter-account-grants
+    - exporter-auth-plugin
+    - exporter-connection-budget
+    - timeout-offset
+    - exporter-lock-wait-timeout
+    - collectors-to-enable
+    - connection-admin-tradeoff
+    - gr-offline-mode
+    - replication-metric-names
+    - heartbeat-writer
+    - cluster-label
+    - long-query-time
+    - statements-digest-limit
+    - ddl-lock-wait-timeout
+    - query-exporter-account
+    - query-exporter-expiration
+    observe:
+    - exporter-up
+    - db-up
+    - collectors-present
+    - collector-success
+    - custom-queries
+    - probe-blast-radius
+    - exporter-grants
+    - exporter-query-timeout
+    - collector-set
+    - scrape-budget
+    - db-up-flapping
+    - replica-status-present
+    - replication-semantics
+    - backup-metric-present
+    misuse:
+    - restarts
+    - crash-oom
+    - disk-space
+    - long-transactions
+    - undo-history
+    - deadlocks
+    - connections
+    - thread-cache
+    - user-connection-limits
+    - lock-waits
+    - slow-queries
+    - innodb-pressure
+    - pending-fsyncs
+    - tmp-tables
+    - table-open-cache
+    - aborted-connects
+    - throughput-drop
+    - metadata-locks
+    - slow-sql-visibility
+    - statement-errors
+    - buffer-pool-misses
+    - replication-running
+    - replication-error
+    - replication-lag
+    - replica-read-only
+    - role-detection
+    - primary-writable
+    - gtid-consistency
+    - semi-sync
+    - gr-member-state
+    - gr-quorum
+    - gr-flow-control
+    - force-recovery
+    - table-fragmentation
+    - corruption-signals
+    - binlog-pitr
+    - durability-settings
+    - backup-freshness
+    - autoinc-exhaustion
+    - connection-headroom
+    - binlog-growth
+    - data-growth
+    - active-sessions
+    bad_queries:
+    - case: 全表掃描、缺索引
+      signals:
+      - slow-queries
+      - slow-sql-visibility
+      - buffer-pool-misses
+      - throughput-drop
+    - case: 長交易（開了不 commit）
+      signals:
+      - long-transactions
+      - undo-history
+      - metadata-locks
+    - case: 查詢造成的 row lock 爭用與 deadlock
+      signals:
+      - lock-waits
+      - deadlocks
+      - statement-errors
+      - throughput-drop
+      - active-sessions
+    - case: 暫存表落到磁碟
+      signals:
+      - tmp-tables
+      - slow-sql-visibility
+    - case: 回傳大量資料的查詢
+      signals:
+      - slow-sql-visibility
+    - case: DDL 卡在長交易後面（metadata lock）
+      signals:
+      - metadata-locks
+      - throughput-drop
+    - case: 連線風暴（短連線反覆連線、斷線）
+      signals:
+      - connections
+      - aborted-connects
+      - connection-headroom
+      - thread-cache
+      - db-up
+    blind:
+    - 連線打滿當下的連線數
+    - errant GTID
+    - Metadata lock 的細節（誰擋住誰）
+    - Replica 的錯誤訊息
+    - 9.7 的 replication applier metrics
+    - 頁面損毀
+    - Group Replication 的節流時間（8.0、8.4）
+    - 真正的寫入是否成功
+    - 磁碟剩餘空間、檔案系統唯讀
+    - 行程 CPU、記憶體、OOM kill、fsync／磁碟延遲
+    - 備份是否成功、多新
+    - 慢查詢的執行計畫、參數值與 slow log 原文
+    - Row lock 的阻擋者（誰擋住誰）
+    - 語句錯誤是哪一個錯誤碼
+    - 此刻正在執行的是哪個語句
+  postgres_exporter:
+    name: postgres_exporter＋PostgreSQL
+    kind: target
+    plugin: alert-trust-postgresql
+    page: components/postgres_exporter.md
+    guide: targets/postgres.md
+    architecture: architecture/db-relational.md
+    usage:
+    - exporter-pg-monitor
+    - exporter-replication-privilege
+    - database-size-privilege
+    - reserved-connections
+    - exporter-lock-timeout
+    - collection-timeout
+    - collectors-to-enable
+    - stat-checkpointer-17
+    - replica-uses-slot
+    - cluster-label
+    - pg-stat-statements-setup
+    - pg-stat-statements-upgrade
+    - query-exporter-account
+    - query-exporter-server-timeout
+    - query-exporter-expiration
+    - query-exporter-version-dsn
+    - query-exporter-connections
+    observe:
+    - exporter-up
+    - custom-queries
+    - db-up
+    - collectors-present
+    - collector-success
+    - legacy-scrape-error
+    - monitor-privilege
+    - scrape-budget
+    - series-volume
+    - probe-blast-radius
+    - version-semantics
+    - replication-semantics
+    - wraparound-collected
+    - lock-blocks-exporter
+    - pg-stat-statements
+    - backup-exporter-status
+    - data-disk-monitored
+    - patroni-up
+    misuse:
+    - wal-io-sources
+    - replication-slots
+    - wraparound
+    - restart-and-crash
+    - wal-disk
+    - xmin-horizon
+    - deadlocks-rollbacks
+    - checkpoint-pressure
+    - autovacuum-workers-full
+    - backend-fsync
+    - autovacuum
+    - invalid-indexes
+    - connection-headroom
+    - sessions-and-locks
+    - cache-and-temp
+    - slow-sql
+    - lock-queue
+    - throughput-drop
+    - resource-pressure
+    - oom-crash
+    - standby-streaming
+    - wal-receiver
+    - replication-lag
+    - standby-conflicts
+    - sync-replication
+    - promotion
+    - archiver
+    - session-errors
+    - archive-freshness
+    - archive-config
+    - backup-freshness
+    - database-growth
+    - disk-forecast
+    - connection-trend
+    - patroni-leader
+    - patroni-dcs
+    - patroni-paused
+    - patroni-timeline
+    bad_queries:
+    - case: 全表掃描、缺索引
+      signals:
+      - slow-sql
+      - cache-and-temp
+      - resource-pressure
+      - throughput-drop
+    - case: 長交易、idle in transaction
+      signals:
+      - xmin-horizon
+      - autovacuum
+      - lock-queue
+    - case: 查詢造成的 row lock 爭用與 deadlock
+      signals:
+      - sessions-and-locks
+      - lock-queue
+      - deadlocks-rollbacks
+      - throughput-drop
+    - case: 排序、hash 溢出到暫存檔（work_mem 不夠）
+      signals:
+      - cache-and-temp
+      - resource-pressure
+    - case: 回傳大量資料的查詢
+      signals:
+      - slow-sql
+    - case: 吃記憶體的查詢讓 backend 被 OOM kill
+      signals:
+      - oom-crash
+      - restart-and-crash
+    - case: DDL 卡在長交易後面（ACCESS EXCLUSIVE 鎖佇列）
+      signals:
+      - lock-queue
+      - collector-success
+      - exporter-up
+    - case: 連線風暴（短連線反覆連線、pool 設太大）
+      signals:
+      - connection-headroom
+      - connection-trend
+      - session-errors
+    - case: 語句錯誤（語法錯、違反 constraint、被取消）
+      signals:
+      - session-errors
+      - deadlocks-rollbacks
+    blind:
+    - 同步 standby 的狀態（`sync_state`、`synchronous_standby_names`）
+    - 時間延遲（`write_lag`、`flush_lag`、`replay_lag`）
+    - 誰擋住 vacuum（`backend_xid` 的 age、slot 的 `xmin`、prepared xacts）
+    - '`archive_mode`、`archive_command`、`last_failed_wal`'
+    - 失效索引、checksum 失敗、timeline
+    - '`pg_stat_wal`、`pg_stat_io`、`sessions_*`'
+    - 其他資料庫的表
+    - SQL 錯誤數
+    - 叢集共識（leader、quorum）
+    - 磁碟剩餘空間、檔案系統唯讀
+    - 行程 CPU、記憶體與 swap、OOM kill、fsync／磁碟延遲
+    - OOM kill 的原因（哪一條連線的 work_mem、哪個查詢）
+    - base backup 的新鮮度
+    - 慢 SQL 的執行計畫、參數值與鎖的阻擋者（誰擋住誰）
+  redis_exporter:
+    name: redis_exporter＋Valkey／Redis
+    kind: target
+    plugin: alert-trust-valkey
+    page: components/redis_exporter.md
+    guide: targets/valkey.md
+    architecture: architecture/db-kv.md
+    usage:
+    - connection-timeout
+    - exporter-acl-config
+    - script-read-only
+    - heartbeat-key
+    - key-groups-separate-job
+    - cluster-label
+    - sentinel-exporter
+    - latency-monitor-threshold
+    - maxmemory-policy
+    - repl-backlog-size
+    - maxclients-headroom
+    - stop-writes-on-bgsave-error
+    - persistence-and-autorestart
+    observe:
+    - exporter-up
+    - collectors-present
+    - collector-success
+    - scrape-budget
+    - probe-blast-radius
+    - exporter-query-timeout
+    - key-scan-cost
+    - version-semantics
+    - db-up
+    - replication-semantics
+    - sentinel-observed
+    misuse:
+    - writes-rejected
+    - restart
+    - slow-commands
+    - keyspace-hit-ratio
+    - bad-commands
+    - maxmemory-eviction
+    - fragmentation
+    - connections
+    - blocked-clients
+    - main-thread
+    - output-buffer-disconnects
+    - replication-link
+    - replication-lag
+    - full-resync
+    - role-detection
+    - sentinel-quorum
+    - cluster-state
+    - expire-cycle
+    - rdb-persistence
+    - aof-persistence
+    - fork-latency
+    - memory-growth
+    bad_queries:
+    - case: KEYS、大集合的 HGETALL／SMEMBERS／LRANGE 這類 O(N) 指令
+      signals:
+      - bad-commands
+      - slow-commands
+      - main-thread
+      - exporter-query-timeout
+    - case: Lua script 長時間佔住主執行緒
+      signals:
+      - bad-commands
+      - exporter-query-timeout
+      - slow-commands
+      - main-thread
+    - case: 大 key、大請求與大回應
+      signals:
+      - bad-commands
+      - output-buffer-disconnects
+      - key-scan-cost
+    - case: 寫入沒有 TTL，又用 noeviction 或 volatile-*
+      signals:
+      - bad-commands
+      - maxmemory-eviction
+      - writes-rejected
+      - memory-growth
+    - case: 大量阻塞指令（BLPOP、XREAD BLOCK）在等
+      signals:
+      - blocked-clients
+    blind:
+    - 複本斷線多久（`master_link_down_since_seconds`）、`min_slaves_good_slaves`、`total_forks`
+    - 複寫延遲的秒數
+    - 哪一類 key 佔記憶體（big key、key group）
+    - CONFIG 這組 metric 有沒有成功
+    - Sentinel 的 TILT 次數與持續時間、每台複本在 Sentinel 眼中的狀態
+    - Cluster 每個節點的 flags 與 link 狀態
+    - 熱 key
+    - 主節點沒有持久化又會自動重啟
+    - swap、RSS 接近主機或 cgroup 上限、OOM kill
+    - 記憶體 overcommit、THP 設定，以及 OOM 是誰造成的
+    - RDB／AOF 所在磁碟的剩餘空間、檔案系統唯讀
+    - RDB 檔案有沒有被送到別處（備份）
+    - 慢指令或大請求是誰送的（slowlog／commandlog 條目裡的指令、參數與 client）
+    - 還在執行中的長指令或 Lua script
+    - 哪些 key 沒有 TTL
+  tidb:
+    name: TiDB（TiDB server、TiKV、PD；內建 /metrics）
+    kind: target
+    plugin: alert-trust-tidb
+    page: components/tidb.md
+    guide: targets/tidb.md
+    architecture: architecture/db-distsql.md
+    usage:
+    - pd-probe-readyz
+    - tidb-tikv-health-metric
+    - probe-instance-relabel
+    - job-absent
+    - expected-counts
+    - sample-limit
+    - official-rules-fixes
+    - rules-version-match
+    - memory-quota-75
+    - store-down-time
+    - tikv-image-debuginfo
+    - sql-memory-limits
+    - token-limit
+    - slow-log-threshold
+    - gc-life-time
+    observe:
+    - endpoint-up
+    - health-second-path
+    - metric-families-present
+    - scrape-budget
+    - endpoint-blocking
+    - role-detection
+    - component-count
+    misuse:
+    - pd-quorum
+    - leader-changes
+    - region-health
+    - store-state
+    - tso-available
+    - replication-lag
+    - raftstore-latency
+    - write-stall
+    - server-busy
+    - memory-quota
+    - tso-wait
+    - pending-compaction
+    - cpu-quota
+    - channel-full
+    - query-errors
+    - query-latency
+    - slow-queries
+    - connections
+    - txn-conflicts
+    - critical-errors
+    - gc-progress
+    - ddl-and-stats
+    - log-backup
+    - storage-space
+    bad_queries:
+    - case: 全表掃描、缺索引
+      signals:
+      - slow-queries
+      - query-latency
+    - case: 連續遞增主鍵造成的寫入熱點
+      signals:
+      - server-busy
+      - txn-conflicts
+      - raftstore-latency
+    - case: 大交易、長交易
+      signals:
+      - gc-progress
+      - memory-quota
+    - case: 鎖衝突（多個交易改同一批列）
+      signals:
+      - txn-conflicts
+      - query-errors
+    - case: 撞到記憶體上限被取消的 SQL（大 JOIN、大結果集）
+      signals:
+      - memory-quota
+      - query-errors
+    - case: DDL 排隊
+      signals:
+      - ddl-and-stats
+    - case: 連線風暴（每個請求開新連線）
+      signals:
+      - connections
+    blind:
+    - 全量備份（BR）的新鮮度與可還原性
+    - SQL 層是否真的能執行交易（端到端）
+    - 哪一條 SQL 造成負載、是哪一種壞 SQL（全表掃描、大交易、被記憶體上限取消的語句）
+    - 熱點 region（例如連續遞增主鍵造成的寫入熱點）
+    - TiFlash、TiCDC、TiProxy
+    - TLS 憑證到期
+    - PD leader 抓不到時的叢集狀態
+    - 時鐘偏移
+  yugabytedb:
+    name: YugabyteDB（yb-master、yb-tserver、YSQL、YCQL；內建 /prometheus-metrics）
+    kind: target
+    plugin: alert-trust-yugabytedb
+    page: components/yugabytedb.md
+    guide: targets/yugabytedb.md
+    architecture: architecture/db-distsql.md#yugabytedb
+    usage:
+    - honor-timestamps
+    - four-ports
+    - master-probe-body
+    - is-leader-probe
+    - leader-only-metrics
+    - expected-counts
+    - metrics-url-params
+    - clock-skew-crash
+    - ysql-lease
+    - ysql-max-connections
+    - postgres-exporter-flags
+    - postgres-metrics-skip
+    - memory-limits
+    - version-metrics
+    - tablet-guardrail
+    observe:
+    - endpoint-up
+    - health-second-path
+    - metric-families-present
+    - scrape-budget
+    - endpoint-blocking
+    - role-detection
+    - component-count
+    - postgres-carryover
+    misuse:
+    - master-quorum
+    - leader-changes
+    - tablet-health
+    - tserver-liveness
+    - ysql-available
+    - replication-lag
+    - clock-skew
+    - memory
+    - write-stall
+    - wal-fsync
+    - rpc-queue-overflow
+    - connections
+    - query-latency
+    - balancer
+    - capacity
+    bad_queries:
+    - case: 全表掃描、缺索引
+      signals:
+      - query-latency
+    - case: 跨 tablet 的交易
+      signals:
+      - query-latency
+    - case: 連線風暴（每個請求開新連線、pool 設太大）
+      signals:
+      - connections
+      - ysql-available
+    - case: 大批次寫入（大 INSERT、COPY）壓垮 DocDB
+      signals:
+      - write-stall
+      - rpc-queue-overflow
+      - memory
+    - case: 鎖衝突與長交易
+      signals:
+      - query-latency
+    blind:
+    - 備份與 PITR 的新鮮度、可還原性
+    - xCluster（跨叢集複寫）延遲
+    - 磁碟空間、檔案系統唯讀
+    - SQL 層是否真的能執行交易（端到端）
+    - 哪一條 SQL 造成負載、是哪一種壞 SQL（全表掃描、跨 tablet 的交易、鎖衝突與長交易）
+    - 時鐘同步本身
+    - TLS 憑證到期
+    - master leader 抓不到時的叢集狀態

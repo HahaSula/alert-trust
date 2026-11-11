@@ -50,7 +50,7 @@
 
 ## 進行中
 
-- 五段框架遷移（架構 → 正確使用 → 正確觀測 → 不正確使用時的觀測 → 目前無法觀測的痕跡）：第 1 步卡片欄位與驗證完成；第 2 步 19 張卡都已標 `section`、補 `usage`、blind_spots 加 `options`（`bad_queries` 已有 MySQL、MariaDB、Valkey、MongoDB、etcd，其餘補齊中）；第 3 步 `map.yaml` 與網站；第 4 步 skill 依元件分、上層匯集、拆 plugin；第 5 步盲測重跑
+- 五段框架遷移（架構 → 正確使用 → 正確觀測 → 不正確使用時的觀測 → 目前無法觀測的痕跡）：第 1 步卡片欄位與驗證完成；第 2 步 19 張卡都已標 `section`、補 `usage`、blind_spots 加 `options`（含所有卡的 `bad_queries`）；第 3 步 `catalog/map.yaml`、元件頁改成五段、`docs/map.md` 完成；第 4 步 skill 依元件分、上層匯集、拆 plugin；第 5 步盲測重跑
 
 使用者同意的資料庫順序已全部完成；CockroachDB（專有授權）不做。資料庫架構頁依類型分頁：關聯式、記憶體 KV、共識（Raft）、分散式 SQL、分析型、文件型。
 
@@ -80,6 +80,8 @@
 22. **資源調查的後續**：各 target 卡的 blind_spots 改成 `covered_by` 主機卡；`#proposed` 表的 10 個飽和訊號；host 卡要不要新的 family；target-pattern 要不要加「主機層存在」。（主機卡小 lab 已完成：記憶體接近 limit、OOM 的主機部分、唯讀掛載實測；容器 OOM 計數在 WSL2 不增加、唯讀 remount 未測。）
 23. **拆卡後續**：MySQL／MariaDB lab 的 compose 仍掛 `rules/targets/mysql.yml`，重跑 MariaDB 要改掛 `mariadb.yml`；新規則 `MariaDBBinlogNotPurged` 與 thread-cache、pending-fsyncs 訊號沒有 lab；MySQL 側多數參考仍釘在 8.4.7。
 24. **五段遷移時沒有依據而沒寫的「正確使用」**：Prometheus `--query.max-samples`、VM `-search.max*`；Valkey 的 KEYS 改 SCAN、Lua 逾時、slowlog-max-len；MongoDB 建 index、16MB 上限、slowms；etcd 備份、watch／lease 用法；PostgreSQL auto-discover、query-exporter cache_seconds。etcd 請求過大回 InvalidArgument，現有錯誤率規則與 mixin 都不算這個 code。
+25. **手寫 target 頁的五段整理**：「建議的 exporter 設定」與 query-exporter 帳號併入或連到 `usage`；「九個面向一覽」補上拆出的新 id；「效能與故障情境」改由 `bad_queries` 產生或精簡；PG「監測自檢」指向新的 observe 訊號；各頁版本段與「監控模型」段和 usage 重疊。
+26. **bad_queries 沒有依據的部分**：YugabyteDB 鎖衝突與交易時間沒有訊號；Thanos query-errors 沒有 refs；VM `-search.max*` 沒有確認的 metric；PG、TiDB 沒有連線被拒的計數；Prometheus 碰到 `--query.max-samples` 的行為沒有讀碼。
 
 ## 已做的決定
 

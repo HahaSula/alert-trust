@@ -1266,6 +1266,69 @@ not_applicable_aspects:
       對照：YugabyteDB 這類分散式資料庫每個 tablet 用 Raft，才有 leader 與 quorum 可監控
     refs: [pg-asp-src17-doc-nofailover, pg-asp-src16-doc-nofailover, pg-asp-src17-promote, pg-asp-src16-promote, pg-asp-src17-doc-quorum, pg-asp-src17-syncrep-wait, pg-asp-src17-syncrep-method, pg-asp-src16-syncrep-quorum-def]
 
+# 寫得不好的 SQL：每一種壞用法對應到哪些 misuse 訊號、看得到什麼、exporter 看不到什麼。
+bad_queries:
+  - case: 全表掃描、缺索引
+    signals: [slow-sql, cache-and-temp, resource-pressure, throughput-drop]
+    visible: >-
+      pg_stat_statements 每個 queryid 的平均耗時 rate(seconds_total) / rate(calls_total)（實驗中全表掃描 0.33～0.45 秒）與 rows_total；
+      工作集放不下 shared_buffers 時 rate(blks_read) 升高、cache hit 比例下降
+    not_visible: >-
+      執行計畫、參數值；每個語句的 shared_blks_read（exporter 不輸出）；只取前 100 名、排除總耗時最低的 10%；
+      執行中還沒結束的查詢只有 max_tx_duration{state="active"}（見 blind_spots）
+    refs: [pg-perf-exp, pg-perf-c-stmt-labels, pg-perf-c-stmt-limit, pg-perf-c-stmt-percentile, pg-c-database-columns]
+  - case: 長交易、idle in transaction
+    signals: [xmin-horizon, autovacuum, lock-queue]
+    visible: >-
+      pg_stat_activity_max_tx_duration{state="idle in transaction"}、pg_long_running_transactions_oldest_timestamp_seconds；
+      dead tuple 累積；自訂查詢 pgq_oldest_backend_xmin_age 給 XID age
+    not_visible: 交易裡跑過哪些語句；exporter 本身沒有 backend_xid／backend_xmin 的 age（要自訂查詢）
+    refs: [pg-exp-target, pg-c-activity-query, pg-c-longtx-query, pg-q-exp, pg-q-pg17-view-backendxid]
+  - case: 查詢造成的 row lock 爭用與 deadlock
+    signals: [sessions-and-locks, lock-queue, deadlocks-rollbacks, throughput-drop]
+    visible: >-
+      pg_stat_activity_count{wait_event_type="Lock"}（實驗一個不 commit 的 UPDATE：第一個 scrape 就是 8，TPS 217 → 7.7）；
+      increase(pg_stat_database_deadlocks)；rollback 佔交易的比例
+    not_visible: >-
+      誰擋住誰（要 pg_blocking_pids()，見 blind_spots）；pg_locks_count 不含 transactionid 鎖，等 row lock 的 ShareLock 不出現在 mode="sharelock"
+    refs: [pg-perf-exp, pg-c-locks-query, pg-trace-ex-locks-dbnotnull, pg-trace-pg17-lock-xid-nulldb, pg-c-database-columns]
+  - case: 排序、hash 溢出到暫存檔（work_mem 不夠）
+    signals: [cache-and-temp, resource-pressure]
+    visible: rate(pg_stat_database_temp_bytes) 與 temp_files，每個資料庫一條
+    not_visible: 是哪個語句（exporter 不輸出 temp_blks_written）；還沒結束的排序（暫存檔刪除時才計入 temp_bytes）
+    refs: [pg-c-database-columns, pg-trace-pg17-temp-call, pg-perf-c-db-tempbytes, pg-perf-exp]
+  - case: 回傳大量資料的查詢
+    signals: [slow-sql]
+    visible: pg_stat_statements_rows_total 每個 queryid 的列數
+    not_visible: 單一查詢回傳的位元組數、客戶端記憶體；本專案沒有依據可寫位元組計數
+    refs: [pg-perf-c-stmt-labels, pg-perf-exp]
+  - case: 吃記憶體的查詢讓 backend 被 OOM kill
+    signals: [oom-crash, restart-and-crash]
+    visible: >-
+      resets(pg_stat_database_xact_commit) > 0 且 pg_postmaster_start_time_seconds 沒變（crash recovery，PostgresCrashRecovery）；pg_up 短暫變 0
+    not_visible: 被 kill 的是哪條連線、哪個查詢（只在 server log，見 blind_spots）
+    refs: [pg-perf-exp, pg-perf-src-child-signal, pg-perf-src-reinit, pg-src-crash-stats]
+  - case: DDL 卡在長交易後面（ACCESS EXCLUSIVE 鎖佇列）
+    signals: [lock-queue, collector-success, exporter-up]
+    visible: >-
+      pg_stat_activity_count{wait_event_type="Lock"} 加上 pg_locks_count{mode="accessexclusivelock"} > 0；
+      實驗沒設 lock_timeout 時 exporter 的 pg_table_size() 也排在後面，up 0 共 40 秒、看不到任何數字；
+      設 lock_timeout=1s 時只有 stat_user_tables 失敗，看得到等鎖 9 → 17
+    not_visible: 擋住 DDL 的是哪個交易（見 blind_spots）
+    refs: [pg-perf-exp, pg-perf-src-lock-waitmask, pg-perf-src-lock-timeout, pg-perf-c-locks-nogranted]
+  - case: 連線風暴（短連線反覆連線、pool 設太大）
+    signals: [connection-headroom, connection-trend, session-errors]
+    visible: >-
+      pg_stat_activity_count 加總對照 max_connections 減保留連線；exporter 帳號有 pg_use_reserved_connections（16 以上）時額滿仍連得進去；
+      自訂查詢 pgq_db_sessions_abandoned_total（客戶端沒說再見就斷線）
+    not_visible: 被拒絕的新連線次數（本卡沒有對應 metric）、連線來自哪個應用
+    refs: [pg-exp-target, pg-src-reserved, pg-q-exp, pg-asp-src16-statdb-sessions-fatal]
+  - case: 語句錯誤（語法錯、違反 constraint、被取消）
+    signals: [session-errors, deadlocks-rollbacks]
+    visible: xact_rollback 增加（包含應用主動 ROLLBACK，不等於錯誤）
+    not_visible: ERROR 的次數與 SQLSTATE（沒有任何 view 計數，見 blind_spots 的 SQL 錯誤數）
+    refs: [pg-c-database-columns, pg-asp-exp]
+
 # 目前無法監控的範圍。category：exporter（資料庫有、exporter 沒輸出）、database（資料庫本身沒提供）、other（要靠其他元件）。
 blind_spots:
   - what: 同步 standby 的狀態（`sync_state`、`synchronous_standby_names`）
@@ -1400,3 +1463,12 @@ blind_spots:
     workaround: pgbackrest_exporter；WAL-G、Barman 用 textfile
     options: "建議：pgbackrest_exporter（PostgresBackupTooOld）；WAL-G、Barman 用 textfile 寫最後成功時間"
     section: targets/postgres.md#protection
+  # 寫得不好的 SQL：exporter 只看得到彙總，下面這些痕跡看不到（對照 bad_queries）
+  - what: 慢 SQL 的執行計畫、參數值與鎖的阻擋者（誰擋住誰）
+    category: exporter
+    why: >-
+      stat_statements collector 只有每個 queryid 的總和（前 100 名），文字截在 120 字元、常數正規化成 $1；不跑 EXPLAIN、不讀 log；
+      pg_locks_count 只有各 mode 的數量
+    workaround: 告警後查 pg_stat_statements、pg_stat_activity 與 pg_blocking_pids()；計畫靠 auto_explain 寫進 log
+    options: "建議：告警後查 pg_stat_statements 與 pg_blocking_pids()；auto_explain 的計畫交給 log 管線"
+    section: targets/postgres.md#perf-slow-sql

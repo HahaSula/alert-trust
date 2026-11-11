@@ -4,6 +4,18 @@
 
 依據是 YugabyteDB v2026.1.3.0 的原始碼（`gh api .../releases/latest` 回的最新穩定版，commit `f2635f5`；只讀 Apache-2.0 的核心，YugabyteDB Anywhere 的告警範本是 Polyform 授權，只引用名稱與行號），加上一組小實驗：master ×3、tserver ×3（RF=3），停 tserver、停兩台 tserver、停 master leader、停兩台 master、用完 YSQL 連線、postgres_exporter 對 YSQL<span class="at-chip at-ev-tested">實測</span>[^yb-exp]。這台機器的 Docker 容器時鐘比牆鐘慢約 30%，牆鐘還會被 WSL 往回調；秒數以主機 monotonic 時鐘量的 SQL、HTTP 耗時為準，Prometheus 與 YugabyteDB 自己報的秒數只當參考。訊號與規則在[元件卡](../components/yugabytedb.md)，原始碼位置在[附錄](yugabytedb-appendix.md)，機制在[分散式 SQL 架構](../architecture/db-distsql.md#yugabytedb)與[共識（Raft）架構](../architecture/db-raft.md#yugabytedb)。2.20 到 2026.1 之間的 metric 差異見 [YugabyteDB 各版本的監控差異](versions/yugabytedb.md)。
 
+## 五段導覽 {#five-sections}
+
+本頁依面向寫成；對應到[五段框架](../map.md)的位置如下，元件卡已依五段排列。
+
+| 段落 | 元件卡 | 本頁 |
+|---|---|---|
+| 1 架構 | [架構頁](../architecture/db-distsql.md#yugabytedb)、[元件卡](../components/yugabytedb.md#architecture) | [監控模型](#model) |
+| 2 正確使用 | [元件卡](../components/yugabytedb.md#usage) | — |
+| 3 正確觀測 | [元件卡](../components/yugabytedb.md#observe) | [監測自檢](#exporter)、[三方交叉](#health-second-path)、[metric 消失與 scrape 預算](#exporter-scrape) |
+| 4 不正確使用時的觀測 | [元件卡](../components/yugabytedb.md#misuse)、[寫得不好的查詢](../components/yugabytedb.md#bad-query-table) | [九個面向一覽](#aspects) |
+| 5 目前無法觀測的痕跡 | [元件卡](../components/yugabytedb.md#blind) | [盲點與補法](#blind-spots) |
+
 ## 先講結論
 
 1. **master 失去 quorum 時，tserver 不會繼續服務 YSQL。**tserver 要持有 master leader 續約的 YSQL operation lease（`enable_ysql_operation_lease` 預設開，TTL 30 秒）；lab 停 2 台 master 約 30 秒後三台 tserver 同時結束 PostgreSQL：5433 拒絕連線、13000 的 `/prometheus-metrics` 消失，已經連著的 session 也被結束。tserver 的 9000 與 `/api/v1/health-check` 一直正常。<span class="at-chip at-ev-tested">實測</span>[^yb-exp-lease-log][^yb-ysql-lease-kill][^yb-ysql-lease-ttl]

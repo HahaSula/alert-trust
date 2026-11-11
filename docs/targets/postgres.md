@@ -4,6 +4,18 @@
 
 依據是 PostgreSQL 與 exporter 的原始碼，加上幾組小實驗：PostgreSQL 16.15 與 17.11 各一組主從，切斷複寫、停複本、讓 archive 失敗、用完連線、kill 一個 backend、提升複本、把 pg_wal 寫滿<span class="at-chip at-ev-tested">實測</span>[^pg-exp-target]；另一組補 archive 新鮮度、`archive_mode`、資料庫大小與 session 錯誤計數<span class="at-chip at-ev-tested">實測</span>[^pg-asp-exp]。Patroni 與備份工具的部分只讀原始碼，沒有實驗。
 
+## 五段導覽 {#five-sections}
+
+本頁依面向寫成；對應到[五段框架](../map.md)的位置如下，元件卡已依五段排列。
+
+| 段落 | 元件卡 | 本頁 |
+|---|---|---|
+| 1 架構 | [架構頁](../architecture/db-relational.md)、[元件卡](../components/postgres_exporter.md#architecture) | — |
+| 2 正確使用 | [元件卡](../components/postgres_exporter.md#usage) | [建議的設定](#recommended)、[用自訂查詢補上](#custom-queries)、[版本差異](#versions) |
+| 3 正確觀測 | [元件卡](../components/postgres_exporter.md#observe) | [監測自檢](#exporter) |
+| 4 不正確使用時的觀測 | [元件卡](../components/postgres_exporter.md#misuse)、[寫得不好的查詢](../components/postgres_exporter.md#bad-query-table) | [九個面向一覽](#aspects)、[效能與故障情境](#perf) |
+| 5 目前無法觀測的痕跡 | [元件卡](../components/postgres_exporter.md#blind) | [盲點與補法](#blind-spots)、[Exporter 覆蓋矩陣](#coverage) |
+
 ## 先講結論
 
 1. **時間延遲不能單獨用。**`pg_replication_lag_seconds` 在複本收到的 WAL 都已套用時固定是 0：主庫沒寫入時是 0，複本斷線 40 秒、主庫持續寫入時也是 0。延遲要看主庫端的位元組 `pg_stat_replication_pg_wal_lsn_diff`，「有沒有在收」要看主庫上那一列還在不在。<span class="at-chip at-ev-tested">實測</span>[^pg-exp-target][^pg-c-replication-lag]

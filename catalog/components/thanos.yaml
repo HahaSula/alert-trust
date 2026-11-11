@@ -389,6 +389,20 @@ signals:
     upstream: { status: yes, note: "ThanosCompactHasNotRun" }
     rules: []
 
+# 寫得不好的 PromQL 與 Ruler rule：每一種壞用法對應到哪些訊號、看得到什麼、/metrics 看不到什麼。
+bad_queries:
+  - case: Ruler 的查詢扇出到所有 store、時間範圍太長
+    signals: [rule-group-ratio, rule-eval-failures]
+    visible: >-
+      Ruler group 的 last_duration ÷ interval 上升（querier 與 store 的延遲都算在內）；查詢全部失敗時 prometheus_rule_evaluation_failures_total 增加
+    not_visible: 是哪一條查詢讓扇出變慢、哪個 store 拖慢（見 blind_spots）
+    refs: [th-rule-noquery, th-prom-eval-return, exp-thanos-query-down]
+  - case: Rule group 用 warn 策略，store 回錯時用不完整的資料判斷
+    signals: [rule-partial-warnings, partial-response-strategy]
+    visible: thanos_rule_evaluation_with_warnings_total{strategy="warn"} 增加；只在 store 回錯的那幾秒有 warning
+    not_visible: store 斷線 5 秒後從名單移除，之後查詢回 success、沒有 warning（abort 也一樣，見 store-endpoints）
+    refs: [exp-thanos-store-loss, th-rule-warn-count, th-prs-default]
+
 blind_spots:
   - what: Ruler 查詢失敗的原因（querier 停機還是 store 全部消失）
     category: exporter

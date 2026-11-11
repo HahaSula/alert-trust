@@ -1,0 +1,59 @@
+<svg viewBox="0 0 930 350" role="img" aria-label="元件卡依五段產生元件頁，再由 catalog/map.yaml 分到 plugin">
+  <defs>
+    <marker id="ahmap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+  </defs>
+  <!-- 欄 1：元件卡 -->
+  <text x="110" y="22" text-anchor="middle" class="lbl-b">元件卡</text>
+  <text x="110" y="40" text-anchor="middle" class="lbl-s">catalog/components、targets</text>
+  <rect x="20" y="60" width="180" height="56" rx="8" class="b-node"/>
+  <text x="110" y="84" text-anchor="middle" class="lbl-b">prometheus.yaml</text>
+  <text x="110" y="102" text-anchor="middle" class="lbl-s">監控鏈元件</text>
+  <rect x="20" y="132" width="180" height="56" rx="8" class="b-node"/>
+  <text x="110" y="156" text-anchor="middle" class="lbl-b">host.yaml</text>
+  <text x="110" y="174" text-anchor="middle" class="lbl-s">node_exporter 這一層為止</text>
+  <rect x="20" y="204" width="180" height="56" rx="8" class="b-node"/>
+  <text x="110" y="228" text-anchor="middle" class="lbl-b">postgres_exporter.yaml</text>
+  <text x="110" y="246" text-anchor="middle" class="lbl-s">資料庫 target</text>
+  <path d="M200 160 H246" class="arrow" marker-end="url(#ahmap)"/>
+
+  <!-- 欄 2：五段 -->
+  <text x="420" y="22" text-anchor="middle" class="lbl-b">五段（元件頁的順序）</text>
+  <text x="420" y="40" text-anchor="middle" class="lbl-s">docs/components/&lt;id&gt;.md</text>
+  <rect x="250" y="54" width="340" height="40" rx="6" class="b-node-acc"/>
+  <text x="266" y="79" class="lbl-b">1 架構</text>
+  <text x="574" y="79" text-anchor="end" class="tk">architecture</text>
+  <rect x="250" y="100" width="340" height="40" rx="6" class="b-node-acc"/>
+  <text x="266" y="125" class="lbl-b">2 正確使用</text>
+  <text x="574" y="125" text-anchor="end" class="tk">usage</text>
+  <rect x="250" y="146" width="340" height="40" rx="6" class="b-node-acc"/>
+  <text x="266" y="171" class="lbl-b">3 正確觀測</text>
+  <text x="574" y="171" text-anchor="end" class="tk">observe</text>
+  <rect x="250" y="192" width="340" height="40" rx="6" class="b-node-acc"/>
+  <text x="266" y="217" class="lbl-b">4 不正確使用時的觀測</text>
+  <text x="574" y="217" text-anchor="end" class="tk">misuse＋bad_queries</text>
+  <rect x="250" y="238" width="340" height="40" rx="6" class="b-node-acc"/>
+  <text x="266" y="263" class="lbl-b">5 目前無法觀測的痕跡</text>
+  <text x="574" y="263" text-anchor="end" class="tk">blind_spots</text>
+  <path d="M590 166 H646" class="arrow" marker-end="url(#ahmap)"/>
+  <text x="618" y="152" text-anchor="middle" class="tl">map</text>
+
+  <!-- 欄 3：plugin -->
+  <text x="770" y="22" text-anchor="middle" class="lbl-b">Plugin</text>
+  <text x="770" y="40" text-anchor="middle" class="lbl-s">catalog/map.yaml（產生）</text>
+  <rect x="650" y="60" width="240" height="56" rx="8" class="b-node"/>
+  <text x="770" y="84" text-anchor="middle" class="lbl-b">alert-trust-core</text>
+  <text x="770" y="102" text-anchor="middle" class="lbl-s">監控鏈 9 張卡、上層 skill</text>
+  <rect x="650" y="132" width="240" height="56" rx="8" class="b-node"/>
+  <text x="770" y="156" text-anchor="middle" class="lbl-b">alert-trust-host</text>
+  <text x="770" y="174" text-anchor="middle" class="lbl-s">主機與容器</text>
+  <rect x="650" y="204" width="240" height="56" rx="8" class="b-node"/>
+  <text x="770" y="228" text-anchor="middle" class="lbl-b">alert-trust-&lt;資料庫&gt;</text>
+  <text x="770" y="246" text-anchor="middle" class="lbl-s">每個資料庫一個，共 9 個</text>
+  <path d="M890 232 H914 V88 H896" class="arrow" marker-end="url(#ahmap)"/>
+  <path d="M890 160 H914" class="arrow"/>
+  <text x="770" y="282" text-anchor="middle" class="tl">右側箭頭：依賴 alert-trust-core</text>
+
+  <!-- 深度界線 -->
+  <line x1="20" y1="306" x2="880" y2="306" class="grid"/>
+  <text x="450" y="332" text-anchor="middle" class="lbl-s">範圍以深度為界：只到 exporter／endpoint 實際輸出的那一層，不往核心或內部實作挖。</text>
+</svg>

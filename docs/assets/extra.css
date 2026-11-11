@@ -22,7 +22,7 @@
   border-radius: 3px; white-space: nowrap; vertical-align: .08em; }
 .at-ev-tested, .at-up-yes, .at-st-stable, .at-res-ok { background: var(--at-ok-bg); color: var(--at-ok); }
 .at-ev-code { background: var(--at-info-bg); color: var(--at-info); }
-.at-ev-upstream { background: var(--at-accent-bg); color: var(--at-accent); }
+.at-ev-upstream, .at-ev-doc { background: var(--at-accent-bg); color: var(--at-accent); }
 .at-ev-inferred, .at-up-partial, .at-st-draft, .at-res-warn { background: var(--at-warn-bg); color: var(--at-warn); }
 .at-up-no, .at-res-bad { background: var(--at-crit-bg); color: var(--at-crit); }
 .at-res-na { background: var(--at-mute-bg); color: var(--at-mute); }

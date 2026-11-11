@@ -466,6 +466,46 @@ signals:
     upstream: { status: partial }
     rules: [rules/prometheus/meta.yml#PrometheusConfigReloadFailed]
 
+# 寫得不好的 PromQL 與 rule：每一種壞用法對應到哪些訊號、看得到什麼、/metrics 看不到什麼。
+bad_queries:
+  - case: 昂貴的查詢（高基數或大量 regex 的 selector、長 range、subquery）
+    signals: [query-slots, rule-group-ratio, memory-limit]
+    visible: >-
+      prometheus_engine_queries ÷ queries_concurrent_max 與 queue_time；rule group 的 last_duration ÷ interval
+      （實驗中 Grafana 的重查詢讓 rule group 從幾秒變 40 秒，scrape 不受影響）；working set ÷ memory limit
+    not_visible: 是哪一條 rule 或哪一個查詢、哪個 selector（engine metric 只有全域與 slice，rule 層只到 group；見 blind_spots）
+    refs: [exp-prom-query, p-engine-queue, p-maxconc, exp-prom-cpu, exp-prom-mem]
+  - case: 查詢排隊或執行超過 `--query.timeout`、撞到 `--query.max-samples`
+    signals: [rule-failures, query-slots]
+    visible: >-
+      逾時的 rule 查詢回 context deadline exceeded，rule_evaluation_failures_total 增加，pending 的 activeAt 不變
+      （實驗 `--query.timeout` 300 ms、1 個 slot；在第一道 slot 排隊不受 timeout 影響）
+    not_visible: 失敗的是哪條 rule（lastError 只在 /api/v1/rules）；max-samples 超限的行為本 repo 沒有核對（見 blind_spots）
+    refs: [exp-prom-slots, p255-query-timeout, p3-query-timeout, p-engine-queue]
+  - case: 昂貴的 recording rule 和關鍵 alert 放在同一個 group
+    signals: [rule-group-ratio]
+    visible: >-
+      group 的 last_duration ÷ interval > 0.8、iterations_missed_total 增加，health 仍是 ok
+      （實驗 CPU 0.15 核時重 group 裡的 alert 延遲變近兩倍、還漏事件，獨立小 group 不變）
+    not_visible: group 裡是哪一條 rule 慢（單條的 evaluationTime 只在 /api/v1/rules）
+    refs: [exp-prom-cpu, p-group-missed, p-group-eval]
+  - case: Recording rule 讓 series 暴增
+    signals: [rule-group-ratio, memory-limit]
+    visible: 只有間接的痕跡：group 耗時變長、working set 上升（推論）
+    not_visible: rule 寫出多少 series、是哪一條（/api/v1/status/tsdb 不依 rule 分，見 blind_spots）
+    refs: [exp-prom-cpu, exp-prom-mem]
+  - case: Range 相對 `scrape_interval` 太短、或 selector 對不到
+    signals: [for-reset]
+    visible: >-
+      進過 pending 的 rule 有 changes(ALERTS_FOR_STATE[1h])（rate 回空時 pending 被刪、`for` 歸零）；rule_evaluation_failures_total 是 0
+    not_visible: 從沒進入 pending 的 rule 什麼都沒有：查詢回空不算失敗（見 blind_spots 的永遠回空的 rule）
+    refs: [exp-prom-range, exp-prom-silent, p-alert-delete]
+  - case: 長時間範圍的查詢佔住 block reader
+    signals: [tsdb-maintenance]
+    visible: prometheus_tsdb_reloads_total 停止增加，沒有任何失敗數（BlockReloadStalled，讀碼）
+    not_visible: 是哪個查詢（見 blind_spots）
+    refs: [p3-block-close-wait, p3-db-run]
+
 # 目前無法觀測的痕跡。category：exporter（元件裡有、沒有輸出成 metric）、other（要靠其他元件）。
 blind_spots:
   - what: 哪一條 rule 或哪一個查詢造成查詢負載
@@ -496,3 +536,9 @@ blind_spots:
     why: 行程重啟期間不在抓資料，Prometheus 自己查不到 OOMKilled
     workaround: 外部 Prometheus 抓 kube-state-metrics 與 cAdvisor
     options: "建議：observer 卡的 k8s-sources；主機上看 host 卡的 oom-kills"
+  - what: 查詢撞到 `--query.max-samples` 的是哪一條、撞的是哪一個上限
+    category: exporter
+    why: 本 repo 沒有核對 max-samples 超限時的錯誤與計數；rule 端只看得到失敗數，rule 層的 metric 只到 group
+    workaround: 依 /api/v1/rules 的 lastError 找出失敗的 rule
+    options: "建議：依 /api/v1/rules 的 lastError 找失敗的 rule；設 global.query_log_file 記下重查詢（未核對）"
+    section: architecture/prometheus.md#query-engine

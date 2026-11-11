@@ -17,6 +17,7 @@ alert-trust 回答兩個問題：
 |---|---|---|
 | `catalog/components/*.yaml` | 監控元件卡：prometheus、alertmanager、vmalert、vmagent、victoriametrics、victorialogs、observer | 手寫 |
 | `catalog/targets/*.yaml` | Target 卡：mysql、mariadb、postgres_exporter 等（MySQL 與 MariaDB 各一張，共用 mysqld_exporter） | 手寫 |
+| `catalog/map.yaml` | 五段與 plugin 的索引（給 skill 讀） | **產生**：`tools/build_map.py`，要 commit |
 | `catalog/target-pattern.yaml` | 每張 target 卡必須回答的標準問題（validate 強制） | 手寫 |
 | `catalog/contracts.yaml` | 信任契約；每個 id 在 `docs/contracts.md` 要有 `{#id}` 錨點 | 手寫 |
 | `catalog/terms.yaml` | 名詞表：每個設定與 metric 的設定位置、預設值、觀察方式；頁面中反引號名稱自動連結到這裡 | 手寫 |
@@ -65,7 +66,7 @@ docker run --rm -u $(id -u):$(id -g) -v "$PWD":/docs squidfunk/mkdocs-material:9
 
 ## 五段框架
 
-每張卡都回答：1 架構（會留下哪些痕跡）、2 正確使用（`usage`，只寫原始碼推理、本機小實驗或標明的官方文件）、3 正確觀測（訊號 `section: observe`）、4 不正確使用時的觀測（`section: misuse`，包含寫得不好的查詢：DB 的 SQL／命令、監控系統的 PromQL／MetricsQL／LogsQL 與 rule）、5 目前無法觀測的痕跡（`blind_spots`，方案 `options` 一行點到為止）。範圍只到 exporter／endpoint 實際輸出的那一層，不往下挖（例如主機只到 node_exporter、kube-state-metrics）。格式見 `docs/contributing.md#五段框架`。
+每張卡都回答：1 架構（會留下哪些痕跡）、2 正確使用（`usage`，只寫原始碼推理、本機小實驗或標明的官方文件）、3 正確觀測（訊號 `section: observe`）、4 不正確使用時的觀測（`section: misuse`，包含寫得不好的查詢：DB 的 SQL／命令、監控系統的 PromQL／MetricsQL／LogsQL 與 rule）、5 目前無法觀測的痕跡（`blind_spots`，方案 `options` 一行點到為止）。範圍只到 exporter／endpoint 實際輸出的那一層，不往下挖（例如主機只到 node_exporter、kube-state-metrics）。格式見 `docs/contributing.md#five-sections`。`catalog/map.yaml` 由 `tools/build_map.py`（`build_pages.py` 會呼叫）產生並 commit，記錄每張卡屬於哪個 plugin、各段有哪些項目；skill 讀它來分派，`validate.py` 會檢查它是否過期。
 
 ## 證據規則（最重要）
 

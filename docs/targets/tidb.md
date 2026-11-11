@@ -4,6 +4,18 @@
 
 依據是 TiDB、TiKV、PD v8.5.8 的原始碼（PD 內嵌 etcd v3.5.15），加上一組小實驗：PD ×3、TiKV ×3、TiDB ×1，停 TiKV、讓 PD leader 抓不到、停 PD leader、停兩台 PD 失去 quorum，並稽核官方規則<span class="at-chip at-ev-tested">實測</span>[^tidb-exp]。`gh api .../releases/latest` 回的是 v7.5.8（最後發布的 LTS 修補版），版本號最高的穩定版是 v8.5.8，以它為準。這台機器的 Docker 容器時鐘比牆鐘慢約 30%，牆鐘還會被 WSL 往回調；秒數以主機時鐘量的 SQL、HTTP 耗時為準，Prometheus 內的時間只當參考。訊號與規則在[元件卡](../components/tidb.md)，原始碼位置在[附錄](tidb-appendix.md)，機制在[分散式 SQL 架構](../architecture/db-distsql.md)與[共識（Raft）架構](../architecture/db-raft.md#tikv)。7.5、8.1、8.5 之間的 metric 與官方規則差異見 [TiDB 各版本的監控差異](versions/tidb.md)。
 
+## 五段導覽 {#five-sections}
+
+本頁依面向寫成；對應到[五段框架](../map.md)的位置如下，元件卡已依五段排列。
+
+| 段落 | 元件卡 | 本頁 |
+|---|---|---|
+| 1 架構 | [架構頁](../architecture/db-distsql.md)、[元件卡](../components/tidb.md#architecture) | [監控模型](#model) |
+| 2 正確使用 | [元件卡](../components/tidb.md#usage) | — |
+| 3 正確觀測 | [元件卡](../components/tidb.md#observe) | [監測自檢](#exporter)、[三方交叉](#health-second-path)、[metric 消失與 scrape 預算](#exporter-scrape) |
+| 4 不正確使用時的觀測 | [元件卡](../components/tidb.md#misuse)、[寫得不好的查詢](../components/tidb.md#bad-query-table) | [九個面向一覽](#aspects) |
+| 5 目前無法觀測的痕跡 | [元件卡](../components/tidb.md#blind) | [盲點與補法](#blind-spots) |
+
 ## 先講結論
 
 1. **三種元件的健康端點都不看自己能不能服務。**PD 失去 quorum 時，存活那台 `/pd/api/v1/health` 仍回 200（只在 JSON 裡把停掉的成員標 `health: false`）；TiDB 的 `/status` 200、`select 1` 成功，讀表與寫入 25 秒逾時；TiKV 的 `/status` 一律是空的 200。<span class="at-chip at-ev-tested">實測</span>[^tidb-exp-raw][^pd-memberlist-nonlinear][^tidb-h-status-health][^tikv-h-status]

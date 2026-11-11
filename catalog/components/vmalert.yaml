@@ -222,6 +222,32 @@ signals:
     applies_when: "group limit 或 -rule.resultsLimit > 0"
     rules: [rules/victoriametrics/meta.yml#MetaRuleNearResultsLimit]
 
+# 寫得不好的 MetricsQL、LogsQL 與 rule：每一種壞用法對應到哪些訊號、看得到什麼、/metrics 看不到什麼。
+bad_queries:
+  - case: Rule 回傳太多結果（高基數的 by、沒有聚合的 selector）
+    signals: [results-limit, rule-errors]
+    visible: >-
+      vmalert_alerting_rules_last_evaluation_samples ÷ vmalert_group_rule_results_limit；超過 limit 時該 rule 的 active alert 全部清空並回報錯誤
+    not_visible: 是哪些 label 讓結果變多；沒設 limit 時沒有比值可看
+    refs: [vma-results-limit, vma-results-limit-flag, vma-results-limit-gauge, vma-eval-samples-gauge]
+  - case: 昂貴的 MetricsQL 讓 vmselect 飽和或觸發 -search.max* 上限
+    signals: [rule-errors, group-ratio]
+    visible: >-
+      vmalert_alerting_rules_errors_total 增加；查詢變慢時 group 的 iteration_duration ÷ interval 上升；
+      429 讓查詢很快失敗時 vmalert_iteration_missed_total 可能仍是 0（推論）
+    not_visible: 是哪條 rule 的查詢造成負載、撞的是哪一個上限（見 blind_spots）
+    refs: [exp-vm-faults, vma-missed, vma-iter-interval]
+  - case: 昂貴的 recording rule 和關鍵 alert 放在同一個 group
+    signals: [group-ratio]
+    visible: group 的 vmalert_iteration_duration_seconds ÷ vmalert_iteration_interval_seconds > 0.8、vmalert_iteration_missed_total 增加
+    not_visible: group 裡是哪一條 rule 慢（/api/v1/rules）
+    refs: [vma-missed, vma-iter-interval, vma-iter-duration]
+  - case: 視窗相對資料間隔與 eval_delay 太短，rule 永遠回空
+    signals: [rules-loaded]
+    visible: vmalert_alerting_rules_last_evaluation_samples 一直是 0（讀碼）
+    not_visible: 回空是視窗太短還是本來就沒有事件，metric 分不出來（見 blind_spots）
+    refs: [vma-eval-samples, exp-vm-matrix, pqw-vm-rate-1sample]
+
 blind_spots:
   - what: 哪一條 rule 的查詢讓 vmselect 飽和或觸發 -search.max* 上限
     category: exporter
@@ -237,3 +263,9 @@ blind_spots:
     workaround: 重啟後查 UI 的 restored 標記與 log 裡的 restore 錯誤
     options: "建議：收 vmalert log 的 restore 錯誤成告警；狀態用的 VictoriaMetrics 和資料用的分開"
     section: architecture/vmalert.md#restore
+  - what: 視窗太短而永遠回空的 rule
+    category: exporter
+    why: 查詢回空不算錯誤；last_evaluation_samples 是 0 時分不出是視窗太短還是沒有事件
+    workaround: 上線前依契約 vm-range-window 算視窗，並用較長視窗手動查一次確認有資料
+    options: "建議：rule review 用 tools/fit_contracts.py 比對視窗；長期回 0 的 rule 人工確認"
+    section: architecture/vmalert.md#group

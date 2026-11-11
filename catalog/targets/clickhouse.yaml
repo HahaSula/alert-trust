@@ -679,6 +679,50 @@ signals:
     upstream: { status: partial, note: "Altinity ClickHouseDiskUsage：predict_linear(DiskFreeBytes[1d], 86400) < 0（exporter 查 system.disks）" }
     rules: [rules/targets/clickhouse.yml#CHDiskSpaceLow, rules/targets/clickhouse.yml#CHDiskFillingUp]
 
+# 寫得不好的查詢：每一種壞用法對應到哪些 misuse 訊號、看得到什麼、/metrics 看不到什麼。
+bad_queries:
+  - case: 大量小 insert（每次幾列）或 partition key 太細，part 數暴增
+    signals: [parts-pressure, writes-rejected, merge-pool]
+    visible: >-
+      MaxPartCountForPartition 對 parts_to_delay_insert 的比例；DelayedInserts 增加（lab 門檻 20／40、停 merge：DelayedInserts 20、MaxPartCountForPartition 40）；
+      到門檻後 RejectedInserts 與 TOO_MANY_PARTS 增加（lab 門檻 40：第 40 筆起被拒）
+    not_visible: 是哪個 client 送的小 insert（system.query_log）；MaxPartCountForPartition 是全伺服器最大值，哪張表要 query-exporter（chq_parts_max_per_partition）
+    refs: [ch-exp-raw, ch-exp-extra, ch-sam-maxparts, ch-mt-delay, ch-mt-throw, ch-pe-rejected, ch-set-async-insert]
+  - case: 對大表頻繁 ALTER UPDATE／DELETE（mutation）
+    signals: [mutations, merge-pool]
+    visible: >-
+      chq_mutations_failing、chq_mutation_oldest_pending_seconds；打開 heavy metric 時 NumberOfPendingMutationsOverExecutionTime；
+      merge 池一直滿；未完成數到 number_of_mutations_to_delay（500）延遲、到 number_of_mutations_to_throw（1000）被拒
+    not_visible: mutation 改了哪些 part、為什麼慢（system.mutations，見 blind_spots）
+    refs: [ch-sys-mut-fail, ch-sam-mutations-over, ch-mt-mut-delay, ch-mt-mut-throw, ch-cm-pooltask]
+  - case: 撞到 max_memory_usage 的查詢（大 GROUP BY、JOIN、排序）
+    signals: [memory, failed-queries]
+    visible: >-
+      ClickHouseErrorMetric_MEMORY_LIMIT_EXCEEDED 增加（lab：max_memory_usage 30MB 的 GROUP BY 在 0.06 秒失敗）；失敗查詢的比例上升
+    not_visible: 是哪一條查詢、用了多少記憶體（system.query_log，見 blind_spots）；max_memory_usage 預設 0 時要等整台接近上限才失敗
+    refs: [ch-exp-raw, ch-mem-exceeded, ch-ss-max-mem, ch-set-max-mem, ch-pe-failed-query]
+  - case: 沒有條件或 LIMIT 的大 SELECT
+    signals: [memory, query-admission, global-thread-pool]
+    visible: >-
+      MemoryTracking ÷ 主機或 cgroup 記憶體上升；這類查詢同時很多時 TOO_MANY_SIMULTANEOUS_QUERIES 或 CANNOT_SCHEDULE_TASK 增加
+    not_visible: 讀了多少列與位元組、是誰送的：本卡沒有收讀取量的訊號（system.query_log，見 blind_spots）
+    refs: [ch-cm-memtracking, ch-ss-mem-ratio, ch-pl-toomany, res-ch-cannot-schedule]
+  - case: 查詢風暴（並行查詢超過 max_concurrent_queries）
+    signals: [query-admission]
+    visible: ClickHouseErrorMetric_TOO_MANY_SIMULTANEOUS_QUERIES 增加（lab：上限 2 時第 3 個查詢在 0.02 秒被拒）
+    not_visible: 被拒的是哪個使用者、哪個查詢
+    refs: [ch-exp-raw, ch-pl-toomany, ch-ss-max-conc, ch-cfg-max-conc]
+  - case: 透過 Distributed 表非同步寫入，目的 shard 收不下
+    signals: [distributed-queue]
+    visible: DistributedFilesToInsert 積壓、DistributedAsyncInsertionFailures 增加、BrokenDistributedFilesToInsert > 0；insert 端看不到錯誤
+    not_visible: 送出失敗的原因與哪一張表（見 blind_spots）
+    refs: [ch-cm-distfiles, ch-cm-brokendist, ch-pe-dist-fail, ch-dist-broken]
+  - case: ON CLUSTER DDL 在 Keeper 排隊
+    signals: [keeper-latency]
+    visible: KeeperOutstandingRequests 排隊數
+    not_visible: DDL 佇列本身（system.distributed_ddl_queue 本卡沒有對應 metric，見 blind_spots）
+    refs: [alt-k-outstanding]
+
 blind_spots:
   - what: 每張表的唯讀、延遲、佇列、active replica 數（system.replicas）
     category: exporter

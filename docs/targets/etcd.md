@@ -4,6 +4,18 @@
 
 依據是 etcd v3.7.3 的原始碼（raft 函式庫 v3.7.0），加上一組三台叢集的小實驗：停 leader、停兩台失去 quorum、讓 scrape 失敗、讀取與刪除時量 `/metrics`、寫到 quota<span class="at-chip at-ev-tested">實測</span>[^etcd-exp]。慢磁碟、TLS、learner 沒有實驗，只讀原始碼。這台機器的 Docker 容器時鐘比牆鐘慢約 30%，秒數類的實驗結果以主機時鐘量的為準，其餘只看狀態。訊號與規則在[元件卡](../components/etcd.md)，原始碼位置在[附錄](etcd-appendix.md)，機制在[共識（Raft）架構](../architecture/db-raft.md)。3.4、3.5、3.6 與 3.7 之間的 metric 差異見 [etcd 各版本的監控差異](versions/etcd.md)。
 
+## 五段導覽 {#five-sections}
+
+本頁依面向寫成；對應到[五段框架](../map.md)的位置如下，元件卡已依五段排列。
+
+| 段落 | 元件卡 | 本頁 |
+|---|---|---|
+| 1 架構 | [架構頁](../architecture/db-raft.md)、[元件卡](../components/etcd.md#architecture) | [監控模型](#model) |
+| 2 正確使用 | [元件卡](../components/etcd.md#usage) | — |
+| 3 正確觀測 | [元件卡](../components/etcd.md#observe) | [監測自檢](#exporter)、[三方交叉](#health-second-path)、[metric 消失與 scrape 預算](#exporter-scrape) |
+| 4 不正確使用時的觀測 | [元件卡](../components/etcd.md#misuse)、[寫得不好的查詢](../components/etcd.md#bad-query-table) | [九個面向一覽](#aspects) |
+| 5 目前無法觀測的痕跡 | [元件卡](../components/etcd.md#blind) | [盲點與補法](#blind-spots) |
+
 ## 先講結論
 
 1. **失去 quorum 的 member 照樣回應 `/metrics`。**3 台停 2 台，存活那台 `up=1`、`etcd_server_has_leader=0`、`/livez` 200、`/readyz` 503、寫入逾時。只看 `up` 的規則看不出來。<span class="at-chip at-ev-tested">實測</span>[^etcd-exp-raw]

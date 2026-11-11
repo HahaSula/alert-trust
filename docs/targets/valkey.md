@@ -6,6 +6,18 @@
 
 版本：Valkey 9.1.3（主要）、Redis 7.2.17（最後的 BSD 授權分支）與 8.10.3（看差異）、redis_exporter v1.97.0。依據是原始碼，加上兩輪小實驗：Valkey 主從加 3 個 Sentinel、Redis 7.2 與 8.10 各一台、每台一個 exporter，製造慢指令、阻塞、maxmemory、exporter 逾時、連線額滿、複本斷線、BGSAVE 失敗、failover、Sentinel 失去多數、script 失敗、key group 掃描。<span class="at-chip at-ev-tested">實測</span>[^vk-exp][^vk-exp2] 這台機器的容器時鐘比牆鐘慢約 30%、而且會跳動：Sentinel 每 25～30 秒進一次 TILT，**failover 與 sdown 在這裡測不到**，相關結論以原始碼為準並標「讀碼」。
 
+## 五段導覽 {#five-sections}
+
+本頁依面向寫成；對應到[五段框架](../map.md)的位置如下，元件卡已依五段排列。
+
+| 段落 | 元件卡 | 本頁 |
+|---|---|---|
+| 1 架構 | [架構頁](../architecture/db-kv.md)、[元件卡](../components/redis_exporter.md#architecture) | [監控模型](#models) |
+| 2 正確使用 | [元件卡](../components/redis_exporter.md#usage) | [建議的設定](#recommended) |
+| 3 正確觀測 | [元件卡](../components/redis_exporter.md#observe) | [監測自檢](#exporter) |
+| 4 不正確使用時的觀測 | [元件卡](../components/redis_exporter.md#misuse)、[寫得不好的查詢](../components/redis_exporter.md#bad-query-table) | [九個面向一覽](#aspects) |
+| 5 目前無法觀測的痕跡 | [元件卡](../components/redis_exporter.md#blind) | [盲點與補法](#blind-spots) |
+
 ## 先講結論
 
 1. **只看 `redis_up` 的規則在最需要時不響。**mixin 與 awesome 的 RedisDown 都是 `redis_up == 0`。exporter 停機時 `redis_up` 消失；伺服器忙到 `INFO` 回不來時，exporter 的 `--connection-timeout` 預設 15 秒比 `scrape_timeout` 長，Prometheus 先放棄，`redis_up` 也消失。要加 `up == 0` 與 `absent()`，並把 `--connection-timeout` 設得比 `scrape_timeout` 短。<span class="at-chip at-ev-tested">實測</span>[^vk-exp][^rx-flag-timeout]

@@ -162,6 +162,24 @@ signals:
     upstream: { status: yes, note: "TooHighQueryLoad" }
     rules: [rules/victoriametrics/meta.yml#MetaVLQueryTimeouts]
 
+# 寫得不好的 LogsQL 與 log rule：每一種壞用法對應到哪些訊號、看得到什麼、/metrics 看不到什麼。
+bad_queries:
+  - case: 大時間範圍或沒有過濾條件的 LogsQL 佔滿 vlselect
+    signals: [query-load]
+    visible: vl_concurrent_select_limit_timeout_total 增加；log rule 和人工查詢共用同一組上限
+    not_visible: 是哪一條 LogsQL（見 blind_spots）
+    refs: [vl-rule-queryload, vl-select-timeout]
+  - case: "Canary 用 `* | stats count()` 沒加 `filter c:>0`"
+    signals: [log-freshness]
+    visible: 加了 filter c:>0 的 canary 在沒有 log 時回空，帶 for 會觸發
+    not_visible: 沒加 filter 的 canary 沒有 log 時仍回 0，看起來正常、不報錯
+    refs: [exp-vm-vl]
+  - case: "Log rule 沒寫 `_time`，log 延遲超過 eval_delay + interval"
+    signals: [log-freshness]
+    visible: 只有旁證：明確寫 `_time` 視窗的 canary 照常有資料
+    not_visible: 晚到的事件落在已查過的視窗，rule 不報錯、沒有任何 metric（見 blind_spots）
+    refs: [exp-vm-vl]
+
 blind_spots:
   - what: 查詢故障期間進來的 log 事件
     category: other
@@ -180,3 +198,9 @@ blind_spots:
     why: "`vl_concurrent_select_limit_timeout_total` 只有總數；log rule 與人工大範圍查詢共用同一組上限"
     workaround: 看 vmalert /api/v1/rules 的 lastError 與查詢時間
     options: "建議：log rule 用獨立的 vlselect，限制人工查詢的時間範圍"
+  - what: Log 延遲超過 eval_delay + interval 而漏掉的事件
+    category: other
+    why: 沒寫 `_time` 的 log rule 視窗不重疊，晚到的事件落在已查過的視窗；rule 不報錯
+    workaround: 依尖峰 log 延遲設 eval_delay，或明確寫較長的 `_time` 視窗
+    options: "建議：log rule 明確寫較長的 `_time` 視窗，或依尖峰 log 延遲拉長 eval_delay"
+    section: architecture/victorialogs.md#log-rule-window

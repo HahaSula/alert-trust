@@ -6,6 +6,18 @@
 
 版本：MongoDB 8.0.34（目前的 LTS 系列；SSPL）、Percona mongodb_exporter v0.54.0。8.2.12 與 9.0.4（2026-10 釋出）只查了 OTel metrics 的程式碼。依據是原始碼，加上一個 3 member replica set 的小實驗（`wiredTigerCacheSizeGB` 0.25、oplog 2MB），每個 member 一個 exporter，另有預設旗標、沒有 clusterMonitor、`--collect-all`、multi-target 四種 exporter，並把 PMM v3.10.0 的範本與 awesome-prometheus-alerts 的規則照抄進 Prometheus 看會不會響。<span class="at-chip at-ev-tested">實測</span>[^mg-exp] 這台機器的容器單調時鐘比牆鐘慢約 30%：選舉與降級的秒數比真實環境長，只當量級看，機制以原始碼為準。sharded cluster 沒有做實驗。
 
+## 五段導覽 {#five-sections}
+
+本頁依面向寫成；對應到[五段框架](../map.md)的位置如下，元件卡已依五段排列。
+
+| 段落 | 元件卡 | 本頁 |
+|---|---|---|
+| 1 架構 | [架構頁](../architecture/db-doc.md)、[元件卡](../components/mongodb_exporter.md#architecture) | [監控模型](#models) |
+| 2 正確使用 | [元件卡](../components/mongodb_exporter.md#usage) | [建議的設定](#recommended) |
+| 3 正確觀測 | [元件卡](../components/mongodb_exporter.md#observe) | [監測自檢](#exporter) |
+| 4 不正確使用時的觀測 | [元件卡](../components/mongodb_exporter.md#misuse)、[寫得不好的查詢](../components/mongodb_exporter.md#bad-query-table) | [九個面向一覽](#aspects) |
+| 5 目前無法觀測的痕跡 | [元件卡](../components/mongodb_exporter.md#blind) | [盲點與補法](#blind-spots) |
+
 ## 先講結論
 
 1. **mongodb_exporter 預設什麼都不收。**不加旗標時只有 `mongodb_up` 與 go／process metric（lab 46 個 sample）；要 `--collector.diagnosticdata --collector.replicasetstatus --compatible-mode` 才有約 6100 個 sample，PMM 的規則用的舊名 metric 也要 `--compatible-mode`。<span class="at-chip at-ev-tested">實測</span>[^mg-exp][^mx-flag-diag][^mx-flag-compat]

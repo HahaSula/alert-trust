@@ -56,6 +56,7 @@ nav:
   - 首頁: index.md
   - 開始使用:
       - 從哪裡開始: tools/start.md
+      - 範圍與結構: map.md
       - 共同模型與檢查流程: model.md
       - 檢查 rule 檔: tools/rule-review.md
       - scrape 與 evaluation 的基準值: tools/baseline.md
