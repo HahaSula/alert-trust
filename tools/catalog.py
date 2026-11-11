@@ -147,7 +147,8 @@ def load_rules(root: str = ROOT) -> dict[str, dict]:
 
 
 # Five-section framework (docs/map.md): every card answers
-#   1 architecture (card.architecture), 2 usage (card.usage), 3 observe and 4 misuse (signal.section),
+#   1 architecture (card.architecture), 2 usage (card.usage), 3 observe and 4 misuse (signal.section;
+#   card.bad_queries maps kinds of badly written queries to misuse signals),
 #   5 blind (card.blind_spots, one-line options).
 SECTIONS = {"observe": "正確觀測：看到的數字是不是真的", "misuse": "不正確使用時的觀測：誤用或故障時看得到什麼"}
 USAGE_EVIDENCE = {"tested": "實測（本機小實驗）", "code": "讀碼（原始碼推理）", "doc": "官方文件"}
@@ -183,6 +184,18 @@ def check_five_sections(card: dict, all_refs: dict) -> tuple[list[str], int]:
             missing += 1
         elif sec not in SECTIONS:
             errors.append(f"{where}#{s.get('id')}: section 要是 {'、'.join(SECTIONS)} 之一")
+    sig_ids = {s.get("id") for s in card.get("signals", [])}
+    for i, q in enumerate(card.get("bad_queries") or []):
+        at = f"{where}: bad_queries[{i}]"
+        for f in ("case", "signals", "visible", "not_visible", "refs"):
+            if not q.get(f):
+                errors.append(f"{at} 缺少 {f}")
+        for sid in q.get("signals") or []:
+            if sid not in sig_ids:
+                errors.append(f"{at} 訊號 {sid!r} 不在這張卡")
+        for r in q.get("refs") or []:
+            if r not in all_refs:
+                errors.append(f"{at} refs {r!r} 不存在")
     for i, b in enumerate(card.get("blind_spots") or []):
         opt = b.get("options")
         if opt is not None and (not isinstance(opt, str) or "\n" in opt.strip() or len(opt) > OPTIONS_MAX):

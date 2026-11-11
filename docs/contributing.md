@@ -18,6 +18,8 @@
 
 **同一類訊號在監控系統與 target 的歸屬**：監控系統本身就是觀測的路徑，所以它的存活、重啟、設定 reload、rule 評估是否成功都屬於「正確觀測」；target 的重啟、OOM 則是「不正確使用時的觀測」。
 
+**寫得不好的查詢**用卡片的 `bad_queries` 列出：`[{case, signals, visible, not_visible, refs}]`，每一種壞用法對應到哪些 misuse 訊號、看得到什麼、exporter 看不到什麼。
+
 同一個主題同時有「量得準不準」和「數值異常」兩面時，拆成兩個訊號：例如「複寫延遲量的是不是真的」是 `observe`，「延遲太大」是 `misuse`。`validate.py` 會列出還沒有 `section` 的訊號數（遷移中只是警告）。
 
 ## 新增一個監控元件或 target

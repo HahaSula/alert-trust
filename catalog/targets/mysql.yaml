@@ -7,7 +7,7 @@ family: database
 status: draft
 stages: [source]
 versions_checked: ["mysqld_exporter 0.21.0", "MySQL 8.0.46", "MySQL 8.4.13", "MySQL 9.7.4", "MySQL 8.4.7（lab 與多數原始碼參考）"]
-architecture: architecture/exporters.md
+architecture: architecture/db-relational.md
 role: >-
   只寫 MySQL（Oracle 社群版）。MariaDB 的原始碼與行為不同，另有一張卡（[mariadb](mariadb.md)）；兩張卡共用的訊號 id 相同，
   但證據都引用各自的原始碼與 lab。
@@ -19,6 +19,7 @@ role: >-
   規則範例在 rules/targets/mysql.yml，job="mysql" 是佔位符。
   訊號依九個面向分組（aspect 欄位）：exporter、availability、workload、saturation、replication、cluster（Group Replication）、
   maintenance（purge、救援模式、碎片）、protection（binlog、耐久性、備份）、capacity（磁碟、auto_increment、連線高水位）。
+  exporter 的連線與錯誤處理見 [Exporter 架構](../architecture/exporters.md#mysqld-exporter)。
   資料庫本身該監控什麼、每個訊號由哪個 collector 提供、需要什麼權限，整理在 docs/targets/mysql.md。
 
 silent_failures:
@@ -137,6 +138,104 @@ silent_failures:
     source: mysql-server-src
     refs: [ver-my80-gr-exit-readonly, ver-my84-gr-exit-offline]
 
+# 五段框架 2：正確使用。只寫原始碼推理（code）、本機小實驗（tested）或標明的官方文件（doc）。
+usage:
+  - id: exporter-account-grants
+    text: >-
+      exporter 帳號 GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.*，WITH MAX_USER_CONNECTIONS 3（README 的建議）；
+      沒有 PROCESS 時 innodb_trx、processlist 只看得到自己的連線，數字偏低但 collector 回報成功
+    evidence: doc
+    refs: [ver-ex-readme-grants, my-innodb-trx-query, my-processlist-query]
+  - id: exporter-auth-plugin
+    text: >-
+      exporter 帳號用 caching_sha2_password 建立。mysql_native_password 在 8.4 預設停用、9.7 不在內建 plugin 裡，
+      8.0 上用它建的帳號升版後登不進去（mysql_up 0）；exporter 的 driver 支援 caching_sha2_password
+    evidence: code
+    refs: [ver-my84-native-pw-cached, ver-my97-no-native-pw, ver-ex-gsd-sha2]
+  - id: exporter-connection-budget
+    text: >-
+      exporter 每次 scrape 最多開 2 條連線；MAX_USER_CONNECTIONS 要大於等於 2 ×（同時抓的 Prometheus 數 + /probe 併發數），
+      否則 mysql_up 間歇變 0
+    evidence: code
+    refs: [my-pool-default, ver-ex-readme-grants]
+  - id: timeout-offset
+    text: >-
+      exporter 用 Prometheus 送的 scrape timeout header 減 --timeout-offset（預設 0.25s）當查詢期限；
+      --timeout-offset 要小於 scrape_timeout，否則 exporter 不設期限，Prometheus 先逾時、所有 mysql_* 消失
+    evidence: code
+    refs: [my-offset, bl-my-offset-default]
+  - id: exporter-lock-wait-timeout
+    text: >-
+      保留 --exporter.lock_wait_timeout（預設開、2 秒），exporter 的 session 不會被 metadata lock 卡住；
+      --exporter.query_timeout 限制單一 collector，慢的那個失敗、其他照常
+    evidence: code
+    refs: [my-lock-wait-timeout, my-trace-ex-lockwait, my-querytimeout]
+  - id: collectors-to-enable
+    text: >-
+      預設只開 global_status、global_variables、slave_status、innodb_cmp、innodb_cmpmem、query_response_time。
+      要明確打開：info_schema.innodb_trx（長交易）、info_schema.innodb_metrics（MySQL 的 deadlock 與 history length 只在這裡）、
+      info_schema.processlist（metadata lock 等待）、heartbeat、binlog_size；看 SQL 時加 perf_schema.eventsstatements 與 eventsstatementssum
+    evidence: tested
+    refs: [my-default-collectors, exp-mysql-ha, exp-mysql-perf, my-innodb-metrics-name]
+  - id: connection-admin-tradeoff
+    text: >-
+      給 exporter CONNECTION_ADMIN 只換到 max_connections + 1 那一條保留連線；exporter 要兩條，打滿時第二條仍被拒、7 個 collector 失敗。
+      要打滿時還看得到連線數，讓 query-exporter 走 admin port（admin_address／admin_port，帳號要 SERVICE_CONNECTION_ADMIN）
+    evidence: tested
+    refs: [exp-mysql-ha, mysql-conn-reserved, my-q-exp, my-q-my-admin-bypass, my-q-my-admin-priv, ver-my80-admin-port]
+  - id: gr-offline-mode
+    text: >-
+      8.4 起 Group Replication 被踢出的成員預設進 offline_mode，沒有 CONNECTION_ADMIN 的 exporter 連不上那台；
+      GR 節點要把「成員的 mysql_up 0」算進成員狀態，或給 exporter CONNECTION_ADMIN（8.0 的預設是 READ_ONLY）
+    evidence: code
+    refs: [ver-my80-gr-exit-readonly, ver-my84-gr-exit-offline]
+  - id: replication-metric-names
+    text: >-
+      replication 規則同時寫 8.0 的 slave_*／seconds_behind_master 與 8.4 起的 replica_*／seconds_behind_source；
+      exporter 依序試 SHOW SLAVE STATUS、SHOW REPLICA STATUS，名稱跟著伺服器版本換
+    evidence: code
+    refs: [ver-my80-old-names, ver-my84-sbs-col, ver-ex-slave-loop]
+  - id: heartbeat-writer
+    text: >-
+      延遲用 heartbeat 表（--collect.heartbeat，pt-heartbeat 格式）；寫入程式要跟著 primary 角色走（例如由 HA 工具啟動 pt-heartbeat），
+      primary 上的 EVENT 在 failover 後的新 primary 是 SLAVESIDE_DISABLED，heartbeat 停住
+    evidence: tested
+    refs: [exp-mysql-ha, my-heartbeat-query]
+  - id: cluster-label
+    text: 同一組 primary／replica 的 target 加同一個 cluster label；角色由 read_only 與 slave_status 推，不用靜態 role label
+    evidence: tested
+    refs: [exp-mysql-ha]
+  - id: long-query-time
+    text: >-
+      Slow_queries 依 long_query_time（預設 10 秒）計數，不管 slow log 有沒有開；要讓 MySQLSlowQueries 有意義，
+      long_query_time 要設成應用能接受的上限（實驗 0.5 秒時 30 秒 +38）
+    evidence: tested
+    refs: [exp-mysql-perf, my-trace-my-slow]
+  - id: statements-digest-limit
+    text: >-
+      eventsstatements 只輸出依總耗時排序的前 --collect.perf_schema.eventsstatements.limit（預設 250）個 digest，
+      每個 digest 19 條 series；用 limit 控制 cardinality（實驗 250 個 digest 是 4,771 條）。不受前 N 限制的總數用 eventsstatementssum
+    evidence: tested
+    refs: [exp-mysql-perf, my-perf-ex-stmt-topn, my-perf-ex-stmt-defaults, my-perf-ex-stmt-labels, my-perf-ex-stmtsum-query]
+  - id: ddl-lock-wait-timeout
+    text: >-
+      跑 DDL 的 session 先 SET lock_wait_timeout（預設 31,536,000 秒，一年）。沒設時 ALTER 排在未 commit 的交易後面不放棄，
+      之後用到這張表的語句全部排隊（實驗 commit 從 320/s 掉到 0）
+    evidence: tested
+    refs: [exp-mysql-perf, my-perf-my-lock-wait-timeout]
+  - id: query-exporter-account
+    text: >-
+      query-exporter 帳號 MAX_USER_CONNECTIONS 2、GRANT PROCESS 與 SELECT ON performance_schema.*；
+      connect-sql 設 lock_wait_timeout=2、max_execution_time=4000，每個查詢 timeout 5 秒
+    evidence: tested
+    refs: [my-q-exp]
+  - id: query-exporter-expiration
+    text: >-
+      自訂 metric 都設 expiration：查詢失敗時 series 在 expiration 後消失，沒設時停在最後一個值；
+      值規則要搭配 queries_total{status!="success"} 與 query_timestamp
+    evidence: tested
+    refs: [my-q-exp, my-q-qe-expiration, my-q-qe-query-timestamp]
+
 contracts:
   - scrape-within-interval
   - lookback
@@ -146,6 +245,7 @@ signals:
   # ---------- Exporter：它真的在量嗎 ----------
   - id: exporter-up
     aspect: exporter
+    section: observe
     tier: 1
     question: Exporter 抓得到嗎
     signal: up{job="mysql"} == 0，加上 absent(up{job="mysql"})；不能只靠 mysql_up
@@ -160,6 +260,7 @@ signals:
 
   - id: db-up
     aspect: exporter
+    section: observe
     tier: 1
     question: Exporter 連得到資料庫嗎
     signal: >-
@@ -175,6 +276,7 @@ signals:
 
   - id: collectors-present
     aspect: exporter
+    section: observe
     tier: 1
     question: Exporter 有回應，collector 的結果還在嗎
     signal: up == 1 但 mysql_exporter_collector_success 完全沒有 series
@@ -189,6 +291,7 @@ signals:
 
   - id: collector-success
     aspect: exporter
+    section: observe
     tier: 1
     question: 關鍵 collector 都成功嗎
     signal: >-
@@ -205,6 +308,7 @@ signals:
 
   - id: custom-queries
     aspect: exporter
+    section: observe
     tier: 1
     question: 補盲點的自訂查詢（query-exporter）還在跑嗎
     signal: >-
@@ -228,6 +332,7 @@ signals:
 
   - id: probe-blast-radius
     aspect: exporter
+    section: observe
     tier: 1
     question: 多 target 模式下是 exporter 壞還是資料庫壞
     signal: 同一個 job 超過一半的 up 同時是 0；另外用一個 job 抓 exporter 自己的 /metrics
@@ -241,6 +346,7 @@ signals:
 
   - id: exporter-grants
     aspect: exporter
+    section: observe
     tier: 1
     question: Exporter 帳號的權限、認證方式與連線上限夠嗎
     signal: >-
@@ -259,6 +365,7 @@ signals:
   - id: exporter-query-timeout
     tier: 2
     aspect: exporter
+    section: observe
     question: Exporter 的查詢會不會被鎖或連線上限卡住
     signal: "`--exporter.lock_wait_timeout`（預設開啟、2 秒）避免被 metadata lock 卡住；`--exporter.query_timeout` 限制單一 collector。連線打滿時 exporter 自己也被擋，`mysql_up` 變 0，要給 exporter 帳號保留連線（admin port，見 blind_spots）"
     metrics: [mysql_up, mysql_global_status_connection_errors_total]
@@ -272,6 +379,7 @@ signals:
 
   - id: collector-set
     aspect: exporter
+    section: observe
     tier: 2
     question: 回報的 collector 數量有沒有變少
     signal: count(mysql_exporter_collector_success) 比一小時前少；搭配盤點應有的 collector 清單
@@ -285,6 +393,7 @@ signals:
 
   - id: scrape-budget
     aspect: exporter
+    section: observe
     tier: 2
     question: Scrape 來得及在 timeout 內完成嗎
     signal: >-
@@ -303,6 +412,7 @@ signals:
 
   - id: db-up-flapping
     aspect: exporter
+    section: observe
     tier: 2
     question: mysql_up 有沒有間歇掉下來
     signal: changes(mysql_up[15m]) > 2；常見原因是連線數超過 MAX_USER_CONNECTIONS 或 max_connections
@@ -316,6 +426,7 @@ signals:
   # ---------- 穩定：資料庫自己會不會停、卡住、進救援模式 ----------
   - id: restarts
     aspect: availability
+    section: misuse
     tier: 3
     question: 資料庫重啟過或在救援模式嗎
     signal: >-
@@ -331,6 +442,7 @@ signals:
 
   - id: crash-oom
     aspect: availability
+    section: misuse
     tier: 3
     question: 資料庫被 OOM kill 或 crash 後，看得出來嗎
     signal: >-
@@ -350,6 +462,7 @@ signals:
 
   - id: disk-space
     aspect: capacity
+    section: misuse
     tier: 2
     question: 資料目錄與 binlog 的磁碟還夠嗎
     signal: >-
@@ -368,6 +481,7 @@ signals:
 
   - id: long-transactions
     aspect: maintenance
+    section: misuse
     tier: 2
     question: 有沒有開太久的交易
     signal: >-
@@ -384,6 +498,7 @@ signals:
 
   - id: undo-history
     aspect: maintenance
+    section: misuse
     tier: 2
     question: Undo history 有沒有被擋住無法 purge
     signal: >-
@@ -402,6 +517,7 @@ signals:
 
   - id: deadlocks
     aspect: workload
+    section: misuse
     tier: 3
     question: Deadlock 變多了嗎
     signal: >-
@@ -420,6 +536,7 @@ signals:
   # ---------- 使用：連線、鎖、快取與暫存表 ----------
   - id: connections
     aspect: saturation
+    section: misuse
     tier: 3
     question: 連線數接近上限了嗎
     signal: >-
@@ -446,6 +563,7 @@ signals:
 
   - id: thread-cache
     aspect: saturation
+    section: misuse
     tier: 3
     question: 新連線都要現開 thread 嗎（thread cache 不夠）
     signal: >-
@@ -467,6 +585,7 @@ signals:
 
   - id: user-connection-limits
     aspect: saturation
+    section: misuse
     tier: 3
     question: 個別帳號快碰到 MAX_USER_CONNECTIONS 了嗎
     signal: >-
@@ -483,6 +602,7 @@ signals:
 
   - id: lock-waits
     aspect: saturation
+    section: misuse
     tier: 3
     question: 有很多 session 在等鎖嗎
     signal: >-
@@ -505,6 +625,7 @@ signals:
 
   - id: slow-queries
     aspect: workload
+    section: misuse
     tier: 3
     question: 有新的慢查詢嗎
     signal: >-
@@ -520,6 +641,7 @@ signals:
 
   - id: innodb-pressure
     aspect: saturation
+    section: misuse
     tier: 3
     question: InnoDB 在等磁碟或等 buffer pool 嗎
     signal: >-
@@ -538,6 +660,7 @@ signals:
 
   - id: pending-fsyncs
     aspect: saturation
+    section: misuse
     tier: 3
     question: InnoDB 的 fsync 在排隊嗎
     signal: >-
@@ -555,6 +678,7 @@ signals:
 
   - id: tmp-tables
     aspect: saturation
+    section: misuse
     tier: 3
     question: 暫存表常常落到磁碟嗎
     signal: >-
@@ -570,6 +694,7 @@ signals:
 
   - id: table-open-cache
     aspect: saturation
+    section: misuse
     tier: 3
     question: table_open_cache 夠用嗎
     signal: rate(table_open_cache_overflows) > 1；也可看 table_open_cache_misses 與 opened_tables 的增加速度
@@ -586,6 +711,7 @@ signals:
 
   - id: aborted-connects
     aspect: workload
+    section: misuse
     tier: 3
     question: 連線建立失敗變多了嗎
     signal: >-
@@ -602,6 +728,7 @@ signals:
   # ---------- 效能情境（lab/targets/mysql/perf）----------
   - id: throughput-drop
     aspect: workload
+    section: misuse
     tier: 3
     question: 吞吐量（TPS／QPS）掉下來了嗎
     signal: >-
@@ -625,6 +752,7 @@ signals:
 
   - id: metadata-locks
     aspect: saturation
+    section: misuse
     tier: 2
     question: 有 DDL 卡在長交易後面、把整張表的查詢都擋住嗎
     signal: >-
@@ -647,6 +775,7 @@ signals:
 
   - id: slow-sql-visibility
     aspect: workload
+    section: misuse
     tier: 3
     question: 慢的是哪一種 SQL
     signal: >-
@@ -672,6 +801,7 @@ signals:
 
   - id: statement-errors
     aspect: workload
+    section: misuse
     tier: 3
     question: 語句錯誤（lock wait timeout、table is full）變多了嗎
     signal: >-
@@ -688,6 +818,7 @@ signals:
 
   - id: buffer-pool-misses
     aspect: saturation
+    section: misuse
     tier: 3
     question: Buffer pool 放得下工作集嗎
     signal: >-
@@ -708,6 +839,7 @@ signals:
   # ---------- HA：replication、角色、semi-sync ----------
   - id: replication-running
     aspect: replication
+    section: misuse
     tier: 1
     question: Replication thread 在跑嗎
     signal: >-
@@ -730,6 +862,7 @@ signals:
 
   - id: replication-error
     aspect: replication
+    section: misuse
     tier: 2
     question: Replication 是因為錯誤停下的嗎
     signal: >-
@@ -746,6 +879,7 @@ signals:
 
   - id: replica-status-present
     aspect: replication
+    section: observe
     tier: 1
     question: Replica 的狀態資料還在嗎
     signal: >-
@@ -761,15 +895,40 @@ signals:
     upstream: { status: no }
     rules: [rules/targets/mysql.yml#MySQLReplicaStatusMissing]
 
-  - id: replication-lag
+  - id: replication-semantics
     aspect: replication
+    section: observe
     tier: 2
     question: Replication 延遲量的是真的嗎
     signal: >-
-      用 heartbeat 表（--collect.heartbeat，pt-heartbeat 格式）：now - stored > 30。
-      Seconds_Behind 只當輔助：SQL thread 停、或 IO thread 停而 SQL 追完時是 NULL；名稱 8.0 是 seconds_behind_master、8.4 起是 seconds_behind_source，
-      規則用 or 接起來（同一台只會有一個）。9.7 的 replication_applier_metrics component 有更細的 applier 統計，exporter 沒有 collector。
-      heartbeat 在每台都會變大時，代表 primary 上的寫入程式停了，不是 replica 延遲
+      主要來源是 heartbeat 表（--collect.heartbeat，pt-heartbeat 格式）的 now - stored。
+      Seconds_Behind 只當輔助：SQL thread 停、或 IO thread 停而 SQL 追完時是 NULL，exporter 不輸出；名稱 8.0 是 seconds_behind_master、8.4 起是 seconds_behind_source。
+      heartbeat 在每台都會變大時，代表 primary 上的寫入程式停了，不是 replica 延遲。
+      Seconds_Behind 消失時由 replication-running、replica-status-present 補位；延遲太大本身看 replication-lag
+    metrics:
+      - mysql_heartbeat_now_timestamp_seconds
+      - mysql_heartbeat_stored_timestamp_seconds
+      - mysql_slave_status_seconds_behind_master
+      - mysql_slave_status_seconds_behind_source
+    evaluate_on: self
+    applies_when: replication
+    silent_failure: >-
+      IO thread 停止時 Seconds_Behind 消失，heartbeat 卻持續變大（實驗 27 秒）；
+      failover 後若寫入程式是 primary 上的 EVENT，它在升級的 replica 上是停用的，heartbeat 從此停住
+    evidence: tested
+    source: art-mysql-ha
+    refs: [exp-mysql-ha, my-heartbeat-query, mysql-sbs-null, mysql-sbs-compute, ver-my84-sbs-col]
+    upstream: { status: partial, note: "mixin 的 MySQLReplicationLag 只用 seconds_behind_master，8.4 起名稱不同、thread 停時消失" }
+    rules: [rules/targets/mysql.yml#MySQLReplicationNotRunning, rules/targets/mysql.yml#MySQLReplicaStatusMissing]
+
+  - id: replication-lag
+    aspect: replication
+    section: misuse
+    tier: 2
+    question: Replica 落後太多了嗎
+    signal: >-
+      heartbeat：now - stored > 30（例子）。Seconds_Behind 扣掉 SQL_Delay > 30 當輔助，兩個名稱用 or 接起來（同一台只會有一個）。
+      9.7 的 replication_applier_metrics component 有更細的 applier 統計，exporter 沒有 collector。量的是不是真的見 replication-semantics
     metrics:
       - mysql_heartbeat_now_timestamp_seconds
       - mysql_heartbeat_stored_timestamp_seconds
@@ -778,17 +937,16 @@ signals:
       - mysql_slave_status_sql_delay
     evaluate_on: self
     applies_when: replication
-    silent_failure: >-
-      IO thread 停止時 Seconds_Behind 消失，heartbeat 卻持續變大（實驗 27 秒）；
-      failover 後若寫入程式是 primary 上的 EVENT，它在升級的 replica 上是停用的，heartbeat 從此停住
+    silent_failure: thread 停止時 Seconds_Behind 消失，MySQLReplicationLag 回傳空；heartbeat 寫入程式停了時 MySQLHeartbeatLag 在每台都響
     evidence: tested
     source: art-mysql-ha
-    refs: [exp-mysql-ha, my-heartbeat-query, mysql-sbs-null, mysql-sbs-compute, ver-my84-sbs-col, ver-my97-applier-metrics]
+    refs: [exp-mysql-ha, my-heartbeat-query, mysql-sbs-null, ver-my97-applier-metrics]
     upstream: { status: partial, note: "mixin 有 MySQLHeartbeatLag 與 MySQLReplicationLag；後者只用 seconds_behind_master" }
     rules: [rules/targets/mysql.yml#MySQLHeartbeatLag, rules/targets/mysql.yml#MySQLReplicationLag]
 
   - id: replica-read-only
     aspect: replication
+    section: misuse
     tier: 2
     question: Replica 擋得住寫入嗎
     signal: >-
@@ -805,6 +963,7 @@ signals:
 
   - id: role-detection
     aspect: replication
+    section: misuse
     tier: 2
     question: 每個叢集剛好有一台可寫的 primary 嗎
     signal: >-
@@ -822,6 +981,7 @@ signals:
 
   - id: primary-writable
     aspect: availability
+    section: misuse
     tier: 2
     question: Primary 寫得進去嗎
     signal: >-
@@ -837,6 +997,7 @@ signals:
 
   - id: gtid-consistency
     aspect: replication
+    section: misuse
     tier: 2
     question: Replica 有沒有 primary 沒有的交易（errant GTID）
     signal: >-
@@ -855,6 +1016,7 @@ signals:
 
   - id: semi-sync
     aspect: replication
+    section: misuse
     tier: 3
     question: Semi-sync 有沒有退回 async
     signal: >-
@@ -877,6 +1039,7 @@ signals:
   # ---------- 叢集與共識：Group Replication ----------
   - id: gr-member-state
     aspect: cluster
+    section: misuse
     tier: 2
     question: Group Replication 每個成員都 ONLINE 嗎
     signal: >-
@@ -898,6 +1061,7 @@ signals:
 
   - id: gr-quorum
     aspect: cluster
+    section: misuse
     tier: 2
     question: Group Replication 還有多數嗎
     signal: >-
@@ -918,6 +1082,7 @@ signals:
 
   - id: gr-flow-control
     aspect: cluster
+    section: misuse
     tier: 3
     question: Group Replication 的佇列快碰到 flow control 門檻了嗎
     signal: >-
@@ -944,6 +1109,7 @@ signals:
   # ---------- 資料維護與完整性：救援模式、碎片、損毀 ----------
   - id: force-recovery
     aspect: maintenance
+    section: misuse
     tier: 3
     question: 資料庫在 InnoDB 救援模式嗎
     signal: >-
@@ -959,6 +1125,7 @@ signals:
 
   - id: table-fragmentation
     aspect: maintenance
+    section: misuse
     tier: 3
     question: 有沒有表在大量刪除後留下很多未使用空間
     signal: >-
@@ -978,6 +1145,7 @@ signals:
 
   - id: corruption-signals
     aspect: maintenance
+    section: misuse
     tier: 2
     question: 有頁面損毀或 checksum 錯誤嗎
     signal: >-
@@ -996,6 +1164,7 @@ signals:
   # ---------- 資料保護：PITR、耐久性、備份 ----------
   - id: binlog-pitr
     aspect: protection
+    section: misuse
     tier: 2
     question: binlog 有開、保留得夠久，可以做 point-in-time recovery 嗎
     signal: >-
@@ -1018,6 +1187,7 @@ signals:
 
   - id: durability-settings
     aspect: protection
+    section: misuse
     tier: 3
     question: 斷電時會不會少掉已 commit 的交易
     signal: >-
@@ -1032,6 +1202,7 @@ signals:
 
   - id: backup-freshness
     aspect: protection
+    section: misuse
     tier: 2
     question: 最近一次成功的備份是什麼時候
     signal: >-
@@ -1046,11 +1217,28 @@ signals:
     source: node-exporter-textfile
     refs: [my-default-collectors]
     upstream: { status: no, note: "mixin 與 awesome 都沒有；metric 名稱是本專案的例子" }
-    rules: [rules/targets/mysql.yml#MySQLBackupStale, rules/targets/mysql.yml#MySQLBackupMetricMissing]
+    rules: [rules/targets/mysql.yml#MySQLBackupStale]
+
+  - id: backup-metric-present
+    aspect: protection
+    section: observe
+    tier: 2
+    question: 備份新鮮度的 metric 還在嗎
+    signal: >-
+      absent(mysql_backup_last_success_timestamp_seconds) 持續 1 小時：備份 job 沒在寫、textfile 路徑錯，或 node_exporter 沒開 textfile collector。
+      這時 backup-freshness 的 MySQLBackupStale 回傳空
+    metrics: [mysql_backup_last_success_timestamp_seconds]
+    evaluate_on: external
+    evidence: inferred
+    source: node-exporter-textfile
+    refs: [my-default-collectors]
+    upstream: { status: no, note: "metric 名稱是本專案的例子" }
+    rules: [rules/targets/mysql.yml#MySQLBackupMetricMissing]
 
   # ---------- 容量與成長 ----------
   - id: autoinc-exhaustion
     aspect: capacity
+    section: misuse
     tier: 3
     question: 有沒有 AUTO_INCREMENT 欄位快用完整數範圍
     signal: >-
@@ -1068,6 +1256,7 @@ signals:
 
   - id: connection-headroom
     aspect: capacity
+    section: misuse
     tier: 3
     question: 連線數的高峰離 max_connections 還有多遠
     signal: >-
@@ -1083,6 +1272,7 @@ signals:
 
   - id: binlog-growth
     aspect: capacity
+    section: misuse
     tier: 3
     question: binlog 有照設定刪除嗎
     signal: >-
@@ -1099,6 +1289,7 @@ signals:
 
   - id: data-growth
     aspect: capacity
+    section: misuse
     tier: 3
     question: 資料量長多快
     signal: >-
@@ -1116,6 +1307,7 @@ signals:
   # ---------- 工作量：active session ----------
   - id: active-sessions
     aspect: workload
+    section: misuse
     tier: 3
     question: 此刻有多少 session 在做事、在等什麼
     signal: >-
@@ -1132,6 +1324,53 @@ signals:
     upstream: { status: no }
     rules: []
 
+# 不正確使用：應用送出寫得不好的 SQL 時，哪些訊號看得到（section: misuse）、哪些看不到（blind_spots）。
+# 依據是 lab/targets/mysql/perf 與 ha 的實驗與原始碼；沒有依據的項目寫在 not_visible。
+bad_queries:
+  - case: 全表掃描、缺索引
+    signals: [slow-queries, slow-sql-visibility, buffer-pool-misses, throughput-drop]
+    visible: >-
+      Slow_queries 增加（依 long_query_time）；eventsstatements 每個 digest 的 rows_examined、no_index_used（實驗中 filesort 全表的 digest 是 rows_examined 第一名）；
+      eventsstatementssum 有全部 digest 加總的全表掃描數；工作集放不下時 buffer pool 磁碟讀取升高
+    not_visible: 執行計畫、參數值、排不進前 250 的 digest
+    refs: [exp-mysql-perf, my-trace-my-slow, my-perf-ex-stmt-query, my-perf-ex-stmtsum-query]
+  - case: 長交易（開了不 commit）
+    signals: [long-transactions, undo-history, metadata-locks]
+    visible: innodb_trx 的 oldest_transaction_age_seconds；history list 變長（實驗 50 秒到 13,474）；後面有 DDL 時變成 metadata lock 排隊
+    not_visible: 交易裡跑了哪些語句、是哪個應用
+    refs: [exp-mysql-ha, exp-mysql-perf, my-innodb-trx-query]
+  - case: 查詢造成的 row lock 爭用與 deadlock
+    signals: [lock-waits, deadlocks, statement-errors, throughput-drop, active-sessions]
+    visible: >-
+      innodb_row_lock_current_waits（最多等於應用連線數）與 rate(innodb_row_lock_time)；innodb_metrics 的 lock_deadlocks_total；
+      lock wait timeout（1205）算進語句錯誤數；threads_running 先升、commit 速率跟著掉
+    not_visible: 誰擋住誰、錯誤碼分布
+    refs: [exp-mysql-perf, exp-mysql-ha, my-innodb-metrics-name, my-perf-ex-stmtsum-errors]
+  - case: 暫存表落到磁碟
+    signals: [tmp-tables, slow-sql-visibility]
+    visible: created_tmp_disk_tables / created_tmp_tables；eventsstatements 的 tmp_disk_tables_total 指出是哪個 digest（實驗 9.5/s、84%）
+    not_visible: 暫存表用了多少磁碟空間（MySQL 沒有這個 status）
+    refs: [exp-mysql-perf, my-asp-my-tmp-disk]
+  - case: 回傳大量資料的查詢
+    signals: [slow-sql-visibility]
+    visible: eventsstatements 每個 digest 的 rows_sent 與 rows_examined
+    not_visible: 單一查詢回傳的位元組數、客戶端的記憶體；本專案沒有實驗或原始碼依據可寫 global 的位元組計數
+    refs: [my-perf-ex-stmt-query, exp-mysql-perf]
+  - case: DDL 卡在長交易後面（metadata lock）
+    signals: [metadata-locks, throughput-drop]
+    visible: >-
+      processlist 的 state="waiting_for_table_metadata_lock"（實驗 9 個 session、commit 0）；query-exporter 的阻擋者數與持有時間（MySQLMetadataLockBlocker）；
+      row lock 與長交易規則都不響
+    not_visible: exporter 本身看不到阻擋者（見 blind_spots）
+    refs: [exp-mysql-perf, my-processlist-query, my-q-exp]
+  - case: 連線風暴（短連線反覆連線、斷線）
+    signals: [connections, aborted-connects, connection-headroom, thread-cache, db-up]
+    visible: >-
+      打滿當下 exporter 也被擋，mysql_up 0、其他 metric 消失；事後 connection_errors_total{error="max_connections"}（實驗 +4,040）、
+      max_used_connections 到 max_connections + 1；被 max_connections 拒絕的連線在 MySQL 不算進 aborted_connects
+    not_visible: 打滿當下的連線數（見 blind_spots，query-exporter 走 admin port 補）
+    refs: [exp-mysql-perf, exp-mysql-ha, mysql-conn-reserved]
+
 # 目前無法監控的範圍。category：exporter（資料庫有、exporter 沒輸出）、database（資料庫本身沒提供）、other（要靠其他元件）。
 blind_spots:
   - what: 連線打滿當下的連線數
@@ -1139,6 +1378,7 @@ blind_spots:
     why: exporter 也被擋在外面，整組 metric 消失
     workaround: >-
       告警靠 `mysql_up` 與事後的 `connection_errors_total`；或讓查詢走不受 max_connections 限制的 admin port（`admin_address`、`admin_port`，8.0.14 起；帳號要 SERVICE_CONNECTION_ADMIN）
+    options: "建議：query-exporter 走 admin port 讀連線數（MySQLConnectionsExhausted）"
     section: targets/mysql.md#custom-queries
     covered_by:
       tool: "query-exporter 5.2.2"
@@ -1152,6 +1392,7 @@ blind_spots:
     workaround: >-
       自訂查詢把 gtid_executed 拆成每個 source UUID 的交易數，在 PromQL 裡比 replica 與 read_only=0 的 primary；
       精確的 GTID_SUBSET 要同時連兩台，單一查詢做不到
+    options: "建議：query-exporter 輸出每個 source UUID 的交易數，在 PromQL 比 replica 與 primary（MySQLErrantGtid）"
     section: targets/mysql.md#custom-queries
     covered_by:
       tool: "query-exporter 5.2.2"
@@ -1165,6 +1406,7 @@ blind_spots:
     workaround: >-
       自訂查詢彙總成數字：等待數、最久等待、阻擋者數、閒置的阻擋者數、阻擋者持有多久；誰（pid、帳號、SQL）不放 label，
       告警後查 `sys.schema_table_lock_waits`
+    options: "建議：query-exporter 彙總 metadata_locks 的等待與阻擋者（MySQLMetadataLockBlocker）；是誰查 sys.schema_table_lock_waits"
     section: targets/mysql.md#custom-queries
     covered_by:
       tool: "query-exporter 5.2.2"
@@ -1177,6 +1419,7 @@ blind_spots:
     why: "`Last_SQL_Error` 是字串（自由文字，不能當 label）"
     workaround: >-
       自訂查詢把 errno 與 ER_ 名稱（events_errors_summary_global_by_error，有限集合）當 label；錯誤訊息本身仍要看 `SHOW REPLICA STATUS`
+    options: "建議：query-exporter 把 errno 與 ER_ 名稱當 label（MySQLReplicaErrorCode）；訊息看 SHOW REPLICA STATUS"
     section: targets/mysql.md#custom-queries
     covered_by:
       tool: "query-exporter 5.2.2"
@@ -1188,21 +1431,25 @@ blind_spots:
     category: exporter
     why: "`replication_applier_metrics`、`replication_applier_progress_by_worker`（9.7 的 component）沒有 collector"
     workaround: 裝 component 後用自訂查詢；這裡沒有提供查詢
+    options: "建議：裝 component 後用自訂查詢（這裡沒有提供）"
     section: targets/versions/mysql.md#diff
   - what: 頁面損毀
     category: database
     why: 沒有 status 計數，只寫在 error log；`CHECK TABLE` 要讀整張表（並加鎖），不能放進每 15–60 秒的查詢
     workaround: log 管線對 error log 告警；離峰排程 `CHECK TABLE`／mysqlcheck 寫 textfile（query-exporter 的 schedule 也能跑，但成本與鎖要自己評估，這裡不提供）
+    options: "建議：log 管線對 error log 告警；離峰排程 CHECK TABLE 寫 textfile"
     section: targets/mysql.md#blind-spots
   - what: Group Replication 的節流時間（8.0、8.4）
     category: database
     why: "`Gr_flow_control_*` 在 8.4 以前只有 Enterprise component 有；9.7 社群版要另裝 component"
     workaround: 看 applier／certifier 佇列對門檻的比例；9.7 裝 component_group_replication_flow_control_stats
+    options: "建議：看 applier／certifier 佇列對門檻的比例；9.7 裝 flow control stats component"
     section: targets/mysql.md#blind-spots
   - what: 真正的寫入是否成功
     category: database
     why: "`mysql_up` 只做 ping"
     workaround: heartbeat 寫入程式回報成功時間（pt-heartbeat ＋ --collect.heartbeat），或應用層探測；不建議讓監控帳號寫入，所以沒有放進自訂查詢
+    options: "建議：heartbeat 寫入程式回報成功時間，或應用層探測"
     section: targets/mysql.md#blind-spots
   - what: 磁碟剩餘空間、檔案系統唯讀
     category: other
@@ -1210,6 +1457,7 @@ blind_spots:
     workaround: >-
       node_exporter 的 `node_filesystem_avail_bytes`、`node_filesystem_readonly`；本卡的 MySQLDataDiskFilling 指定資料目錄的 mountpoint。
       主機層規則只讀碼
+    options: "建議：node_exporter 指定資料目錄的 mountpoint（MySQLDataDiskFilling、HostFilesystemReadOnly）"
     section: targets/mysql.md#capacity
     covered_by:
       tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"
@@ -1221,6 +1469,7 @@ blind_spots:
     category: other
     why: mysqld_exporter 沒有行程 CPU 與 fsync 延遲（`Innodb_data_pending_fsyncs` 只是數量）；OOM kill 在資料庫裡只看得到 uptime 歸零
     workaround: node_exporter 的 PSI、MemAvailable、vmstat 與磁碟時間；容器用 cAdvisor 的節流、working set 與 OOM 事件。主機層規則只讀碼
+    options: "建議：node_exporter 的 PSI、MemAvailable、vmstat 與磁碟時間；容器用 cAdvisor"
     section: targets/mysql.md#saturation
     covered_by:
       tool: "node_exporter v1.12.1（容器另加 cAdvisor／kube-state-metrics）"
@@ -1232,4 +1481,30 @@ blind_spots:
     category: other
     why: 沒有備份 collector
     workaround: 備份 job 寫 textfile metric
+    options: "建議：備份 job 成功後寫 textfile 時間戳（MySQLBackupStale、MySQLBackupMetricMissing）"
     section: targets/mysql.md#protection
+  # 寫得不好的 SQL：exporter 只看得到彙總，下面這些痕跡看不到（對照 bad_queries）
+  - what: 慢查詢的執行計畫、參數值與 slow log 原文
+    category: exporter
+    why: eventsstatements 只有 digest 彙總（digest_text 截在 120 字、只取總耗時前 250 個），exporter 不讀 slow log、不跑 EXPLAIN
+    workaround: 告警後查 `sys.statement_analysis`、`sys.statements_with_full_table_scans` 與 `EXPLAIN`；slow log 交給 log 管線
+    options: "建議：告警帶出 digest，再查 sys.statement_analysis 與 EXPLAIN；slow log 交給 log 管線"
+    section: targets/mysql.md#perf-slow-sql
+  - what: Row lock 的阻擋者（誰擋住誰）
+    category: exporter
+    why: 沒有 collector 讀 `performance_schema.data_lock_waits`；等 row lock 的 session 在 processlist 的 state 是 updating
+    workaround: 告警後查 `sys.innodb_lock_waits`（這個查詢未實測）與 `INNODB_TRX`
+    options: "建議：告警後查 sys.innodb_lock_waits 與 INNODB_TRX（未實測）"
+    section: targets/mysql.md#perf-row-lock
+  - what: 語句錯誤是哪一個錯誤碼
+    category: exporter
+    why: eventsstatementssum 只有錯誤總數；`events_errors_summary_global_by_error` 沒有 collector
+    workaround: 查 `performance_schema.events_errors_summary_global_by_error`
+    options: "建議：查 events_errors_summary_global_by_error；要告警時用自訂查詢輸出有限的錯誤名稱"
+    section: targets/mysql.md#perf-slow-sql
+  - what: 此刻正在執行的是哪個語句
+    category: exporter
+    why: processlist collector 只依 command、state 計數，沒有語句或 digest 的維度，也只有 scrape 那一刻的快照
+    workaround: 查 `performance_schema.events_statements_current`、`sys.session`
+    options: "建議：告警後查 events_statements_current、sys.session"
+    section: targets/mysql.md#workload

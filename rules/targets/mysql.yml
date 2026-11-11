@@ -341,7 +341,7 @@ groups:
         labels: { severity: warning, component: mysql, tier: "2" }
         annotations:
           summary: "完全沒有備份的 metric：備份 job 沒在寫、textfile 路徑錯，或 node_exporter 沒開 textfile collector；這時 MySQLBackupStale 回傳空"
-          runbook_url: https://hahasula.github.io/alert-trust/components/mysql/#backup-freshness
+          runbook_url: https://hahasula.github.io/alert-trust/components/mysql/#backup-metric-present
 
   # 容量與成長：趨勢與預測
   - name: mysql-capacity

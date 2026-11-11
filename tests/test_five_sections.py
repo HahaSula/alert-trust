@@ -38,5 +38,17 @@ class FiveSectionsTest(unittest.TestCase):
         self.assertEqual(sum("options" in e for e in errors), 2)
 
 
+class BadQueriesTest(unittest.TestCase):
+    def test_bad_queries(self):
+        card = {"_path": "t.yaml", "signals": [{"id": "slow", "section": "misuse"}],
+                "bad_queries": [{"case": "全表掃描", "signals": ["slow", "nope"], "visible": "x", "not_visible": "y",
+                                 "refs": ["r1", "zz"]}, {"case": "缺欄位"}]}
+        errors, _ = C.check_five_sections(card, REFS)
+        text = "\n".join(errors)
+        self.assertIn("'nope' 不在這張卡", text)
+        self.assertIn("refs 'zz'", text)
+        self.assertIn("缺少 signals", text)
+
+
 if __name__ == "__main__":
     unittest.main()
