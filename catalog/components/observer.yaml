@@ -21,8 +21,30 @@ silent_failures:
 
 contracts: [deadman-wait]
 
+usage:
+  - id: federate-series
+    text: >-
+      `up`、`scrape_duration_seconds`、`ALERTS_FOR_STATE` 不在 Prometheus 的 /metrics；用到它們的規則要在受測 Prometheus 評估，或用 /federate 送到 meta
+    evidence: code
+    refs: [p-scrape-report]
+  - id: deadman-wait
+    text: >-
+      DMS 的等待依契約 deadman-wait。Prometheus 停機後 Alertmanager 仍重送 Watchdog 到 EndsAt，停機 3 分鐘內外部還收得到，太短的等待會誤報
+    evidence: tested
+    refs: [exp-prom-heartbeat]
+  - id: probe-content
+    text: >-
+      外部探測要驗證回應內容（實際查詢、Alertmanager 的 /api/v2/status），不能只看 HTTP 200：/-/healthy、/-/ready 在 8 種故障裡只明確抓到 2 種
+    evidence: tested
+    refs: [exp-prom-blackbox]
+  - id: k8s-from-outside
+    text: OOMKilled 與重啟次數由外部 Prometheus 抓 kube-state-metrics；受測 Prometheus 在重啟期間沒有在抓資料，自己查不到原因
+    evidence: tested
+    refs: [exp-prom-k8s]
+
 signals:
   - id: failure-domain
+    section: observe
     tier: 1
     question: 跟被監控對象在不同故障域嗎
     signal: 不同節點、儲存、叢集；不寫入被監控的 VM 或 VL
@@ -34,6 +56,7 @@ signals:
     rules: []
 
   - id: separate-alert-path
+    section: observe
     tier: 1
     question: 告警是否不經過被監控的 Alertmanager
     signal: meta 的 alerting 設定指向另一台 Alertmanager 或直接送外部
@@ -46,6 +69,7 @@ signals:
     rules: []
 
   - id: own-deadman
+    section: observe
     tier: 1
     question: Meta 自己也有 dead man's switch 嗎
     signal: meta 的 Watchdog 送到外部接收端
@@ -57,6 +81,7 @@ signals:
     rules: []
 
   - id: scrapes-all-infra
+    section: observe
     tier: 1
     question: 抓得到每個 infra 元件的 /metrics 嗎
     signal: 每個元件在 meta 上都有 up series
@@ -69,6 +94,7 @@ signals:
     rules: []
 
   - id: deadman-wait
+    section: observe
     tier: 1
     question: DMS 的等待時間算過嗎
     signal: 等待 > 4 × max(resend, E) + repeat_interval + group_interval；要更快就靠外部 up
@@ -82,6 +108,7 @@ signals:
     contract: deadman-wait
 
   - id: federation
+    section: observe
     tier: 2
     question: Prometheus 的 up、scrape_duration、ALERTS_FOR_STATE 有 federate 過來嗎
     signal: meta 上查得到這些 series（它們不在 /metrics）
@@ -95,6 +122,7 @@ signals:
     rules: []
 
   - id: k8s-sources
+    section: observe
     tier: 2
     question: K8s 有 cAdvisor、kube-state-metrics、PVC 用量嗎
     signal: meta 上查得到 container_*、kube_pod_*、kubelet_volume_stats_*
@@ -106,3 +134,15 @@ signals:
     upstream: { status: no }
     applies_when: kubernetes
     rules: []
+
+blind_spots:
+  - what: Meta 與被監控對象是否真的在不同故障域
+    category: other
+    why: 節點、儲存、叢集的擺放沒有 metric，只能盤點
+    workaround: 訪談與部署設定盤點（failure-domain）
+    options: "建議：把 meta 與受測對象的 node、PV、叢集寫進環境設定檔，rule review 時比對"
+  - what: 外部 dead man's switch 服務本身停機
+    category: other
+    why: DMS 是監控鏈的最後一段，沒有更外層的觀察者
+    workaround: DMS 服務自己的狀態頁或通知
+    options: "建議：兩套 DMS（不同供應商），或兩台 meta 互相監控"

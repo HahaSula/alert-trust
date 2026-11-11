@@ -33,8 +33,58 @@ silent_failures:
 
 contracts: [am-failure-window, deadman-wait]
 
+usage:
+  - id: failure-window
+    text: 通知失敗的告警視窗至少 2 × 最大的 `group_interval`（契約 am-failure-window）；失敗要整輪 flush 結束才計數，G 1h 時 rate[5m] 抓不到
+    evidence: tested
+    refs: [exp-am-window, am-aggr-run]
+  - id: watchdog-route
+    text: >-
+      Watchdog 給專用 route，`repeat_interval` 與 `group_interval` 都短；繼承主路由時重送週期變 4h5m，DMS 要等 4 小時以上
+    evidence: tested
+    refs: [ad-am-route-inherit, ad-am-repeat, exp-ad-repeat]
+  - id: repeat-on-tick
+    text: >-
+      `repeat_interval` 只在 `group_interval` 的 tick 比對，實際重送是 G 的整數倍、設成整數倍時再多一個 G；DMS 等待依契約 deadman-wait
+    evidence: tested
+    refs: [exp-ad-repeat, ad-am-nflog-ts]
+  - id: group-by
+    text: >-
+      `group_by` 加上 cluster、instance 這類區分事件的 label；只用 alertname 時，第一個 instance 之後的 alert 都要等下一個 `group_interval` tick
+    evidence: tested
+    refs: [ad-am-group-labels, ad-am-group-interval, exp-ad-group-interval]
+  - id: empty-group-by
+    text: >-
+      子路由的 `group_by: []` 在 0.31 起不再繼承父路由、合成一組（0.27、0.29 會繼承）；check-config 照樣通過，想繼承就刪掉這行
+    evidence: tested
+    refs: [exp-am-compat]
+  - id: resolve-timeout
+    text: "`resolve_timeout` 只用在沒有 EndsAt 的 alert；Prometheus、vmalert 都帶 EndsAt，假 resolved 要調 ruler 的 resend 或 E"
+    evidence: code
+    refs: [ad-am-api-resolve-timeout]
+  - id: failure-reason
+    text: >-
+      失敗告警不要用 `reason="clientError"` 篩選：0.34 起 401、403 改成 authError，429 改成 rateLimited；email 失敗的 reason 是 other。
+      排除的只有 reload 造成的 contextCanceled
+    evidence: tested
+    refs: [exp-am-delivery, am-reload]
+  - id: smtp-version
+    text: 用 email 時至少 0.28：0.27.0 在 SMTP 於 DATA 結尾拒收時記成成功，counter 是 0、log 沒有錯誤
+    evidence: tested
+    refs: [exp-am-delivery]
+  - id: ha-peer-timeout
+    text: >-
+      HA 時第 N 順位先等 N × `--cluster.peer-timeout`（預設 15s）再查 nflog，通知延遲算進去
+    evidence: code
+    refs: [am-peertimeout, am-wait, ad-am-peer-timeout]
+  - id: gomaxprocs-flag
+    text: 升到 0.33 以上前，從啟動參數拿掉 `--enable-feature=auto-gomaxprocs`，否則啟動失敗
+    evidence: tested
+    refs: [exp-am-compat]
+
 signals:
   - id: alertmanager-down
+    section: observe
     tier: 1
     question: 行程活著嗎
     signal: up == 0，加上 absent(up{job=~".*alertmanager.*"})
@@ -48,6 +98,7 @@ signals:
       - rules/alertmanager/meta.yml#AlertmanagerScrapeMissing
 
   - id: delivery-failing
+    section: observe
     tier: 1
     question: 通知送出去了嗎
     signal: increase(alertmanager_notifications_failed_total{reason!="contextCanceled"}[2 × group_interval]) > 0
@@ -63,6 +114,7 @@ signals:
     contract: am-failure-window
 
   - id: end-to-end
+    section: observe
     tier: 1
     question: 端到端真的收得到嗎
     signal: Watchdog 專屬短週期路由送外部 DMS；email 走 canary 信箱，由外部程式檢查最新一封的時間
@@ -76,6 +128,7 @@ signals:
     contract: deadman-wait
 
   - id: config-reload
+    section: observe
     tier: 1
     question: 新設定生效了嗎
     signal: alertmanager_config_last_reload_successful == 0
@@ -88,6 +141,7 @@ signals:
     rules: [rules/alertmanager/meta.yml#AlertmanagerConfigReloadFailed]
 
   - id: attempts-failing
+    section: misuse
     tier: 2
     question: 重試中的早期訊號
     signal: alertmanager_notification_requests_failed_total 增加
@@ -100,6 +154,7 @@ signals:
     rules: [rules/alertmanager/meta.yml#AlertmanagerNotificationAttemptsFailing]
 
   - id: cluster-health
+    section: misuse
     tier: 2
     question: 叢集一致嗎
     signal: cluster_failed_peers、成員數、config_hash；存活那台重啟後 failed_peers 會歸零，即使另一台仍停機
@@ -116,6 +171,7 @@ signals:
       - rules/alertmanager/meta.yml#AlertmanagerConfigInconsistent
 
   - id: crash-loop
+    section: observe
     tier: 2
     question: 有沒有反覆重啟
     signal: changes(process_start_time_seconds[15m]) > 2
@@ -127,6 +183,7 @@ signals:
     rules: [rules/alertmanager/meta.yml#AlertmanagerCrashLooping]
 
   - id: state-persistence
+    section: misuse
     tier: 3
     question: 狀態落盤與輸入正常嗎
     signal: nflog／silence 落盤錯誤、無效 alert
@@ -141,3 +198,29 @@ signals:
     rules:
       - rules/alertmanager/meta.yml#AlertmanagerStateSnapshotFailing
       - rules/alertmanager/meta.yml#AlertmanagerInvalidAlerts
+
+blind_spots:
+  - what: SMTP 不回應時卡住的 aggregation group
+    category: exporter
+    why: 整個 group 停止通知，同 receiver 的 webhook 也收不到，counter 不動，到 0.34.2 仍是如此
+    workaround: Email 走 canary 信箱，由外部程式檢查最新一封的時間
+    options: "建議：CanaryEmail 加外部檢查；email 與 webhook 分到不同 receiver"
+    section: architecture/alertmanager.md#aggregation-group
+  - what: Alert store 往 dispatcher 的 channel 佔用率
+    category: exporter
+    why: channel 長度 200，滿了 POST 會阻塞；0.30 起只有寫入次數，看不到佔用率
+    workaround: Prometheus 端看 `prometheus_notifications_latency_seconds`
+    options: "建議：0.30 以上加 AlertmanagerAlertPostSlow；ruler 端的通知延遲當旁證"
+    section: architecture/alertmanager.md#alert-store
+  - what: 存活探測看不出通知已經送不出去
+    category: exporter
+    why: /-/healthy、/-/ready 是寫死的，receiver 全部失敗時也回 200
+    workaround: 看通知失敗計數加外部 dead man's switch
+    options: "建議：外部探測改打 /api/v2/status 並驗證內容，不要只看 HTTP 200"
+    section: architecture/alertmanager.md#health
+  - what: 單機當機時最後一次快照之後的 silence 變更
+    category: exporter
+    why: silence 存在記憶體加快照，當機時最後一次快照之後的變更遺失，沒有 metric
+    workaround: 重啟後重新確認進行中的 silence
+    options: "建議：跑兩台以上的 HA，silence 透過 gossip 同步"
+    section: architecture/alertmanager.md#restart

@@ -31,7 +31,7 @@ FAMILIES = {
     "database": "Target：資料庫",
 }
 STATUS = {"stable", "draft"}
-BLIND_CATEGORIES = {"exporter": "資料庫有、exporter 沒輸出", "database": "資料庫本身沒提供", "other": "要靠其他元件"}
+BLIND_CATEGORIES = {"exporter": "元件有、exporter 或 endpoint 沒輸出", "database": "元件本身沒提供", "other": "要靠其他元件"}
 ASPECTS = {
     "exporter": "監測自檢：exporter 有沒有真的在量",
     "cluster": "叢集與共識：quorum、成員、flow control",

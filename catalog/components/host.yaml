@@ -5,7 +5,7 @@ family: shared
 status: draft
 stages: [source]
 versions_checked: ["node_exporter v1.12.1（含 docs/node-mixin）", "cAdvisor v0.60.6", "kubelet v1.37.2 /metrics/cadvisor", "kube-state-metrics v2.20.0", "kubernetes-mixin version-1.5.6", "process-exporter v0.8.7（選用）"]
-architecture: architecture/db-resources.md
+architecture: architecture/db-resources.md#host-layer
 role: >-
   每個資料庫 target 都跑在一台主機或一個容器上。資料庫自己的 metric 只看得到它管的池（buffer pool、連線上限、cache 配額），
   看不到 CPU 排隊、page cache、swap、磁碟延遲、檔案系統唯讀、cgroup 記憶體上限與 OOM kill。這張卡把這一層的訊號集中在一處，
@@ -50,8 +50,41 @@ silent_failures:
 
 contracts: []
 
+usage:
+  - id: node-mixin-selector
+    text: node-mixin 的預設 selector 是 `job="node"`，job 名稱不同時每一條規則都回空、不報錯；套用前改 selector，並另加 exporter 停掉的規則
+    evidence: code
+    refs: [res-nm-selector]
+  - id: cadvisor-labels
+    text: >-
+      獨立執行的 cAdvisor 沒有 `container` label，只有 id、name、image；`container!=""` 的容器規則在它上面回空，要改用 id 或 name 選
+    evidence: tested
+    refs: [exp-host-memlimit, res-cadv-labels]
+  - id: cadvisor-process-metrics
+    text: 獨立 cAdvisor 預設停用 process 類 metric（container_file_descriptors、container_threads），要用時自己打開；kubelet 的 /metrics/cadvisor 有開
+    evidence: code
+    refs: [res-cadv-ignore-process, res-kubelet-included]
+  - id: psi-sources
+    text: 容器的 PSI（container_pressure_*）在 kubelet 要開 KubeletPSI feature gate；node_exporter 的 pressure collector 在沒有 PSI 的核心上會失敗
+    evidence: code
+    refs: [res-kubelet-psi, res-ne-pressure-default]
+  - id: memory-limit-source
+    text: kube-prometheus-stack 預設丟棄 `container_spec_memory_limit_bytes`；記憶體比值改用 kube-state-metrics 的 `kube_pod_container_resource_limits`
+    evidence: tested
+    refs: [exp-prom-k8s]
+  - id: readonly-rule
+    text: node-mixin 的空間規則只算 `node_filesystem_readonly == 0` 的檔案系統，mixin 也沒有唯讀規則；要另加唯讀與 device_error 規則
+    evidence: code
+    refs: [res-nm-fs-readonly, res-ne-fs-readonly, res-ne-fs-deverr]
+  - id: memory-limit-threshold
+    text: >-
+      Page cache 會把容器用量推到 limit，working set 在 0.9 附近上下；記憶體比值的門檻離 limit 太近會反覆 pending，要搭配 `for`
+    evidence: tested
+    refs: [exp-host-memlimit, res-cadv-wss-calc]
+
 signals:
   - id: exporter-up
+    section: observe
     tier: 1
     aspect: exporter
     question: 每台資料庫主機都有 node_exporter，而且抓得到嗎
@@ -66,6 +99,7 @@ signals:
     rules: [rules/host/meta.yml#HostExporterDown, rules/host/meta.yml#HostExporterMissing]
 
   - id: collector-success
+    section: observe
     tier: 2
     aspect: exporter
     question: node_exporter 的 collector 都成功嗎
@@ -79,6 +113,7 @@ signals:
     rules: [rules/host/meta.yml#HostCollectorFailed]
 
   - id: disk-space
+    section: misuse
     tier: 1
     aspect: capacity
     question: 資料目錄所在的檔案系統快滿了嗎
@@ -92,6 +127,7 @@ signals:
     rules: [rules/host/meta.yml#HostFilesystemAlmostFull, rules/host/meta.yml#HostFilesystemFillingUp, rules/host/meta.yml#HostInodesAlmostFull]
 
   - id: filesystem-readonly
+    section: misuse
     tier: 1
     aspect: availability
     question: 資料目錄的檔案系統變成唯讀或讀不到了嗎
@@ -106,6 +142,7 @@ signals:
     rules: [rules/host/meta.yml#HostFilesystemReadOnly, rules/host/meta.yml#HostFilesystemDeviceError]
 
   - id: oom-kills
+    section: misuse
     tier: 1
     aspect: availability
     question: 資料庫行程被 OOM kill 了嗎
@@ -120,6 +157,7 @@ signals:
     rules: [rules/host/meta.yml#HostOOMKill, rules/host/meta.yml#ContainerOOMEvent, rules/host/meta.yml#ContainerOOMKilled]
 
   - id: container-memory-limit
+    section: misuse
     tier: 1
     aspect: saturation
     question: 容器的記憶體快碰到 cgroup limit 了嗎
@@ -135,6 +173,7 @@ signals:
     rules: [rules/host/meta.yml#ContainerMemoryNearLimit]
 
   - id: memory-available
+    section: misuse
     tier: 2
     aspect: saturation
     question: 主機的可用記憶體與記憶體壓力
@@ -148,6 +187,7 @@ signals:
     rules: [rules/host/meta.yml#HostMemoryLow, rules/host/meta.yml#HostMemoryPressure]
 
   - id: swap-activity
+    section: misuse
     tier: 2
     aspect: saturation
     question: 主機在換頁（swap in／out）嗎
@@ -162,6 +202,7 @@ signals:
     rules: [rules/host/meta.yml#HostSwapping]
 
   - id: cpu-saturation
+    section: misuse
     tier: 2
     aspect: saturation
     question: 主機的 CPU 夠嗎
@@ -175,6 +216,7 @@ signals:
     rules: [rules/host/meta.yml#HostCPUPressure]
 
   - id: container-cpu-throttling
+    section: misuse
     tier: 2
     aspect: saturation
     question: 容器被 CPU quota 節流嗎
@@ -190,6 +232,7 @@ signals:
     rules: [rules/host/meta.yml#ContainerCPUThrottled]
 
   - id: disk-latency
+    section: misuse
     tier: 2
     aspect: saturation
     question: 資料磁碟每次 IO 要多久
@@ -204,6 +247,7 @@ signals:
     rules: [rules/host/meta.yml#HostDiskWriteLatencyHigh, rules/host/meta.yml#HostDiskReadLatencyHigh, rules/host/meta.yml#HostIOPressure]
 
   - id: disk-busy
+    section: misuse
     tier: 3
     aspect: saturation
     question: 磁碟忙碌時間與佇列
@@ -217,6 +261,7 @@ signals:
     rules: []
 
   - id: fd-headroom
+    section: misuse
     tier: 2
     aspect: saturation
     question: 整機與資料庫行程的 file descriptor 還夠嗎
@@ -231,6 +276,7 @@ signals:
     rules: [rules/host/meta.yml#HostFdNearLimit, rules/host/meta.yml#ProcessFdNearLimit]
 
   - id: clock-sync
+    section: misuse
     tier: 2
     aspect: availability
     question: 主機時鐘有同步、偏移多大
@@ -245,6 +291,7 @@ signals:
     rules: [rules/host/meta.yml#HostClockNotSynchronised, rules/host/meta.yml#HostClockOffsetHigh]
 
   - id: network-errors
+    section: misuse
     tier: 3
     aspect: saturation
     question: 網卡有丟包或錯誤嗎
@@ -258,6 +305,7 @@ signals:
     rules: []
 
   - id: process-threads-cpu
+    section: misuse
     tier: 3
     aspect: saturation
     question: 資料庫行程內哪一類 thread 在吃 CPU
@@ -270,3 +318,27 @@ signals:
     refs: [res-px-thread-cpu, res-px-memory, res-px-threads-flag]
     upstream: { status: no }
     rules: []
+
+blind_spots:
+  - what: 容器的 OOM kill 次數（cgroup 路徑不一致時）
+    category: exporter
+    why: cAdvisor 用核心 OOM 訊息裡的 cgroup 路徑查容器，和自己看到的名稱不同時 container_oom_events_total 永遠是 0（WSL2 上實測）
+    workaround: 主機的 node_vmstat_oom_kill；K8s 上看 kube-state-metrics 的上次結束原因
+    options: "建議：容器 OOM 規則同時看 node_vmstat_oom_kill 與 KSM 的 OOMKilled，不要只靠 cAdvisor counter"
+    section: architecture/db-resources.md#memory
+  - what: 被 OOM kill 後沒有重啟的容器
+    category: exporter
+    why: 容器消失後它的 series 一起消失，counter 的增加量看不到
+    workaround: 主機的 node_vmstat_oom_kill
+    options: "建議：對資料庫容器加 absent 類規則，或看 KSM 的 terminated reason"
+  - what: 單次 IO 的延遲尖峰（fsync 慢）
+    category: exporter
+    why: node_exporter 只輸出累計時間與次數，只能算平均；佇列不長時尖峰被平均掉
+    workaround: 有 fsync 直方圖的資料庫（etcd、YugabyteDB）看資料庫自己的 metric
+    options: "建議：其他資料庫靠 log 的慢 fsync 訊息；本卡不往核心追蹤工具延伸"
+    section: architecture/db-resources.md#io
+  - what: 哪個行程在用 IO 或 page cache
+    category: exporter
+    why: node_exporter 只有裝置層級與整機的數字；cAdvisor 只到容器
+    workaround: 依容器拆分（cAdvisor）
+    options: "建議：需要行程層級時用 process-exporter（選用），不在本卡的必要範圍"

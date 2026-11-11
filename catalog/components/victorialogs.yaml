@@ -32,8 +32,32 @@ silent_failures:
 
 contracts: [vl-log-delay]
 
+usage:
+  - id: log-rule-window
+    text: >-
+      沒寫 `_time` 的 log rule 只查 [ts − interval, ts]，ts 已減掉 eval_delay，視窗不重疊（契約 vl-log-delay）。
+      尖峰 log 延遲超過 eval_delay 時，eval_delay 要拉長或明確寫較長的 `_time` 視窗
+    evidence: tested
+    refs: [exp-vm-vl]
+  - id: canary-filter
+    text: "`* | stats count()` 沒有 log 時仍回 0，canary 要加 `filter c:>0`"
+    evidence: tested
+    refs: [exp-vm-vl]
+  - id: ingest-content-type
+    text: >-
+      Shipper 不要用 `application/x-www-form-urlencoded`（Python urllib 的預設）送 log：回 200 但 `vl_rows_ingested_total` 不增加；不帶 header 可以收
+    evidence: tested
+    refs: [exp-vm-vl, exp-vm-vl-ingested]
+  - id: cluster-partial
+    text: >-
+      Cluster 缺節點時預設回 502（和 VictoriaMetrics 相反），log rule 變 ERR 後假 resolved；
+      `allow_partial_response` 會改成不完整的結果，log rule 建議保持預設
+    evidence: tested
+    refs: [exp-vm-vl, vl-select-502]
+
 signals:
   - id: components-up
+    section: observe
     tier: 1
     question: 行程活著嗎
     signal: up == 0
@@ -45,6 +69,7 @@ signals:
     rules: [rules/victoriametrics/meta.yml#MetaTargetDown]
 
   - id: log-freshness
+    section: observe
     tier: 1
     question: Log 有新資料嗎
     signal: "固定送 canary log 流；_time:2m flow:canary | stats count() c | filter c:>0，帶 for"
@@ -59,6 +84,7 @@ signals:
     contract: vl-log-delay
 
   - id: read-only
+    section: misuse
     tier: 1
     question: 還能寫入嗎
     signal: max(vl_storage_is_read_only) == 1
@@ -71,6 +97,7 @@ signals:
     rules: [rules/victoriametrics/meta.yml#MetaVLReadOnly]
 
   - id: ingested
+    section: observe
     tier: 1
     question: 真的有收進去嗎
     signal: "有寫入請求（`vl_http_requests_total{path=~\"/insert/.*\"}`）卻沒有收進任何一行（`vl_rows_ingested_total`）；也可對照 shipper 送出量"
@@ -83,6 +110,7 @@ signals:
     rules: [rules/victoriametrics/meta.yml#MetaVLRowsNotIngested]
 
   - id: storage-reachable
+    section: observe
     tier: 1
     question: vlstorage 連得到嗎
     signal: "vlselect 的 `vl_select_remote_send_errors_total` 增加（有查詢就會變）；`vl_insert_remote_is_reachable` == 0 只在有資料要寫到那台時才出現，不能單獨用"
@@ -96,6 +124,7 @@ signals:
     rules: [rules/victoriametrics/meta.yml#MetaVLStorageUnreachable]
 
   - id: vlagent-backlog
+    section: misuse
     tier: 2
     question: vlagent 堆積或丟資料嗎
     signal: vlagent_remotewrite_pending_data_bytes、dropped
@@ -108,6 +137,7 @@ signals:
     rules: [rules/victoriametrics/meta.yml#MetaVLAgentBacklog]
 
   - id: disk-space
+    section: misuse
     tier: 2
     question: 磁碟夠嗎
     signal: "vl_data_size_bytes ÷（vl_free_disk_space_bytes + vl_data_size_bytes）> 0.8；剩餘低於 -storage.minFreeDiskSpaceBytes 時切唯讀（第 1 級 read-only）"
@@ -120,6 +150,7 @@ signals:
     rules: [rules/victoriametrics/meta.yml#MetaVLDiskRunsOutOfSpace]
 
   - id: query-load
+    section: misuse
     tier: 2
     question: 查詢排隊逾時了嗎
     signal: vl_concurrent_select_limit_timeout_total 增加；log rule 和人工查詢共用同一組上限
@@ -130,3 +161,22 @@ signals:
     refs: [vl-rule-queryload, vl-select-timeout]
     upstream: { status: yes, note: "TooHighQueryLoad" }
     rules: [rules/victoriametrics/meta.yml#MetaVLQueryTimeouts]
+
+blind_spots:
+  - what: 查詢故障期間進來的 log 事件
+    category: other
+    why: 不重疊的視窗在 vlselect 失敗時直接跳過，恢復後不補判；事後查得到，rule 沒響過（推論，lab 沒有測 vlselect 停）
+    workaround: 恢復後人工查故障期間的事件
+    options: "建議：重要的 log rule 用較長的 `_time` 視窗，恢復後下一輪仍涵蓋故障期間"
+    section: architecture/victorialogs.md#log-rule-window
+  - what: 全部 vlstorage 停時 vlinsert 記憶體裡的緩衝
+    category: exporter
+    why: vlinsert 每秒重試、資料留在記憶體；緩衝上限與停多久會丟資料沒有核對，也沒有對應的 metric
+    workaround: 前面放 vlagent，用它的磁碟 buffer
+    options: "建議：vlagent 的 pending 與 dropped（vlagent-backlog）當作 log 是否遺失的訊號"
+    section: architecture/victorialogs.md#ingest
+  - what: 哪一條 LogsQL 查詢佔用了 vlselect 的併發
+    category: exporter
+    why: "`vl_concurrent_select_limit_timeout_total` 只有總數；log rule 與人工大範圍查詢共用同一組上限"
+    workaround: 看 vmalert /api/v1/rules 的 lastError 與查詢時間
+    options: "建議：log rule 用獨立的 vlselect，限制人工查詢的時間範圍"

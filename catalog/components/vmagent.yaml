@@ -20,8 +20,37 @@ silent_failures:
 
 contracts: [scrape-within-interval]
 
+usage:
+  - id: scrape-timeout-clamp
+    text: "`scrape_timeout` 預設 10s；大於 `scrape_interval` 時自動改成等於 S，不報錯（Prometheus 會載入失敗），設定檔照抄 Prometheus 的值時要自己檢查"
+    evidence: code
+    refs: [bl-vmag-default-timeout, bl-vmag-timeout-clamp]
+  - id: scrape-within-interval
+    text: >-
+      和 Prometheus 一樣，同一個 target 抓不完時 tick 被丟掉（契約 scrape-within-interval）；sample 時間戳對齊排定的 tick，
+      偏離超過 interval 的 10% 才改用實際時間
+    evidence: code
+    refs: [vmag-ticker, vmag-drift]
+  - id: max-scrape-size
+    text: "`-promscrape.maxScrapeSize` 預設 16MiB（Prometheus 的 body_size_limit 預設不限）；series 多的 target 要先確認回應大小"
+    evidence: code
+    refs: [bl-vmag-maxscrapesize]
+  - id: disk-buffer-limit
+    text: "`-remoteWrite.maxDiskUsagePerURL` 預設 0（不限）；設了上限時滿了丟最舊的資料，大小依可容忍的中斷時間估算"
+    evidence: code
+    refs: [vmag-maxdisk]
+  - id: keep-disk-queue
+    text: 不要開 `-remoteWrite.disableOnDiskQueue`；開了之後遠端跟不上時資料直接消失，事後也不會回補
+    evidence: code
+    refs: [vmag-nodisk]
+  - id: remote-write-queues
+    text: 每個 `-remoteWrite.url` 各自一個 queue 與磁碟 buffer，worker 數 `-remoteWrite.queues` 預設 2 × CPU
+    evidence: code
+    refs: [vmag-queues]
+
 signals:
   - id: vmagent-down
+    section: observe
     tier: 1
     question: 行程活著嗎
     signal: up == 0
@@ -34,6 +63,7 @@ signals:
     rules: [rules/victoriametrics/meta.yml#MetaTargetDown]
 
   - id: job-freshness
+    section: observe
     tier: 1
     question: 每個關鍵 job 都有新資料嗎
     signal: time() - max(timestamp(up{job="X"})) < 120，for 1m，正常時 firing，由外部判斷沒收到
@@ -47,6 +77,7 @@ signals:
     rules: [rules/victoriametrics/canary.yml#MetricsFresh]
 
   - id: data-dropped
+    section: observe
     tier: 1
     question: 有沒有丟資料
     signal: persistent queue 或 remote write 丟棄數增加
@@ -59,6 +90,7 @@ signals:
     rules: [rules/victoriametrics/meta.yml#MetaVMAgentDataDropped]
 
   - id: remote-write-retries
+    section: observe
     tier: 1
     question: 寫得出去嗎
     signal: rate(vmagent_remotewrite_retries_count_total[5m]) > 0
@@ -71,6 +103,7 @@ signals:
     rules: [rules/victoriametrics/meta.yml#MetaVMAgentRemoteWriteRetries]
 
   - id: buffer-time-to-full
+    section: misuse
     tier: 2
     question: 磁碟 buffer 還能撐多久
     signal: "vm_persistentqueue_free_disk_space_bytes ÷ deriv(vm_persistentqueue_bytes_pending[15m]) < 4h；可用空間是 -remoteWrite.maxDiskUsagePerURL 減去已堆積量，和磁碟剩餘取小者"
@@ -83,14 +116,40 @@ signals:
     rules: [rules/victoriametrics/meta.yml#MetaVMAgentBufferFullSoon]
 
   - id: scrape-health
+    section: observe
     tier: 2
     question: Scrape 正常嗎
-    signal: "`vm_promscrape_scrapes_failed_total`、scrape pool 沒有 target、`scrape_duration_seconds` ÷ `scrape_interval`"
-    metrics: [vm_promscrape_scrapes_failed_total, vm_promscrape_scrape_pool_targets, scrape_duration_seconds]
+    signal: "`vm_promscrape_scrapes_failed_total` 增加、scrape pool 沒有 target"
+    metrics: [vm_promscrape_scrapes_failed_total, vm_promscrape_scrape_pool_targets]
     evaluate_on: observer
     evidence: upstream
     source: vm-rules
-    refs: [vmag-ticker]
-    upstream: { status: partial, note: "沒有耗時比值" }
+    upstream: { status: partial, note: "沒有耗時比值（見 scrape-ratio）" }
+    rules: []
+
+  - id: scrape-ratio
+    section: misuse
+    tier: 2
+    question: Scrape 耗時接近 scrape_interval 了嗎
+    signal: "`scrape_duration_seconds` ÷ `scrape_interval`；vmagent 一直輸出 `scrape_timeout_seconds`，也可以直接比 timeout。抓不完時 tick 被丟掉、實際間隔拉長"
+    metrics: [scrape_duration_seconds, scrape_timeout_seconds]
+    evaluate_on: observer
+    evidence: code
+    source: vm-rules
+    refs: [vmag-ticker, bl-vm-doc-timeout-ratio]
+    upstream: { status: no }
     rules: []
     contract: scrape-within-interval
+
+blind_spots:
+  - what: 補回的資料 rule 不會補判
+    category: other
+    why: 遠端恢復後 buffer 補送，事後查同一段時間沒有缺口，但 rule 當下沒看到資料；沒有任何 metric 記錄「當下缺、事後補」
+    workaround: 用每個關鍵 job 的資料新鮮度 heartbeat 判斷當下
+    options: "建議：事後要確認漏報時用 vmalert -replay 對那段時間補判（本 repo 沒有測）"
+    section: architecture/vmagent.md#remote-write
+  - what: Buffer 丟掉的是哪一段時間的資料
+    category: exporter
+    why: "`vm_persistentqueue_bytes_dropped_total` 只有位元組數，沒有時間範圍"
+    workaround: 記下 drop 開始增加的時間，對照 rule 視窗
+    options: "建議：把 MetaVMAgentDataDropped 的觸發時間記進事件紀錄，事後查那段的 rule 結果"

@@ -51,7 +51,7 @@ groups:
         labels: { severity: critical, component: prometheus, tier: "1", scope: rule_group }
         annotations:
           summary: "Rule group 超過 3 個 interval 沒有完成 evaluation"
-          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#rule-group-ratio
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#rule-group-running
       - alert: RuleEvaluationFailures
         expr: increase(prometheus_rule_evaluation_failures_total[10m]) > 0
         labels: { severity: critical, component: prometheus, tier: "1", scope: rule_group }
@@ -251,7 +251,7 @@ groups:
         labels: { severity: warning, component: prometheus, tier: "3", scope: prometheus }
         annotations:
           summary: "新設定或 rule 沒有生效，仍在跑舊設定"
-          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#root-cause
+          runbook_url: https://hahasula.github.io/alert-trust/components/prometheus/#config-reload
           absence_covered_by: "PrometheusDown, PrometheusMissing"
 
   - name: prometheus-disk           # 需要 node_exporter 或 kubelet；Prometheus 自己的 metric 看不到磁碟剩餘空間

@@ -39,8 +39,100 @@ contracts:
   - lookback
   - resend-endsat
 
+# 正確使用：怎麼設定才讓 contracts 成立。公式在 catalog/contracts.yaml，這裡只寫設定與依據。
+usage:
+  - id: scrape-timeout
+    text: >-
+      `scrape_timeout` 不能大於 `scrape_interval`（global 與每個 job 都檢查，設定檔載入失敗）。它只管 HTTP 階段；
+      逾時就是失敗，up=0、所有 series 立刻拿到 stale 標記，所以 τ 要蓋過尖峰 scrape 耗時，不是平均。推導步驟見 docs/tools/baseline.md
+    evidence: code
+    refs: [bl-p3-global-timeout-check, bl-p3-job-timeout-check, bl-p3-scrape-ctx, bl-p3-failed-stale]
+  - id: scrape-within-interval
+    text: >-
+      尖峰 scrape 耗時要在 `scrape_interval` 內（契約 scrape-within-interval）。超過時 tick 被丟掉、實際間隔拉長，alert 可能永遠不 firing；
+      同一個 target 內是單序，加 CPU 幫助有限，要降 series 或拆 target
+    evidence: tested
+    refs: [exp-prom-silent, p-scrape-run, p-scrape-report]
+  - id: range-window
+    text: >-
+      rate、increase 這類要 2 個 sample 的函式，視窗依契約 range-window；*_over_time、changes 依 range-window-1sample。
+      視窗相對 `scrape_interval` 太短時 rate 回空、pending 被刪、`for` 歸零，rule 不報錯
+    evidence: tested
+    refs: [exp-prom-range, exp-prom-silent, p-alert-delete]
+  - id: query-offset
+    text: >-
+      尖峰 scrape 耗時 d 明顯時，group 的 `query_offset` 設成不小於 d（全域 `rule_query_offset` 預設 0，group 的值優先）；
+      2.51 沒有這個設定，要在每個 selector 寫 `offset`。實測 2.55.1–3.15.1 加了之後才會 firing
+    evidence: tested
+    refs: [exp-prom-silent, bl-p3-default-query-offset, bl-p3-group-query-offset]
+  - id: lookback
+    text: >-
+      沒有 range 的 selector 受 `--query.lookback-delta`（預設 5m）限制（契約 lookback）；scrape 失敗時 stale 標記讓它立刻變空，
+      帶 `for` 的 instant 條件遇到一次逾時就重新計時
+    evidence: code
+    refs: [p-lookback, bl-p3-lookback-flag, bl-p3-failed-stale, p-alert-delete]
+  - id: group-layout
+    text: >-
+      關鍵 alert 獨立成小 group，不和昂貴的 recording rule 放一起（契約 group-within-interval）；實測 CPU 0.15 核時重 group 的延遲變近兩倍還漏事件。
+      Alert 依賴 recording rule 時放同一個 group、排在後面
+    evidence: tested
+    refs: [exp-prom-cpu, p-group-eval]
+  - id: query-concurrency
+    text: >-
+      `--query.max-concurrency`（預設 20）由 rule 與 API 共用，一條 rule 的查詢要搶兩次 slot。Grafana 的重查詢讓 rule group 從幾秒變 40 秒；
+      先限制 dashboard 查詢，queue_time 真的偏高才加大上限
+    evidence: tested
+    refs: [p-maxconc, p-engine-queue, exp-prom-query]
+  - id: query-timeout
+    text: >-
+      `--query.timeout`（預設 2m）同時管 rule 與 API。在執行 slot 排隊超過它時 rule 失敗（context deadline exceeded），pending 的 activeAt 不變；
+      長查詢佔住 block reader 時 compaction 與 reload 一起停住，上限也是這個值
+    evidence: tested
+    refs: [p3-query-timeout, exp-pend, exp-prom-slots, p3-compact-lock, p3-block-close-wait]
+  - id: resend-endsat
+    text: >-
+      Firing 之後每 `--rules.alert.resend-delay`（預設 1m）續送，EndsAt 設在 4 × max(resend, E) 之後（契約 resend-endsat）；
+      續送中斷超過這段時間 Alertmanager 自動 resolve。DMS 的等待依契約 deadman-wait
+    evidence: tested
+    refs: [p-alert-validuntil, p-resenddelay, exp-prom-heartbeat]
+  - id: notifier-queue
+    text: >-
+      2.x 到 3.9 的 notifier 只有一條 queue，每批等所有 Alertmanager 回應，一台慢拖累全部；3.10 起每台一條。送出逾時預設 10s，
+      queue 滿時丟最舊的，容量看 `prometheus_notifications_queue_capacity`
+    evidence: code
+    refs: [p-notifier-wait, p-notifier-batch, p3-notifier-queue, ad-p-send-timeout, p3-notifier-drop, p3-notifier-capacity]
+  - id: retention-config
+    text: >-
+      3.13.5 的 `--storage.tsdb.retention.time`／`.size` 已 deprecated，改寫在設定檔；兩者都沒設時 time retention 才是 15d。
+      Size retention 把 WAL 與 Head chunk 也算進用量。實際值看 `/api/v1/status/runtimeinfo`
+    evidence: code
+    refs: [p3-retention-size-flag, p3-retention-time-flag, p3-size-retention-wal, p3-head-size]
+  - id: restart-gap
+    text: >-
+      重啟時 replay WAL 期間 rule 不執行，之後 `for` 小於 `--rules.alert.for-grace-period`（預設 10m）的 alert 要重新計時；
+      replay 時間是已知的偵測空窗
+    evidence: code
+    refs: [p-forgrace]
+  - id: gomaxprocs-251
+    text: >-
+      2.51 預設用節點核心數當 GOMAXPROCS；1 核 limit 下 throttling 37%，開 `--enable-feature=auto-gomaxprocs` 後 3%。開之前先看 runtimeinfo 與 throttling
+    evidence: tested
+    refs: [exp-prom-cpu]
+  - id: extra-scrape-metrics
+    text: >-
+      要直接算 scrape 對 timeout 的邊際，設 `extra_scrape_metrics: true` 才有 `scrape_timeout_seconds`（3.x 已是設定項）
+    evidence: doc
+    refs: [bl-p3-doc-extra-metrics]
+  - id: k8s-selectors
+    text: >-
+      K8s 上 ServiceMonitor 的 job 通常是 service 名稱，meta 規則用 `job=~".*prometheus"`；kube-prometheus-stack 預設丟棄
+      `container_spec_memory_limit_bytes`，記憶體比值改用 `kube_pod_container_resource_limits`。兩者寫錯時規則 health=ok 卻永遠沒資料
+    evidence: tested
+    refs: [exp-prom-k8s]
+
 signals:
   - id: prometheus-down
+    section: observe
     tier: 1
     question: 行程活著嗎
     signal: 'up{job="prometheus"} == 0，加上 absent(up{job="prometheus"})'
@@ -53,6 +145,7 @@ signals:
     rules: [rules/prometheus/meta.yml#PrometheusDown, rules/prometheus/meta.yml#PrometheusMissing]
 
   - id: watchdog
+    section: observe
     tier: 1
     question: 評估 → 通知 → 接收端整條活著嗎
     signal: Watchdog（vector(1)）走專屬短週期路由送到外部 dead man's switch
@@ -66,6 +159,7 @@ signals:
     rules: [rules/prometheus/canary.yml#Watchdog]
 
   - id: job-freshness
+    section: observe
     tier: 1
     question: 每個關鍵 job 都有新資料嗎
     signal: >-
@@ -86,6 +180,7 @@ signals:
       - rules/prometheus/targets.yml#TargetJobMissing
 
   - id: known-true-canary
+    section: observe
     tier: 1
     question: 依賴真實資料的判斷會成立嗎
     signal: 已知成立、帶 for 的 canary，放在和真實 rule 相同負載的 group
@@ -99,6 +194,7 @@ signals:
     rules: [rules/prometheus/canary.yml#KnownTrueCanary]
 
   - id: rule-group-ratio
+    section: misuse
     tier: 1
     question: Rule group 跑得完嗎
     signal: "`prometheus_rule_group_last_duration_seconds` ÷ `prometheus_rule_group_interval_seconds` > 0.8；已經跳過的次數看 `prometheus_rule_group_iterations_missed_total`"
@@ -106,7 +202,6 @@ signals:
       - prometheus_rule_group_last_duration_seconds
       - prometheus_rule_group_interval_seconds
       - prometheus_rule_group_iterations_missed_total
-      - prometheus_rule_group_last_evaluation_timestamp_seconds
     evaluate_on: observer
     evidence: tested
     source: art-prom
@@ -115,10 +210,23 @@ signals:
     rules:
       - rules/prometheus/meta.yml#RuleGroupNearInterval
       - rules/prometheus/meta.yml#RuleGroupMissingEvaluations
-      - rules/prometheus/meta.yml#RuleGroupStale
     contract: group-within-interval
 
+  - id: rule-group-running
+    section: observe
+    tier: 1
+    question: 每個 rule group 還在評估嗎
+    signal: "time() - `prometheus_rule_group_last_evaluation_timestamp_seconds` > 3 × `prometheus_rule_group_interval_seconds`；查詢飽和實驗中 group 未完成時 `rule_evaluation_failures_total` 沒有動"
+    metrics: [prometheus_rule_group_last_evaluation_timestamp_seconds, prometheus_rule_group_interval_seconds]
+    evaluate_on: observer
+    evidence: tested
+    source: art-prom
+    refs: [exp-prom-query, p-group-missed]
+    upstream: { status: no }
+    rules: [rules/prometheus/meta.yml#RuleGroupStale]
+
   - id: rule-failures
+    section: observe
     tier: 1
     question: Rule 有沒有評估失敗
     signal: prometheus_rule_evaluation_failures_total 增加
@@ -131,6 +239,7 @@ signals:
     rules: [rules/prometheus/meta.yml#RuleEvaluationFailures]
 
   - id: notify-to-alertmanager
+    section: observe
     tier: 1
     question: 送得到 Alertmanager 嗎
     signal: notifications_errors_total、dropped_total 增加，或 alertmanagers_discovered < 1
@@ -149,6 +258,7 @@ signals:
       - rules/prometheus/meta.yml#NoAlertmanagerDiscovered
 
   - id: notify-early-warning
+    section: misuse
     tier: 2
     question: 通知在丟之前有沒有先變慢、堆積
     signal: "queue_length ÷ queue_capacity > 0.5、errors ÷ sent > 1%、latency p99 > 5s；丟棄看 dropped_total（第 1 級）"
@@ -171,6 +281,7 @@ signals:
     contract: resend-endsat
 
   - id: wal-write-failed
+    section: misuse
     tier: 1
     question: 資料和 rule 結果寫得進去嗎
     signal: prometheus_tsdb_wal_writes_failed_total 增加
@@ -184,6 +295,7 @@ signals:
     rules: [rules/prometheus/meta.yml#WALWriteFailed]
 
   - id: crash-loop
+    section: observe
     tier: 1
     question: 有沒有反覆重啟
     signal: changes(process_start_time_seconds[15m]) > 2
@@ -196,6 +308,7 @@ signals:
     rules: [rules/prometheus/meta.yml#PrometheusCrashLooping]
 
   - id: for-reset
+    section: misuse
     tier: 2
     question: Alert 的 for 有沒有反覆重置
     signal: changes(ALERTS_FOR_STATE[1h])
@@ -210,6 +323,7 @@ signals:
     contract: range-window
 
   - id: scrape-ratio
+    section: misuse
     tier: 2
     question: Scrape 耗時接近 scrape_interval 了嗎
     signal: "`scrape_duration_seconds` ÷ `scrape_interval`（`/api/v1/targets` 的 `scrapeInterval`）；實際間隔看 `prometheus_target_interval_length_seconds`"
@@ -225,6 +339,7 @@ signals:
     contract: scrape-within-interval
 
   - id: query-slots
+    section: misuse
     tier: 2
     question: 查詢 slot 滿了嗎
     signal: prometheus_engine_queries / prometheus_engine_queries_concurrent_max；queue_time
@@ -240,6 +355,7 @@ signals:
     rules: [rules/prometheus/meta.yml#QueryQueueing]
 
   - id: tsdb-maintenance
+    section: misuse
     tier: 2
     question: TSDB 維護停了嗎
     signal: compaction 或 checkpoint 失敗、reloads_total 停止增加、Head 未落成 block
@@ -269,6 +385,7 @@ signals:
       - rules/prometheus/meta.yml#WALTruncationFailing
 
   - id: size-retention
+    section: misuse
     tier: 2
     question: Size retention 有在作用、而且沒有刪太多嗎
     signal: "blocks＋WAL＋Head chunk 用量超過 `prometheus_tsdb_retention_limit_bytes`（retention 沒在作用）；`size_retentions_total` 增加（保留期比 time retention 短）"
@@ -289,6 +406,7 @@ signals:
       - rules/prometheus/meta.yml#PrometheusSizeRetentionDeleting
 
   - id: disk-free
+    section: misuse
     tier: 2
     question: 資料目錄還有空間嗎
     signal: "node_exporter 的 `node_filesystem_avail_bytes`（K8s 用 `kubelet_volume_stats_available_bytes`）低於 15% 或 24 小時內用完；Prometheus 自己的 metric 沒有磁碟剩餘空間"
@@ -303,6 +421,7 @@ signals:
       - rules/prometheus/meta.yml#PrometheusPVCLow
 
   - id: memory-limit
+    section: misuse
     tier: 2
     question: 記憶體接近 limit 了嗎
     signal: container working set ÷ memory limit > 0.8（cAdvisor 加 kube-state-metrics）
@@ -315,15 +434,15 @@ signals:
     rules: [rules/prometheus/meta.yml#PrometheusMemoryNearLimit]
 
   - id: root-cause
+    section: misuse
     tier: 3
     question: 根因與容量
-    signal: Retention 落後、WAL fsync、WAL 啟動修復、CPU throttling、設定 reload
+    signal: Retention 落後、WAL fsync、WAL 啟動修復、CPU throttling
     metrics:
       - prometheus_tsdb_lowest_timestamp_seconds
       - prometheus_tsdb_retention_limit_seconds
       - prometheus_tsdb_wal_fsync_duration_seconds
       - prometheus_tsdb_wal_corruptions_total
-      - prometheus_config_last_reload_successful
     evaluate_on: observer
     evidence: tested
     source: art-prom
@@ -334,4 +453,46 @@ signals:
       - rules/prometheus/meta.yml#WALFsyncSlow
       - rules/prometheus/meta.yml#WALRepairedAtStartup
       - rules/prometheus/meta.yml#PrometheusCPUThrottled
-      - rules/prometheus/meta.yml#PrometheusConfigReloadFailed
+
+  - id: config-reload
+    section: observe
+    tier: 3
+    question: 新設定與 rule 檔生效了嗎
+    signal: prometheus_config_last_reload_successful == 0（仍在跑舊設定）
+    metrics: [prometheus_config_last_reload_successful]
+    evaluate_on: observer
+    evidence: inferred
+    source: art-prom
+    upstream: { status: partial }
+    rules: [rules/prometheus/meta.yml#PrometheusConfigReloadFailed]
+
+# 目前無法觀測的痕跡。category：exporter（元件裡有、沒有輸出成 metric）、other（要靠其他元件）。
+blind_spots:
+  - what: 哪一條 rule 或哪一個查詢造成查詢負載
+    category: exporter
+    why: "`prometheus_engine_*` 只有全域與 slice；rule 層的 metric 只到 group。單條 rule 的 `evaluationTime`、`lastError` 只在 /api/v1/rules"
+    workaround: 定期抓 /api/v1/rules，依 evaluationTime 排序
+    options: "建議：設 global.query_log_file 記下每個查詢；Grafana 重查詢另走一台 Prometheus 或加查詢限制"
+    section: architecture/prometheus.md#query-engine
+  - what: Recording rule 造成的 series 暴增來自哪一條
+    category: exporter
+    why: "/api/v1/status/tsdb 只列 series 最多的 metric 與 label，沒有依 rule 分；rule 寫出的 series 數沒有 metric"
+    workaround: 對 recording rule 的輸出名稱做 count by (__name__)
+    options: "建議：recording rule 的 group 設 limit，超過時該 rule 失敗、rule_evaluation_failures_total 看得到"
+  - what: 永遠回空的 rule（視窗太短、selector 對不到）
+    category: exporter
+    why: 查詢回空不算失敗，health 是 ok、failures 是 0；從沒進入 pending 的 rule 連 ALERTS_FOR_STATE 都沒有
+    workaround: 上線前用 prometheus-trust §6 的探針記錄 rule 當下看到的資料
+    options: "建議：rule review 時用 tools/fit_contracts.py 比對視窗與 scrape_interval；selector 用 count() 確認有資料"
+    section: reports/prometheus-trust.md#probe
+  - what: 長查詢佔住 block reader 讓 reload 停住
+    category: exporter
+    why: 沒有任何失敗計數，只有 reloads_total 停止增加（BlockReloadStalled），看不出是哪個查詢
+    workaround: 對照 --query.timeout 與 reload 停止的時間
+    options: "建議：開 query log 找出同時段的長查詢；--query.timeout 是佔住時間的上限"
+    section: architecture/prometheus.md#retention-diagnosis
+  - what: OOM 或 crash loop 的原因
+    category: other
+    why: 行程重啟期間不在抓資料，Prometheus 自己查不到 OOMKilled
+    workaround: 外部 Prometheus 抓 kube-state-metrics 與 cAdvisor
+    options: "建議：observer 卡的 k8s-sources；主機上看 host 卡的 oom-kills"

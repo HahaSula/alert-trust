@@ -28,8 +28,46 @@ silent_failures:
 
 contracts: []
 
+usage:
+  - id: replication-factor
+    text: >-
+      Cluster 用 `-replicationFactor=2`、vmstorage 至少 3 台。RF=1 時一台 vmstorage 掛掉就 partial response，
+      increase 類的「數量太低」規則假觸發；RF=2 實測不受影響
+    evidence: tested
+    refs: [exp-vm-faults, vmi-rf]
+  - id: deny-partial-response
+    text: >-
+      需要完整資料的 rule 在 vmalert group 的 `params` 加 `deny_partial_response=1`；官方文件寫的 `denyPartialResponse` 沒有作用。
+      全域 `-search.denyPartialResponse` 會讓 dashboard 一起報錯
+    evidence: tested
+    refs: [vms-denypartial, vms-partial, exp-vm-faults]
+  - id: skip-slow-replicas
+    text: "`-search.skipSlowReplicas` 保持關閉；開了會跳過較慢的副本，RF=2 的保護打折"
+    evidence: code
+    refs: [vms-skipslow]
+  - id: drop-on-overload
+    text: vminsert 的 `-dropSamplesOnOverload` 保持關閉；開了之後節點過載就丟資料，而且發生在複製之前
+    evidence: code
+    refs: [vmi-drop]
+  - id: latency-offset
+    text: >-
+      vmselect 的 `-search.latencyOffset`（預設 30s）把比它新的查詢時間改成 now − 30s；只調小 vmalert 的 eval_delay 拿不到更新的資料，要一起調
+    evidence: code
+    refs: [vms-latency]
+  - id: select-concurrency
+    text: >-
+      `-search.maxConcurrentRequests`（cluster 預設 2 × CPU）與 `-search.maxQueueDuration`（10s，逾時回 429）由 rule 與 dashboard 共用；
+      dashboard 的重查詢會讓 vmalert 收到 429。考慮給 rule 獨立的 vmselect
+    evidence: code
+    refs: [vms-maxconc, vms-queue]
+  - id: min-free-disk
+    text: 可用空間低於 `-storage.minFreeDiskSpaceBytes`（預設 100MB）時 vmstorage 切唯讀；全部唯讀時 rule 不報錯，只會看到資料變舊
+    evidence: tested
+    refs: [vst-minfree, vst-readonly, exp-vm-faults]
+
 signals:
   - id: components-up
+    section: observe
     tier: 1
     question: 每個元件活著嗎
     signal: vminsert、vmselect、vmstorage（或 single）的 up
@@ -42,6 +80,7 @@ signals:
     rules: [rules/victoriametrics/meta.yml#MetaTargetDown]
 
   - id: read-only
+    section: misuse
     tier: 1
     question: 還能寫入嗎
     signal: max(vm_storage_is_read_only) == 1
@@ -54,6 +93,7 @@ signals:
     rules: [rules/victoriametrics/meta.yml#MetaStorageReadOnly]
 
   - id: partial-results
+    section: observe
     tier: 1
     question: 查詢結果完整嗎
     signal: sum(rate(vm_partial_results_total[2m])) > 0
@@ -67,6 +107,7 @@ signals:
     rules: [rules/victoriametrics/meta.yml#MetaPartialResponses]
 
   - id: storage-reachable
+    section: observe
     tier: 1
     question: vmstorage 連得到嗎
     signal: min(vm_rpc_vmstorage_is_reachable) == 0
@@ -80,6 +121,7 @@ signals:
     rules: [rules/victoriametrics/meta.yml#MetaStorageUnreachable]
 
   - id: disk-space
+    section: misuse
     tier: 1
     question: 磁碟夠嗎
     signal: DiskRunsOutOfSpace
@@ -91,6 +133,7 @@ signals:
     rules: []
 
   - id: query-saturation
+    section: misuse
     tier: 2
     question: 查詢飽和了嗎
     signal: vm_concurrent_select_limit_timeout_total 增加
@@ -103,6 +146,7 @@ signals:
     rules: []
 
   - id: rows-dropped
+    section: misuse
     tier: 2
     question: 資料被丟掉了嗎
     signal: vm_rows_ignored_total、vm_rpc_rows_dropped_on_overload_total、series limit 丟棄數
@@ -115,6 +159,7 @@ signals:
     rules: []
 
   - id: restarts
+    section: observe
     tier: 2
     question: 一直重啟或上次沒有正常關閉嗎
     signal: "changes(vm_app_start_timestamp[15m]) > 2；vm_app_prev_shutdown_unclean == 1（啟動 10 分鐘內）"
@@ -127,3 +172,18 @@ signals:
     rules:
       - rules/victoriametrics/meta.yml#MetaVMTooManyRestarts
       - rules/victoriametrics/meta.yml#MetaVMUncleanShutdown
+
+blind_spots:
+  - what: 哪一條查詢佔滿 vmselect 的併發、或觸發 -search.max* 上限
+    category: exporter
+    why: >-
+      本 repo 只核對到總數 `vm_concurrent_select_limit_timeout_total`；`-search.maxQueryDuration`、`-search.maxUniqueTimeseries`、
+      `-search.maxSamplesPerQuery` 超限時有沒有對應的 metric 沒有讀碼確認，rule 端只看到查詢失敗
+    workaround: 看 vmalert /api/v1/rules 的 lastError
+    options: "建議：開 vmselect 的 slow query log（-search.logSlowQueryDuration，預設 5s），對照 vmalert 的錯誤時間"
+    section: architecture/victoriametrics.md#vmselect
+  - what: Partial response 少的是哪些 series
+    category: exporter
+    why: "`vm_partial_results_total` 只計次數，結果裡沒有標記少了哪一台 vmstorage 的資料"
+    workaround: 對照 `vm_rpc_vmstorage_is_reachable` 找出失聯的節點
+    options: "建議：關鍵 rule 用 deny_partial_response=1，讓不完整變成查詢失敗"

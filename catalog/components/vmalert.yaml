@@ -33,8 +33,64 @@ silent_failures:
 
 contracts: [vm-range-window, resend-endsat, group-within-interval, vl-log-delay]
 
+usage:
+  - id: eval-delay
+    text: >-
+      實際查詢時間是 now − `eval_delay`（`-rule.evalDelay`，預設 30s），再依 `eval_alignment` 按 interval 向下取整；
+      最壞延遲是 eval_delay + interval，代入契約 vm-range-window 時用最壞值
+    evidence: code
+    refs: [vma-evaldelay, vma-evalalign]
+  - id: range-window
+    text: >-
+      視窗依契約 vm-range-window；rate_prometheus 這類要 2 個 sample 的函式另算。視窗內沒有可見 sample 時查詢回空、`for` 永遠歸零
+    evidence: tested
+    refs: [exp-vm-matrix, pqw-vm-rate-1sample]
+  - id: query-step
+    text: >-
+      沒寫 range 的查詢最多往回找 `-datasource.queryStep`（預設 5m），資料停止後 `m > 0` 這類條件還會成立約 6 分鐘；
+      依可接受的反應時間調小，但要大於實際資料間隔
+    evidence: tested
+    refs: [vma-querystep, exp-vm-faults]
+  - id: watchdog-resend
+    text: >-
+      Watchdog 放在獨立的 vmalert，不設 `-rule.resendDelay`（契約 resend-endsat）。設 3m 時 23 次裡有 5 次真正的 resolved 晚 2–3 分鐘才到
+    evidence: tested
+    refs: [exp-vm-resend, ad-vma-resend-flag]
+  - id: notifier-timeout
+    text: >-
+      每條 alerting rule 評估完同步送給所有 Alertmanager，等每台回應或 `-notifier.sendTimeout`（預設 10s）才換下一條；
+      一台 Alertmanager 慢，同 group 的評估時間跟著拉長
+    evidence: code
+    refs: [vma-exec-send, vma-notify-send, vma-notify-timeout]
+  - id: group-concurrency
+    text: group 的 `concurrency` 預設 1（依序）；調高後 rule 之間不保證順序，alert 依賴同 group 的 recording rule 時不要調高
+    evidence: code
+    refs: [vma-conc-default, vma-execconc]
+  - id: results-limit
+    text: >-
+      `limit`／`-rule.resultsLimit` 要明顯高於事故時的 alert 數；超過時該 rule 的 active alert 全部被清空並報錯，正好在事故最大時消失
+    evidence: code
+    refs: [vma-results-limit, vma-results-limit-flag]
+  - id: state-restore
+    text: >-
+      同時設 `-remoteWrite.url` 與 `-remoteRead.url`，啟動時才會從 `ALERTS_FOR_STATE` 還原 `for`；`-remoteRead.lookback`（預設 1h）
+      要不小於可能的停機時間。狀態用的 VictoriaMetrics 掛掉時重啟，`for` 從頭計時
+    evidence: tested
+    refs: [vma-rr-lookback, exp-vm-vl]
+  - id: state-write-queue
+    text: >-
+      Recording 結果與 ALERTS 先進記憶體 queue（`-remoteWrite.maxQueueSize` 100000），重試超過 `-remoteWrite.retryMaxTime`（30s）就丟棄；
+      寫入端可能中斷較久時調大
+    evidence: code
+    refs: [vma-rw-queue, vma-rw-retry]
+  - id: operator-selector
+    text: Operator 的 ruleSelector 與 ruleNamespaceSelector 都沒設時一條 rule 都不選，也沒有錯誤；要明確設定
+    evidence: code
+    refs: [op-vmalert-selector]
+
 signals:
   - id: vmalert-down
+    section: observe
     tier: 1
     question: 行程活著嗎
     signal: up{job=~".*vmalert.*"} == 0
@@ -47,6 +103,7 @@ signals:
     rules: [rules/victoriametrics/meta.yml#MetaTargetDown]
 
   - id: watchdog
+    section: observe
     tier: 1
     question: 通知鏈活著嗎
     signal: Watchdog 放在獨立的 vmalert，不設 -rule.resendDelay
@@ -61,6 +118,7 @@ signals:
     contract: resend-endsat
 
   - id: rule-errors
+    section: observe
     tier: 1
     question: 查詢有沒有失敗
     signal: rate(vmalert_alerting_rules_errors_total[2m]) > 0；有 recording rule 時再加 vmalert_recording_rules_errors_total（逐條 rule 產生，沒有 recording rule 就不存在）
@@ -73,6 +131,7 @@ signals:
     rules: [rules/victoriametrics/meta.yml#MetaRuleErrors]
 
   - id: notifier-errors
+    section: observe
     tier: 1
     question: 送得到 Alertmanager 嗎
     signal: vmalert_alerts_send_errors_total 增加
@@ -85,6 +144,7 @@ signals:
     rules: [rules/victoriametrics/meta.yml#MetaNotifierErrors]
 
   - id: rules-loaded
+    section: observe
     tier: 1
     question: Rule 真的有載入嗎
     signal: 預期 rule 數對照 /api/v1/rules；vmalert_alerting_rules_last_evaluation_samples
@@ -97,6 +157,7 @@ signals:
     rules: []
 
   - id: state-write
+    section: observe
     tier: 1
     question: 狀態寫得回去嗎
     signal: vmalert_remotewrite_errors_total、dropped_rows 增加
@@ -109,6 +170,7 @@ signals:
     rules: [rules/victoriametrics/meta.yml#MetaNoRuleWrites]
 
   - id: group-ratio
+    section: misuse
     tier: 2
     question: Group 跑得完嗎
     signal: "每個 group 的 `vmalert_iteration_duration_seconds` ÷ 同一個 group 的 `vmalert_iteration_interval_seconds`（該 group 的 `interval`，沒寫時是 `-evaluationInterval`）> 0.8；不同 interval 的 group 各自比。已經跳過的次數看 `vmalert_iteration_missed_total`"
@@ -122,6 +184,7 @@ signals:
     contract: group-within-interval
 
   - id: resolve-settings
+    section: observe
     tier: 2
     question: 假 resolved 的設定對嗎
     signal: flag{name="rule.resendDelay"}、rule.maxResolveDuration、notifier.blackhole
@@ -134,6 +197,7 @@ signals:
     rules: []
 
   - id: config-reload
+    section: observe
     tier: 2
     question: 新設定生效了嗎
     signal: vmalert_config_last_reload_successful != 1
@@ -145,6 +209,7 @@ signals:
     rules: []
 
   - id: results-limit
+    section: misuse
     tier: 3
     question: Rule 結果數接近上限了嗎
     signal: "vmalert_alerting_rules_last_evaluation_samples ÷ vmalert_group_rule_results_limit > 0.8；超過 limit 時該 rule 的 active alert 全部被清空並回報錯誤"
@@ -156,3 +221,19 @@ signals:
     upstream: { status: no }
     applies_when: "group limit 或 -rule.resultsLimit > 0"
     rules: [rules/victoriametrics/meta.yml#MetaRuleNearResultsLimit]
+
+blind_spots:
+  - what: 哪一條 rule 的查詢讓 vmselect 飽和或觸發 -search.max* 上限
+    category: exporter
+    why: >-
+      429 讓查詢很快失敗，`vmalert_iteration_missed_total` 可能仍是 0（推論）；錯誤只在 rule 的錯誤計數與 /api/v1/rules 的 lastError，
+      看不出是哪條查詢造成負載
+    workaround: 依 /api/v1/rules 的 lastError 與查詢時間找出失敗與最慢的 rule
+    options: "建議：vmselect 開 slow query log；昂貴的 recording rule 放獨立 vmalert 或拉長 interval"
+    section: architecture/vmalert.md#group
+  - what: 重啟後 `for` 有沒有還原成功
+    category: exporter
+    why: 只在啟動時還原一次、hot reload 不觸發；還原失敗只寫 log，評估照常繼續
+    workaround: 重啟後查 UI 的 restored 標記與 log 裡的 restore 錯誤
+    options: "建議：收 vmalert log 的 restore 錯誤成告警；狀態用的 VictoriaMetrics 和資料用的分開"
+    section: architecture/vmalert.md#restore
