@@ -2,6 +2,20 @@
 
 這頁說明怎麼新增一個元件或 target、怎麼引用證據、怎麼加實驗。給 AI agent 的完整指引在 repo 根目錄的 `AGENTS.md`。
 
+## 五段框架
+
+每張卡（監控系統或被監控的 target）都回答同樣的五段。範圍的界線是深度：只到 exporter 或 endpoint 實際輸出的那一層。
+
+| 段落 | 回答什麼 | 卡片欄位 | 依據 |
+|---|---|---|---|
+| 1. 架構 | 使用時會留下哪些痕跡 | `architecture`（連到架構頁的段落） | 原始碼 |
+| 2. 正確使用 | 怎麼設定、限制在哪 | `usage: [{id, text, evidence, refs}]`，`evidence` 只能是 `tested`（本機小實驗）、`code`（原始碼推理）、`doc`（官方文件） | 原始碼推理、本機小實驗 |
+| 3. 正確觀測 | 看到的數字是不是真的 | 訊號的 `section: observe` | 原始碼、本機小實驗 |
+| 4. 不正確使用時的觀測 | 誤用或故障時看得到什麼 | 訊號的 `section: misuse` | 原始碼、本機小實驗 |
+| 5. 目前無法觀測的痕跡 | 有痕跡但 exporter／endpoint 沒輸出 | `blind_spots`；方案寫在 `options`，一行、點到為止 | 原始碼；方案標為建議 |
+
+同一個主題同時有「量得準不準」和「數值異常」兩面時，拆成兩個訊號：例如「複寫延遲量的是不是真的」是 `observe`，「延遲太大」是 `misuse`。`validate.py` 會列出還沒有 `section` 的訊號數（遷移中只是警告）。
+
 ## 新增一個監控元件或 target
 
 1. 在 `catalog/components/`（監控元件）或 `catalog/targets/`（exporter 加上它背後的服務）新增 `<id>.yaml`，格式照 `catalog/components/prometheus.yaml`。必填：`id`、`name`、`kind`、`family`、`status`、`stages`、`role`、`signals`。

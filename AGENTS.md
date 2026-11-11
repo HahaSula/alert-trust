@@ -63,6 +63,10 @@ docker run --rm -u $(id -u):$(id -g) -v "$PWD":/docs squidfunk/mkdocs-material:9
 
 完整步驟在 `skills/rule-review/SKILL.md`。
 
+## 五段框架
+
+每張卡都回答：1 架構（會留下哪些痕跡）、2 正確使用（`usage`，只寫原始碼推理、本機小實驗或標明的官方文件）、3 正確觀測（訊號 `section: observe`）、4 不正確使用時的觀測（`section: misuse`）、5 目前無法觀測的痕跡（`blind_spots`，方案 `options` 一行點到為止）。範圍只到 exporter／endpoint 實際輸出的那一層，不往下挖（例如主機只到 node_exporter、kube-state-metrics）。格式見 `docs/contributing.md#五段框架`。
+
 ## 證據規則（最重要）
 
 - **每個結論都要有依據並附參考**：原始碼（釘在 tag 與行號）或可重現的實驗結果。頁面用 `[^key]`，元件卡用 `refs: [key]`。

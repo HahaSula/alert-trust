@@ -146,6 +146,50 @@ def load_rules(root: str = ROOT) -> dict[str, dict]:
     return out
 
 
+# Five-section framework (docs/map.md): every card answers
+#   1 architecture (card.architecture), 2 usage (card.usage), 3 observe and 4 misuse (signal.section),
+#   5 blind (card.blind_spots, one-line options).
+SECTIONS = {"observe": "正確觀測：看到的數字是不是真的", "misuse": "不正確使用時的觀測：誤用或故障時看得到什麼"}
+USAGE_EVIDENCE = {"tested": "實測（本機小實驗）", "code": "讀碼（原始碼推理）", "doc": "官方文件"}
+OPTIONS_MAX = 120
+
+
+def check_five_sections(card: dict, all_refs: dict) -> tuple[list[str], int]:
+    """Errors for usage / section / blind_spots.options, and how many signals still lack a section."""
+    where = card.get("_path", card.get("id", "?"))
+    errors, missing = [], 0
+    seen = set()
+    for i, u in enumerate(card.get("usage") or []):
+        at = f"{where}: usage[{i}]"
+        uid = u.get("id", "")
+        if not ID_RE.match(uid):
+            errors.append(f"{at} id 要是 kebab-case")
+        if uid in seen:
+            errors.append(f"{at} id {uid!r} 重複")
+        seen.add(uid)
+        if not str(u.get("text", "")).strip():
+            errors.append(f"{at} 缺少 text")
+        if u.get("evidence") not in USAGE_EVIDENCE:
+            errors.append(f"{at} evidence 只能是 {'、'.join(USAGE_EVIDENCE)}（正確使用只寫原始碼推理、本機小實驗或標明的官方文件）")
+        refs = u.get("refs") or []
+        if not refs:
+            errors.append(f"{at} 要有 refs")
+        for r in refs:
+            if r not in all_refs:
+                errors.append(f"{at} refs {r!r} 不存在")
+    for s in card.get("signals", []):
+        sec = s.get("section")
+        if sec is None:
+            missing += 1
+        elif sec not in SECTIONS:
+            errors.append(f"{where}#{s.get('id')}: section 要是 {'、'.join(SECTIONS)} 之一")
+    for i, b in enumerate(card.get("blind_spots") or []):
+        opt = b.get("options")
+        if opt is not None and (not isinstance(opt, str) or "\n" in opt.strip() or len(opt) > OPTIONS_MAX):
+            errors.append(f"{where}: blind_spots[{i}].options 要是一行、{OPTIONS_MAX} 字以內（方案點到為止）")
+    return errors, missing
+
+
 def runbook_url(component_id: str, signal_id: str) -> str:
     return f"{SITE_URL}/components/{component_id}/#{signal_id}"
 

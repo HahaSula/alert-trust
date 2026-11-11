@@ -44,6 +44,7 @@ def validate(root: str = C.ROOT) -> tuple[list[str], list[str]]:
             if "{#" + cid + "}" not in text:
                 errors.append(f"docs/contracts.md: 缺少契約 {cid} 的錨點 {{#{cid}}}")
 
+    no_section = 0
     signal_ids: dict[str, set[str]] = {}
     referenced_rules: set[str] = set()
     seen_components: set[str] = set()
@@ -77,6 +78,9 @@ def validate(root: str = C.ROOT) -> tuple[list[str], list[str]]:
             if sf.get("source") not in sources:
                 errors.append(f"{where}: silent_failures[{i}] source {sf.get('source')!r} 不存在")
 
+        fs_errors, fs_missing = C.check_five_sections(card, all_refs)
+        errors += fs_errors
+        no_section += fs_missing
         ids = signal_ids.setdefault(comp, set())
         for s in card.get("signals", []):
             sid = s.get("id", "")
@@ -133,6 +137,8 @@ def validate(root: str = C.ROOT) -> tuple[list[str], list[str]]:
         if tier not in ("1", "2", "3"):
             errors.append(f"{ref}: labels.tier 要是字串 \"1\"、\"2\" 或 \"3\"")
 
+    if no_section:
+        warnings.append(f"{no_section} 個訊號還沒有 section（observe／misuse），五段框架遷移中")
     PENDING_ASPECTS.clear()
     errors += check_target_pattern(components, root)
     warnings += list(PENDING_ASPECTS)
