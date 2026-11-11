@@ -1,0 +1,20 @@
+# alert-delivery lab：Prometheus 3.13.5 → 兩台 Alertmanager 0.29.0（設定 A、B）→ webhook 接收端。
+# 接收端（recv.py）同時是受控的 exporter，並每 1s 輪詢兩台 Alertmanager 與 Prometheus 的 API，
+# 所有事件都用接收端容器自己的牆鐘記錄。AM_A_CONFIG／AM_B_CONFIG 換設定（rounding 情境用）。
+name: at-ad
+x-am: &am
+  image: prom/alertmanager:v0.29.0
+  command: [--config.file=/etc/am/am.yml, --storage.path=/alertmanager, --cluster.listen-address=]
+services:
+  recv:
+    image: python:3.12.7-alpine
+    command: [python3, -u, /recv.py]
+    volumes: ["./recv.py:/recv.py:ro", "${RESULTS:-./results}:/results"]
+    ports: ["35080:8080"]
+  am-a: { <<: *am, volumes: ["${AM_A_CONFIG:-./configs/am-a.yml}:/etc/am/am.yml:ro"], ports: ["35093:9093"] }
+  am-b: { <<: *am, volumes: ["${AM_B_CONFIG:-./configs/am-b.yml}:/etc/am/am.yml:ro"], ports: ["35094:9093"] }
+  prom:
+    image: prom/prometheus:v3.13.5
+    command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.path=/prometheus, --rules.alert.resend-delay=15s]
+    volumes: [./configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro, ./configs/rules.yml:/etc/prometheus/rules.yml:ro]
+    ports: ["35090:9090"]

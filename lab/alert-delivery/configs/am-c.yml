@@ -1,0 +1,12 @@
+# 設定 C：group_wait 10s、group_interval 30s、repeat_interval 75s（lab 專用）
+route:
+  receiver: hook
+  group_by: [alertname, scen]
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 75s
+receivers:
+  - name: hook
+    webhook_configs:
+      - url: http://recv:8080/hook/c
+        send_resolved: true

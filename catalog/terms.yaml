@@ -836,3 +836,54 @@ terms:
       - "每個 secondary 會被每個 exporter 各報一次，用 `self=\"1\"` 取自己報的那條"
     note: "replSetGetStatus 裡沒有 PRIMARY（選舉中、失去多數）時整組不輸出；DOWN 的 member optime 被清成 0，也不輸出。"
     refs: [mx-compat-gotprimary, mx-compat-lag, mx-compat-abs, mx-compat-self, mg-set-down-optime, mg-exp]
+
+  # ---------- 從觸發到通知（docs/architecture/alert-delivery.md） ----------
+  group_by:
+    title: Alertmanager 的 group_by
+    kind: config
+    systems: [alertmanager]
+    tokens: [group_by]
+    where: "`alertmanager.yml` 的 `route`，子路由沒寫就繼承父路由"
+    default: "沒有設定：route 下所有 alert 同一個 group；`['...']`：每組不同的 label 各一個 group"
+    note: "決定什麼算「新 group」。新 group 等 `group_wait`；已經送過通知的 group 要等下一個 `group_interval` tick。子路由的 `group_by: []` 在 0.31 起語意不同，見 Alertmanager 報告第 6 節。"
+    refs: [ad-am-group-labels, ad-am-groupby-all, ad-am-route-inherit]
+
+  resolve_timeout:
+    title: Alertmanager 的 resolve_timeout
+    kind: config
+    systems: [alertmanager]
+    tokens: [resolve_timeout]
+    where: "`alertmanager.yml` 的 `global.resolve_timeout`"
+    default: "5m"
+    note: "只用在沒有帶 EndsAt 的 alert。Prometheus 與 vmalert 一定帶 EndsAt，所以對它們沒有作用；它們的自動 resolve 由 4 × max(resend, E) 決定。"
+    refs: [ad-am-api-resolve-timeout, ad-am-resolve-default]
+
+  send_resolved:
+    title: Receiver 的 send_resolved
+    kind: config
+    systems: [alertmanager]
+    tokens: [send_resolved]
+    where: "`receivers[].<integration>_configs[].send_resolved`"
+    default: "webhook 是 true；email 是 false（其他 integration 看各自的預設）"
+    note: "關掉時 resolved 不會通知，但 group 全部 resolved 時仍會寫入通知紀錄（nflog）。resolved 和新 alert 一樣要等下一個 `group_interval` tick。"
+    refs: [ad-am-send-resolved, ad-am-all-resolved, ad-am-webhook-resolved, ad-am-email-resolved]
+
+  am_send_timeout:
+    title: Ruler 送給 Alertmanager 的逾時
+    kind: config
+    systems: [prometheus, vmalert]
+    tokens: ["alerting.alertmanagers[].timeout", -notifier.sendTimeout]
+    where: "Prometheus：`alerting.alertmanagers[].timeout`。vmalert：`-notifier.sendTimeout`。"
+    default: "兩者都是 10s"
+    note: "Prometheus 逾時或失敗時整批丟棄、不重試，靠下一次續送補；vmalert 在 group 裡同步送，Alertmanager 慢會拉長評估時間。"
+    refs: [ad-p-am-timeout, ad-p-drop, ad-vma-timeout]
+
+  cluster_peer_timeout:
+    title: Alertmanager HA 的 peer-timeout
+    kind: config
+    systems: [alertmanager]
+    tokens: [--cluster.peer-timeout]
+    where: "Alertmanager 啟動參數 `--cluster.peer-timeout`"
+    default: "15s"
+    note: "第 N 順位的實例先等 N × peer-timeout 再查通知紀錄，所以 HA 下第二台的通知最多晚 N × 15s；一次 flush 的逾時也加上這段。"
+    refs: [ad-am-peer-timeout, ad-am-wait-stage, ad-am-timeout-func]

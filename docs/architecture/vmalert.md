@@ -42,6 +42,7 @@ vmalert 不用「現在」查詢。實際的查詢時間是：
 - 同一批同時送給所有 Alertmanager，逾時是 `-notifier.sendTimeout`（預設 10s）[^vma-notify-timeout]。
 - 因為是在 group 的 goroutine 裡同步送，一台 Alertmanager 變慢，同 group 的評估時間就跟著拉長，可能開始跳過 evaluation。Prometheus 3.10 以後每台 Alertmanager 各一條 queue，不會這樣。
 - 送出的 alert 帶 `EndsAt = now + 4 × max(interval, -rule.resendDelay)`。**查詢失敗時不續送**，約 2 分鐘後 Alertmanager 把 alert 標成 resolved，連 Watchdog 也一樣。<span class="at-chip at-ev-tested">實測</span>[^exp-vm-faults][^vma-resend] 見[續送契約](../contracts.md#resend-endsat)。
+- 送到之後 Alertmanager 怎麼分組、等多久，見[從觸發到通知](alert-delivery.md)。
 
 ## 寫回 VictoriaMetrics {#remote-write}
 

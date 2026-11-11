@@ -1,0 +1,380 @@
+# 從觸發到通知（docs/architecture/alert-delivery.md）用到的參考。
+# 原始碼行號都在對應 tag 的檔案上手動核對過（gh api 取檔、逐行比對）；Alertmanager 釘在 v0.28.1，lab 用 v0.29.0（dispatch、notify 的計時邏輯相同）。
+refs:
+  exp-ad-group-wait:
+    kind: experiment
+    title: "alert-delivery 實驗：新 group 的第一次通知（group_wait 10s）（Prometheus 3.13.5、Alertmanager 0.29.0）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/alert-delivery/results/summary.md#group-wait"
+  exp-ad-group-interval:
+    kind: experiment
+    title: "alert-delivery 實驗：加入已在響的 group、resolved 等下一個 group_interval tick（Prometheus 3.13.5、Alertmanager 0.29.0）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/alert-delivery/results/summary.md#group-interval"
+  exp-ad-repeat:
+    kind: experiment
+    title: "alert-delivery 實驗：repeat_interval 只在 group_interval tick 判斷（45s、1m、75s、105s）（Prometheus 3.13.5、Alertmanager 0.29.0）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/alert-delivery/results/summary.md#repeat"
+  exp-ad-endsat:
+    kind: experiment
+    title: "alert-delivery 實驗：Prometheus 停掉後 EndsAt 到期、下一個 tick 送 resolved（Prometheus 3.13.5、Alertmanager 0.29.0）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/alert-delivery/results/summary.md#endsat"
+  exp-ad-clock:
+    kind: experiment
+    title: "alert-delivery 實驗：Docker Desktop VM 的單調時鐘比牆鐘慢，tick 間隔以牆鐘看會變長（Prometheus 3.13.5、Alertmanager 0.29.0）"
+    url: "https://github.com/HahaSula/alert-trust/blob/main/lab/alert-delivery/results/summary.md#clock"
+  ad-p-firing:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "rules/alerting.go"
+    line: 526
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/rules/alerting.go#L526"
+  ad-p-needs-sending:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "rules/alerting.go"
+    line: 112
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/rules/alerting.go#L112"
+  ad-p-validuntil:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "rules/alerting.go"
+    line: 625
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/rules/alerting.go#L625"
+  ad-p-send-after-eval:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "rules/group.go"
+    line: 553
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/rules/group.go#L553"
+  ad-p-startsat:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "rules/manager.go"
+    line: 478
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/rules/manager.go#L478"
+  ad-p-endsat:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "rules/manager.go"
+    line: 483
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/rules/manager.go#L483"
+  ad-p-resend-flag:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "cmd/prometheus/main.go"
+    line: 603
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/cmd/prometheus/main.go#L603"
+  ad-p-am-timeout:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "config/config.go"
+    line: 216
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/config/config.go#L216"
+  ad-p-queue-add:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "notifier/alertmanagerset.go"
+    line: 146
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/notifier/alertmanagerset.go#L146"
+  ad-p-batch:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "notifier/sendloop.go"
+    line: 164
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/notifier/sendloop.go#L164"
+  ad-p-send-timeout:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "notifier/sendloop.go"
+    line: 235
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/notifier/sendloop.go#L235"
+  ad-p-drop:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "notifier/sendloop.go"
+    line: 180
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/notifier/sendloop.go#L180"
+  ad-vma-resend-flag:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/group.go"
+    line: 35
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/group.go#L35"
+  ad-vma-resolve:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/group.go"
+    line: 695
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/group.go#L695"
+  ad-vma-send:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/group.go"
+    line: 810
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/group.go#L810"
+  ad-vma-needs-sending:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/alerting.go"
+    line: 886
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/alerting.go#L886"
+  ad-vma-end:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/rule/alerting.go"
+    line: 894
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/rule/alerting.go#L894"
+  ad-vma-timeout:
+    kind: code
+    project: "VictoriaMetrics"
+    version: "v1.155.0"
+    file: "app/vmalert/notifier/init.go"
+    line: 66
+    url: "https://github.com/VictoriaMetrics/VictoriaMetrics/blob/v1.155.0/app/vmalert/notifier/init.go#L66"
+  ad-am-api-updated:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "api/v2/api.go"
+    line: 324
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/api/v2/api.go#L324"
+  ad-am-api-resolve-timeout:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "api/v2/api.go"
+    line: 338
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/api/v2/api.go#L338"
+  ad-am-resolve-default:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "config/config.go"
+    line: 727
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/config/config.go#L727"
+  ad-am-mem-merge:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "provider/mem/mem.go"
+    line: 234
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/provider/mem/mem.go#L234"
+  ad-am-mem-notify:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "provider/mem/mem.go"
+    line: 254
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/provider/mem/mem.go#L254"
+  ad-am-route-match:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "dispatch/dispatch.go"
+    line: 174
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/dispatch/dispatch.go#L174"
+  ad-am-group-key:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "dispatch/dispatch.go"
+    line: 316
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/dispatch/dispatch.go#L316"
+  ad-am-group-existing:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "dispatch/dispatch.go"
+    line: 329
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/dispatch/dispatch.go#L329"
+  ad-am-group-labels:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "dispatch/dispatch.go"
+    line: 370
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/dispatch/dispatch.go#L370"
+  ad-am-group-wait:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "dispatch/dispatch.go"
+    line: 419
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/dispatch/dispatch.go#L419"
+  ad-am-flush-timeout:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "dispatch/dispatch.go"
+    line: 445
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/dispatch/dispatch.go#L445"
+  ad-am-group-interval:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "dispatch/dispatch.go"
+    line: 464
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/dispatch/dispatch.go#L464"
+  ad-am-old-alert:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "dispatch/dispatch.go"
+    line: 497
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/dispatch/dispatch.go#L497"
+  ad-am-flush-resolved:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "dispatch/dispatch.go"
+    line: 521
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/dispatch/dispatch.go#L521"
+  ad-am-flush-delete:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "dispatch/dispatch.go"
+    line: 537
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/dispatch/dispatch.go#L537"
+  ad-am-route-defaults:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "dispatch/route.go"
+    line: 33
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/dispatch/route.go#L33"
+  ad-am-route-inherit:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "dispatch/route.go"
+    line: 64
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/dispatch/route.go#L64"
+  ad-am-groupby-all:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "config/config.go"
+    line: 915
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/config/config.go#L915"
+  ad-am-pipeline:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "notify/notify.go"
+    line: 415
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/notify/notify.go#L415"
+  ad-am-wait-stage:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "notify/notify.go"
+    line: 601
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/notify/notify.go#L601"
+  ad-am-new-firing:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "notify/notify.go"
+    line: 676
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/notify/notify.go#L676"
+  ad-am-all-resolved:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "notify/notify.go"
+    line: 688
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/notify/notify.go#L688"
+  ad-am-send-resolved:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "notify/notify.go"
+    line: 691
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/notify/notify.go#L691"
+  ad-am-repeat:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "notify/notify.go"
+    line: 696
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/notify/notify.go#L696"
+  ad-am-retry:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "notify/notify.go"
+    line: 815
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/notify/notify.go#L815"
+  ad-am-nflog-ts:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "nflog/nflog.go"
+    line: 405
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/nflog/nflog.go#L405"
+  ad-am-peer-timeout:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "cmd/alertmanager/main.go"
+    line: 167
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/cmd/alertmanager/main.go#L167"
+  ad-am-timeout-func:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "cmd/alertmanager/main.go"
+    line: 401
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/cmd/alertmanager/main.go#L401"
+  ad-am-webhook-resolved:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "config/notifiers.go"
+    line: 34
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/config/notifiers.go#L34"
+  ad-am-email-resolved:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "config/notifiers.go"
+    line: 58
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/config/notifiers.go#L58"
+  ad-am-maintenance:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.28.1"
+    file: "dispatch/dispatch.go"
+    line: 149
+    url: "https://github.com/prometheus/alertmanager/blob/v0.28.1/dispatch/dispatch.go#L149"
+  ad-am032-repeat:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.32.0"
+    file: "notify/notify.go"
+    line: 748
+    url: "https://github.com/prometheus/alertmanager/blob/v0.32.0/notify/notify.go#L748"
+  ad-am032-group-interval:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.32.0"
+    file: "dispatch/dispatch.go"
+    line: 700
+    url: "https://github.com/prometheus/alertmanager/blob/v0.32.0/dispatch/dispatch.go#L700"

@@ -1,0 +1,38 @@
+<svg viewBox="0 0 900 330" role="img" aria-label="Ruler resends only extend EndsAt; Alertmanager decides at ticks; after the ruler is killed the alert resolves when EndsAt passes and is sent at the next tick">
+      <text x="20" y="24" class="lbl-b">續送只延長 EndsAt；ruler 停掉後，EndsAt 到期，下一個 tick 送 resolved</text>
+      <line x1="70" y1="262" x2="860" y2="262" class="ax"/>
+      <g class="tk">
+        <text x="70" y="280" text-anchor="middle">240</text>
+        <text x="162" y="280" text-anchor="middle">260</text>
+        <text x="254" y="280" text-anchor="middle">280</text>
+        <text x="346" y="280" text-anchor="middle">300</text>
+        <text x="438" y="280" text-anchor="middle">320</text>
+        <text x="530" y="280" text-anchor="middle">340</text>
+        <text x="622" y="280" text-anchor="middle">360</text>
+        <text x="714" y="280" text-anchor="middle">380</text>
+        <text x="806" y="280" text-anchor="middle">400</text>
+      </g>
+      <line x1="72" y1="190" x2="72" y2="262" class="grid"/>
+      <line x1="361" y1="190" x2="361" y2="262" class="grid"/>
+      <line x1="658" y1="190" x2="658" y2="262" class="grid"/>
+      <line x1="512" y1="40" x2="512" y2="262" class="hot"/>
+      <text x="518" y="50" class="t-bad">kill Prometheus 336.1</text>
+      <text x="20" y="84" class="lbl-s">Ruler POST</text>
+      <circle cx="119" cy="80" r="6" class="dot-acc"/>
+      <circle cx="214" cy="80" r="6" class="dot-acc"/>
+      <circle cx="311" cy="80" r="6" class="dot-acc"/>
+      <circle cx="403" cy="80" r="6" class="dot-acc"/>
+      <circle cx="507" cy="80" r="6" class="dot-acc"/>
+      <text x="259" y="66" text-anchor="middle" class="lbl-s">每 20–23s 一次（resend 15s，E 5s）</text>
+      <text x="20" y="144" class="lbl-s">EndsAt</text>
+      <rect x="507" y="132" width="261" height="22" rx="3" class="b-fire"/>
+      <text x="638" y="148" text-anchor="middle" class="lbl-s">最後一次 EndsAt 391.8</text>
+      <line x1="768" y1="120" x2="768" y2="196" class="ts"/>
+      <text x="20" y="214" class="lbl-s">AM 通知</text>
+      <circle cx="214" cy="210" r="7" class="ok-mark"/><text x="214" y="236" text-anchor="middle" class="lbl-s">重送 271.2</text>
+      <circle cx="507" cy="210" r="7" class="ok-mark"/><text x="497" y="236" text-anchor="end" class="lbl-s">重送 335.1</text>
+      <circle cx="809" cy="210" r="7" class="bad-mark"/>
+      <text x="817" y="240" text-anchor="end" class="t-bad">resolved 400.6</text>
+      <text x="450" y="304" text-anchor="middle" class="lbl-s">秒（lab 情境 d、e，inst 2；接收端容器牆鐘與 updatedAt、endsAt）。灰色虛線是中間沒有送出的 tick（兩次通知的中點，推算）</text>
+      <text x="450" y="322" text-anchor="middle" class="lbl-s">條件其實還成立；這則 resolved 是 ruler 停掉造成的</text>
+    </svg>

@@ -96,6 +96,8 @@ Grafana 的重查詢會讓 rule group 變慢，實驗中從幾秒變成 40 秒�
 
 送出的 alert 帶 `EndsAt = 評估時間 + 4 × max(resend-delay, E)`[^p-alert-validuntil][^p-resenddelay]，見[續送契約](../contracts.md#resend-endsat)。
 
+從觸發到通知的每一段等待，見[從觸發到通知](alert-delivery.md)。
+
 
 <!-- figure: notifier-queues -->
 

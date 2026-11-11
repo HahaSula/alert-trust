@@ -229,6 +229,8 @@ Prometheus 和 vmalert 送出的 alert 都帶 `EndsAt`。查詢失敗、ruler �
 
 DMS 等待 `> 4 × max(resend, E) + repeat_interval + group_interval`
 
+`repeat_interval` 剛好是 `group_interval` 整數倍時，實際重送還要再多一個 `group_interval`，見[從觸發到通知](architecture/alert-delivery.md#repeat-interval)。
+
 等待太短會誤報。另一方面，ruler 停機後 Alertmanager 還會繼續重送 Watchdog 直到 `EndsAt`，所以 DMS 最快也要這段時間加上自己的等待才會響。[^exp-prom-heartbeat]要更快發現 ruler 停機，靠外部觀察者的 `up`。
 
 ## Log

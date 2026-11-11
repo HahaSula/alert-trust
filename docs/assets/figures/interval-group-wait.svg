@@ -1,0 +1,26 @@
+<svg viewBox="0 0 900 300" role="img" aria-label="group_wait: the first alert creates the group and starts a one-time timer; alerts arriving before it fires are sent together">
+      <text x="20" y="24" class="lbl-b">新 group：第一個 alert 建立 group，計時 group_wait 一次；期間到的 alert 一起送</text>
+      <line x1="80" y1="200" x2="820" y2="200" class="ax"/>
+      <g class="tk">
+        <text x="80" y="218" text-anchor="middle">10</text>
+        <text x="255" y="218" text-anchor="middle">15</text>
+        <text x="430" y="218" text-anchor="middle">20</text>
+        <text x="605" y="218" text-anchor="middle">25</text>
+        <text x="780" y="218" text-anchor="middle">30</text>
+      </g>
+      <text x="450" y="240" text-anchor="middle" class="lbl-s">秒（lab 情境 a；接收端容器牆鐘與 Alertmanager updatedAt）</text>
+      <text x="20" y="74" class="lbl-s">inst 1</text>
+      <circle cx="174" cy="70" r="6" class="dot-acc"/>
+      <text x="184" y="62" class="lbl-s">AM 收到 12.7，group 建立</text>
+      <text x="20" y="114" class="lbl-s">inst 3</text>
+      <circle cx="350" cy="110" r="6" class="dot-acc"/>
+      <text x="360" y="102" class="lbl-s">AM 收到 17.7（還在等）</text>
+      <text x="20" y="160" class="lbl-s">group</text>
+      <rect x="174" y="146" width="350" height="24" rx="3" class="win-ok"/>
+      <text x="350" y="163" text-anchor="middle" class="lbl">group_wait 10s</text>
+      <line x1="524" y1="50" x2="524" y2="200" class="ts"/>
+      <circle cx="524" cy="158" r="7" class="ok-mark"/>
+      <text x="536" y="150" class="t-ok">通知 22.7</text>
+      <text x="536" y="168" class="lbl-s">inst 1、3 同一則</text>
+      <text x="20" y="276" class="lbl-s">例外：alert 的 startsAt 已早於 now − group_wait（例如 Alertmanager 重啟後 ruler 重送），group 還沒 flush 過就立刻 flush。</text>
+    </svg>

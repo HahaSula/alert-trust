@@ -1,0 +1,55 @@
+<svg viewBox="0 0 900 300" role="img" aria-label="repeat_interval is only checked at group_interval ticks; the resend happens at the first tick where the time since the last logged send exceeds it">
+      <text x="20" y="24" class="lbl-b">group_interval 30s：每個 tick 才比對「距上一次送出 &gt; repeat_interval？」</text>
+      <line x1="150" y1="236" x2="850" y2="236" class="ax"/>
+      <g class="tk">
+        <text x="150" y="254" text-anchor="middle">0</text>
+        <text x="255" y="254" text-anchor="middle">30</text>
+        <text x="360" y="254" text-anchor="middle">60</text>
+        <text x="465" y="254" text-anchor="middle">90</text>
+        <text x="570" y="254" text-anchor="middle">120</text>
+        <text x="675" y="254" text-anchor="middle">150</text>
+        <text x="780" y="254" text-anchor="middle">180</text>
+      </g>
+      <line x1="150" y1="44" x2="150" y2="236" class="grid"/>
+      <line x1="255" y1="44" x2="255" y2="236" class="grid"/>
+      <line x1="360" y1="44" x2="360" y2="236" class="grid"/>
+      <line x1="465" y1="44" x2="465" y2="236" class="grid"/>
+      <line x1="570" y1="44" x2="570" y2="236" class="grid"/>
+      <line x1="675" y1="44" x2="675" y2="236" class="grid"/>
+      <line x1="780" y1="44" x2="780" y2="236" class="grid"/>
+      <text x="20" y="74" class="lbl-s">repeat 45s</text>
+      <circle cx="150" cy="70" r="7" class="ok-mark"/>
+      <circle cx="255" cy="70" r="5" class="dot-inv"/>
+      <circle cx="360" cy="70" r="7" class="ok-mark"/>
+      <text x="360" y="58" text-anchor="middle" class="t-ok">60s</text>
+      <circle cx="465" cy="70" r="5" class="dot-inv"/>
+      <circle cx="570" cy="70" r="7" class="ok-mark"/>
+      <text x="570" y="58" text-anchor="middle" class="t-ok">60s</text>
+      <circle cx="675" cy="70" r="5" class="dot-inv"/>
+      <circle cx="780" cy="70" r="7" class="ok-mark"/>
+      <text x="780" y="58" text-anchor="middle" class="t-ok">60s</text>
+      <text x="20" y="129" class="lbl-s">repeat 1m（整數倍）</text>
+      <circle cx="150" cy="125" r="7" class="ok-mark"/>
+      <circle cx="255" cy="125" r="5" class="dot-inv"/>
+      <circle cx="360" cy="125" r="5" class="dot-inv"/>
+      <circle cx="465" cy="125" r="7" class="ok-mark"/>
+      <text x="465" y="113" text-anchor="middle" class="t-ok">90s</text>
+      <circle cx="570" cy="125" r="5" class="dot-inv"/>
+      <circle cx="675" cy="125" r="5" class="dot-inv"/>
+      <circle cx="780" cy="125" r="7" class="ok-mark"/>
+      <text x="780" y="113" text-anchor="middle" class="t-ok">90s</text>
+      <text x="20" y="184" class="lbl-s">repeat 75s</text>
+      <circle cx="150" cy="180" r="7" class="ok-mark"/>
+      <circle cx="255" cy="180" r="5" class="dot-inv"/>
+      <circle cx="360" cy="180" r="5" class="dot-inv"/>
+      <circle cx="465" cy="180" r="7" class="ok-mark"/>
+      <text x="465" y="168" text-anchor="middle" class="t-ok">90s</text>
+      <circle cx="570" cy="180" r="5" class="dot-inv"/>
+      <circle cx="675" cy="180" r="5" class="dot-inv"/>
+      <circle cx="780" cy="180" r="7" class="ok-mark"/>
+      <text x="780" y="168" text-anchor="middle" class="t-ok">90s</text>
+      <text x="360" y="149" text-anchor="middle" class="t-bad">60 − δ，不大於 1m</text>
+      <circle cx="160" cy="278" r="6" class="ok-mark"/><text x="172" y="282" class="lbl-s">送出（寫入通知紀錄）</text>
+      <circle cx="360" cy="278" r="5" class="dot-inv"/><text x="372" y="282" class="lbl-s">tick 時比對，沒到 repeat_interval，不送</text>
+      <text x="640" y="282" class="lbl-s">秒（理想時鐘）；δ = 上次送出花的時間</text>
+    </svg>

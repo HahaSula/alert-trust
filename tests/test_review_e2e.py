@@ -112,6 +112,27 @@ class NotifyWithinTest(unittest.TestCase):
         self.assertIn("S 15s + d 10s + E 15s + ⌈for/E⌉·E 1m + group_wait 30s = 2m10s", md)
         self.assertFalse(fit["dms"]["ok"])
         self.assertIn("外部觀察者", md)
+        # 加入已在響的 group：group_wait 換成 group_interval（route 沒設，用預設 5m）
+        self.assertEqual(n["DbDown"]["total_join"], 15 + 10 + 15 + 60 + 300)
+        self.assertFalse(n["DbDown"]["ok_join"])
+        self.assertIn("| `DbDown` | 加入已在響的 group |", md)
+        self.assertIn("S 15s + d 10s + E 15s + ⌈for/E⌉·E 1m + group_interval 5m = 6m40s", md)
+
+    def test_join_uses_route_group_interval(self):
+        a = type("A", (), {})()
+        a.stack, a.S, a.E, a.O, a.d, a.latency, a.eval_delay, a.notify_within = "prometheus", 30.0, 30.0, 0.0, None, None, 0.0, 120.0
+        a.job_interval, a.job_duration, a.job_timeout, a.timeout, a.p99, a.job_p99, a.cfg_jobs = {}, {}, {}, 10.0, None, {}, None
+        docs = [("x", {"groups": [{"name": "g", "rules": [{"alert": "A", "expr": "x > 1", "for": "30s",
+                                                           "labels": {"severity": "page"}}]}]})]
+        inv = {"alertmanager": {"routes": {}},
+               "rules": [{"name": "A", "route": {"matches": [{"group_wait": "10s", "group_interval": "1m"}]}}]}
+        n = FC.notify_checks(a, docs, inv)[0]
+        base = n["total"] - 10
+        self.assertEqual(n["total_join"], base + 60)
+        self.assertIn("group_interval 1m", n["formula_join"])
+        self.assertEqual(n["gi_src"], "alertmanager.yml（這條 rule 的 route）")
+        self.assertTrue(n["ok"])
+        self.assertEqual(n["ok_join"], n["total_join"] <= 120.0)
 
     def test_vmalert_formula(self):
         a = type("A", (), {})()

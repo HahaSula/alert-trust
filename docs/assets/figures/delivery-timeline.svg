@@ -1,0 +1,78 @@
+<svg viewBox="0 0 900 400" role="img" aria-label="From rule evaluation to receiver: ruler hops, Alertmanager hops, and one measured first-notification timeline">
+      <defs>
+        <marker id="dt-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+      </defs>
+      <text x="20" y="22" class="lbl-b">Ruler（Prometheus／vmalert）</text>
+      <g>
+        <rect x="20" y="34" width="150" height="62" rx="8" class="b-node"/>
+        <text x="95" y="58" text-anchor="middle" class="lbl-b">Scrape → 寫入</text>
+        <text x="95" y="78" text-anchor="middle" class="lbl-s">≤ S + d</text>
+        <rect x="195" y="34" width="150" height="62" rx="8" class="b-node"/>
+        <text x="270" y="58" text-anchor="middle" class="lbl-b">Rule 評估</text>
+        <text x="270" y="78" text-anchor="middle" class="lbl-s">≤ E（＋O）</text>
+        <rect x="370" y="34" width="150" height="62" rx="8" class="b-pend"/>
+        <text x="445" y="58" text-anchor="middle" class="lbl-b">pending → firing</text>
+        <text x="445" y="78" text-anchor="middle" class="lbl-s">⌈for ÷ E⌉ × E</text>
+        <rect x="545" y="34" width="150" height="62" rx="8" class="b-node-acc"/>
+        <text x="620" y="58" text-anchor="middle" class="lbl-b">Notifier queue</text>
+        <text x="620" y="78" text-anchor="middle" class="lbl-s">續送看 resend</text>
+        <rect x="720" y="34" width="160" height="62" rx="8" class="b-node"/>
+        <text x="800" y="58" text-anchor="middle" class="lbl-b">POST /api/v2/alerts</text>
+        <text x="800" y="78" text-anchor="middle" class="lbl-s">逾時 10s，失敗就丟</text>
+      </g>
+      <g>
+        <line x1="170" y1="65" x2="193" y2="65" class="arrow" marker-end="url(#dt-ah)"/>
+        <line x1="345" y1="65" x2="368" y2="65" class="arrow" marker-end="url(#dt-ah)"/>
+        <line x1="520" y1="65" x2="543" y2="65" class="arrow" marker-end="url(#dt-ah)"/>
+        <line x1="695" y1="65" x2="718" y2="65" class="arrow" marker-end="url(#dt-ah)"/>
+        <path d="M800,96 L800,112 L140,112 L140,138" class="arrow" marker-end="url(#dt-ah)"/>
+      </g>
+      <text x="20" y="132" class="lbl-b">Alertmanager</text>
+      <g>
+        <rect x="20" y="140" width="150" height="62" rx="8" class="b-node"/>
+        <text x="95" y="164" text-anchor="middle" class="lbl-b">API → alert store</text>
+        <text x="95" y="184" text-anchor="middle" class="lbl-s">依 fingerprint 合併</text>
+        <rect x="195" y="140" width="150" height="62" rx="8" class="b-node"/>
+        <text x="270" y="164" text-anchor="middle" class="lbl-b">Dispatcher</text>
+        <text x="270" y="184" text-anchor="middle" class="lbl-s">route 比對、group_by</text>
+        <rect x="370" y="140" width="150" height="62" rx="8" class="b-node-bad"/>
+        <text x="445" y="164" text-anchor="middle" class="lbl-b">Aggregation group</text>
+        <text x="445" y="184" text-anchor="middle" class="lbl-s">三個 interval</text>
+        <rect x="545" y="140" width="150" height="62" rx="8" class="b-node"/>
+        <text x="620" y="164" text-anchor="middle" class="lbl-b">通知流程</text>
+        <text x="620" y="184" text-anchor="middle" class="lbl-s">inhibit→dedup→retry</text>
+        <rect x="720" y="140" width="160" height="62" rx="8" class="b-node-ok"/>
+        <text x="800" y="164" text-anchor="middle" class="lbl-b">Receiver</text>
+        <text x="800" y="184" text-anchor="middle" class="lbl-s">webhook／email／…</text>
+      </g>
+      <g>
+        <line x1="170" y1="171" x2="193" y2="171" class="arrow" marker-end="url(#dt-ah)"/>
+        <line x1="345" y1="171" x2="368" y2="171" class="arrow" marker-end="url(#dt-ah)"/>
+        <line x1="520" y1="171" x2="543" y2="171" class="arrow" marker-end="url(#dt-ah)"/>
+        <line x1="695" y1="171" x2="718" y2="171" class="arrow" marker-end="url(#dt-ah)"/>
+      </g>
+      <text x="620" y="220" text-anchor="middle" class="lbl-s">repeat_interval 只在這裡比對（每個 tick）</text>
+
+      <text x="20" y="262" class="lbl-b">這組數據：新 group 的第一次通知（lab 情境 a，秒）</text>
+      <line x1="60" y1="350" x2="860" y2="350" class="ax"/>
+      <g class="tk">
+        <text x="60" y="368" text-anchor="middle">0</text>
+        <text x="200" y="368" text-anchor="middle">5</text>
+        <text x="340" y="368" text-anchor="middle">10</text>
+        <text x="480" y="368" text-anchor="middle">15</text>
+        <text x="620" y="368" text-anchor="middle">20</text>
+        <text x="760" y="368" text-anchor="middle">25</text>
+      </g>
+      <rect x="110" y="296" width="280" height="20" rx="3" class="b-pend"/>
+      <text x="250" y="311" text-anchor="middle" class="lbl-s">pending（for 10s）</text>
+      <rect x="390" y="296" width="25" height="20" rx="3" class="scrape"/>
+      <rect x="416" y="296" width="280" height="20" rx="3" class="win-ok"/>
+      <text x="556" y="311" text-anchor="middle" class="lbl-s">group_wait 10s</text>
+      <line x1="60" y1="282" x2="60" y2="350" class="ts"/>
+      <line x1="696" y1="282" x2="696" y2="350" class="ts"/>
+      <circle cx="60" cy="336" r="5" class="dot-acc"/><text x="66" y="326" class="lbl-s">條件成立 0</text>
+      <circle cx="110" cy="336" r="5" class="dot-acc"/><text x="118" y="290" class="lbl-s">評估看到 1.8</text>
+      <circle cx="390" cy="336" r="5" class="dot-acc"/><text x="382" y="341" text-anchor="end" class="lbl-s">firing 11.8</text>
+      <circle cx="416" cy="336" r="5" class="dot-acc"/><text x="424" y="341" class="lbl-s">AM 收到 12.7</text>
+      <circle cx="696" cy="336" r="6" class="ok-mark"/><text x="690" y="290" text-anchor="end" class="t-ok">通知 22.7</text>
+    </svg>

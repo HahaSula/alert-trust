@@ -135,6 +135,7 @@ nav:
           - vmalert: architecture/vmalert.md
           - Grafana Alerting: architecture/grafana-alerting.md
           - Alertmanager: architecture/alertmanager.md
+          - 從觸發到通知: architecture/alert-delivery.md
           - 資料庫 exporter: architecture/exporters.md
       - 資料庫架構:
           - 關聯式: architecture/db-relational.md

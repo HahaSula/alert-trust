@@ -1,0 +1,37 @@
+<svg viewBox="0 0 900 290" role="img" aria-label="group_interval: after the first flush the group ticks every group_interval; a new alert or a resolved alert waits for the next tick">
+      <defs>
+        <marker id="gi-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+      </defs>
+      <text x="20" y="24" class="lbl-b">第一次 flush 之後每 group_interval 一個 tick；變化都等下一個 tick</text>
+      <line x1="90" y1="220" x2="820" y2="220" class="ax"/>
+      <g class="tk">
+        <text x="90" y="238" text-anchor="middle">20</text>
+        <text x="190" y="238" text-anchor="middle">30</text>
+        <text x="290" y="238" text-anchor="middle">40</text>
+        <text x="390" y="238" text-anchor="middle">50</text>
+        <text x="490" y="238" text-anchor="middle">60</text>
+        <text x="590" y="238" text-anchor="middle">70</text>
+        <text x="690" y="238" text-anchor="middle">80</text>
+        <text x="790" y="238" text-anchor="middle">90</text>
+      </g>
+      <line x1="117" y1="44" x2="117" y2="220" class="ts"/>
+      <text x="121" y="54" class="lbl-s">tick 0（第一次通知） 22.7</text>
+      <line x1="424" y1="44" x2="424" y2="220" class="ts"/>
+      <text x="428" y="54" class="lbl-s">tick 1 53.4</text>
+      <line x1="730" y1="44" x2="730" y2="220" class="ts"/>
+      <text x="734" y="54" class="lbl-s">tick 2 84.0</text>
+      <text x="20" y="104" class="lbl-s">inst 2 加入</text>
+      <circle cx="374" cy="100" r="6" class="dot-acc"/>
+      <text x="366" y="88" text-anchor="end" class="lbl-s">AM 收到 48.4</text>
+      <line x1="381" y1="100" x2="416" y2="100" class="arrow" marker-end="url(#gi-ah)"/>
+      <circle cx="424" cy="100" r="7" class="ok-mark"/>
+      <text x="436" y="104" class="t-ok">送出（等 5.0s）</text>
+      <text x="20" y="164" class="lbl-s">inst 1 解除</text>
+      <circle cx="534" cy="160" r="6" class="dot-acc"/>
+      <text x="528" y="184" class="lbl-s">AM 標成 resolved 64.4</text>
+      <line x1="541" y1="160" x2="722" y2="160" class="arrow" marker-end="url(#gi-ah)"/>
+      <circle cx="730" cy="160" r="7" class="ok-mark"/>
+      <text x="742" y="164" class="t-ok">resolved 送出（等 19.6s）</text>
+      <text x="450" y="262" text-anchor="middle" class="lbl-s">秒（lab 情境 b、c；接收端容器牆鐘，updatedAt；resolved 時間是 1s 輪詢看到的）</text>
+      <text x="450" y="280" text-anchor="middle" class="lbl-s">最壞要等一整個 group_interval；預設 5m</text>
+    </svg>

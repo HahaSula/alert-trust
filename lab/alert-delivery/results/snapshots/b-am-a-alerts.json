@@ -1,0 +1,83 @@
+[
+ {
+  "annotations": {},
+  "endsAt": "2026-11-11T07:05:56.243Z",
+  "fingerprint": "5888da8984fa13f8",
+  "receivers": [
+   {
+    "name": "hook"
+   }
+  ],
+  "startsAt": "2026-11-11T07:04:16.243Z",
+  "status": {
+   "inhibitedBy": [],
+   "mutedBy": [],
+   "silencedBy": [],
+   "state": "active"
+  },
+  "updatedAt": "2026-11-11T07:04:57.918Z",
+  "generatorURL": "http://31c749597e09:9090/graph?g0.expr=at_ad_flag+%3E+0&g0.tab=1",
+  "labels": {
+   "alertname": "DeliveryTest",
+   "inst": "1",
+   "instance": "recv:8080",
+   "job": "recv",
+   "scen": "x",
+   "severity": "page"
+  }
+ },
+ {
+  "annotations": {},
+  "endsAt": "2026-11-11T07:05:51.243Z",
+  "fingerprint": "697060148cd81c25",
+  "receivers": [
+   {
+    "name": "hook"
+   }
+  ],
+  "startsAt": "2026-11-11T07:04:51.243Z",
+  "status": {
+   "inhibitedBy": [],
+   "mutedBy": [],
+   "silencedBy": [],
+   "state": "active"
+  },
+  "updatedAt": "2026-11-11T07:04:52.919Z",
+  "generatorURL": "http://31c749597e09:9090/graph?g0.expr=at_ad_flag+%3E+0&g0.tab=1",
+  "labels": {
+   "alertname": "DeliveryTest",
+   "inst": "2",
+   "instance": "recv:8080",
+   "job": "recv",
+   "scen": "x",
+   "severity": "page"
+  }
+ },
+ {
+  "annotations": {},
+  "endsAt": "2026-11-11T07:05:41.243Z",
+  "fingerprint": "cb52e398c5741b3e",
+  "receivers": [
+   {
+    "name": "hook"
+   }
+  ],
+  "startsAt": "2026-11-11T07:04:21.243Z",
+  "status": {
+   "inhibitedBy": [],
+   "mutedBy": [],
+   "silencedBy": [],
+   "state": "active"
+  },
+  "updatedAt": "2026-11-11T07:04:42.157Z",
+  "generatorURL": "http://31c749597e09:9090/graph?g0.expr=at_ad_flag+%3E+0&g0.tab=1",
+  "labels": {
+   "alertname": "DeliveryTest",
+   "inst": "3",
+   "instance": "recv:8080",
+   "job": "recv",
+   "scen": "x",
+   "severity": "page"
+  }
+ }
+]

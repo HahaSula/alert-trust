@@ -32,6 +32,7 @@
 | YugabyteDB v2026.1.3.0 target（`model: native`），YSQL 與 PostgreSQL 監控對照（postgres_exporter 實測） | `catalog/targets/yugabytedb.yaml`、`docs/targets/yugabytedb*.md`、`lab/targets/yugabytedb/` |
 | ClickHouse v26.10.2 target（內建 endpoint＋query-exporter 查 system 表）與「分析型」架構頁，2 副本＋3 Keeper lab | `catalog/targets/clickhouse.yaml`、`docs/targets/clickhouse*.md`、`queries/clickhouse/`、`lab/targets/clickhouse/` |
 | MongoDB 8.0.34 target（Percona mongodb_exporter v0.54.0）與「文件型」架構頁，3 成員 replica set lab | `catalog/targets/mongodb_exporter.yaml`、`docs/targets/mongodb*.md`、`lab/targets/mongodb/` |
+| 新章「從觸發到通知」：觸發 → notifier → Alertmanager API → dispatcher → aggregation group → receiver 的每一段延遲，`group_wait`／`group_interval`／`repeat_interval` 各一張圖與互動圖、最壞時間公式；lab 量到 repeat 被取整成 ⌈R ÷ G⌉ × G、加入已在響的 group 要等 tick、EndsAt 到期的假 resolved | `docs/architecture/alert-delivery.md`、`lab/alert-delivery/` |
 | 盲測（4 個情境，受測者不知道考點、協調者扮演使用者、另一個 agent 依評分標準打分）：45／48，考點 33.5／34。依裁判建議改進：`for` 重置的證據要用 `stale` 模擬（範本 `docs/tools/templates/`）、第一句回答「多久內叫到人」並分列偵測／載入／路由／自我監控（`--notify-within`）、版本未知時不直接建議 `query_offset`、部署模式檢查、單一問題計數、Watchdog 路由、`MetaGroupSlow` 改為每個 group 的比例 | `skills/rule-review/`、`tools/` |
 | 版本條件變成正式欄位：訊號 `versions: {min, max}`、rule annotation `alert_trust_min_version`；env 填版本後覆蓋檢查自動判斷不適用，沒填時標「需要回答：版本」 | `tools/`、`catalog/targets/` |
 | MySQL 與 MariaDB 拆成兩張卡（各 55 個訊號，各引用自己的原始碼；只在 MariaDB 跑過的 lab 結果，MySQL 卡降為讀碼）；舊網址 `components/mysqld_exporter` 保留轉址頁；九個資料庫的版本差異頁（原始碼）與版本條件；各卡 blind_spots 指向主機卡；新增 10 個飽和訊號 | `catalog/targets/`、`docs/targets/versions/` |
@@ -75,7 +76,7 @@
 18. **query-exporter 排程跳過**：間隔對齊時較長間隔的查詢會被跳過（ClickHouse lab 錯開間隔後解決；MySQL lab 也看過 `misfire_grace_time` 1 秒的跳過）。PostgreSQL 的 5 分鐘查詢可能受影響，要檢查 `queries/query-exporter/postgres.yaml` 的間隔。
 19. **artifact 對照的後續輕量 lab**：429 與 `iteration_missed`、帶 `for` 的 log rule、損毀 block（`reloads_failures_total`）、長查詢卡住 Compact（目前讀碼）。新增的 Prometheus／VM 規則只過 promtool／dryRun，沒有在 lab 觸發過。
 20. **MongoDB 待補**：sharded cluster、WiredTiger cache／eviction 壓力、ticket 排隊、連線打滿、collStats 成本只讀碼；oplog 被釘住只讀碼。`docs/targets/models.md` 說「8.0、8.2 的 tag 沒有 OTel 程式碼」，MongoDB agent 回報 8.2.12 有 OTLP 檔案／HTTP 推送（沒有 Prometheus 檔案輸出），要附原始碼行號後修正。
-21. **契約複查的後續**：`resend-endsat` 最差情況（`− P`）與 `d > S` 時 `I ≈ d` 只讀碼，要輕量 lab；Grafana Alerting 的續送是否同樣「嚴格大於」才送未查。
+21. **契約複查的後續**：`resend-endsat` 的續送間隔已在 `lab/alert-delivery` 量到 20–23s（符合 P 公式）；`d > S` 時 `I ≈ d` 仍只讀碼；`repeat_interval` 剛好是 `group_interval` 整數倍時多等一個 tick 只讀碼（這台 VM 的單調時鐘每 30s 慢約 2–9%，量不出來）；Grafana Alerting 的續送是否同樣「嚴格大於」才送未查。
 22. **資源調查的後續**：各 target 卡的 blind_spots 改成 `covered_by` 主機卡；`#proposed` 表的 10 個飽和訊號；host 卡要不要新的 family；target-pattern 要不要加「主機層存在」。（主機卡小 lab 已完成：記憶體接近 limit、OOM 的主機部分、唯讀掛載實測；容器 OOM 計數在 WSL2 不增加、唯讀 remount 未測。）
 23. **拆卡後續**：MySQL／MariaDB lab 的 compose 仍掛 `rules/targets/mysql.yml`，重跑 MariaDB 要改掛 `mariadb.yml`；新規則 `MariaDBBinlogNotPurged` 與 thread-cache、pending-fsyncs 訊號沒有 lab；MySQL 側多數參考仍釘在 8.4.7。
 

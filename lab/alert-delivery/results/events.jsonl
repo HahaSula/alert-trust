@@ -1,0 +1,123 @@
+{"t": 1794380631.912, "ev": "start"}
+{"t": 1794380644.492, "ev": "mark", "what": "a"}
+{"t": 1794380644.494, "ev": "set", "inst": "1", "v": 1}
+{"t": 1794380646.994, "ev": "prom", "inst": "1", "state": "pending", "activeAt": "2026-11-11T07:04:06.243860584Z"}
+{"t": 1794380650.496, "ev": "set", "inst": "3", "v": 1}
+{"t": 1794380652.011, "ev": "prom", "inst": "3", "state": "pending", "activeAt": "2026-11-11T07:04:11.243860584Z"}
+{"t": 1794380657.94, "ev": "am", "am": "a", "inst": "1", "state": "active", "startsAt": "2026-11-11T07:04:16.243Z", "updatedAt": "2026-11-11T07:04:17.159Z", "endsAt": "2026-11-11T07:05:16.243Z"}
+{"t": 1794380657.942, "ev": "am", "am": "b", "inst": "1", "state": "active", "startsAt": "2026-11-11T07:04:16.243Z", "updatedAt": "2026-11-11T07:04:17.159Z", "endsAt": "2026-11-11T07:05:16.243Z"}
+{"t": 1794380657.943, "ev": "prom", "inst": "1", "state": "firing", "activeAt": "2026-11-11T07:04:06.243860584Z"}
+{"t": 1794380662.824, "ev": "clock", "wall": 30.912, "mono": 30.0}
+{"t": 1794380662.961, "ev": "am", "am": "a", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:04:22.157Z", "endsAt": "2026-11-11T07:05:21.243Z"}
+{"t": 1794380662.962, "ev": "am", "am": "b", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:04:22.157Z", "endsAt": "2026-11-11T07:05:21.243Z"}
+{"t": 1794380662.963, "ev": "prom", "inst": "3", "state": "firing", "activeAt": "2026-11-11T07:04:11.243860584Z"}
+{"t": 1794380667.163, "ev": "notify", "am": "b", "status": "firing", "alerts": [{"inst": "1", "status": "firing", "startsAt": "2026-11-11T07:04:16.243Z", "endsAt": "0001-01-01T00:00:00Z"}, {"inst": "3", "status": "firing", "startsAt": "2026-11-11T07:04:21.243Z", "endsAt": "0001-01-01T00:00:00Z"}]}
+{"t": 1794380667.164, "ev": "notify", "am": "a", "status": "firing", "alerts": [{"inst": "1", "status": "firing", "startsAt": "2026-11-11T07:04:16.243Z", "endsAt": "0001-01-01T00:00:00Z"}, {"inst": "3", "status": "firing", "startsAt": "2026-11-11T07:04:21.243Z", "endsAt": "0001-01-01T00:00:00Z"}]}
+{"t": 1794380671.948, "ev": "mark", "what": "b"}
+{"t": 1794380671.949, "ev": "set", "inst": "2", "v": 1}
+{"t": 1794380678.021, "ev": "am", "am": "a", "inst": "1", "state": "active", "startsAt": "2026-11-11T07:04:16.243Z", "updatedAt": "2026-11-11T07:04:37.157Z", "endsAt": "2026-11-11T07:05:36.243Z"}
+{"t": 1794380678.022, "ev": "am", "am": "b", "inst": "1", "state": "active", "startsAt": "2026-11-11T07:04:16.243Z", "updatedAt": "2026-11-11T07:04:37.157Z", "endsAt": "2026-11-11T07:05:36.243Z"}
+{"t": 1794380683.039, "ev": "am", "am": "a", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:04:42.157Z", "endsAt": "2026-11-11T07:05:41.243Z"}
+{"t": 1794380683.04, "ev": "am", "am": "b", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:04:42.157Z", "endsAt": "2026-11-11T07:05:41.243Z"}
+{"t": 1794380683.041, "ev": "prom", "inst": "2", "state": "pending", "activeAt": "2026-11-11T07:04:41.243860584Z"}
+{"t": 1794380693.585, "ev": "clock", "wall": 30.761, "mono": 30.0}
+{"t": 1794380693.84, "ev": "am", "am": "a", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:04:52.919Z", "endsAt": "2026-11-11T07:05:51.243Z"}
+{"t": 1794380693.841, "ev": "am", "am": "b", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:04:52.919Z", "endsAt": "2026-11-11T07:05:51.243Z"}
+{"t": 1794380693.842, "ev": "prom", "inst": "2", "state": "firing", "activeAt": "2026-11-11T07:04:41.243860584Z"}
+{"t": 1794380697.924, "ev": "notify", "am": "b", "status": "firing", "alerts": [{"inst": "1", "status": "firing", "startsAt": "2026-11-11T07:04:16.243Z", "endsAt": "0001-01-01T00:00:00Z"}, {"inst": "2", "status": "firing", "startsAt": "2026-11-11T07:04:51.243Z", "endsAt": "0001-01-01T00:00:00Z"}, {"inst": "3", "status": "firing", "startsAt": "2026-11-11T07:04:21.243Z", "endsAt": "0001-01-01T00:00:00Z"}]}
+{"t": 1794380697.925, "ev": "notify", "am": "a", "status": "firing", "alerts": [{"inst": "1", "status": "firing", "startsAt": "2026-11-11T07:04:16.243Z", "endsAt": "0001-01-01T00:00:00Z"}, {"inst": "2", "status": "firing", "startsAt": "2026-11-11T07:04:51.243Z", "endsAt": "0001-01-01T00:00:00Z"}, {"inst": "3", "status": "firing", "startsAt": "2026-11-11T07:04:21.243Z", "endsAt": "0001-01-01T00:00:00Z"}]}
+{"t": 1794380698.769, "ev": "mark", "what": "c"}
+{"t": 1794380698.77, "ev": "set", "inst": "1", "v": 0}
+{"t": 1794380698.861, "ev": "am", "am": "a", "inst": "1", "state": "active", "startsAt": "2026-11-11T07:04:16.243Z", "updatedAt": "2026-11-11T07:04:57.918Z", "endsAt": "2026-11-11T07:05:56.243Z"}
+{"t": 1794380698.862, "ev": "am", "am": "b", "inst": "1", "state": "active", "startsAt": "2026-11-11T07:04:16.243Z", "updatedAt": "2026-11-11T07:04:57.918Z", "endsAt": "2026-11-11T07:05:56.243Z"}
+{"t": 1794380703.882, "ev": "am", "am": "a", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:05:02.918Z", "endsAt": "2026-11-11T07:06:01.243Z"}
+{"t": 1794380703.883, "ev": "am", "am": "b", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:05:02.918Z", "endsAt": "2026-11-11T07:06:01.243Z"}
+{"t": 1794380708.903, "ev": "am", "am": "a", "inst": "1", "state": "gone"}
+{"t": 1794380708.904, "ev": "am", "am": "b", "inst": "1", "state": "gone"}
+{"t": 1794380708.905, "ev": "prom", "inst": "1", "state": "inactive"}
+{"t": 1794380712.919, "ev": "am", "am": "b", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:05:12.918Z", "endsAt": "2026-11-11T07:06:11.243Z"}
+{"t": 1794380713.922, "ev": "am", "am": "a", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:05:12.918Z", "endsAt": "2026-11-11T07:06:11.243Z"}
+{"t": 1794380723.514, "ev": "am", "am": "a", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:05:23.475Z", "endsAt": "2026-11-11T07:06:21.243Z"}
+{"t": 1794380723.515, "ev": "am", "am": "b", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:05:23.475Z", "endsAt": "2026-11-11T07:06:21.243Z"}
+{"t": 1794380724.142, "ev": "clock", "wall": 30.557, "mono": 30.0}
+{"t": 1794380728.482, "ev": "notify", "am": "b", "status": "firing", "alerts": [{"inst": "1", "status": "resolved", "startsAt": "2026-11-11T07:04:16.243Z", "endsAt": "2026-11-11T07:05:06.243Z"}, {"inst": "2", "status": "firing", "startsAt": "2026-11-11T07:04:51.243Z", "endsAt": "0001-01-01T00:00:00Z"}, {"inst": "3", "status": "firing", "startsAt": "2026-11-11T07:04:21.243Z", "endsAt": "0001-01-01T00:00:00Z"}]}
+{"t": 1794380728.482, "ev": "notify", "am": "a", "status": "firing", "alerts": [{"inst": "1", "status": "resolved", "startsAt": "2026-11-11T07:04:16.243Z", "endsAt": "2026-11-11T07:05:06.243Z"}, {"inst": "2", "status": "firing", "startsAt": "2026-11-11T07:04:51.243Z", "endsAt": "0001-01-01T00:00:00Z"}, {"inst": "3", "status": "firing", "startsAt": "2026-11-11T07:04:21.243Z", "endsAt": "0001-01-01T00:00:00Z"}]}
+{"t": 1794380729.397, "ev": "mark", "what": "d"}
+{"t": 1794380733.554, "ev": "am", "am": "a", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:05:33.475Z", "endsAt": "2026-11-11T07:06:31.243Z"}
+{"t": 1794380733.555, "ev": "am", "am": "b", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:05:33.475Z", "endsAt": "2026-11-11T07:06:31.243Z"}
+{"t": 1794380743.592, "ev": "am", "am": "a", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:05:43.476Z", "endsAt": "2026-11-11T07:06:41.243Z"}
+{"t": 1794380743.593, "ev": "am", "am": "b", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:05:43.476Z", "endsAt": "2026-11-11T07:06:41.243Z"}
+{"t": 1794380754.744, "ev": "am", "am": "a", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:05:54.588Z", "endsAt": "2026-11-11T07:06:51.243Z"}
+{"t": 1794380754.745, "ev": "am", "am": "b", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:05:54.588Z", "endsAt": "2026-11-11T07:06:51.243Z"}
+{"t": 1794380755.256, "ev": "clock", "wall": 31.113, "mono": 30.0}
+{"t": 1794380764.785, "ev": "am", "am": "a", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:06:04.589Z", "endsAt": "2026-11-11T07:07:01.243Z"}
+{"t": 1794380764.786, "ev": "am", "am": "b", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:06:04.589Z", "endsAt": "2026-11-11T07:07:01.243Z"}
+{"t": 1794380774.822, "ev": "am", "am": "a", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:06:14.588Z", "endsAt": "2026-11-11T07:07:11.243Z"}
+{"t": 1794380774.823, "ev": "am", "am": "b", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:06:14.588Z", "endsAt": "2026-11-11T07:07:11.243Z"}
+{"t": 1794380785.806, "ev": "am", "am": "a", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:06:25.535Z", "endsAt": "2026-11-11T07:07:21.243Z"}
+{"t": 1794380785.807, "ev": "am", "am": "b", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:06:25.535Z", "endsAt": "2026-11-11T07:07:21.243Z"}
+{"t": 1794380786.202, "ev": "clock", "wall": 30.947, "mono": 30.0}
+{"t": 1794380790.542, "ev": "notify", "am": "b", "status": "firing", "alerts": [{"inst": "1", "status": "resolved", "startsAt": "2026-11-11T07:04:16.243Z", "endsAt": "2026-11-11T07:05:06.243Z"}, {"inst": "2", "status": "firing", "startsAt": "2026-11-11T07:04:51.243Z", "endsAt": "0001-01-01T00:00:00Z"}, {"inst": "3", "status": "firing", "startsAt": "2026-11-11T07:04:21.243Z", "endsAt": "0001-01-01T00:00:00Z"}]}
+{"t": 1794380790.543, "ev": "notify", "am": "a", "status": "firing", "alerts": [{"inst": "1", "status": "resolved", "startsAt": "2026-11-11T07:04:16.243Z", "endsAt": "2026-11-11T07:05:06.243Z"}, {"inst": "2", "status": "firing", "startsAt": "2026-11-11T07:04:51.243Z", "endsAt": "0001-01-01T00:00:00Z"}, {"inst": "3", "status": "firing", "startsAt": "2026-11-11T07:04:21.243Z", "endsAt": "0001-01-01T00:00:00Z"}]}
+{"t": 1794380795.844, "ev": "am", "am": "a", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:06:35.535Z", "endsAt": "2026-11-11T07:07:31.243Z"}
+{"t": 1794380795.845, "ev": "am", "am": "b", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:06:35.535Z", "endsAt": "2026-11-11T07:07:31.243Z"}
+{"t": 1794380805.88, "ev": "am", "am": "a", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:06:45.535Z", "endsAt": "2026-11-11T07:07:41.243Z"}
+{"t": 1794380805.881, "ev": "am", "am": "b", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:06:45.535Z", "endsAt": "2026-11-11T07:07:41.243Z"}
+{"t": 1794380813.627, "ev": "am", "am": "a", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:06:53.263Z", "endsAt": "2026-11-11T07:07:51.243Z"}
+{"t": 1794380813.628, "ev": "am", "am": "b", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:06:53.263Z", "endsAt": "2026-11-11T07:07:51.243Z"}
+{"t": 1794380818.931, "ev": "clock", "wall": 32.728, "mono": 30.0}
+{"t": 1794380823.664, "ev": "am", "am": "a", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:07:03.263Z", "endsAt": "2026-11-11T07:08:01.243Z"}
+{"t": 1794380823.665, "ev": "am", "am": "b", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:07:03.263Z", "endsAt": "2026-11-11T07:08:01.243Z"}
+{"t": 1794380833.703, "ev": "am", "am": "a", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:07:13.264Z", "endsAt": "2026-11-11T07:08:11.243Z"}
+{"t": 1794380833.704, "ev": "am", "am": "b", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:07:13.263Z", "endsAt": "2026-11-11T07:08:11.243Z"}
+{"t": 1794380844.742, "ev": "am", "am": "a", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:07:24.263Z", "endsAt": "2026-11-11T07:08:21.243Z"}
+{"t": 1794380844.743, "ev": "am", "am": "b", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:07:24.263Z", "endsAt": "2026-11-11T07:08:21.243Z"}
+{"t": 1794380849.931, "ev": "clock", "wall": 31.0, "mono": 30.0}
+{"t": 1794380854.277, "ev": "notify", "am": "a", "status": "firing", "alerts": [{"inst": "1", "status": "resolved", "startsAt": "2026-11-11T07:04:16.243Z", "endsAt": "2026-11-11T07:05:06.243Z"}, {"inst": "2", "status": "firing", "startsAt": "2026-11-11T07:04:51.243Z", "endsAt": "0001-01-01T00:00:00Z"}, {"inst": "3", "status": "firing", "startsAt": "2026-11-11T07:04:21.243Z", "endsAt": "0001-01-01T00:00:00Z"}]}
+{"t": 1794380854.278, "ev": "notify", "am": "b", "status": "firing", "alerts": [{"inst": "1", "status": "resolved", "startsAt": "2026-11-11T07:04:16.243Z", "endsAt": "2026-11-11T07:05:06.243Z"}, {"inst": "2", "status": "firing", "startsAt": "2026-11-11T07:04:51.243Z", "endsAt": "0001-01-01T00:00:00Z"}, {"inst": "3", "status": "firing", "startsAt": "2026-11-11T07:04:21.243Z", "endsAt": "0001-01-01T00:00:00Z"}]}
+{"t": 1794380854.782, "ev": "am", "am": "a", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:07:34.264Z", "endsAt": "2026-11-11T07:08:31.243Z"}
+{"t": 1794380854.783, "ev": "am", "am": "b", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:07:34.264Z", "endsAt": "2026-11-11T07:08:31.243Z"}
+{"t": 1794380864.822, "ev": "am", "am": "a", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:07:44.263Z", "endsAt": "2026-11-11T07:08:41.243Z"}
+{"t": 1794380864.823, "ev": "am", "am": "b", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:07:44.263Z", "endsAt": "2026-11-11T07:08:41.243Z"}
+{"t": 1794380875.658, "ev": "am", "am": "a", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:07:55.064Z", "endsAt": "2026-11-11T07:08:51.243Z"}
+{"t": 1794380875.659, "ev": "am", "am": "b", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:07:55.064Z", "endsAt": "2026-11-11T07:08:51.243Z"}
+{"t": 1794380880.731, "ev": "clock", "wall": 30.8, "mono": 30.0}
+{"t": 1794380885.698, "ev": "am", "am": "a", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:08:05.063Z", "endsAt": "2026-11-11T07:09:01.243Z"}
+{"t": 1794380885.699, "ev": "am", "am": "b", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:08:05.063Z", "endsAt": "2026-11-11T07:09:01.243Z"}
+{"t": 1794380895.739, "ev": "am", "am": "a", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:08:15.064Z", "endsAt": "2026-11-11T07:09:11.243Z"}
+{"t": 1794380895.74, "ev": "am", "am": "b", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:08:15.064Z", "endsAt": "2026-11-11T07:09:11.243Z"}
+{"t": 1794380906.41, "ev": "am", "am": "a", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:08:25.699Z", "endsAt": "2026-11-11T07:09:21.243Z"}
+{"t": 1794380906.411, "ev": "am", "am": "b", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:08:25.699Z", "endsAt": "2026-11-11T07:09:21.243Z"}
+{"t": 1794380911.367, "ev": "clock", "wall": 30.636, "mono": 30.0}
+{"t": 1794380915.708, "ev": "notify", "am": "b", "status": "firing", "alerts": [{"inst": "1", "status": "resolved", "startsAt": "2026-11-11T07:04:16.243Z", "endsAt": "2026-11-11T07:05:06.243Z"}, {"inst": "2", "status": "firing", "startsAt": "2026-11-11T07:04:51.243Z", "endsAt": "0001-01-01T00:00:00Z"}, {"inst": "3", "status": "firing", "startsAt": "2026-11-11T07:04:21.243Z", "endsAt": "0001-01-01T00:00:00Z"}]}
+{"t": 1794380915.709, "ev": "notify", "am": "a", "status": "firing", "alerts": [{"inst": "1", "status": "resolved", "startsAt": "2026-11-11T07:04:16.243Z", "endsAt": "2026-11-11T07:05:06.243Z"}, {"inst": "2", "status": "firing", "startsAt": "2026-11-11T07:04:51.243Z", "endsAt": "0001-01-01T00:00:00Z"}, {"inst": "3", "status": "firing", "startsAt": "2026-11-11T07:04:21.243Z", "endsAt": "0001-01-01T00:00:00Z"}]}
+{"t": 1794380916.449, "ev": "am", "am": "a", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:08:35.699Z", "endsAt": "2026-11-11T07:09:31.243Z"}
+{"t": 1794380916.451, "ev": "am", "am": "b", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:08:35.699Z", "endsAt": "2026-11-11T07:09:31.243Z"}
+{"t": 1794380926.488, "ev": "am", "am": "a", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:08:45.698Z", "endsAt": "2026-11-11T07:09:41.243Z"}
+{"t": 1794380926.489, "ev": "am", "am": "b", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:08:45.699Z", "endsAt": "2026-11-11T07:09:41.243Z"}
+{"t": 1794380937.723, "ev": "am", "am": "a", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:08:56.899Z", "endsAt": "2026-11-11T07:09:56.243Z"}
+{"t": 1794380937.725, "ev": "am", "am": "b", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:08:56.899Z", "endsAt": "2026-11-11T07:09:56.243Z"}
+{"t": 1794380942.567, "ev": "clock", "wall": 31.2, "mono": 30.0}
+{"t": 1794380942.742, "ev": "am", "am": "a", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:09:01.899Z", "endsAt": "2026-11-11T07:10:01.243Z"}
+{"t": 1794380942.743, "ev": "am", "am": "b", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:09:01.899Z", "endsAt": "2026-11-11T07:10:01.243Z"}
+{"t": 1794380957.795, "ev": "am", "am": "a", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:09:16.899Z", "endsAt": "2026-11-11T07:10:16.243Z"}
+{"t": 1794380957.796, "ev": "am", "am": "b", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:09:16.899Z", "endsAt": "2026-11-11T07:10:16.243Z"}
+{"t": 1794380962.814, "ev": "am", "am": "a", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:09:21.899Z", "endsAt": "2026-11-11T07:10:21.243Z"}
+{"t": 1794380962.815, "ev": "am", "am": "b", "inst": "3", "state": "active", "startsAt": "2026-11-11T07:04:21.243Z", "updatedAt": "2026-11-11T07:09:21.899Z", "endsAt": "2026-11-11T07:10:21.243Z"}
+{"t": 1794380975.296, "ev": "clock", "wall": 32.728, "mono": 30.0}
+{"t": 1794380979.638, "ev": "notify", "am": "b", "status": "firing", "alerts": [{"inst": "1", "status": "resolved", "startsAt": "2026-11-11T07:04:16.243Z", "endsAt": "2026-11-11T07:05:06.243Z"}, {"inst": "2", "status": "firing", "startsAt": "2026-11-11T07:04:51.243Z", "endsAt": "0001-01-01T00:00:00Z"}, {"inst": "3", "status": "firing", "startsAt": "2026-11-11T07:04:21.243Z", "endsAt": "0001-01-01T00:00:00Z"}]}
+{"t": 1794380979.639, "ev": "notify", "am": "a", "status": "firing", "alerts": [{"inst": "1", "status": "resolved", "startsAt": "2026-11-11T07:04:16.243Z", "endsAt": "2026-11-11T07:05:06.243Z"}, {"inst": "2", "status": "firing", "startsAt": "2026-11-11T07:04:51.243Z", "endsAt": "0001-01-01T00:00:00Z"}, {"inst": "3", "status": "firing", "startsAt": "2026-11-11T07:04:21.243Z", "endsAt": "0001-01-01T00:00:00Z"}]}
+{"t": 1794380980.556, "ev": "mark", "what": "e-kill"}
+{"t": 1794380980.6, "ev": "am", "am": "a", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:09:39.626Z", "endsAt": "2026-11-11T07:10:36.243Z"}
+{"t": 1794380980.601, "ev": "am", "am": "b", "inst": "2", "state": "active", "startsAt": "2026-11-11T07:04:51.243Z", "updatedAt": "2026-11-11T07:09:39.627Z", "endsAt": "2026-11-11T07:10:36.243Z"}
+{"t": 1794380985.224, "ev": "prom", "inst": "3", "state": "inactive"}
+{"t": 1794380985.224, "ev": "prom", "inst": "2", "state": "inactive"}
+{"t": 1794381008.008, "ev": "clock", "wall": 32.713, "mono": 30.0}
+{"t": 1794381023.632, "ev": "am", "am": "a", "inst": "3", "state": "gone"}
+{"t": 1794381023.633, "ev": "am", "am": "b", "inst": "3", "state": "gone"}
+{"t": 1794381038.222, "ev": "am", "am": "a", "inst": "2", "state": "gone"}
+{"t": 1794381038.223, "ev": "am", "am": "b", "inst": "2", "state": "gone"}
+{"t": 1794381040.726, "ev": "clock", "wall": 32.717, "mono": 30.0}
+{"t": 1794381045.069, "ev": "notify", "am": "a", "status": "resolved", "alerts": [{"inst": "2", "status": "resolved", "startsAt": "2026-11-11T07:04:51.243Z", "endsAt": "2026-11-11T07:10:36.243Z"}, {"inst": "3", "status": "resolved", "startsAt": "2026-11-11T07:04:21.243Z", "endsAt": "2026-11-11T07:10:21.243Z"}]}
+{"t": 1794381045.07, "ev": "notify", "am": "b", "status": "resolved", "alerts": [{"inst": "2", "status": "resolved", "startsAt": "2026-11-11T07:04:51.243Z", "endsAt": "2026-11-11T07:10:36.243Z"}, {"inst": "3", "status": "resolved", "startsAt": "2026-11-11T07:04:21.243Z", "endsAt": "2026-11-11T07:10:21.243Z"}]}
+{"t": 1794381048.59, "ev": "mark", "what": "end"}

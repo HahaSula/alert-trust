@@ -31,7 +31,8 @@ The report answers, in this order (the order a reviewer needs):
      R from range-window-1sample), labelled 推論. To verify it with promtool, a failed scrape is `stale`, never `_`
      (template docs/tools/templates/for-reset.test.yml).
   6. --notify-within X: per critical alert the worst case to the first notification, S + d + E + O (vmalert:
-     + max(L, D)) + ⌈for/E⌉·E + group_wait (from the inventory's route), labelled 推算; and the Watchdog route's
+     + max(L, D)) + ⌈for/E⌉·E + group_wait (from the inventory's route), labelled 推算, plus a second row for an
+     alert joining an already-firing group (+ group_interval instead of group_wait); and the Watchdog route's
      DMS lower bound (contract deadman-wait, inventory alertmanager.watchdog_route) against X.
 
 A rule whose job has no --job-* value (and is not in --config) uses the defaults; every such row says
@@ -626,6 +627,7 @@ COST_TAU_UP = "τ 變大，壞掉的 target 要等更久才判定失敗"
 
 CRITICAL = ("critical", "page", "p1", "sev1")
 AM_GROUP_WAIT_DEFAULT = 30.0
+AM_GROUP_INTERVAL_DEFAULT = 300.0  # Alertmanager dispatch/route.go DefaultRouteOpts
 
 
 def notify_checks(a, docs, inv: dict | None) -> list[dict]:
@@ -638,7 +640,9 @@ def notify_checks(a, docs, inv: dict | None) -> list[dict]:
     in the past (query_offset; vmalert eval_delay D, or the data latency L when longer); `for` is checked at
     evaluations, so it takes ⌈for/E⌉·E; group_wait: Alertmanager's first notification of a new group (from the
     inventory's route for that rule, else the default 30s). A rule whose condition needs several samples (rate
-    over a window) needs more than this; a group that is already open waits group_interval instead."""
+    over a window) needs more than this. A second row per rule covers an alert that joins a group which is
+    already firing (its first flush is over): it waits for the next group_interval tick instead of group_wait,
+    so group_wait is replaced by group_interval (route value, else the default 5m)."""
     inv_rules = {r.get("name"): r for r in (inv or {}).get("rules") or []}
     am_known = isinstance((inv or {}).get("alertmanager"), dict) and "routes" in (inv or {}).get("alertmanager", {})
     out = []
@@ -674,24 +678,36 @@ def notify_checks(a, docs, inv: dict | None) -> list[dict]:
                 for_eff = math.ceil(fr / E - 1e-9) * E if fr else 0.0
                 rt = (inv_rules.get(name) or {}).get("route") or {}
                 gws = [dur(m.get("group_wait")) for m in rt.get("matches") or [] if m.get("group_wait")]
+                gis = [dur(m.get("group_interval")) for m in rt.get("matches") or [] if m.get("group_interval")]
                 if gws:
                     gw, gw_src = max(gws), "alertmanager.yml（這條 rule 的 route）"
                 else:
                     gw, gw_src = AM_GROUP_WAIT_DEFAULT, ("Alertmanager 預設" if not am_known else "route 沒有設定，用預設")
+                if gis:
+                    gi, gi_src = max(gis), "alertmanager.yml（這條 rule 的 route）"
+                else:
+                    gi, gi_src = AM_GROUP_INTERVAL_DEFAULT, ("Alertmanager 預設" if not am_known else "route 沒有設定，用預設")
                 parts = [("S", S), ("d", d), ("E", E)]
                 if a.stack == "vmalert":
                     L = a.latency if a.latency is not None else S
                     parts.append(("max(L, D)", max(L, a.eval_delay)))
                 elif O:
                     parts.append(("O", O))
-                parts += [("⌈for/E⌉·E", for_eff), ("group_wait", gw)]
+                parts.append(("⌈for/E⌉·E", for_eff))
+                parts_join = parts + [("group_interval", gi)]
+                parts = parts + [("group_wait", gw)]
                 total = sum(v for _, v in parts)
+                total_join = sum(v for _, v in parts_join)
                 nd = (getattr(a, "nodata_rules", None) or {}).get(name) or \
                     ("selector 全部沒有資料" if n_sel and n_empty == n_sel else None)
                 out.append({"rule": name, "job_src": src, "parts": parts, "total": total, "gw_src": gw_src,
                             "defaults": worst[1]["defaults"], "nodata": nd,
                             "ok": None if nd else total <= a.notify_within,
-                            "formula": " + ".join(f"{k} {fmt(v)}" for k, v in parts) + f" = {fmt(total)}"})
+                            "formula": " + ".join(f"{k} {fmt(v)}" for k, v in parts) + f" = {fmt(total)}",
+                            # 加入已經在響的 group：第一次 flush 已過，要等下一個 group_interval tick
+                            "total_join": total_join, "gi_src": gi_src,
+                            "ok_join": None if nd else total_join <= a.notify_within,
+                            "formula_join": " + ".join(f"{k} {fmt(v)}" for k, v in parts_join) + f" = {fmt(total_join)}"})
     return out
 
 
@@ -712,16 +728,20 @@ def notify_section(a, nrows: list[dict], dms: dict | None) -> list[str]:
               "Prometheus：`S + d + E + O + ⌈for/E⌉·E + group_wait`（O 是 `query_offset`，沒有設就是 0）。")
            + "S + d：變化最多等一個 `scrape_interval` 才被抓到、再 d 才寫入；E：最多一個 `evaluation_interval` 才被評估；"
              "`for` 只在評估時檢查，要 ⌈for/E⌉·E；`group_wait`：新 group 的第一次通知。"
-             "`rate` 這類要視窗內多個 sample 才超過門檻的 rule 會更久；同一個 group 已經有 alert 在響時，等的是 `group_interval`。"
+             "`rate` 這類要視窗內多個 sample 才超過門檻的 rule 會更久。每條 rule 列兩行：**新 group**（`+ group_wait`）與"
+             "**加入已在響的 group**（同一個 group 已經送過通知，要等下一個 `group_interval` tick，`+ group_interval`），"
+             "見[從觸發到通知](" + SITE + "/architecture/alert-delivery/#worst-case)。"
              "這裡只算偵測與第一次通知；rule 有沒有載入、route 會不會 page、ruler 停了誰知道，見 summary.md 的端到端結論。\n"]
     if not nrows:
         out.append("沒有 severity critical 的 alert rule。")
     else:
-        out.append(f"| rule | 來源 | 推算（最壞） | ≤ {X}？ | `group_wait` 來源 |\n|---|---|---|---|---|")
+        out.append(f"| rule | 情況 | 來源 | 推算（最壞） | ≤ {X}？ | route 時間來源 |\n|---|---|---|---|---|---|")
         for n in nrows:
-            ok = "沒有資料，不會響" if n["nodata"] else ("是" if n["ok"] else "**否**")
+            yn = lambda v: "沒有資料，不會響" if n["nodata"] else ("是" if v else "**否**")  # noqa: E731
             dflt = f"（用預設值：{'、'.join(n['defaults'])}）" if n["defaults"] else ""
-            out.append(f"| `{n['rule']}` | {n['job_src']}{dflt} | {n['formula']} | {ok} | {n['gw_src']} |")
+            out.append(f"| `{n['rule']}` | 新 group | {n['job_src']}{dflt} | {n['formula']} | {yn(n['ok'])} | {n['gw_src']} |")
+            out.append(f"| `{n['rule']}` | 加入已在響的 group | {n['job_src']}{dflt} | {n['formula_join']} | "
+                       f"{yn(n['ok_join'])} | {n['gi_src']} |")
     if dms:
         out.append("")
         verdict_ = "是" if dms["ok"] else "**否**"
@@ -1441,7 +1461,8 @@ def main(argv=None) -> int:
                    "for_checks": [{"rule": x["rule"], "job": x["job"], "R": x["R"]} for x in fors],
                    "prom_version": a.prom_version_text or None,
                    "notify_within": a.notify_within,
-                   "notify": [{k: n[k] for k in ("rule", "total", "ok", "formula", "nodata")} for n in nrows],
+                   "notify": [{k: n[k] for k in ("rule", "total", "ok", "formula", "nodata", "total_join", "ok_join",
+                                                   "formula_join")} for n in nrows],
                    "dms": {k: dms[k] for k in ("dms_min_wait", "dms_min_wait_seconds", "ok", "dedicated", "path", "basis")}
                    if dms else None},
                   f, ensure_ascii=False, indent=1)

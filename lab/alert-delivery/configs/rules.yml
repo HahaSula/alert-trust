@@ -1,0 +1,8 @@
+groups:
+  - name: delivery
+    interval: 5s
+    rules:
+      - alert: DeliveryTest
+        expr: at_ad_flag > 0
+        for: 10s
+        labels: { severity: page }
