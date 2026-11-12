@@ -17,7 +17,7 @@
 | 網站：模型、元件卡、內部架構 8 頁、信任契約、計算器、名詞表、Target 怎麼監控、4 篇報告、10 張圖 | `docs/` |
 | 覆蓋檢查器（含驗證 lab） | `tools/check_coverage.py`、`lab/coverage/` |
 | 唯讀蒐集器 | `tools/collect.py` |
-| Claude Code plugin：selfcheck、env-profile、prometheus、victoriametrics、alertmanager、database-targets、policy-lint | `skills/`、`.claude-plugin/` |
+| Claude Code plugin：selfcheck、env-profile、prometheus、victoriametrics、alertmanager、database-targets、policy-lint | `plugins/`、`.claude-plugin/` |
 | Lab：metric 名稱、MySQL／MariaDB（HA、效能與故障、SQL 追蹤）、PostgreSQL（HA、效能與故障、SQL 追蹤）、pending 抖動（10 組）、Alertmanager、rule 並行與查詢 slot、VictoriaMetrics／VictoriaLogs、Prometheus（從前身 repo 搬來） | `lab/` |
 | 資料庫附錄：從 DB 原始碼到 exporter SQL 到 metric（MySQL／MariaDB、PostgreSQL） | `docs/targets/*-appendix.md` |
 | 資料庫 target 依 9 個面向分類，每條範例規則附證據鏈（DB 原始碼、表或變數、exporter 原始碼與 SQL） | `catalog/targets/`、`docs/targets/` |
@@ -33,24 +33,24 @@
 | ClickHouse v26.10.2 target（內建 endpoint＋query-exporter 查 system 表）與「分析型」架構頁，2 副本＋3 Keeper lab | `catalog/targets/clickhouse.yaml`、`docs/targets/clickhouse*.md`、`queries/clickhouse/`、`lab/targets/clickhouse/` |
 | MongoDB 8.0.34 target（Percona mongodb_exporter v0.54.0）與「文件型」架構頁，3 成員 replica set lab | `catalog/targets/mongodb_exporter.yaml`、`docs/targets/mongodb*.md`、`lab/targets/mongodb/` |
 | 新章「從觸發到通知」：觸發 → notifier → Alertmanager API → dispatcher → aggregation group → receiver 的每一段延遲，`group_wait`／`group_interval`／`repeat_interval` 各一張圖與互動圖、最壞時間公式；lab 量到 repeat 被取整成 ⌈R ÷ G⌉ × G、加入已在響的 group 要等 tick、EndsAt 到期的假 resolved | `docs/architecture/alert-delivery.md`、`lab/alert-delivery/` |
-| 盲測（4 個情境，受測者不知道考點、協調者扮演使用者、另一個 agent 依評分標準打分）：45／48，考點 33.5／34。依裁判建議改進：`for` 重置的證據要用 `stale` 模擬（範本 `docs/tools/templates/`）、第一句回答「多久內叫到人」並分列偵測／載入／路由／自我監控（`--notify-within`）、版本未知時不直接建議 `query_offset`、部署模式檢查、單一問題計數、Watchdog 路由、`MetaGroupSlow` 改為每個 group 的比例 | `skills/rule-review/`、`tools/` |
+| 盲測（4 個情境，受測者不知道考點、協調者扮演使用者、另一個 agent 依評分標準打分）：45／48，考點 33.5／34。依裁判建議改進：`for` 重置的證據要用 `stale` 模擬（範本 `docs/tools/templates/`）、第一句回答「多久內叫到人」並分列偵測／載入／路由／自我監控（`--notify-within`）、版本未知時不直接建議 `query_offset`、部署模式檢查、單一問題計數、Watchdog 路由、`MetaGroupSlow` 改為每個 group 的比例 | `plugins/core/skills/rule-review/`、`tools/` |
 | 版本條件變成正式欄位：訊號 `versions: {min, max}`、rule annotation `alert_trust_min_version`；env 填版本後覆蓋檢查自動判斷不適用，沒填時標「需要回答：版本」 | `tools/`、`catalog/targets/` |
 | MySQL 與 MariaDB 拆成兩張卡（各 55 個訊號，各引用自己的原始碼；只在 MariaDB 跑過的 lab 結果，MySQL 卡降為讀碼）；舊網址 `components/mysqld_exporter` 保留轉址頁；九個資料庫的版本差異頁（原始碼）與版本條件；各卡 blind_spots 指向主機卡；新增 10 個飽和訊號 | `catalog/targets/`、`docs/targets/versions/` |
 | 一鍵入口 `tools/review.py`，各工具 `--inventory` 共用盤點；路由問題（缺 label、送進空 receiver、critical 不會叫人、inhibit 沒有 `equal`、DMS 路由沒有 Watchdog）；卡片 `key_metrics`／`metrics_any` | `tools/` |
 | 盤點工具 `tools/inventory.py`：從 Prometheus／vmagent config、rule 檔、Alertmanager config 建環境模型（每個值標來源），含 Alertmanager 路由與 inhibit；計算錯誤修正（vmagent timeout 截斷、`--baseline` 下限、d = τ、dedup、正規式 job、subquery、沒資料的 rule、exporter 預設期限、`--prom-version`、覆蓋檢查的 Watchdog 歸屬與 `partial`） | `tools/` |
 | 資料庫資源對照（連線、執行緒、記憶體池、IO／fsync、複寫 worker、背景工作、CPU）與共用的主機／容器卡（node_exporter、cAdvisor、kube-state-metrics），只讀碼 | `docs/architecture/db-resources.md`、`catalog/components/host.yaml`、`rules/host/` |
-| rule-review 改為建議優先：第 0 輪只看檔案就給建議、缺資料用保守假設、每輪最多 3 題但可提前問；工具修正（覆蓋檢查比對 job、`features` 判斷不適用、`fit_contracts --config`、方案 B 可行性、`for` 被 stale 重置的提示、`always_fires`、缺 label 的提問、`validate.py --lint-rules`）；新頁「從哪裡開始」（五階） | `skills/rule-review/`、`tools/`、`docs/tools/start.md` |
+| rule-review 改為建議優先：第 0 輪只看檔案就給建議、缺資料用保守假設、每輪最多 3 題但可提前問；工具修正（覆蓋檢查比對 job、`features` 判斷不適用、`fit_contracts --config`、方案 B 可行性、`for` 被 stale 重置的提示、`always_fires`、缺 label 的提問、`validate.py --lint-rules`）；新頁「從哪裡開始」（五階） | `plugins/core/skills/rule-review/`、`tools/`、`docs/tools/start.md` |
 | 時間契約複查（原始碼＋promtool 虛擬時鐘測試，Prometheus 3.13.5／2.51.2、VictoriaMetrics）：range-window 一般化為 `(n+k)·I + max(0, d − O)`、新增 `range-window-1sample`、vm-range-window 改為 `(n+k)·I + max(0, L − D)`、resend-endsat 最差情況 `4 × max − P`；各 range 函式需要的 sample 數表；`fit_contracts.py` 依函式判斷 n；視窗要保留語意時（`keep_range`）改給縮短 S、`query_offset`、`anchored` | `docs/contracts.md#range-functions`、`lab/promql-windows/` |
 | scrape 與 evaluation 的基準值：官方預設與限制、來源比較、由耗時分布推導 S／τ／exporter 期限／E／k 的步驟；`fit_contracts.py` 檢查 τ、exporter 期限、截斷、p99、E ≥ S、VM dedup，`--baseline` 輸出建議值 | `docs/tools/baseline.md`、`tools/fit_contracts.py` |
-| Skill 與工具跟上新卡片：覆蓋檢查器認得所有卡片 id 與常見別名、Thanos Ruler／Grafana 算 ruler；database-targets 依 `model` 分 exporter／native 兩條流程；selfcheck 分派 Thanos、Grafana；plugin 0.3.0 | `tools/check_coverage.py`、`skills/`、`.claude-plugin/` |
+| Skill 與工具跟上新卡片：覆蓋檢查器認得所有卡片 id 與常見別名、Thanos Ruler／Grafana 算 ruler；database-targets 依 `model` 分 exporter／native 兩條流程；selfcheck 分派 Thanos、Grafana；plugin 0.3.0 | `tools/check_coverage.py`、`plugins/`、`.claude-plugin/` |
 | artifact 對照後的修正：VM 報告只留公開 lab 數字、VictoriaLogs storage-reachable 改規則（重跑 lab）、Prometheus retention／notifier／磁碟訊號、VM 系列第 2、3 級訊號 | `docs/reports/`、`catalog/components/`、`rules/`、`lab/vm/vl/` |
 | 時間契約不合時給兩個方向：目前合格的 rule、方案 A 改 rule（最短合格視窗，可另存）、方案 B 改環境（`scrape_interval`、`query_offset`） | `tools/fit_contracts.py` |
 | metric 來源檢查：每個 metric 要對到 config 的 scrape job、live 快照或使用者回答，不假定（使用者在 v0.1.0 用 opencode 時回報 AI 直接假定來源） | `tools/check_metric_sources.py`、`env/sources.example.yaml` |
-| `rule-review` skill 與流程圖：先確認體系與基礎設施覆蓋，再看時間契約；離線用 `tools/rules_to_snapshot.py` | `skills/rule-review/`、`docs/tools/rule-review.md` |
+| `rule-review` skill 與流程圖：先確認體系與基礎設施覆蓋，再看時間契約；離線用 `tools/rules_to_snapshot.py` | `plugins/core/skills/rule-review/`、`docs/tools/rule-review.md` |
 
 ## 進行中
 
-- 五段框架遷移（架構 → 正確使用 → 正確觀測 → 不正確使用時的觀測 → 目前無法觀測的痕跡）：第 1 步卡片欄位與驗證完成；第 2 步 19 張卡都已標 `section`、補 `usage`、blind_spots 加 `options`（含所有卡的 `bad_queries`）；第 3 步 `catalog/map.yaml`、元件頁改成五段、`docs/map.md` 完成；第 4 步 skill 依元件分、上層匯集、拆 plugin；第 5 步盲測重跑
+- 五段框架遷移（架構 → 正確使用 → 正確觀測 → 不正確使用時的觀測 → 目前無法觀測的痕跡）：第 1 步卡片欄位與驗證完成；第 2 步 19 張卡都已標 `section`、補 `usage`、blind_spots 加 `options`（含所有卡的 `bad_queries`）；第 3 步 `catalog/map.yaml`、元件頁改成五段、`docs/map.md` 完成；第 4 步拆成 11 個 plugin（`plugins/`，共用資料以 symlink 連到 repo 根目錄，從 git marketplace 安裝實測時會變成實體檔）、skill 依元件分、上層讀 `map.yaml` 匯集，完成；第 5 步盲測重跑
 
 使用者同意的資料庫順序已全部完成；CockroachDB（專有授權）不做。資料庫架構頁依類型分頁：關聯式、記憶體 KV、共識（Raft）、分散式 SQL、分析型、文件型。
 
@@ -87,7 +87,7 @@
 
 - Repo 名稱 `alert-trust`；舊 repo 保留不刪。
 - Alertmanager 的長週期例子用 `group_interval` 1h、失敗告警視窗 `[2h]`。
-- Plugin 以 repo 根目錄為來源，skill 才能讀目錄（代價是安裝時帶著 `lab/` 與 `docs/`）。
+- Plugin 拆成 `plugins/<name>/`（core、host、各資料庫），共用的 `catalog/`、`tools/`、`rules/`、`queries/`、`env/` 用 symlink；`docs/`、`lab/` 不進 plugin。舊 plugin 名稱 `alert-trust` 以 `renames` 改為 `alert-trust-core`。
 - 卡片依 `family` 分組（prometheus、victoriametrics、shared、database）；target 卡的訊號依 9 個 `aspect` 分組：exporter、availability、workload、saturation、replication、cluster、maintenance、protection、capacity。不適用的面向要寫 `not_applicable_aspects` 並附 why 與 refs（例如 PostgreSQL 核心沒有共識機制）。
 - 範圍與結構（使用者決定，2026-11-12）：所有元件用同一個五段框架；範圍以深度為界，只到 exporter／endpoint 輸出的那一層；「正確使用」只寫原始碼推理與本機小實驗；skill 依元件分、上層匯集，拆成多個 plugin（core 加各資料庫、主機），共用 catalog／tools 以 symlink；版號全部共用 repo 的 tag。
 - MySQL 與 MariaDB 拆成兩張卡（使用者選擇，2026-11-10）：兩者原始碼不同，各自盤查；版本差異都從原始碼出發。

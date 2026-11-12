@@ -1,12 +1,67 @@
 {
   "name": "alert-trust",
-  "description": "Self-check skills for the whole alert chain: Prometheus, Thanos, VictoriaMetrics/vmalert/vmagent/VictoriaLogs, Grafana Alerting, Alertmanager and database targets, driven by the alert-trust catalog",
-  "owner": { "name": "HahaSula" },
+  "description": "Self-check skills for the whole alert chain, split per component: alert-trust-core (Prometheus, Thanos, VictoriaMetrics/vmalert/vmagent/VictoriaLogs, Grafana Alerting, Alertmanager, rule review and aggregation) plus one plugin per database and one for hosts, all reading the alert-trust catalog",
+  "owner": {
+    "name": "HahaSula"
+  },
   "plugins": [
     {
-      "name": "alert-trust",
-      "source": "./",
-      "description": "Audit whether your alert rules can be trusted at peak and which monitor-of-monitor signals are missing, reading signals and contracts from the alert-trust catalog"
+      "name": "alert-trust-core",
+      "source": "./plugins/core",
+      "description": "Interactive self-check of the alert chain (collect, write, query, evaluate, route, receive): env profile, read-only snapshot, metric-source check, coverage gaps, timing contracts with fix options, rule review, and component packs for Prometheus, Thanos, VictoriaMetrics, Grafana Alerting and Alertmanager; aggregates the database and host plugins (alert-trust-<db>) when installed"
+    },
+    {
+      "name": "alert-trust-host",
+      "source": "./plugins/host",
+      "description": "alert-trust host and container pack: checks the host card (node_exporter, cAdvisor, kube-state-metrics) in five sections; depends on alert-trust-core"
+    },
+    {
+      "name": "alert-trust-mysql",
+      "source": "./plugins/mysql",
+      "description": "alert-trust MySQL pack: checks the mysql card in five sections (architecture, usage, observe, misuse incl. bad queries, blind spots); depends on alert-trust-core"
+    },
+    {
+      "name": "alert-trust-mariadb",
+      "source": "./plugins/mariadb",
+      "description": "alert-trust MariaDB pack: checks the mariadb card in five sections (architecture, usage, observe, misuse incl. bad queries, blind spots); depends on alert-trust-core"
+    },
+    {
+      "name": "alert-trust-postgresql",
+      "source": "./plugins/postgresql",
+      "description": "alert-trust PostgreSQL pack: checks the postgres_exporter card in five sections (architecture, usage, observe, misuse incl. bad queries, blind spots); depends on alert-trust-core"
+    },
+    {
+      "name": "alert-trust-valkey",
+      "source": "./plugins/valkey",
+      "description": "alert-trust Valkey／Redis pack: checks the redis_exporter card in five sections (architecture, usage, observe, misuse incl. bad queries, blind spots); depends on alert-trust-core"
+    },
+    {
+      "name": "alert-trust-mongodb",
+      "source": "./plugins/mongodb",
+      "description": "alert-trust MongoDB pack: checks the mongodb_exporter card in five sections (architecture, usage, observe, misuse incl. bad queries, blind spots); depends on alert-trust-core"
+    },
+    {
+      "name": "alert-trust-etcd",
+      "source": "./plugins/etcd",
+      "description": "alert-trust etcd pack: checks the etcd card in five sections (architecture, usage, observe, misuse incl. bad queries, blind spots); depends on alert-trust-core"
+    },
+    {
+      "name": "alert-trust-tidb",
+      "source": "./plugins/tidb",
+      "description": "alert-trust TiDB pack: checks the tidb card in five sections (architecture, usage, observe, misuse incl. bad queries, blind spots); depends on alert-trust-core"
+    },
+    {
+      "name": "alert-trust-yugabytedb",
+      "source": "./plugins/yugabytedb",
+      "description": "alert-trust YugabyteDB pack: checks the yugabytedb card in five sections (architecture, usage, observe, misuse incl. bad queries, blind spots); depends on alert-trust-core"
+    },
+    {
+      "name": "alert-trust-clickhouse",
+      "source": "./plugins/clickhouse",
+      "description": "alert-trust ClickHouse pack: checks the clickhouse card in five sections (architecture, usage, observe, misuse incl. bad queries, blind spots); depends on alert-trust-core"
     }
-  ]
+  ],
+  "renames": {
+    "alert-trust": "alert-trust-core"
+  }
 }

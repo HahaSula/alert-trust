@@ -42,7 +42,7 @@ exporter 沒輸出的痕跡放第 5 段，方案點到為止（例如「用 quer
 <!-- map: plugins -->
 
 - `alert-trust-core` 放監控鏈的卡片與上層 skill（rule-review、selfcheck 等）：盤點環境、依 `map.yaml` 找出每個元件的 plugin、匯集結果。
-- 資料庫與主機各自一個 plugin，依賴 core；沒裝時上層 skill 只做通用的正確觀測檢查，並提示可以安裝哪個 plugin。
+- 資料庫與主機各自一個 plugin（`plugins/<db>/`），依賴 core；沒裝時上層 skill 只做通用的正確觀測檢查，並提示可以安裝哪個 plugin。目錄與 symlink 的做法見[參與與擴充](contributing.md#plugins)。
 
 ## `catalog/map.yaml` {#map-yaml}
 
@@ -52,7 +52,8 @@ exporter 沒輸出的痕跡放第 5 段，方案點到為止（例如「用 quer
 sections:            # 五段的順序與元件頁上的錨點
   - {id: usage, title: 正確使用, field: usage, anchor: usage}
 plugins:
-  alert-trust-postgresql: {title: PostgreSQL, cards: [postgres_exporter], depends: [alert-trust-core]}
+  alert-trust-postgresql: {title: PostgreSQL, dir: plugins/postgresql, cards: [postgres_exporter],
+                           skills: ['alert-trust-postgresql:postgresql'], depends: [alert-trust-core]}
 cards:
   postgres_exporter:
     plugin: alert-trust-postgresql

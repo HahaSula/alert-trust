@@ -29,7 +29,10 @@ alert-trust 回答兩個問題：
 | `hooks/refs.py` | MkDocs hook：`[^key]` 變註腳、反引號名稱連到名詞表、`<!-- figure: name -->` 內嵌 SVG | 手寫 |
 | `docs/` | 網站；`docs/components/*.md`、`docs/reference/*.md` 由 `build_pages.py` 產生，不 commit | 混合 |
 | `docs/assets/figures/*.svg` | 圖；顏色用 class，由 `docs/assets/extra.css` 對應主題 | 手寫 |
-| `skills/`、`.claude-plugin/` | Claude Code plugin（repo 根目錄就是 plugin） | 手寫 |
+| `.claude-plugin/marketplace.json` | Marketplace：列出 `plugins/` 下的 11 個 plugin；`renames` 把舊的 `alert-trust` 對到 `alert-trust-core` | 手寫 |
+| `plugins/core/` | `alert-trust-core`：上層與監控鏈 skill（`skills/{selfcheck,env-profile,rule-review,prometheus,victoriametrics,alertmanager,policy-lint}/`）、共用說明 `references/`（`five-sections.md`、`evidence.md`、`snapshot.md`） | 手寫 |
+| `plugins/<db>/`、`plugins/host/` | 每個資料庫（mysql、mariadb、postgresql、valkey、mongodb、etcd、tidb、yugabytedb、clickhouse）與主機各一個 plugin（`alert-trust-<db>`，依賴 core），各有一個同名 skill `skills/<db>/SKILL.md` | 手寫 |
+| `plugins/*/{catalog,tools,rules,env,references,queries}` | 指回 repo 的 symlink（git marketplace 安裝時複製成實際檔案）；不帶 `docs/`、`lab/` | 手寫 |
 | `lab/` | 小型實驗：每個子目錄有 README、compose、腳本、`results/` | 手寫 |
 | `env/env.example.yaml` | 環境描述範例；真實的 `env/*.yaml` 在 `.gitignore` | 手寫 |
 
@@ -62,11 +65,11 @@ docker run --rm -u $(id -u):$(id -g) -v "$PWD":/docs squidfunk/mkdocs-material:9
 5. **每條 rule 的時間契約**：`tools/fit_contracts.py --inventory …`。跑之前先問短視窗是不是刻意的（`--keep-range`）。沒有基準值時用 `--baseline`。不成立時給：目前成立的 rule、方案 A 改 rule、方案 B 改環境、保留視窗的做法，附代價。
 6. **寫法**：`tools/validate.py --lint-rules`、group 擺放。
 
-完整步驟在 `skills/rule-review/SKILL.md`。
+完整步驟在 `plugins/core/skills/rule-review/SKILL.md`。資料庫與主機的檢查在 `plugins/<db>/skills/<db>/SKILL.md`，共同流程在 `plugins/core/references/five-sections.md`；不裝 plugin 直接讀 repo 時，skill 裡的 `$AT` 是 repo 根目錄、`$REF` 是 `plugins/core/references`。
 
 ## 五段框架
 
-每張卡都回答：1 架構（會留下哪些痕跡）、2 正確使用（`usage`，只寫原始碼推理、本機小實驗或標明的官方文件）、3 正確觀測（訊號 `section: observe`）、4 不正確使用時的觀測（`section: misuse`，包含寫得不好的查詢：DB 的 SQL／命令、監控系統的 PromQL／MetricsQL／LogsQL 與 rule）、5 目前無法觀測的痕跡（`blind_spots`，方案 `options` 一行點到為止）。範圍只到 exporter／endpoint 實際輸出的那一層，不往下挖（例如主機只到 node_exporter、kube-state-metrics）。格式見 `docs/contributing.md#five-sections`。`catalog/map.yaml` 由 `tools/build_map.py`（`build_pages.py` 會呼叫）產生並 commit，記錄每張卡屬於哪個 plugin、各段有哪些項目；skill 讀它來分派，`validate.py` 會檢查它是否過期。
+每張卡都回答：1 架構（會留下哪些痕跡）、2 正確使用（`usage`，只寫原始碼推理、本機小實驗或標明的官方文件）、3 正確觀測（訊號 `section: observe`）、4 不正確使用時的觀測（`section: misuse`，包含寫得不好的查詢：DB 的 SQL／命令、監控系統的 PromQL／MetricsQL／LogsQL 與 rule）、5 目前無法觀測的痕跡（`blind_spots`，方案 `options` 一行點到為止）。範圍只到 exporter／endpoint 實際輸出的那一層，不往下挖（例如主機只到 node_exporter、kube-state-metrics）。格式見 `docs/contributing.md#five-sections`。`catalog/map.yaml` 由 `tools/build_map.py`（`build_pages.py` 會呼叫）產生並 commit，記錄每張卡屬於哪個 plugin（`plugins.<name>.dir`、`skills`）、各段有哪些項目；上層 skill（selfcheck、rule-review）讀它把每個 target 分派給 `/alert-trust-<db>:<db>`，沒裝時只做通用的正確觀測檢查並提示安裝。`validate.py` 會檢查它是否過期，`tests/test_plugins.py` 檢查 plugin 目錄、版本與 symlink。
 
 ## 證據規則（最重要）
 

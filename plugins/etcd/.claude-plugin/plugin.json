@@ -1,0 +1,21 @@
+{
+  "name": "alert-trust-etcd",
+  "description": "alert-trust etcd pack: checks the etcd card in five sections (architecture, usage, observe, misuse incl. bad queries, blind spots); depends on alert-trust-core",
+  "version": "0.3.1",
+  "author": {
+    "name": "HahaSula"
+  },
+  "homepage": "https://hahasula.github.io/alert-trust/",
+  "repository": "https://github.com/HahaSula/alert-trust",
+  "license": "MIT",
+  "keywords": [
+    "alerting",
+    "database",
+    "meta-monitoring",
+    "prometheus",
+    "etcd"
+  ],
+  "dependencies": [
+    "alert-trust-core"
+  ]
+}

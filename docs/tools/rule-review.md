@@ -14,11 +14,13 @@
 
 ## 怎麼跑
 
-用 Claude Code plugin：
+用 Claude Code plugin（安裝 `alert-trust-core`，資料庫另裝 `alert-trust-<db>`，見[參與與擴充](../contributing.md#plugins)）：
 
 ```text
-/alert-trust:rule-review my-rules/*.yml
+/alert-trust-core:rule-review my-rules/*.yml
 ```
+
+rule 裡有資料庫的 metric 時，它依 `catalog/map.yaml` 把每個資料庫交給對應的 `/alert-trust-<db>:<db>`；沒裝的只做通用的正確觀測檢查，並告訴你要裝哪個 plugin。
 
 不用 skill、自己跑工具時，先用一鍵入口（盤點 → metric 來源 → lint → 時間契約）：
 

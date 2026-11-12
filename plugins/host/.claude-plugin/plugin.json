@@ -1,0 +1,22 @@
+{
+  "name": "alert-trust-host",
+  "description": "alert-trust host and container pack: checks the host card (node_exporter, cAdvisor, kube-state-metrics) in five sections; depends on alert-trust-core",
+  "version": "0.3.1",
+  "author": {
+    "name": "HahaSula"
+  },
+  "homepage": "https://hahasula.github.io/alert-trust/",
+  "repository": "https://github.com/HahaSula/alert-trust",
+  "license": "MIT",
+  "keywords": [
+    "alerting",
+    "cadvisor",
+    "kube-state-metrics",
+    "meta-monitoring",
+    "node-exporter",
+    "prometheus"
+  ],
+  "dependencies": [
+    "alert-trust-core"
+  ]
+}

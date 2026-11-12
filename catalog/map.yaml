@@ -25,6 +25,7 @@ sections:
 plugins:
   alert-trust-core:
     title: 監控鏈
+    dir: plugins/core
     cards:
     - prometheus
     - vmagent
@@ -35,64 +36,102 @@ plugins:
     - thanos
     - grafana_alerting
     - observer
+    skills:
+    - alert-trust-core:selfcheck
+    - alert-trust-core:env-profile
+    - alert-trust-core:rule-review
+    - alert-trust-core:prometheus
+    - alert-trust-core:victoriametrics
+    - alert-trust-core:alertmanager
+    - alert-trust-core:policy-lint
   alert-trust-host:
     title: 主機與容器
+    dir: plugins/host
     cards:
     - host
+    skills:
+    - alert-trust-host:host
     depends:
     - alert-trust-core
   alert-trust-mysql:
     title: MySQL
+    dir: plugins/mysql
     cards:
     - mysql
+    skills:
+    - alert-trust-mysql:mysql
     depends:
     - alert-trust-core
   alert-trust-mariadb:
     title: MariaDB
+    dir: plugins/mariadb
     cards:
     - mariadb
+    skills:
+    - alert-trust-mariadb:mariadb
     depends:
     - alert-trust-core
   alert-trust-postgresql:
     title: PostgreSQL
+    dir: plugins/postgresql
     cards:
     - postgres_exporter
+    skills:
+    - alert-trust-postgresql:postgresql
     depends:
     - alert-trust-core
   alert-trust-valkey:
     title: Valkey／Redis
+    dir: plugins/valkey
     cards:
     - redis_exporter
+    skills:
+    - alert-trust-valkey:valkey
     depends:
     - alert-trust-core
   alert-trust-mongodb:
     title: MongoDB
+    dir: plugins/mongodb
     cards:
     - mongodb_exporter
+    skills:
+    - alert-trust-mongodb:mongodb
     depends:
     - alert-trust-core
   alert-trust-etcd:
     title: etcd
+    dir: plugins/etcd
     cards:
     - etcd
+    skills:
+    - alert-trust-etcd:etcd
     depends:
     - alert-trust-core
   alert-trust-tidb:
     title: TiDB
+    dir: plugins/tidb
     cards:
     - tidb
+    skills:
+    - alert-trust-tidb:tidb
     depends:
     - alert-trust-core
   alert-trust-yugabytedb:
     title: YugabyteDB
+    dir: plugins/yugabytedb
     cards:
     - yugabytedb
+    skills:
+    - alert-trust-yugabytedb:yugabytedb
     depends:
     - alert-trust-core
   alert-trust-clickhouse:
     title: ClickHouse
+    dir: plugins/clickhouse
     cards:
     - clickhouse
+    skills:
+    - alert-trust-clickhouse:clickhouse
     depends:
     - alert-trust-core
 cards:

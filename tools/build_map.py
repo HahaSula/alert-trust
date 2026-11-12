@@ -33,19 +33,26 @@ GROUP_ANCHORS = {f"{sec}-{g}" for sec in ("observe", "misuse")
 RESERVED_ANCHORS = {s["anchor"] for s in SECTIONS} | EXTRA_ANCHORS | GROUP_ANCHORS
 
 CORE = "alert-trust-core"
+# `dir` is plugins/<dir>/ in the repo; `skills` are invoked as /<plugin>:<skill>.
 PLUGINS = {
-    CORE: {"title": "監控鏈", "cards": ["prometheus", "vmagent", "victoriametrics", "victorialogs", "vmalert",
-                                       "alertmanager", "thanos", "grafana_alerting", "observer"]},
-    "alert-trust-host": {"title": "主機與容器", "cards": ["host"]},
-    "alert-trust-mysql": {"title": "MySQL", "cards": ["mysql"]},
-    "alert-trust-mariadb": {"title": "MariaDB", "cards": ["mariadb"]},
-    "alert-trust-postgresql": {"title": "PostgreSQL", "cards": ["postgres_exporter"]},
-    "alert-trust-valkey": {"title": "Valkey／Redis", "cards": ["redis_exporter"]},
-    "alert-trust-mongodb": {"title": "MongoDB", "cards": ["mongodb_exporter"]},
-    "alert-trust-etcd": {"title": "etcd", "cards": ["etcd"]},
-    "alert-trust-tidb": {"title": "TiDB", "cards": ["tidb"]},
-    "alert-trust-yugabytedb": {"title": "YugabyteDB", "cards": ["yugabytedb"]},
-    "alert-trust-clickhouse": {"title": "ClickHouse", "cards": ["clickhouse"]},
+    CORE: {"title": "監控鏈", "dir": "core",
+           "cards": ["prometheus", "vmagent", "victoriametrics", "victorialogs", "vmalert", "alertmanager", "thanos",
+                     "grafana_alerting", "observer"],
+           "skills": ["selfcheck", "env-profile", "rule-review", "prometheus", "victoriametrics", "alertmanager",
+                      "policy-lint"]},
+    "alert-trust-host": {"title": "主機與容器", "dir": "host", "cards": ["host"], "skills": ["host"]},
+    "alert-trust-mysql": {"title": "MySQL", "dir": "mysql", "cards": ["mysql"], "skills": ["mysql"]},
+    "alert-trust-mariadb": {"title": "MariaDB", "dir": "mariadb", "cards": ["mariadb"], "skills": ["mariadb"]},
+    "alert-trust-postgresql": {"title": "PostgreSQL", "dir": "postgresql", "cards": ["postgres_exporter"],
+                               "skills": ["postgresql"]},
+    "alert-trust-valkey": {"title": "Valkey／Redis", "dir": "valkey", "cards": ["redis_exporter"], "skills": ["valkey"]},
+    "alert-trust-mongodb": {"title": "MongoDB", "dir": "mongodb", "cards": ["mongodb_exporter"], "skills": ["mongodb"]},
+    "alert-trust-etcd": {"title": "etcd", "dir": "etcd", "cards": ["etcd"], "skills": ["etcd"]},
+    "alert-trust-tidb": {"title": "TiDB", "dir": "tidb", "cards": ["tidb"], "skills": ["tidb"]},
+    "alert-trust-yugabytedb": {"title": "YugabyteDB", "dir": "yugabytedb", "cards": ["yugabytedb"],
+                               "skills": ["yugabytedb"]},
+    "alert-trust-clickhouse": {"title": "ClickHouse", "dir": "clickhouse", "cards": ["clickhouse"],
+                               "skills": ["clickhouse"]},
 }
 # Hand-written "怎麼監控" pages for target cards (docs/targets/...).
 GUIDES = {"mysql": "targets/mysql.md", "mariadb": "targets/mariadb.md", "postgres_exporter": "targets/postgres.md",
@@ -92,7 +99,8 @@ def card_entry(card: dict) -> dict:
 def build_map(cards: list[dict]) -> dict:
     plugins = {}
     for p, info in PLUGINS.items():
-        d = {"title": info["title"], "cards": list(info["cards"])}
+        d = {"title": info["title"], "dir": f"plugins/{info['dir']}", "cards": list(info["cards"]),
+             "skills": [f"{p}:{sk}" for sk in info["skills"]]}
         if p != CORE:
             d["depends"] = [CORE]
         plugins[p] = d

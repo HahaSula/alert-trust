@@ -37,6 +37,23 @@ python3 -m unittest discover -s tests
 promtool check rules rules/<id>/*.yml
 ```
 
+## Plugin 與 skill {#plugins}
+
+Claude Code plugin 依元件拆開，全部列在 `.claude-plugin/marketplace.json`，版號相同（每個 `plugin.json` 的 `version` 一致，marketplace 的項目不寫版號）：
+
+| Plugin | 目錄 | Skill（`/<plugin>:<skill>`） |
+|---|---|---|
+| `alert-trust-core` | `plugins/core/` | `selfcheck`、`env-profile`、`rule-review`、`prometheus`、`victoriametrics`、`alertmanager`、`policy-lint`；共同流程 `references/five-sections.md` |
+| `alert-trust-host` | `plugins/host/` | `host` |
+| `alert-trust-<db>` | `plugins/<db>/` | `<db>`：mysql、mariadb、postgresql、valkey、mongodb、etcd、tidb、yugabytedb、clickhouse |
+
+- 每個資料庫與主機的 plugin 依賴 core（`plugin.json` 的 `dependencies`）。plugin 讀不到別的 plugin 的檔案，所以共用的資料用 symlink 放進每個 plugin 目錄：`catalog`、`tools`、`rules`、`env` 指到 repo 根目錄，`references` 指到 `../core/references`，資料庫 plugin 另有 `queries`。從 git marketplace 安裝時 symlink 會被複製成實際檔案；`docs/`、`lab/` 不帶，skill 改讀網站。
+- 元件 skill 照 `plugins/core/references/five-sections.md` 檢查自己的卡片；skill 裡只寫這個元件專屬的部分，訊號清單在執行時從 `catalog/` 讀。
+- 上層 skill（`selfcheck`、`rule-review`）讀 `catalog/map.yaml` 的 `cards.<id>.plugin` 與 `plugins.<name>.skills` 分派；元件 plugin 沒裝時只做通用的正確觀測檢查，並提示要裝哪個。
+- 不裝 plugin、直接讀 repo（例如 opencode）時，skill 裡的 `$AT` 是 repo 根目錄、`$REF` 是 `plugins/core/references`。
+
+新增一個資料庫：卡片加進 `tools/build_map.py` 的 `PLUGINS`（`dir`、`skills`），建立 `plugins/<db>/.claude-plugin/plugin.json`、`plugins/<db>/skills/<db>/SKILL.md` 與上面的 symlink，再加進 `marketplace.json`。`tests/test_plugins.py` 會檢查這些是否一致。
+
 ## 證據怎麼引用
 
 | 證據 | 寫法 |

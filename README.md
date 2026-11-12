@@ -19,7 +19,7 @@ alert-trust 是一份 **monitor of monitor 元件目錄**，加上檢查 **rule 
 | `catalog/sources.yaml`、`catalog/sources.d/` | 每個結論的來源 |
 | `rules/` | 依元件分的規則範本，每條都有 `runbook_url` 連到網站上的對應訊號 |
 | `tools/` | 驗證目錄、產生網站頁面、蒐集快照（`collect.py`）、覆蓋檢查（`check_coverage.py`）、比對 metric 名稱 |
-| `skills/`、`.claude-plugin/` | Claude Code plugin：每個元件一包 skill |
+| `plugins/`、`.claude-plugin/` | Claude Code plugin：`alert-trust-core` 加上每個資料庫與主機各一個 plugin |
 | `lab/` | 輕量實驗 |
 | `docs/` | 網站內容；`docs/components/` 由目錄產生 |
 
@@ -46,11 +46,12 @@ docker run --rm -it -p 8000:8000 -v "$PWD":/docs squidfunk/mkdocs-material:9.5.3
 
 ```text
 /plugin marketplace add HahaSula/alert-trust
-/plugin install alert-trust@alert-trust
-/alert-trust:selfcheck
+/plugin install alert-trust-core@alert-trust
+/plugin install alert-trust-mysql@alert-trust      # 依你的環境：mariadb、postgresql、valkey、mongodb、etcd、tidb、yugabytedb、clickhouse、host
+/alert-trust-core:selfcheck
 ```
 
-`selfcheck` 會先建立環境描述（`env-profile`），再唯讀蒐集快照、檢查覆蓋缺口，依元件交給 `prometheus`、`victoriametrics`、`alertmanager`、`database-targets` 各包處理，最後輸出報告。前身 prometheus-selfcheck-skills 的使用者可以直接改用這個 plugin。
+`selfcheck` 會先建立環境描述（`env-profile`），再唯讀蒐集快照、檢查覆蓋缺口，依元件交給 `prometheus`、`victoriametrics`、`alertmanager` 與各資料庫、主機的 plugin（`/alert-trust-<db>:<db>`）處理，最後輸出報告。沒裝的資料庫 plugin 只做通用的正確觀測檢查，報告會寫要裝哪個。舊的 `alert-trust` plugin 已改名為 `alert-trust-core`（marketplace 的 `renames` 會自動轉）。前身 prometheus-selfcheck-skills 的使用者可以直接改用這個 plugin。
 
 不用 Claude 也能跑：
 
@@ -66,7 +67,7 @@ python3 tools/rules_to_snapshot.py --out snapshot --ruler prom-a my-rules/*.yml 
 python3 tools/check_coverage.py --env env/<name>.yaml --snapshot snapshot --out report
 ```
 
-檢查別人的 rule 檔時用 `/alert-trust:rule-review`：先確認監控體系與基礎設施的覆蓋，最後才看每條 rule 的時間契約。
+檢查別人的 rule 檔時用 `/alert-trust-core:rule-review`：先確認監控體系與基礎設施的覆蓋，最後才看每條 rule 的時間契約。
 
 ## 新增一個元件或 target
 

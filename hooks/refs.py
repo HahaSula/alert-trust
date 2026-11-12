@@ -112,14 +112,15 @@ def map_plugins_table(markdown: str, src_uri: str) -> str:
     with open(os.path.join(ROOT, "catalog", "map.yaml"), encoding="utf-8") as f:
         m = yaml.safe_load(f)
     up = "../" * src_uri.count("/")
-    rows = ["| Plugin | 涵蓋的卡片 | 依賴 | 正確使用 | 正確觀測 | 不正確使用 | 寫得不好的查詢 | 無法觀測 |",
-            "|---|---|---|---|---|---|---|---|"]
+    rows = ["| Plugin | Skill | 涵蓋的卡片 | 依賴 | 正確使用 | 正確觀測 | 不正確使用 | 寫得不好的查詢 | 無法觀測 |",
+            "|---|---|---|---|---|---|---|---|---|"]
     for name, p in m["plugins"].items():
         cards = [(cid, m["cards"][cid]) for cid in p["cards"]]
         n = {k: sum(len(c[k]) for _, c in cards) for k in ("usage", "observe", "misuse", "bad_queries", "blind")}
         links = "、".join(f"[{c['name']}]({up}{c['page']})" for _, c in cards)
         dep = "、".join(f"`{d}`" for d in p.get("depends", [])) or "—"
-        rows.append(f"| `{name}` | {links} | {dep} | {n['usage']} | {n['observe']} | {n['misuse']} | {n['bad_queries']} | {n['blind']} |")
+        skills = "、".join(f"`/{sk}`" for sk in p.get("skills", [])) or "—"
+        rows.append(f"| `{name}` | {skills} | {links} | {dep} | {n['usage']} | {n['observe']} | {n['misuse']} | {n['bad_queries']} | {n['blind']} |")
     return MAP_PLUGINS.sub(lambda _: "\n".join(rows), markdown)
 
 

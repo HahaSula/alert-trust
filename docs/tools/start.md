@@ -37,7 +37,7 @@ python3 tools/review.py --rules my-rules/*.yml --config prometheus.yml --alertma
 
 先看 `report/summary.md`（建議先處理的 3 件事），再看 `report/inventory.md`：這是工具從你的檔案理解的環境，哪裡不對就直接改 `report/inventory.yaml`（改過的標 `confirmed: true`），再加 `--merge report/inventory.yaml` 跑一次，改過的值會保留。
 
-完整流程見[檢查 rule 檔](rule-review.md)。用 Claude Code 的話，直接 `/alert-trust:rule-review my-rules/*.yml`，它會先給只看檔案就說得出的建議，再逐輪問你。
+完整流程見[檢查 rule 檔](rule-review.md)。用 Claude Code 的話，直接 `/alert-trust-core:rule-review my-rules/*.yml`，它會先給只看檔案就說得出的建議，再逐輪問你。
 
 ## 第 4 階：連得到監控系統
 
@@ -46,4 +46,4 @@ python3 tools/collect.py --out snapshot --prom prom-a=http://localhost:9090
 python3 tools/check_coverage.py --env env/<name>.yaml --snapshot snapshot --out report --live
 ```
 
-`env/<name>.yaml` 的格式見 [env.example.yaml](https://github.com/HahaSula/alert-trust/blob/main/env/env.example.yaml)。這個檔案描述你的環境，已在 `.gitignore`，不會被 commit。用 Claude Code 的話，`/alert-trust:selfcheck` 會引導你建立它。
+`env/<name>.yaml` 的格式見 [env.example.yaml](https://github.com/HahaSula/alert-trust/blob/main/env/env.example.yaml)。這個檔案描述你的環境，已在 `.gitignore`，不會被 commit。用 Claude Code 的話，`/alert-trust-core:selfcheck` 會引導你建立它。

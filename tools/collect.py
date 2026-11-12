@@ -23,7 +23,7 @@ Backends:
   --vlogs    VictoriaLogs: /flags, /metrics
   --am       Alertmanager: /api/v2/status, /api/v2/alerts, /api/v2/silences, /metrics
 
-Snapshot layout (see skills/selfcheck/references/snapshot.md):
+Snapshot layout (see plugins/core/references/snapshot.md):
   <out>/manifest.json            what was collected, per id: kind, url (credentials removed), files, error count
   <out>/<id>/component.json      {id, kind, url, collected_at}
   <out>/<id>/buildinfo.json      {"status":"success","data":{"version":...,"source":...}} when known
