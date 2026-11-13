@@ -26,7 +26,12 @@ worst-case times (推算) and flags each critical rule over X; without any, the 
   3. critical alerts that will not page (route label no rule has, only email / empty receivers)
   3b. rules that do not fit this deployment (「這條 rule 不適用這個部署」: feature or label)
   4. time contracts not met (environment, rule windows)
-then the inventory to confirm, the assumptions, and at most 3 next questions (ranked by tools/inventory.py).
+then the inventory to confirm, the assumptions (card must_ask defaults applied while unanswered, 「假設：預設值」, and the
+assumption used for each question answered 「不知道」), and at most 3 next questions (ranked by tools/inventory.py; a
+question put off last round comes back first). tools/proposal_check.py runs on the same files: placeholders
+(`*.invalid`) are listed as 「上線前要換」, never as findings; with --original / --original-config a group whose
+`scrape_interval` changed but not its E (group `interval`) or the other way round is flagged; new rules without a
+promtool test (--tests) or copied from an upstream rule without the pinned ref / 「依結構改寫，非原文」 are listed.
 Everything is advice (建議 / 代價), not a verdict. Exit code 0 always (CI: use the single tools).
 """
 from __future__ import annotations
@@ -43,6 +48,8 @@ import check_coverage as CC  # noqa: E402
 import check_metric_sources as MS  # noqa: E402
 import fit_contracts as FC  # noqa: E402
 import inventory as INV  # noqa: E402
+import inventory_use as IU  # noqa: E402
+import proposal_check as PC  # noqa: E402
 import validate as VAL  # noqa: E402
 
 
@@ -326,8 +333,11 @@ def end_to_end(a, inv: dict, fit: dict | None, ms_rows: list[dict]) -> list[str]
     else:
         det = f"{len(crit)} 條 critical rule；{len(cnd)} 條永遠不會響（{_names(cnd, 4)}）" if cnd else f"{len(crit)} 條 critical rule 都讀得到資料（依檔案）"
         sc = [n for n in cnd if n in setting]
-        if sc:
-            det += f"；其中 {_names(sc, 4)} 是使用者的回答造成的：這個設定下沒有資料"
+        asm = {n for x in f if x["kind"] == "must_ask_no_data" and x.get("assumed") for n in x["rules"]}
+        if [n for n in sc if n not in asm]:
+            det += f"；其中 {_names([n for n in sc if n not in asm], 4)} 是使用者的回答造成的：這個設定下沒有資料"
+        if [n for n in sc if n in asm]:
+            det += f"；其中 {_names([n for n in sc if n in asm], 4)}：{IU.ASSUMED_DEFAULT}下沒有資料（卡片記載的預設，推論，待確認）"
         if len(cnd) == len(crit):
             no.append("critical rule 全部不會響")
         elif cnd:
@@ -492,14 +502,28 @@ def summary(a, inv, items, fit, ms_rows, lint_out, cov) -> str:
     pw = (fit or {}).get("promtool_warning")
     if pw and pw not in asm:
         asm.append(pw)
+    for e in inv.get("must_ask_effects") or []:
+        if e.get("assumed"):
+            asm.append(f"{IU.ASSUMED_DEFAULT}：`facts.{e['key']}` = {e['answer']}（卡片記載的預設，使用者還沒確認）"
+                       + (f"；{_names(e['rules'], 4)} 在這個預設下沒有資料，算進「沒有資料」" if e["verdict"] == "no_data" and e["rules"] else ""))
+    for d in inv.get("declined") or []:
+        asm.append(f"使用者答「不知道」：`{d['id']}` 不再問，改用假設：{d['assumption']}")
+    for x in inv.get("answers_ignored") or []:
+        asm.append(f"沒有採用 `{x['key']}`：{x['why']}")
     L += [f"- {x}" for x in asm] or ["- （沒有）"]
     if (st.get("ruler") or {}).get("value") == "vmalert" or (fit or {}).get("stack") == "vmalert":
         L += ["", "## 證據等級（ruler 是 vmalert）", "", f"- {FC.VMALERT_EVIDENCE}"]
     L += ["", "## 接下來想問（最多 3 題）", ""]
     qs = [q for q in inv.get("questions") or [] if q.get("ask_now")][:3]
-    L += [f"{n}. {q['q']}（{'**必問**；' if q.get('mandatory') else ''}可能推翻 {q.get('overturns', '?')} 個結論 × 代價 "
+    L += [f"{n}. {q['q']}（{'**上一輪延後**；' if q.get('deferred') else ''}{'**必問**；' if q.get('mandatory') else ''}可能推翻 {q.get('overturns', '?')} 個結論 × 代價 "
           f"{q.get('cost', '?')}：{'、'.join(q['changes'])}；回答寫到 `{q['answer_key']}`）" for n, q in enumerate(qs, 1)] or ["- （沒有）"]
-    L += ["", "每個回答都寫進 answers.yaml（或 inventory.yaml，加 `confirmed: true`），用 `--merge` 重跑後再回覆；回答過的題目不會再問。"]
+    L += ["", "每個回答都寫進 answers.yaml（或 inventory.yaml，加 `confirmed: true`），用 `--merge` 重跑後再回覆；回答過的題目不會再問。"
+          "答「不知道／沒權限」寫進 `unknown: [題目 id]`（不再問，改用假設）；同意提案方向寫進 `approved: [{rule, change, round}]`，"
+          "不是 `keep_range`。"]
+    pc = getattr(a, "_proposal", None) or {}
+    pl = PC.markdown(pc) if pc else []
+    if pl:
+        L += ["", "## 提案檔檢查（proposal_check.py）", ""] + pl
     errors, advice = lint_out
     cnt: dict = {}
     for r in ms_rows:
@@ -529,6 +553,8 @@ def main(argv=None) -> int:
     ap.add_argument("--merge", help="既有的 inventory（使用者改過的值保留）")
     ap.add_argument("--original", nargs="+", default=[],
                     help="使用者原本的 rule 檔（--rules 是提案時）：視窗改過、使用者沒確認的 rule 標「語意已改，未確認」")
+    ap.add_argument("--original-config", help="使用者原本的 prometheus.yml（--config 是提案時）：檢查 `scrape_interval` 與 group `interval` 有沒有一起改")
+    ap.add_argument("--tests", nargs="+", default=[], help="提案的 promtool 測試檔：每條新加的 rule 要有 firing 與不 firing 的測試")
     ap.add_argument("--env", help="env/<name>.yaml：給了才跑覆蓋檢查")
     ap.add_argument("--tiers", default="1")
     ap.add_argument("--notify-within", help="使用者要求的「X 內通知到人」（例如 5m）；沒給時用 answers.yaml 的 notify_within，"
@@ -569,6 +595,9 @@ def main(argv=None) -> int:
             with open(cj, encoding="utf-8") as f:
                 cov = json.load(f)["items"]
     items = rank(inv, ms_rows, fit, cov)
+    a._proposal = PC.check(a.rules, a.config, a.alertmanager, a.original, a.original_config, a.tests)
+    with open(os.path.join(a.out, "proposal-check.json"), "w", encoding="utf-8") as f:
+        json.dump(a._proposal, f, ensure_ascii=False, indent=1)
     with open(os.path.join(a.out, "summary.md"), "w", encoding="utf-8") as f:
         f.write(summary(a, inv, items, fit, ms_rows, lint_out, cov))
     print(f"{a.out}/summary.md：建議先處理 {min(3, len(items))} 件（共 {len(items)} 件）")

@@ -44,3 +44,15 @@ measured:
 facts:
   etcd:
     metrics-level: basic
+
+# 卡片 must_ask 有 default（例如 etcd --metrics 預設 basic）時，回答前工具就用預設值，標「假設：預設值」。
+
+# 使用者答「不知道／沒權限」的題目（題目 id 或 answer key）：不再問，摘要寫出改用的假設。也可以把值寫成 unknown。
+unknown: [external_observer]
+
+# 這輪延後的題目：下一輪排第 1 題，直到回答或寫進 answered／unknown（上一輪在前 3 題、沒回答的 must_ask 會自動記進來）。
+deferred: []
+
+# 使用者同意的提案方向（不是 keep_range；keep_range 只記「這個視窗是刻意的嗎？」的直接回答）。
+approved:
+  - { rule: ExampleRule, change: "改成 last_over_time", round: 2 }

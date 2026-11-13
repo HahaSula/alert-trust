@@ -158,7 +158,9 @@ def keep_state(v) -> bool | None:
 
 
 def keep_range(inv: dict) -> list[str]:
-    return [r["name"] for r in inv.get("rules") or [] if keep_state(val(r.get("keep_range"))) is True]
+    """Rules whose window is kept: answered intentional, or 「不知道」 (declined: kept, no option A)."""
+    return [r["name"] for r in inv.get("rules") or [] if keep_state(val(r.get("keep_range"))) is True
+            or (isinstance(r.get("keep_range"), dict) and r["keep_range"].get("declined"))]
 
 
 def change_range(inv: dict) -> list[str]:
@@ -169,7 +171,16 @@ def change_range(inv: dict) -> list[str]:
 # ---------- facts from answers.yaml and env.yaml (one reading for every tool) ----------
 
 RULER_TYPES = ("prometheus", "vmalert", "thanos", "grafana_alerting")
-_UNANSWERED = ("", "unknown", "不知道", "未知", "none", "null", "?")
+_UNANSWERED = ("", "unknown", "不知道", "未知", "none", "null", "?", "沒權限", "無權限", "no access", "不知道／沒權限",
+               "declined", "不確定")
+
+
+DECLINED_WORDS = ("unknown", "不知道", "未知", "沒權限", "無權限", "no access", "不知道／沒權限", "declined", "不確定", "?")
+
+
+def declined(v) -> bool:
+    """An explicit 「不知道／沒權限」 answer (not an empty value): the question is not asked again."""
+    return isinstance(v, str) and v.strip().lower() in DECLINED_WORDS
 
 
 def answered(v) -> bool:
@@ -276,19 +287,38 @@ def flat_facts(d) -> dict:
     return out
 
 
-def fact_values(inv: dict | None, answers: dict | None = None) -> dict:
+class Facts(dict):
+    """facts.<card>.<id> values; `assumed` holds the keys whose value is the card's documented default
+    (must_ask[].default) applied because nobody answered, or the user said 「不知道」 (label 「假設：預設值」)."""
+
+    def __init__(self, *args, **kw):
+        super().__init__(*args, **kw)
+        self.assumed: set = set()
+
+
+ASSUMED_DEFAULT = "假設：預設值"
+
+
+def fact_values(inv: dict | None, answers: dict | None = None) -> Facts:
     """facts.<card>.<id> answers: the inventory's facts section (answered nodes) plus answers.yaml `facts`
-    (nested or flat; answers win)."""
-    out = {}
+    (nested or flat; answers win). Inventory nodes {from: default, assumed: true} (the card's must_ask default,
+    applied while unanswered) are included and listed in `.assumed`."""
+    out = Facts()
     for k, node in ((inv or {}).get("facts") or {}).items():
         if isinstance(node, dict) and "value" in node:
             if is_user(node) and answered(val(node)):
                 out[str(k)] = val(node)
+            elif node.get("assumed") and answered(val(node)):
+                out[str(k)] = val(node)
+                out.assumed.add(str(k))
         elif isinstance(node, dict):
             out.update({f"{k}.{k2}": v for k2, v in flat_facts(node).items() if answered(v)})
         elif answered(node):
             out[str(k)] = node
-    out.update({k: v for k, v in flat_facts((answers or {}).get("facts")).items() if answered(v)})
+    for k, v in flat_facts((answers or {}).get("facts")).items():
+        if answered(v):
+            out[k] = v
+            out.assumed.discard(k)
     return out
 
 
@@ -320,11 +350,13 @@ def applied_effects(values: dict) -> list[dict]:
             ans = values.get(key)
             if not answered(ans):
                 continue
+            assumed = key in getattr(values, "assumed", ())
             for e in q["effects"]:
                 if C.effect_matches(e.get("when"), ans):
                     out.append({"card": card["id"], "id": q["id"], "key": key, "answer": str(ans), "verdict": e["verdict"],
                                 "metrics": list(e.get("metrics") or []), "signals": list(e.get("signals") or []),
-                                "why": e.get("why") or q.get("why", ""), "question": q.get("question", "")})
+                                "why": e.get("why") or q.get("why", ""), "question": q.get("question", ""),
+                                "assumed": assumed})
     return out
 
 
@@ -346,5 +378,52 @@ def effect_for_metric(metric: str | None, effects: list[dict], verdict: str | No
 
 
 def effect_text(e: dict) -> str:
-    return f"這個設定下沒有資料（facts.{e['key']} = {e['answer']}：{e['why']}）" if e["verdict"] == "no_data" else \
-        f"這個設定下有資料（facts.{e['key']} = {e['answer']}：{e['why']}）"
+    """「這個設定下沒有資料」 text; an effect of an assumed default says 「假設：預設值」 and that it is unconfirmed."""
+    src = (f"{ASSUMED_DEFAULT} facts.{e['key']} = {e['answer']}（卡片記載的預設；推論，待確認）" if e.get("assumed")
+           else f"facts.{e['key']} = {e['answer']}")
+    return f"這個設定下沒有資料（{src}：{e['why']}）" if e["verdict"] == "no_data" else \
+        f"這個設定下有資料（{src}：{e['why']}）"
+
+
+# ---------- placeholders (RFC 2606 / 6761 names in proposed files) ----------
+
+import re as _re  # noqa: E402
+
+PLACEHOLDER_RE = _re.compile(r"(?<![\w.-])((?:[a-z0-9-]+\.)*(?:[a-z0-9-]+\.(?:invalid|example)|example\.(?:com|org|net)))"
+                             r"(?![\w-]|\.[a-z0-9])", _re.I)
+
+
+def placeholder(text) -> str | None:
+    """The placeholder host in a value (`dms.example.invalid`, `x.example.com`, `foo.example`), else None."""
+    m = PLACEHOLDER_RE.search(str(text or ""))
+    return m.group(1) if m else None
+
+
+# ---------- 「不知道／沒權限」: the assumption a declined question is replaced with ----------
+
+DECLINED_ASSUMPTION = {
+    "version": "版本未知：`query_offset` 標「需要 Prometheus ≥ 2.53（版本未知）」、`anchored` 標「需要 Prometheus ≥ 3.x 實驗功能（版本未知）」",
+    "external_observer": "當成沒有外部觀察者：ruler／Alertmanager 停掉時沒有人知道",
+    "measured": "d = τ、k = 1（保守假設，標 assumed）",
+    "notify_within": "沒有通知時限：只回答會不會響，不判斷來不來得及",
+    "keep_range": "當成刻意的視窗：保留，不寫方案 A",
+    "producers": "exporter 用目錄的推測（標推測）",
+    "job_names": "job 名稱用 config 裡的；對不到的 rule 當成不會響（最壞）",
+    "--config": "沒有 scrape config：用 Prometheus 預設值，job 與丟掉的 metric 不檢查",
+    "--config-complete": "當成給的就是完整的 config：沒有 rule_files／alerting 就是沒載入、送不出去（最壞）",
+    "--alertmanager": "沒有 alertmanager.yml：路由不檢查，不能說會 page",
+    "features": "功能當成沒有：依賴它的 rule 當成不適用（標未確認）",
+    "labels": "label 當成不存在：用到它的 rule 當成回傳空（最壞）",
+}
+
+
+def declined_assumption(qid: str, default=None) -> str:
+    """The assumption used instead of re-asking a question the user answered 「不知道／沒權限」."""
+    if default is not None:
+        return f"{ASSUMED_DEFAULT}（{default}）：效果照預設套用，標推論"
+    for k, v in DECLINED_ASSUMPTION.items():
+        if qid == k or qid.startswith(k + "."):
+            return v
+    if qid.startswith(("labels.", "failrun.")):
+        return "用最壞情況：label 當成不存在／k = 1" if qid.startswith("labels.") else "k 只標上限／假設"
+    return "用最壞情況，結論標「未確認」"

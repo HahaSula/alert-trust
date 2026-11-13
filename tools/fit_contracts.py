@@ -1012,6 +1012,44 @@ def env_checks(a) -> list[tuple]:
     return out
 
 
+def group_intervals(a, docs) -> list[dict]:
+    """Per rule group: E used in the timing math (group `interval`, else the global `evaluation_interval`) and the
+    scrape_interval of the jobs its rules read. [{group, E, E_src, jobs: {job: S}}]."""
+    out = []
+    for _, doc in docs:
+        for g in doc.get("groups", []) or []:
+            gi = dur(g.get("interval")) if g.get("interval") else None
+            jobs = {}
+            for r in g.get("rules", []) or []:
+                for sel in MS.selectors(str(r.get("expr", ""))):
+                    job = resolve_job(a, sel["matchers"])[0]
+                    if job is not None and job in a.job_interval:
+                        jobs[job] = a.job_interval[job]
+            out.append({"group": g.get("name"), "E": gi if gi is not None else a.E,
+                        "E_src": "group `interval`" if gi is not None else "global `evaluation_interval`", "jobs": jobs})
+    return out
+
+
+def group_interval_notes(a, docs) -> tuple[list[str], list[tuple]]:
+    """(assumption lines, env checks): which E each group's timing math uses (a group `interval` overrides the
+    global `evaluation_interval`, and the report says so instead of only the global value), and E < S per group."""
+    gs = group_intervals(a, docs)
+    over = [g for g in gs if g["E_src"].startswith("group")]
+    notes, checks = [], []
+    if over:
+        notes.append("E：global `evaluation_interval` " + fmt(a.E) + "；group `interval` 覆寫："
+                     + "、".join(f"{g['group']} {fmt(g['E'])}" for g in over)
+                     + "（這些 group 的時間推算用 group `interval`，不是 global）")
+    for g in over:
+        low = {j: S for j, S in g["jobs"].items() if g["E"] < S}
+        if low:
+            checks.append((f"group {g['group']} 的 `interval` 與 `scrape_interval`：E {fmt(g['E'])}（group `interval`）< S "
+                           + "、".join(f"{j} {fmt(S)}" for j, S in sorted(low.items())), False,
+                           "E < S 時同一批資料被重算，pending 依相位循環；group `interval` 與 `scrape_interval` 一起改，一般取 E = S",
+                           None, "E 變大，偵測最多晚 E"))
+    return notes, checks
+
+
 STD_INTERVALS = [15, 30, 60, 120, 300]
 
 
@@ -1582,7 +1620,7 @@ def apply_inventory(a, inv: dict, user_only: bool) -> None:
     a.nodata_rules = dict(IU.nodata_rules(inv), **(getattr(a, "nodata_rules", None) or {}))
     ev = st.get("evaluation_interval") or {}
     if IU.has_config(inv) or IU.known(ev):
-        a.assumptions.append(f"S、τ、E、job 由 inventory `{inv.get('_path')}` 讀入（E {fmt(a.E) if a.E else '—'}"
+        a.assumptions.append(f"S、τ、E、job 由 inventory `{inv.get('_path')}` 讀入（global E {fmt(a.E) if a.E else '—'}"
                          f"（{ev.get('from', 'unknown')}）；job：" + (", ".join(
                              f"{j} S {fmt(a.job_interval[j])}／有效 τ {fmt(a.job_timeout[j]) if j in a.job_timeout else '—'}"
                              for j in sorted(used)) or "—") + "）；inventory 標 from: user／confirmed 的值優先於 --config，"
@@ -1819,7 +1857,9 @@ def main(argv=None) -> int:
     rows, fitted = analyze(a, docs)
     skipped: list = []
     fors = for_checks(a, docs, skipped)
-    checks = env_checks(a)
+    gnotes, gchecks = group_interval_notes(a, docs)
+    a.assumptions.extend(gnotes)
+    checks = env_checks(a) + gchecks
     nrows, dms = ([], None)
     if a.notify_within:
         nrows, dms = notify_checks(a, docs, inv), dms_check(a, inv)

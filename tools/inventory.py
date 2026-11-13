@@ -1178,13 +1178,19 @@ def build(a) -> dict:
     inv["jobs"] = jobs_out
 
     # ---- unscraped components ----
-    unscraped = []
+    unscraped, placeholders = [], []
     if cfg:
         all_targets = {t: j["name"] for j in cfg_jobs for t in j["static_targets"]}
         for t in cfg["am_targets"]:
             if t == "(service discovery)":
                 continue
             if t in all_targets or any(re.search("alertmanager", j["name"] or "") for j in cfg_jobs):
+                continue
+            ph = IU.placeholder(t)
+            if ph:
+                # a placeholder in a proposed file (alertmanager.example.invalid): to be filled, not a finding
+                placeholders.append({"where": "alerting.alertmanagers", "value": t, "host": ph,
+                                     "fact": f"alerting 的 {t} 是佔位值，待填（上線前要換；換成實際位址後再檢查有沒有被 scrape）"})
                 continue
             unscraped.append({"component": "alertmanager", "target": t, "from": "file",
                               "fact": f"alerting 的 {t} 沒有 scrape job 在抓"})
@@ -1199,11 +1205,14 @@ def build(a) -> dict:
         for u in unscraped:
             findings.append({"kind": "component_unscraped", "fact": u["fact"]})
     inv["unscraped_components"] = unscraped if cfg else V(None, "unknown", note="沒有 config")
+    if placeholders:
+        inv["placeholders"] = placeholders
 
     # ---- rules (second pass: labels, emptiness, keep_range, route) ----
     tree = route_tree(am) if am else None
     receivers = {r.get("name"): r for r in (am or {}).get("receivers") or []}
     keep_ans = answers.get("keep_range") or {}
+    ignored: list[dict] = []
     ext = cfg["external_labels"] if cfg else {}
     fires_by: dict[tuple, list] = {}
     deploy_bad: dict[tuple, list] = {}
@@ -1325,10 +1334,18 @@ def build(a) -> dict:
                                      f"(n+1)·I + τ = {fmt(need)}（k=1、d=τ 的保守值）")
             else:
                 rg["short"] = None
+        if not e["ranges"] and name in keep_ans:
+            ignored.append({"key": f"keep_range.{name}", "value": keep_ans.get(name),
+                            "why": "這條 rule 沒有 range selector，沒有視窗可以保留；keep_range 不適用，沒有記錄"})
         if e["ranges"]:
             ka = IU.keep_state(keep_ans.get(name)) if name in keep_ans else None
             ann = IU.keep_state((r.get("annotations") or {}).get("keep_range"))
-            e["keep_range"] = V(ka, "user") if ka is not None else V(ann, "file") if ann is not None else V("unknown", "unknown")
+            kv = keep_ans.get(name)
+            if ka is None and IU.declined(kv):
+                # 「不知道」: not asked again; kept as intentional (the window is left alone, no option A)
+                e["keep_range"] = V("unknown", "user", declined=True, note=IU.declined_assumption("keep_range"))
+            else:
+                e["keep_range"] = V(ka, "user") if ka is not None else V(ann, "file") if ann is not None else V("unknown", "unknown")
             orig = (r.get("annotations") or {}).get(ORIGINAL_RANGE_ANN)
             if orig:
                 e["original_ranges"] = V(str(orig), "file", note="fit_contracts.py --write-fitted 改過視窗；原本的視窗")
@@ -1567,8 +1584,16 @@ def build(a) -> dict:
         seen.add(f["fact"])
         fl.append(f)
     inv["findings_from_files"] = fl
-    inv["facts"] = facts_section(inv, answers)
+    inv["unknown"] = declined_keys(answers)
+    inv["facts"] = facts_section(inv, answers, set(inv["unknown"]))
     inv["answered"] = sorted({str(x) for x in answers.get("answered") or []})
+    inv["deferred"] = sorted({str(x) for x in answers.get("deferred") or []})
+    appr = [x for x in answers.get("approved") or [] if isinstance(x, dict)]
+    if appr:
+        # 「同意提案的方向」: recorded as an approval, never as keep_range (that is only the answer to 「視窗是刻意的嗎？」)
+        inv["approved"] = [{k: x[k] for k in ("rule", "change", "round", "note") if k in x} for x in appr]
+    if ignored:
+        inv["answers_ignored"] = ignored
     inv["_qctx"] = {"cfg": cfg, "am": am}
     inv["questions"] = questions(inv, cfg, am, a, fl)
     return inv
@@ -1660,10 +1685,13 @@ def must_ask_key(card: str, q: dict) -> str:
     return q.get("answer_key") or f"facts.{card}.{q['id']}"
 
 
-def facts_section(inv: dict, answers: dict) -> dict:
-    """facts.<card>.<id> for every must_ask question that applies: the answer (answers.facts) or unknown, so the
-    user can fill it in inventory.yaml (kept by --merge)."""
+def facts_section(inv: dict, answers: dict, declined: set | None = None) -> dict:
+    """facts.<card>.<id> for every must_ask question that applies: the answer (answers.facts), else the card's
+    documented default as an assumption ({value, from: default, assumed: true}, 「假設：預設值」, catalog.py
+    MUST_ASK_KEYS default), else unknown, so the user can fill it in inventory.yaml (kept by --merge). A question the
+    user answered 「不知道」 (answers.unknown or the value unknown) gets declined: true and is not asked again."""
     given = IU.flat_facts(answers.get("facts"))  # nested (facts: {etcd: {metrics-level: basic}}) or flat keys
+    declined = declined or set()
     out = {k: V(v, "user") for k, v in given.items() if IU.answered(v)}
     for it in must_ask_items(inv):
         key = must_ask_key(it["card"], it["q"])
@@ -1671,9 +1699,34 @@ def facts_section(inv: dict, answers: dict) -> dict:
             continue
         k = key[len("facts."):]
         v = given.get(k)
-        out[k] = V(v, "user") if IU.answered(v) else V(None, "unknown", note=it["q"]["question"])
+        if IU.answered(v):
+            out[k] = V(v, "user")
+            continue
+        dec = {"declined": True} if key in declined or f"must_ask.{it['card']}.{it['q']['id']}" in declined else {}
+        d = it["q"].get("default")
+        if d is not None:
+            out[k] = V(d, "default", assumed=True, note=f"{IU.ASSUMED_DEFAULT}（卡片記載的預設；使用者"
+                       f"{'答不知道' if dec else '還沒回答'}）：{it['q']['question']}", **dec)
+        else:
+            out[k] = V(None, "unknown", note=it["q"]["question"], **dec)
     out = dict(sorted(out.items()))
     return out
+
+
+def declined_keys(answers: dict) -> list[str]:
+    """Questions the user answered 「不知道／沒權限」: answers.unknown ids (question ids or answer keys), plus every
+    answers key (and facts.<card>.<id>) whose value is unknown / 不知道 / 沒權限. They are not asked again; the tool
+    states the assumption it uses instead (inventory `declined`)."""
+    out = {str(x) for x in answers.get("unknown") or []}
+    for k, v in answers.items():
+        if k in ("unknown", "answered", "deferred", "facts", "approved"):
+            continue
+        if IU.declined(v):
+            out.add(str(k))
+    for k, v in IU.flat_facts(answers.get("facts")).items():
+        if IU.declined(v):
+            out.add(f"facts.{k}")
+    return sorted(out)
 
 
 def apply_must_ask_effects(inv: dict) -> None:
@@ -1701,22 +1754,27 @@ def apply_must_ask_effects(inv: dict) -> None:
             r = by_name.get(name)
             if r is None or e["verdict"] != "no_data":
                 continue
-            why = f"facts.{e['key']} = {e['answer']}"
+            why = (f"{IU.ASSUMED_DEFAULT} " if e.get("assumed") else "") + f"facts.{e['key']} = {e['answer']}"
             if (r.get("fires") or {}).get("value") in ("never", "always"):
                 continue
             others = [x for x in sels if not IU.effect_for_metric(x["metric"], [e])
                       and not x["metric"].startswith("ALERTS")]
+            frm, extra = ("default", {"assumed": True}) if e.get("assumed") else ("user", {})
             if not others:
-                r["fires"] = V("never", "user", why=[why], note=IU.effect_text(e))
+                r["fires"] = V("never", frm, why=[why], note=IU.effect_text(e), **extra)
             else:
-                r["fires"] = V("partly_empty", "user", why=[why], note=IU.effect_text(e) + "；其他 selector 照常")
+                r["fires"] = V("partly_empty", frm, why=[why], note=IU.effect_text(e) + "；其他 selector 照常", **extra)
         inv["must_ask_effects"].append({"key": e["key"], "answer": e["answer"], "verdict": e["verdict"], "metrics": e["metrics"],
-                                        "signals": e["signals"], "why": e["why"], "rules": sorted(hit)})
+                                        "signals": e["signals"], "why": e["why"], "rules": sorted(hit),
+                                        **({"assumed": True, "label": IU.ASSUMED_DEFAULT} if e.get("assumed") else {})})
         if e["verdict"] == "no_data" and hit:
+            who = (f"{IU.ASSUMED_DEFAULT}：使用者還沒確認，依卡片記載的預設 facts.{e['key']} = {e['answer']}" if e.get("assumed")
+                   else f"使用者回答 facts.{e['key']} = {e['answer']}")
             inv["findings_from_files"].append({
-                "kind": "must_ask_no_data", "rules": sorted(hit), "key": e["key"],
-                "fact": f"使用者回答 facts.{e['key']} = {e['answer']}：{'、'.join(sorted(hit))} 讀的 "
-                        f"{'、'.join(e['metrics'])} 在這個設定下沒有資料（{e['why']}），這些 rule 不會響"})
+                "kind": "must_ask_no_data", "rules": sorted(hit), "key": e["key"], "assumed": bool(e.get("assumed")),
+                "fact": f"{who}：{'、'.join(sorted(hit))} 讀的 "
+                        f"{'、'.join(e['metrics'])} 在這個設定下沒有資料（{e['why']}），這些 rule 不會響"
+                        + ("（推論，待確認；回答後重判）" if e.get("assumed") else "")})
 
 
 def effect_rule_hits(inv: dict, q: dict) -> list[str]:
@@ -1735,6 +1793,8 @@ def must_ask_answered(inv: dict, card: str, q: dict) -> bool:
     st = inv.get("stack") or {}
     if key.startswith("facts."):
         node = (inv.get("facts") or {}).get(key[len("facts."):])
+        if isinstance(node, dict) and node.get("declined"):
+            return True  # 「不知道」: not asked again, the default / worst case is used instead
         return IU.is_user(node) and IU.answered(IU.val(node))
     if key in ("latency", "dedup_interval", "eval_delay"):
         return IU.is_user(st.get(key)) and IU.answered(IU.val(st.get(key)))
@@ -1742,6 +1802,16 @@ def must_ask_answered(inv: dict, card: str, q: dict) -> bool:
         js = [j for j in inv.get("jobs") or [] if (j.get("exporter") or {}).get("value") == card]
         return bool(js) and all(IU.is_user(j.get("exporter_deadline")) for j in js)
     return False
+
+
+def _default_of(inv: dict, q: dict):
+    """The card's must_ask default for a must_ask question (None for the others)."""
+    if not str(q.get("id", "")).startswith("must_ask."):
+        return None
+    for it in must_ask_items(inv):
+        if q["id"] == f"must_ask.{it['card']}.{it['q']['id']}":
+            return it["q"].get("default")
+    return None
 
 
 def questions(inv, cfg, am, a, findings) -> list[dict]:
@@ -1880,7 +1950,28 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
                    "affects": max(1, len(hits)), "findings": 2 + len(hits), "answer_key": must_ask_key(c, q), "refs": list(q["refs"]),
                    "card": c, "present": it["present"]})
     done = set(inv.get("answered") or [])
-    qs = [q for q in qs if q["id"] not in done and q["answer_key"] not in done]
+    unknown = set(inv.get("unknown") or [])
+    declined = [q for q in qs if q["id"] in unknown or q["answer_key"] in unknown]
+    # 「不知道／沒權限」: not asked again (also not in another wording: same answer_key); the assumption is stated
+    inv["declined"] = [{"id": q["id"], "answer_key": q["answer_key"], "q": q["q"],
+                        "assumption": IU.declined_assumption(q["id"], _default_of(inv, q))} for q in declined]
+    for it in must_ask_items(inv):
+        node = (inv.get("facts") or {}).get(must_ask_key(it["card"], it["q"])[len("facts."):]) or {}
+        qid = f"must_ask.{it['card']}.{it['q']['id']}"
+        if node.get("declined") and qid not in {d["id"] for d in inv["declined"]}:
+            inv["declined"].append({"id": qid, "answer_key": must_ask_key(it["card"], it["q"]), "q": it["q"]["question"],
+                                    "assumption": IU.declined_assumption(qid, it["q"].get("default"))})
+    if not inv["declined"]:
+        inv.pop("declined")
+    qs = [q for q in qs if q["id"] not in done and q["answer_key"] not in done and q not in declined]
+    # questions put off in an earlier round (answers.yaml deferred, or a must_ask that was in the first 3 and is
+    # still unanswered): mandatory, first among the mandatory ones, until answered or declined
+    deferred = set(inv.get("deferred") or [])
+    for q in qs:
+        if q["id"] in deferred:
+            q["mandatory"], q["deferred"] = True, True
+            q["mandatory_note"] = "上一輪延後的題目，這輪要問（不問就在 answers.yaml 的 answered／unknown 寫明）"
+    inv["deferred"] = sorted(q["id"] for q in qs if q.get("deferred"))
     for q in qs:
         q.setdefault("findings", 0)
         q["overturns"] = q["findings"] + len(q["changes"])
@@ -1889,10 +1980,12 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
     # answers that can overturn the most conclusions, weighted by the cost of being wrong; rules affected only breaks ties
     qs.sort(key=lambda q: (-q["score"], -q["affects"]))
     # mandatory questions always land in the first 3 (several mandatory ones push the others out, in score order)
-    mand = [q for q in qs if q.get("mandatory")]
+    mand = sorted([q for q in qs if q.get("mandatory")], key=lambda q: (not q.get("deferred"), qs.index(q)))
     if mand:
         rest = [q for q in qs if not q.get("mandatory")]
-        top = sorted(mand + rest[:max(0, 3 - len(mand))], key=qs.index)
+        top = mand[:3] + sorted(rest[:max(0, 3 - len(mand))], key=qs.index)
+        if len(mand) <= 3:
+            top = sorted(top, key=lambda q: (not q.get("deferred"), qs.index(q)))
         qs = top + [q for q in qs if q not in top]
     for i, q in enumerate(qs):
         q["ask_now"] = i < 3
@@ -1951,7 +2044,25 @@ def markdown(inv) -> str:
         L.append(f"1. {q['q']}（可能推翻 {q['overturns']} 個結論 × 錯了的代價 {q['cost']}"
                  + (f"，**必問**：{q.get('mandatory_note') or '回答前不改視窗'}" if q.get("mandatory") else "") + f"：{'、'.join(q['changes'])}）")
     L += ["", "回答寫進 answers.yaml（或直接改 inventory.yaml，加 `confirmed: true`），用 `--merge` 重跑；回答過的題目不會再問。"
-          "答不出來的題目把 id 寫進 answers.yaml 的 `answered: [...]`。"]
+          "使用者答「不知道／沒權限」的題目把 id 寫進 answers.yaml 的 `unknown: [...]`（或值寫 `unknown`）：不再問，改用下面的假設。"
+          "這輪延後不問的題目寫進 `deferred: [...]`，下一輪排在最前面。"]
+    if inv.get("declined"):
+        L += ["", "## 使用者答「不知道」的題目（不再問，改用假設）", ""]
+        L += [f"- `{d['id']}`：{d['assumption']}" for d in inv["declined"]]
+    ma = [e for e in inv.get("must_ask_effects") or [] if e.get("assumed")]
+    if ma:
+        L += ["", f"## {IU.ASSUMED_DEFAULT}（must_ask 還沒回答）", ""]
+        L += [f"- `facts.{e['key']}` = {e['answer']}（卡片記載的預設）："
+              + ("、".join(e["rules"]) + " 在預設下沒有資料（推論，待確認）" if e["verdict"] == "no_data" and e["rules"]
+                 else "效果照預設套用") for e in ma]
+    if inv.get("placeholders"):
+        L += ["", "## 佔位值（上線前要換）", ""] + [f"- {p['fact']}" for p in inv["placeholders"]]
+    if inv.get("answers_ignored"):
+        L += ["", "## 沒有採用的回答", ""] + [f"- `{x['key']}`：{x['why']}" for x in inv["answers_ignored"]]
+    if inv.get("approved"):
+        L += ["", "## 使用者同意的提案（不是 keep_range）", ""]
+        L += [f"- {x.get('rule', '—')}：{x.get('change', '—')}" + (f"（第 {x['round']} 輪）" if x.get("round") is not None else "")
+              for x in inv["approved"]]
     L += ["", "## 只看檔案就知道的事實", ""]
     L += [f"- {f['fact']}" for f in inv["findings_from_files"]] or ["- （沒有）"]
     st = inv["stack"]
@@ -2062,10 +2173,20 @@ def main(argv=None) -> int:
         old = C._load(a.merge) or {}
         same = (old.get("sources") or {}).get("sha256") == inv["sources"]["sha256"]
         answered = sorted(set(inv.get("answered") or []) | {str(x) for x in old.get("answered") or []})
+        unknown = sorted(set(inv.get("unknown") or []) | {str(x) for x in old.get("unknown") or []})
+        # a must_ask question that was in the first 3 last round and is still unanswered was put off: it comes back
+        # (mandatory, first) until answered or declined; ids in answers.deferred / the old inventory's deferred too
+        deferred = set(inv.get("deferred") or []) | {str(x) for x in old.get("deferred") or []} | \
+            {q["id"] for q in old.get("questions") or [] if q.get("ask_now") and str(q.get("id", "")).startswith("must_ask.")}
+        approved = list(old.get("approved") or []) + [x for x in inv.get("approved") or [] if x not in (old.get("approved") or [])]
         os_ = old.get("sources") or {}
         orig = os_.get("original_rules") or (os_.get("rules") if sorted(os_.get("rules") or []) != sorted(a.rules) else None)
         inv = merge(inv, old, same)
         inv["answered"] = answered
+        inv["unknown"] = unknown
+        inv["deferred"] = sorted(deferred)
+        if approved:
+            inv["approved"] = approved
         if orig:
             # the rules the user started with: fit_contracts.py reports a changed window as 「語意已改，未確認」
             inv["sources"]["original_rules"] = list(orig)

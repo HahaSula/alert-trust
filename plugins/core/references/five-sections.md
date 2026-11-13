@@ -118,6 +118,10 @@ max_over_time(scrape_duration_seconds{job="<job>"}[7d])
 每個回答寫進 `answers.yaml`（`facts.<卡片>.<id>`，巢狀 `facts: {<卡片>: {<id>: 值}}` 或扁平 `facts: {<卡片>.<id>: 值}` 都可以；`exporter_deadline.<job>`、`target_versions.<job>`、`keep_range.<rule>` 等）或 inventory（`confirmed: true`），用 `--merge` 重跑後再回覆；答過的題目不再問。
 **回答要改變結論**：卡片 `must_ask[].effects` 寫了回答對應哪些 metric 沒有資料（`verdict: no_data`）或有資料（`available`）；重跑後讀那些 metric 的 rule 標「這個設定下沒有資料」（`check_metric_sources.py` 的 `setting_absent`、`check_coverage.py` 的 `rule_no_data`），報告裡不能還寫「讀得到資料」。
 k（容忍連續失敗幾次）只有在量到最長連續失敗時才寫「觀察到的連續失敗」；只有次數時標「上限／假設」，並問「最長連續失敗幾次？」。
+must_ask 有 `default`（卡片記載的預設值，例如 etcd `--metrics` 預設 basic）時，回答前就套用，標「假設：預設值」，effects 照預設生效（沒有資料的 rule 照算）；被換掉的 must_ask 下一輪回到第 1 題（inventory `deferred`）。使用者答「不知道／沒權限」寫進 answers.yaml 的 `unknown: [題目 id]`，不再問、改用工具寫出的假設。同意提案寫 `approved`，不是 `keep_range`。
+
+提案裡新加的 rule 每條要有 firing／不 firing 的 promtool 測試；從上游抄的要從釘住的 ref 逐字複製（註解寫 url），否則標「依結構改寫，非原文」。佔位值（`.invalid`）列成「上線前要換」。
+
 說「可以動手」前，每個要改的檔都要放在 `proposed/` 並對它跑驗證；本機 promtool 主版本和目標不同（例如 2.x 對 3.x）時寫明測試結果不代表目標的語意；預期失敗的示範測試檔名用 `*.expect-fail.test.yml`、檔頭註解「預期失敗」。
 ruler 是 vmalert 時，`promtool test rules` 的結果標「Prometheus 語意」，`vmalert -dryRun` 標「只驗語法」。
 其他常見的題目：拓撲（決定 `applies_when` 與 component-count）；exporter 帳號權限（請使用者自己跑唯讀查詢，遮蔽後貼回）或有沒有 blackbox 探測健康端點；exporter 期限相關 flag 或 native endpoint 的開關。各 plugin 的 skill 會列這個資料庫的具體題目。

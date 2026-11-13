@@ -773,6 +773,7 @@ cards:
         metrics:
         - grpc_server_handling_seconds_bucket
         why: --metrics=extensive 會註冊 server 端 gRPC histogram
+      default: basic
   mariadb:
     name: mysqld_exporter＋MariaDB
     kind: target

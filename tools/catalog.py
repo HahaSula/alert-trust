@@ -204,7 +204,7 @@ def check_five_sections(card: dict, all_refs: dict) -> tuple[list[str], int]:
 
 
 # Optional card field (catalog/components/*.yaml, catalog/targets/*.yaml):
-#   must_ask: [{id, question, why, refs, applies_when?, answer_key?, effects?}]
+#   must_ask: [{id, question, why, refs, applies_when?, answer_key?, effects?, default?}]
 # Component-specific questions whose answer changes conclusions (a flag that decides whether a metric exists, an
 # exporter deadline, the data latency of a ruler). tools/inventory.py asks them, ranked high, for every card present
 # in the inventory. id kebab-case and unique in the card; question / why non-empty strings; refs non-empty and
@@ -219,7 +219,11 @@ def check_five_sections(card: dict, all_refs: dict) -> tuple[list[str], int]:
 # verdict no_data: rules reading those metrics (histogram _bucket/_sum/_count count as one family) are
 # 「這個設定下沒有資料」 (check_metric_sources.py status setting_absent → fit_contracts.py 沒有資料, review.py detection), and
 # the signals with rules become rule_no_data in check_coverage.py; available: the metrics exist (needs_input → confirmed).
-MUST_ASK_KEYS = {"id", "question", "why", "refs", "applies_when", "answer_key", "effects"}
+# default (optional, needs a facts.* answer_key): the documented default of the setting (e.g. etcd --metrics basic,
+# backed by the question's refs). Until the user answers, or after 「不知道」, tools/inventory.py applies it as an
+# assumption: facts.<card>.<id> is {value: <default>, from: default, assumed: true} and the effects whose `when`
+# matches it apply, labelled 「假設：預設值」 (so rules reading those metrics count as no data under the default).
+MUST_ASK_KEYS = {"id", "question", "why", "refs", "applies_when", "answer_key", "effects", "default"}
 EFFECT_KEYS = {"when", "verdict", "metrics", "signals", "why"}
 EFFECT_VERDICTS = ("no_data", "available")
 _ANSWER_KEY_RE = re.compile(r"^[a-z_][a-z0-9_]*(\.[a-z0-9_.-]+)?$")
@@ -262,6 +266,12 @@ def check_must_ask(card: dict, all_refs: dict, features: set | None = None) -> l
             errors.append(f"{at} answer_key 要是 answers.yaml 的 key（例如 latency、exporter_deadline）")
         if "effects" in q:
             errors += check_effects(card, q, at)
+        if "default" in q:
+            d = q["default"]
+            if isinstance(d, bool) or not isinstance(d, (str, int, float)) or not str(d).strip():
+                errors.append(f"{at} default 要是設定的預設值（字串或數字）")
+            elif ak is not None and not str(ak).startswith("facts."):
+                errors.append(f"{at} default 只能用在 facts.* 的回答（answer_key {ak!r}）")
     return errors
 
 
