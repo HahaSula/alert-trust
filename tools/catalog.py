@@ -203,6 +203,56 @@ def check_five_sections(card: dict, all_refs: dict) -> tuple[list[str], int]:
     return errors, missing
 
 
+# Optional card field (catalog/components/*.yaml, catalog/targets/*.yaml):
+#   must_ask: [{id, question, why, refs, applies_when?, answer_key?}]
+# Component-specific questions whose answer changes conclusions (a flag that decides whether a metric exists, an
+# exporter deadline, the data latency of a ruler). tools/inventory.py asks them, ranked high, for every card present
+# in the inventory. id kebab-case and unique in the card; question / why non-empty strings; refs non-empty and
+# existing; applies_when (optional) a feature from tools/check_coverage.py FEATURES: only asked when the inventory
+# shows that feature (e.g. a patroni job); answer_key (optional) the answers.yaml key the answer goes to
+# (default facts.<card>.<id>).
+MUST_ASK_KEYS = {"id", "question", "why", "refs", "applies_when", "answer_key"}
+_ANSWER_KEY_RE = re.compile(r"^[a-z_][a-z0-9_]*(\.[a-z0-9_.-]+)?$")
+
+
+def check_must_ask(card: dict, all_refs: dict, features: set | None = None) -> list[str]:
+    """Errors for the optional `must_ask` field of a card."""
+    if "must_ask" not in card:
+        return []
+    where = card.get("_path", card.get("id", "?"))
+    ma = card["must_ask"]
+    if not isinstance(ma, list) or not ma:
+        return [f"{where}: must_ask 要是非空清單（[{{id, question, why, refs}}]）"]
+    errors, seen = [], set()
+    for i, q in enumerate(ma):
+        at = f"{where}: must_ask[{i}]"
+        if not isinstance(q, dict):
+            errors.append(f"{at} 要是 {{id, question, why, refs}}")
+            continue
+        errors += [f"{at} 不認得 {k!r}（只有 {'、'.join(sorted(MUST_ASK_KEYS))}）" for k in q if k not in MUST_ASK_KEYS]
+        qid = q.get("id", "")
+        if not isinstance(qid, str) or not ID_RE.match(qid):
+            errors.append(f"{at} id 要是 kebab-case")
+        elif qid in seen:
+            errors.append(f"{at} id {qid!r} 重複")
+        seen.add(qid)
+        for f in ("question", "why"):
+            if not isinstance(q.get(f), str) or not q[f].strip():
+                errors.append(f"{at} 缺少 {f}")
+        refs = q.get("refs")
+        if not isinstance(refs, list) or not refs or not all(isinstance(r, str) for r in refs):
+            errors.append(f"{at} 要有 refs（ref key 清單）")
+        else:
+            errors += [f"{at} refs {r!r} 不存在" for r in refs if r not in all_refs]
+        aw = q.get("applies_when")
+        if aw is not None and (not isinstance(aw, str) or (features is not None and aw not in features)):
+            errors.append(f"{at} applies_when 要是 check_coverage.FEATURES 裡的功能，不是 {aw!r}")
+        ak = q.get("answer_key")
+        if ak is not None and (not isinstance(ak, str) or not _ANSWER_KEY_RE.match(ak)):
+            errors.append(f"{at} answer_key 要是 answers.yaml 的 key（例如 latency、exporter_deadline）")
+    return errors
+
+
 def runbook_url(component_id: str, signal_id: str) -> str:
     return f"{SITE_URL}/components/{component_id}/#{signal_id}"
 

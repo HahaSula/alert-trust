@@ -72,6 +72,20 @@ Other rules the report follows:
     (no data). Precedence: flags > inventory from: user / confirmed > --config > other inventory values.
   - Neither flags, --config nor --inventory give S / E: Prometheus defaults scrape_interval 1m, scrape_timeout 10s,
     evaluation_interval 1m are used and listed as assumptions (no error).
+  - Intentional windows: a short window (R ≤ 2×S, or below the contract minimum) whose keep_range nobody answered
+    (--keep-range / --change-range, answers keep_range.<rule>: true|false, inventory, annotation keep_range) is
+    keep = unknown: the report asks 「這個視窗是刻意的嗎？」 first, lists the 保留視窗 options (shorter scrape_interval
+    for that job, query_offset, anchored, version-gated) side by side with 改視窗 and never ranks 改視窗 first;
+    --write-fitted does not lengthen it and marks it `keep_range: unknown`. Option A is written only for keep_range
+    false, with annotation alert_trust_original_range. A rule whose window differs from the user's original
+    (--original files, inventory sources.original_rules, or that annotation) and was not confirmed is reported as
+    「語意已改，未確認」, never as 符合 (json rows[].status).
+  - --answers / --env: version, latency, dedup_interval, eval_delay, keep_range read like tools/inventory.py
+    (inventory_use.facts). measured.<job>.tau (or the inventory's τ) is the τ the d_max was measured under; when a
+    proposal changes τ, the d_max checks say 「需要重新量」 instead of 符合 (a cut-off d_max becomes d = new τ).
+  - --notify-within lists every input with its source (file / default / assumed / user / flag), a sensitivity line
+    (d +5s, L + S, k + 1 → how much the total moves) and warns when the margin to X is under 30s.
+  - --stack vmalert: promtool test results are labelled 「Prometheus 語意」, vmalert -dryRun 「只驗語法」.
 """
 from __future__ import annotations
 
@@ -216,6 +230,30 @@ EXPORTER_DEADLINE = {
 }
 PREFIX_EXPORTER = {"redis_": "redis_exporter", "pg_": "postgres_exporter", "mysql_": "mysqld_exporter",
                    "mongodb_": "mongodb_exporter", "probe_": "blackbox_exporter"}
+# Annotations --write-fitted writes: the window before option A changed it (so a later run reports
+# 「語意已改，未確認」 until the user confirms), and keep_range: "unknown" on a short window it left alone because
+# nobody has said whether it is intentional.
+ORIGINAL_RANGE_ANN = "alert_trust_original_range"
+KEEP_UNKNOWN = "unknown"
+SEMANTIC_CHANGED = "語意已改，未確認"
+KEEP_Q = "這個視窗是刻意的嗎？"
+_RANGE_TXT = re.compile(r"\[\s*([0-9][0-9smhdwy.]*(?:\s*:\s*[0-9smhdwy.]*)?)\s*\]")
+
+
+def rule_ranges(expr: str) -> list[str]:
+    """The range texts of an expression in order (`[1m]`, `[15m:1m]`): what option A changes."""
+    return [re.sub(r"\s+", "", m.group(1)) for m in _RANGE_TXT.finditer(expr)]
+
+
+def keep_of(a, name: str, ann: dict) -> bool | None:
+    """True: the window is intentional (keep). False: the user said it is not (option A may change it).
+    None: nobody said (the default): option A is not written and 「保留視窗」 options come first."""
+    import inventory_use as IU
+    if name in a.keep_range:
+        return True
+    if name in getattr(a, "change_range", []):
+        return False
+    return IU.keep_state(ann.get("keep_range"))
 
 
 def suggested_x(tau: float) -> float:
@@ -288,8 +326,15 @@ def job_params(a, job) -> dict:
     else:
         d, measured, assumed = S, False, "S"
         defaults.append("d = S")
+    remeasure = None
+    mt = (getattr(a, "measured_tau", None) or {}).get(job)
+    if measured and job in a.job_duration and mt is not None and tau is not None and abs(mt - tau) > 1e-9:
+        # d_max was measured under another τ (a proposal changed it): it says nothing about the new τ
+        remeasure = mt
+        if d >= 0.95 * mt and tau > d:
+            d, assumed = tau, "τ"  # the old d_max was cut off at the old τ: worst case under the new τ until re-measured
     return {"S": S, "d": d, "measured": measured, "assumed": assumed, "tau": tau,
-            "p99": a.job_p99.get(job, a.p99), "defaults": defaults}
+            "p99": a.job_p99.get(job, a.p99), "defaults": defaults, "remeasure": remeasure}
 
 
 def known_jobs(a) -> set | None:
@@ -465,7 +510,11 @@ def analyze(a, docs):
                 expr = str(r.get("expr", ""))
                 name = r.get("alert") or r.get("record")
                 ann = r.get("annotations") or {}
-                keep = name in a.keep_range or str(ann.get("keep_range", "")).lower() in ("true", "yes", "1")
+                keep = keep_of(a, name, ann)
+                orig = (getattr(a, "original_ranges", None) or {}).get(name)
+                if orig is None and ann.get(ORIGINAL_RANGE_ANN):
+                    orig = rule_ranges(str(ann[ORIGINAL_RANGE_ANN]))
+                changed = orig is not None and orig != rule_ranges(expr)
                 new_expr = expr
                 seen = set()
                 sels = MS.selectors(expr)
@@ -518,13 +567,16 @@ def analyze(a, docs):
                            "R": R, "S": S, "d": d, "I": I, "offset": off, "need": need, "src": src,
                            "ok": R >= need and not nodata, "nodata": nodata,
                            "job": job, "defaults": defaults, "notes": notes, "params": P, "k": k,
-                           "contract": range_contract(a, n), "keep": keep}
+                           "contract": range_contract(a, n), "keep": keep,
+                           "short": (R < need or (S is not None and R <= 2 * S)) and not nodata,
+                           "semantic_changed": changed and keep is not False,
+                           "original": orig if changed else None}
                     if a.stack == "prometheus" and func in ANCHORED_OK:
                         row["need_anchored"] = need_window(a, I, d, off, k, 1)
                     if not row["ok"] and not nodata:
                         fit = nice_up(need)
                         row["fit_R"] = fit
-                        if not keep:
+                        if keep is False:  # the user said the window is not intentional: option A may change it
                             new_rtxt = rtxt.replace(rng, fmt(fit), 1)
                             new_expr = new_expr.replace(text, text.replace(rtxt, new_rtxt, 1), 1)
                         if a.stack == "vmalert":
@@ -539,8 +591,15 @@ def analyze(a, docs):
                             row["opt_b"] = {"scrape_interval": R / (n + k + 1),
                                             "scrape_interval_with_offset": R / (n + k), "query_offset": None}
                     rows.append(row)
+                nr = new["groups"][gi]["rules"][ri]
                 if new_expr != expr:
-                    new["groups"][gi]["rules"][ri]["expr"] = new_expr
+                    nr["expr"] = new_expr
+                    nr.setdefault("annotations", {})
+                    nr["annotations"].setdefault(ORIGINAL_RANGE_ANN, ", ".join(f"[{x}]" for x in rule_ranges(expr)))
+                elif keep is None and any(r_["rule"] == name and r_["short"] and r_["file"] == path for r_ in rows):
+                    # short window, nobody said whether it is intentional: not lengthened, marked for the question
+                    nr.setdefault("annotations", {})
+                    nr["annotations"]["keep_range"] = KEEP_UNKNOWN
         fitted_docs.append((path, new))
     return rows, fitted_docs
 
@@ -669,10 +728,10 @@ def notify_checks(a, docs, inv: dict | None) -> list[dict]:
                     P = job_params(a, job)
                     t = P["S"] + P["d"]
                     if worst is None or t > worst[0]:
-                        worst, src = (t, P), jsrc
+                        worst, src = (t, P, job), jsrc
                 if worst is None:
                     P = job_params(a, None)
-                    worst = (P["S"] + P["d"], P)
+                    worst = (P["S"] + P["d"], P, None)
                 S, d = worst[1]["S"], worst[1]["d"]
                 fr = dur(r.get("for")) or 0.0
                 for_eff = math.ceil(fr / E - 1e-9) * E if fr else 0.0
@@ -688,16 +747,38 @@ def notify_checks(a, docs, inv: dict | None) -> list[dict]:
                 else:
                     gi, gi_src = AM_GROUP_INTERVAL_DEFAULT, ("Alertmanager 預設" if not am_known else "route 沒有設定，用預設")
                 parts = [("S", S), ("d", d), ("E", E)]
+                job = worst[2] if len(worst) > 2 else None
+                inputs = [("S", S, origin(a, "S", job, worst[1])), ("d", d, origin(a, "d", job, worst[1])),
+                          ("E", E, "file（group interval）" if g.get("interval") else origin(a, "E", None, None))]
+                L = None
                 if a.stack == "vmalert":
                     L = a.latency if a.latency is not None else S
                     parts.append(("max(L, D)", max(L, a.eval_delay)))
+                    src_ = getattr(a, "src", {})
+                    inputs += [("L", L, src_.get("L", "flag" if a.latency is not None else "assumed（L = S）")),
+                               ("D", a.eval_delay, src_.get("D", "default"))]
+                    if getattr(a, "dedup", None):
+                        inputs.append(("dedup", a.dedup, src_.get("dedup", "user")))
                 elif O:
                     parts.append(("O", O))
+                    inputs.append(("O", O, "file（group query_offset）" if g.get("query_offset") is not None else origin(a, "O", None, None)))
+                if fr:
+                    inputs.append(("for", fr, "file（rule）"))
+                kk = max(getattr(a, "k", 1), int((getattr(a, "job_failrun", None) or {}).get(job, 0)))
+                inputs.append(("k", float(kk), "flag（--k／--job-failrun）" if kk != 1 else "default（k = 1）"))
                 parts.append(("⌈for/E⌉·E", for_eff))
                 parts_join = parts + [("group_interval", gi)]
                 parts = parts + [("group_wait", gw)]
                 total = sum(v for _, v in parts)
                 total_join = sum(v for _, v in parts_join)
+                inputs += [("group_wait", gw, gw_src), ("group_interval", gi, gi_src)]
+                # one step of each uncertain input: d +5s, L + one scrape_interval (vmalert), k + 1 (one more missed
+                # scrape before the condition is seen: + S)
+                sens = [("d +5s", 5.0)]
+                if L is not None:
+                    sens.append((f"L +S（{fmt(S)}）", max(L + S, a.eval_delay) - max(L, a.eval_delay)))
+                sens.append((f"k +1（多漏一次 scrape，+S）", S))
+                margin = a.notify_within - total
                 nd = (getattr(a, "nodata_rules", None) or {}).get(name) or \
                     ("selector 全部沒有資料" if n_sel and n_empty == n_sel else None)
                 out.append({"rule": name, "job_src": src, "parts": parts, "total": total, "gw_src": gw_src,
@@ -707,8 +788,36 @@ def notify_checks(a, docs, inv: dict | None) -> list[dict]:
                             # 加入已經在響的 group：第一次 flush 已過，要等下一個 group_interval tick
                             "total_join": total_join, "gi_src": gi_src,
                             "ok_join": None if nd else total_join <= a.notify_within,
-                            "formula_join": " + ".join(f"{k} {fmt(v)}" for k, v in parts_join) + f" = {fmt(total_join)}"})
+                            "formula_join": " + ".join(f"{k} {fmt(v)}" for k, v in parts_join) + f" = {fmt(total_join)}",
+                            "inputs": [{"name": k, "value": v, "source": src_} for k, v, src_ in inputs],
+                            "sensitivity": [{"step": k, "delta": v} for k, v in sens],
+                            "margin": margin, "margin_warn": (not nd) and 0 <= margin < MARGIN_WARN,
+                            "remeasure": worst[1].get("remeasure")})
     return out
+
+
+MARGIN_WARN = 30.0
+
+
+def origin(a, key: str, job, P: dict | None) -> str:
+    """Where a timing input came from: file / default / assumed / user / flag (snap_origin), for --notify-within."""
+    if key == "d" and P is not None:
+        if P.get("remeasure") is not None:
+            return f"measured（在 τ {fmt(P['remeasure'])} 下量的，**需要重新量**）"
+        if not P["measured"]:
+            return f"assumed（d = {P.get('assumed') or 'S'}）"
+        if job not in a.job_duration:
+            return "flag（--scrape-duration）"
+    src = getattr(a, "src", {})
+    if job is not None and (key, job) in src:
+        v = src[(key, job)]
+    else:
+        v = src.get(key, "default")
+    if key == "d" and v.startswith(("user", "file（inventory")):
+        return "user（measured，answers／inventory）"
+    if key == "d":
+        return "measured（" + v + "）"
+    return v
 
 
 def dms_check(a, inv: dict | None) -> dict | None:
@@ -742,6 +851,21 @@ def notify_section(a, nrows: list[dict], dms: dict | None) -> list[str]:
             out.append(f"| `{n['rule']}` | 新 group | {n['job_src']}{dflt} | {n['formula']} | {yn(n['ok'])} | {n['gw_src']} |")
             out.append(f"| `{n['rule']}` | 加入已在響的 group | {n['job_src']}{dflt} | {n['formula_join']} | "
                        f"{yn(n['ok_join'])} | {n['gi_src']} |")
+        out.append("\n**每個輸入的來源與敏感度**（file 從檔案、default 官方預設、assumed 假設、user 使用者／實測、flag 命令列）："
+                   "推算值只和輸入一樣可靠，標 assumed／default 的先確認。\n")
+        for n in nrows:
+            if n["nodata"]:
+                continue
+            ins = "、".join(f"{x['name']} {fmt(x['value']) if x['name'] != 'k' else int(x['value'])}（{x['source']}）" for x in n["inputs"])
+            sens = "、".join(f"{x['step']} → 總時間 +{fmt(x['delta'])}" for x in n["sensitivity"])
+            warn = ""
+            if n["margin_warn"]:
+                warn = f"；**警告：離 {X} 只剩 {fmt(n['margin'])}（< {fmt(MARGIN_WARN)}）**，上面任何一項多一步就可能超過"
+            elif n["margin"] < 0:
+                warn = f"；超過 {X} {fmt(-n['margin'])}"
+            if n.get("remeasure") is not None:
+                warn += f"；d_max 是在舊 τ {fmt(n['remeasure'])} 下量的，**需要重新量**"
+            out.append(f"- `{n['rule']}`：{ins}。敏感度：{sens}{warn}。")
     if dms:
         out.append("")
         verdict_ = "是" if dms["ok"] else "**否**"
@@ -783,7 +907,14 @@ def env_checks(a) -> list[tuple]:
             else:
                 out.append((f"`scrape_timeout` 與 `scrape_interval`（{who}）：τ {fmt(tau)} < S {fmt(S)}", True, "",
                             "exporter-deadline", ""))
-            if measured:
+            if measured and P.get("remeasure") is not None:
+                mt = P["remeasure"]
+                dm = a.job_duration.get(j, d)
+                out.append((f"耗時數據（{who}）：d_max {fmt(dm)} 是在 τ {fmt(mt)} 下量的，現在的 τ 是 {fmt(tau)}（提案改了 τ）", None,
+                            f"用新的 τ 重新量 d_max／p99（docs/tools/baseline.md 步驟 3）；舊的 d_max "
+                            + ("幾乎等於舊 τ，是被截斷的值，在重新量之前用 d = τ" if dm >= 0.95 * mt else "不能證明新 τ 下也成立"),
+                            None, "量測要再等一段時間（建議 7 天）"))
+            elif measured:
                 cut = d >= 0.95 * tau
                 out.append((f"耗時數據是否被逾時截斷（{who}）：d_max {fmt(d)} {'≥' if cut else '<'} 0.95 × τ（{fmt(0.95 * tau)}）",
                             not cut,
@@ -819,9 +950,13 @@ def env_checks(a) -> list[tuple]:
         if not measured:
             continue  # d unknown: d = τ / S is an assumption, checking d ≤ S against itself says nothing
         ok = d <= S
-        out.append((f"scrape 在 interval 內完成（{who}）：d {fmt(d)} {'≤' if ok else '>'} S {fmt(S)}", ok,
+        if P.get("remeasure") is not None and ok:
+            ok = None  # d_max from the old τ: holds only after it is measured again
+        out.append((f"scrape 在 interval 內完成（{who}）：d {fmt(d)} {'≤' if d <= S else '>'} S {fmt(S)}"
+                    + ("（d 是舊 τ 下量的）" if P.get("remeasure") is not None else ""), ok,
+                    "用新的 τ 重新量 d_max" if ok is None else
                     "" if ok else f"把 `scrape_interval` 調到 ≥ {fmt(nice_up(d))}，或降低 scrape 耗時（exporter 查詢、`scrape_timeout`）",
-                    "scrape-within-interval", "" if ok else "S 變大，偵測變慢、視窗要跟著拉長"))
+                    "scrape-within-interval", "" if ok is not False else "S 變大，偵測變慢、視窗要跟著拉長"))
         if a.stack == "prometheus":
             I = eff_interval(S, d)
             ok = I + d < a.lookback
@@ -911,6 +1046,20 @@ def baseline(a) -> str:
     return "\n".join(out) + "\n"
 
 
+def status_of(r: dict) -> str:
+    """One word per row for other tools (review.py): 符合 / 不符合 / 沒有資料 / 語意已改，未確認."""
+    if r.get("nodata"):
+        return "沒有資料"
+    if r.get("semantic_changed"):
+        return SEMANTIC_CHANGED
+    return "符合" if r["ok"] else "不符合"
+
+
+VMALERT_EVIDENCE = ("ruler 是 vmalert：`promtool test rules` 的結果標「Prometheus 語意」（stale、lookback 是 Prometheus 的，"
+                    "vmalert 的 queryStep、evalDelay、MetricsQL 用視窗前的 sample 另外推算）；`vmalert -dryRun` 標「只驗語法」，"
+                    "不能當成行為已被驗證的證據。")
+
+
 def escape_table_pipes(md: str) -> str:
     """A `|` inside a code span still splits a GitHub/MkDocs table cell: escape it on table rows."""
     out = []
@@ -922,7 +1071,9 @@ def escape_table_pipes(md: str) -> str:
     return "\n".join(out)
 
 
-def verdict(ok: bool, cid: str | None) -> str:
+def verdict(ok: bool | None, cid: str | None) -> str:
+    if ok is None:
+        return "**需要重新量**"
     if ok:
         return "符合"
     return f"**不符合契約 [`{cid}`]({SITE}/contracts/#{cid})**" if cid else "**不符合建議**（docs/tools/baseline.md）"
@@ -972,7 +1123,9 @@ COST_DEDUP = ("dedup 變小，儲存的 sample 變多；多台 vmagent（HA）�
 def advice(a, rows, checks, fors) -> list[str]:
     out = []
     for t, ok, fix, cid, cost in checks:
-        if not ok:
+        if ok is None:
+            out.append(f"- {t}：**需要重新量**。**建議**：{fix}。**代價**：{cost or '—'}。")
+        elif not ok:
             out.append(f"- {t}：不符合契約 `{cid}`。**建議**：{fix}。**代價**：{cost or '—'}。" if cid
                        else f"- {t}：不符合建議。**建議**：{fix}。**代價**：{cost or '—'}。")
     nd = [r for r in rows if r.get("nodata")]
@@ -981,13 +1134,26 @@ def advice(a, rows, checks, fors) -> list[str]:
         out.append(f"- {len(names)} 條 rule 沒有資料，契約不適用（{'、'.join('`' + n + '`' for n in names[:6])}"
                    f"{' 等' if len(names) > 6 else ''}）：job 條件對不上 config 的 scrape job，或 `check_metric_sources.py` 判定選不到 series。"
                    "**建議**：先修 job 條件／label（見 metric-sources 報告），再重跑這個檢查。**代價**：改 rule 要一起改用到同一個 job 的 dashboard。")
+    sem = [r for r in rows if r.get("semantic_changed")]
+    if sem:
+        names = list(dict.fromkeys(r["rule"] for r in sem))
+        out.append(f"- {len(names)} 條 rule 的視窗和使用者原本的不同（{'、'.join('`' + n + '`' for n in names[:6])}）：**{SEMANTIC_CHANGED}**，"
+                   f"不算符合。**建議**：先問「{KEEP_Q}」；不是刻意的，在 answers.yaml 寫 `keep_range: {{<rule>: false}}` 後重跑；"
+                   "是刻意的，改回原本的視窗，用第 3 節「保留視窗」的做法。**代價**：改視窗會改變 rule 回答的問題（例如「最近 1 分鐘」變成「最近 3 分鐘」）。")
+    unk = [r for r in rows if r.get("short") and r.get("keep") is None and not r.get("nodata")]
+    if unk:
+        names = list(dict.fromkeys(r["rule"] for r in unk))
+        out.append(f"- {len(names)} 條 rule 的視窗很短（{'、'.join('`' + n + '`' for n in names[:6])}）：**先問「{KEEP_Q}」**。"
+                   "回答前不改視窗（`--write-fitted` 不寫拉長的視窗，標 `keep_range: unknown`）；保留視窗的做法（縮短該 job 的 "
+                   "`scrape_interval`、`query_offset`、`anchored`，依版本）和改視窗並列在第 3 節。")
     bad = [r for r in rows if not r["ok"] and not r.get("nodata")]
     if bad:
         names = list(dict.fromkeys(r["rule"] for r in bad))
         cids = sorted({r["contract"] for r in bad})
         out.append(f"- {len(names)} 條 rule 的視窗不符合契約 {'、'.join('`' + c + '`' for c in cids)}（{'、'.join('`' + n + '`' for n in names[:6])}）："
-                   "視窗內可能少於需要的 sample 數，查詢回空、`for` 歸零。**建議**：見第 3 節，方案 A 改視窗、方案 B 改環境。"
-                   f"**代價**：A {COST_A}；B {COST_B}。")
+                   "視窗內可能少於需要的 sample 數，查詢回空、`for` 歸零。**建議**：見第 3 節；視窗可能是刻意的，先看「保留視窗」"
+                   "（改環境），確認不是刻意的才用方案 A 改視窗。"
+                   f"**代價**：改視窗 {COST_A}；改環境 {COST_B}。")
         if a.stack == "vmalert" and any(r["opt_b"].get("dedup_bound") for r in bad):
             out.append(f"- `-dedup.minScrapeInterval` {fmt(a.dedup)} 大於 S：方案 B 縮短 `scrape_interval` 沒有用，實際間隔由 dedup 決定。"
                        f"**建議**：降低 dedup（見第 3 節），或用方案 A。**代價**：{COST_DEDUP}。")
@@ -1031,16 +1197,19 @@ def report(a, rows, checks, assumptions, fors=None, skipped=None) -> str:
     out = ["# Rule 時間契約：目前的規格下哪些 rule 可信、要怎麼調\n"]
     if assumptions:
         out.append("**假設**（沒有給的數字）：" + "；".join(assumptions) + "。拿到實際值後重跑。\n")
+    if a.stack == "vmalert":
+        out.append(f"**證據等級**：{VMALERT_EVIDENCE}\n")
     out.append("## 建議先做\n")
     adv = advice(a, rows, checks, fors)
     out += adv or ["- 目前的規格下，環境與每條 rule 都符合契約。"]
     out.append("\n## 1. 環境本身\n")
-    bad_env = [c for c in checks if not c[1]]
+    bad_env = [c for c in checks if c[1] is not True]
     out.append(f"{len(bad_env)} 項不符合。環境不符合契約時，rule 的視窗算得再對也不可靠，建議先處理。\n" if bad_env
                else "環境本身符合契約。\n")
     out.append("| 檢查（實際的關係） | 結果 | 建議 | 代價 |\n|---|---|---|---|")
     out += [f"| {t} | {verdict(ok, cid)} | {fix or '—'} | {cost or '—'} |" for t, ok, fix, cid, cost in checks]
-    ok_rows = [r for r in rows if r["ok"]]
+    ok_rows = [r for r in rows if r["ok"] and not r.get("semantic_changed")]
+    sem_rows = [r for r in rows if r.get("semantic_changed")]
     nd_rows = [r for r in rows if r.get("nodata")]
     bad = [r for r in rows if not r["ok"] and not r.get("nodata")]
     out.append("\n## 2. 在目前規格下符合契約的 rule\n")
@@ -1050,6 +1219,13 @@ def report(a, rows, checks, assumptions, fors=None, skipped=None) -> str:
                 for r in ok_rows]
     else:
         out.append("沒有。")
+    if sem_rows:
+        out.append(f"\n### {SEMANTIC_CHANGED}\n")
+        out.append(f"這些 rule 的視窗和使用者原本的 rule 不同（`--original`、inventory 記的原檔，或 annotation `{ORIGINAL_RANGE_ANN}`），"
+                   f"使用者還沒確認可以改：契約算得過也**不算符合**，因為 rule 回答的已經不是原本的問題。先問「{KEEP_Q}」。\n")
+        out.append("| rule | 原本的視窗 | 現在的視窗 R | 需要 ≥ | 契約 |\n|---|---|---|---|---|")
+        out += [f"| `{r['rule']}` | {', '.join('[' + x + ']' for x in r['original'])} | {fmt(r['R'])} | {fmt(r['need'])} | "
+                f"{SEMANTIC_CHANGED}（數字上{'符合' if r['ok'] else '也不符合'}） |" for r in sem_rows]
     if nd_rows:
         out.append("\n### 沒有資料，契約不適用\n")
         out.append("這些 selector 選不到任何 series，視窗夠不夠長都一樣回傳空，所以不列為符合。先修 job 條件或 label。\n")
@@ -1061,10 +1237,18 @@ def report(a, rows, checks, assumptions, fors=None, skipped=None) -> str:
     if not bad:
         out.append("沒有。")
     else:
+        if any(r.get("keep") is None for r in bad):
+            out.append(f"**視窗可能是刻意的**：還沒問「{KEEP_Q}」的 rule，先看下一節「保留視窗」（改環境），和改視窗並列；"
+                       "回答前不要把改視窗當成第一個建議。\n")
         out.append(f"方案 A：改 rule，配合目前的環境。**代價**：{COST_A}。方案 B：不改 rule，改環境。**代價**：{COST_B}。"
                    "B 會檢查做不做得到：`scrape_interval` 要大於 τ，τ 要 ≥ max(d_max ÷ 0.9, p99 ÷ 0.8)"
                    "（[基準值](https://hahasula.github.io/alert-trust/tools/baseline/)）。\n")
-        A = lambda r: "保留（`keep_range`），見下一節" if r.get("keep") else f"`[{fmt(r['fit_R'])}]`"  # noqa: E731
+        def A(r):  # noqa: N802
+            if r.get("keep") is True:
+                return "保留（`keep_range`），見下一節"
+            if r.get("keep") is None:
+                return f"先問「{KEEP_Q}」：保留的做法見下一節；不是刻意的才改成 `[{fmt(r['fit_R'])}]`"
+            return f"`[{fmt(r['fit_R'])}]`"
         if a.stack == "vmalert":
             out.append("| rule | metric | 契約 | 視窗 R | 需要 ≥ | A：改成 | B：`eval_delay` 至少 | B：或 `scrape_interval` 至多 |\n|---|---|---|---|---|---|---|---|")
             for r in bad:
@@ -1087,25 +1271,37 @@ def report(a, rows, checks, assumptions, fors=None, skipped=None) -> str:
                     s1, s2 = f"上游 group `interval` 至多 {fmt_max(b['scrape_interval_with_offset'])}", "—"
                 src = r["src"] + (f"；{'；'.join(r['notes'])}" if r.get("notes") else "")
                 out.append(f"| `{r['rule']}` | `{r['metric']}` | {src} | `{r['contract']}` | {fmt(r['R'])} | {fmt(r['need'])} | {A(r)} | {s1} | {s2} |")
-        out.append("\nA 的視窗是把需要的長度往上取整。視窗是刻意選的（例如就是要「最近 1 分鐘」），在 rule 加 annotation `keep_range: \"true\"`"
-                   "或用 `--keep-range <rule>`，A 就不會改它，改看下一節。")
-        keep = [r for r in bad if r.get("keep")]
+        out.append("\nA 的視窗是把需要的長度往上取整。**沒有人說過視窗是不是刻意的時候，A 不寫進 `--write-fitted`**（那條 rule 標 "
+                   "`keep_range: unknown`），先問「" + KEEP_Q + "」：是刻意的，在 rule 加 annotation `keep_range: \"true\"`、用 `--keep-range <rule>` "
+                   "或在 answers.yaml 寫 `keep_range: {<rule>: true}`，改看下一節；不是刻意的，寫 `keep_range: {<rule>: false}`（或 "
+                   "`--change-range <rule>`），A 才會寫進去。")
+        keep = [r for r in bad if r.get("keep") is not False]
         if keep:
-            out.append("\n### 視窗要保留時\n")
+            out.append("\n### 保留視窗（視窗是刻意的，或還沒問）\n")
             out.append("視窗內實際看得到的 sample 數約是 R ÷ I；`scrape_interval` 比 R 的一半還長時，「最近 R」的精度其實由 "
-                       "`scrape_interval` 決定，不是由 R 決定。保留語意的做法：\n")
+                       "`scrape_interval` 決定，不是由 R 決定。保留語意的做法和改視窗並列；還沒問過的 rule 不要先建議改視窗：\n")
             if a.stack == "vmalert":
-                out.append("| rule | 函式 | R | 實際約幾個 sample | B：該 job `scrape_interval` 至多 |\n|---|---|---|---|---|")
+                out.append("| rule | 函式 | R | 實際約幾個 sample | 保留：該 job `scrape_interval` 至多 | 改視窗（只在不是刻意時） |\n|---|---|---|---|---|---|")
             else:
-                out.append("| rule | 函式 | R | 實際約幾個 sample | B：該 job `scrape_interval` 至多 | C：`anchored`（Prometheus 3.x 實驗功能） |\n|---|---|---|---|---|---|")
+                out.append("| rule | 函式 | R | 實際約幾個 sample | 保留：該 job `scrape_interval` 至多 | 保留：`query_offset` | "
+                           "保留：`anchored`（Prometheus 3.x 實驗功能） | 改視窗（只在不是刻意時） |\n|---|---|---|---|---|---|---|---|")
             for r in keep:
+                chg = "—（使用者說是刻意的）" if r.get("keep") is True else f"`[{fmt(r['fit_R'])}]`（{COST_A}）"
                 bs = b_text(r["opt_b"]["scrape_interval"], r["params"])
                 if r["opt_b"].get("dedup_bound"):
                     bs = (f"縮短 S 沒有用（dedup {fmt(a.dedup)} > S）；`-dedup.minScrapeInterval` 至多 "
                           f"{fmt_max(r['opt_b']['scrape_interval'])}")
                 if a.stack == "vmalert":
-                    out.append(f"| `{r['rule']}` | `{r['func'] or '—'}` | {fmt(r['R'])} | {r['R'] / r['I']:.1f} | {bs} |")
+                    out.append(f"| `{r['rule']}` | `{r['func'] or '—'}` | {fmt(r['R'])} | {r['R'] / r['I']:.1f} | {bs} | {chg} |")
                     continue
+                b = r["opt_b"]
+                if not qo_ok:
+                    qo_c = qo_na
+                elif r["src"].startswith("recording"):
+                    qo_c = "—"
+                else:
+                    qv = fmt(b["query_offset"]) if b.get("query_offset") is not None else "S"
+                    qo_c = qo_tag(a) + b_text(b["scrape_interval_with_offset"], r["params"], f"`query_offset` {qv}，`scrape_interval` ")
                 v = getattr(a, "prom_version", None)
                 if v is not None and v < (3,):
                     c = f"不可用：Prometheus {a.prom_version_text} 沒有 `anchored`（3.x 實驗功能）"
@@ -1120,7 +1316,7 @@ def report(a, rows, checks, assumptions, fors=None, skipped=None) -> str:
                                 else "要縮短 `scrape_interval`（這個版本沒有 `query_offset`）"))
                 else:
                     c = "不適用這個函式"
-                out.append(f"| `{r['rule']}` | `{r['func'] or '—'}` | {fmt(r['R'])} | {r['R'] / r['I']:.1f} | {bs} | {c} |")
+                out.append(f"| `{r['rule']}` | `{r['func'] or '—'}` | {fmt(r['R'])} | {r['R'] / r['I']:.1f} | {bs} | {qo_c} | {c} | {chg} |")
             if a.stack != "vmalert":
                 out.append("\n`anchored` 用視窗前 lookback 內的最後一個 sample 當起點，視窗內只要 1 個 sample；它不外推，"
                            "值是視窗兩端的實際差，比 `rate` 更接近「最近 R 內增加多少」的語意。實驗功能，見"
@@ -1184,6 +1380,17 @@ def report(a, rows, checks, assumptions, fors=None, skipped=None) -> str:
     return escape_table_pipes("\n".join(out)) + "\n"
 
 
+def snap_origin(a, phase: str) -> None:
+    """Record where each timing input first came from (flag, inventory from: user, --config, inventory, default),
+    for the --notify-within input list."""
+    for key, attr in (("S", "S"), ("tau", "timeout"), ("E", "E"), ("O", "O"), ("d", "d")):
+        if getattr(a, attr, None) is not None:
+            a.src.setdefault(key, phase)
+    for key, attr in (("S", "job_interval"), ("tau", "job_timeout"), ("d", "job_duration")):
+        for j in getattr(a, attr, {}) or {}:
+            a.src.setdefault((key, j), phase)
+
+
 def apply_config(a, paths: list[str]) -> None:
     """Fill S / τ / E / O and per-job scrape_interval / scrape_timeout from prometheus.yml (or a vmagent
     -promscrape.config); explicit flags win. An unset scrape_timeout is the global one capped at the job's S
@@ -1209,6 +1416,12 @@ def apply_config(a, paths: list[str]) -> None:
     for j in jobs:
         S = dur(j.get("scrape_interval")) or gS
         a.job_interval.setdefault(j["job"], S)
+        raw0 = dur(j.get("scrape_timeout"))
+        cfg_tau = min(gT, a.job_interval[j["job"]]) if raw0 is None else min(raw0, a.job_interval[j["job"]])
+        if j["job"] in a.job_duration:
+            if not hasattr(a, "measured_tau"):
+                a.measured_tau = {}
+            a.measured_tau.setdefault(j["job"], cfg_tau)  # the d_max given was measured under the config's τ
         if j["job"] in a.job_timeout:
             continue
         raw = dur(j.get("scrape_timeout"))
@@ -1267,6 +1480,10 @@ def apply_inventory(a, inv: dict, user_only: bool) -> None:
         if m.get("from") == "user":
             if m.get("d_max") and name not in a.job_duration:
                 a.job_duration[name] = dur(m["d_max"])
+            # d_max was measured under the environment's τ: answers measured.<job>.tau, else the inventory's
+            mt = dur(m.get("tau")) if m.get("tau") else (dur(to.get("effective") or IU.val(to)) if IU.known(to) else None)
+            if mt is not None:
+                a.measured_tau.setdefault(name, mt)
             if m.get("d_p99") and name not in a.job_p99:
                 a.job_p99[name] = dur(m["d_p99"])
         if name in a.job_interval:
@@ -1364,12 +1581,18 @@ def main(argv=None) -> int:
     ap.add_argument("--k", type=int, default=1, help="容忍漏掉幾次 scrape（建議至少 1）")
     ap.add_argument("--lookback", default="5m")
     ap.add_argument("--latency", help="L：資料延遲（vmalert）；沒給時保守假設 L = 該 job 的 S")
-    ap.add_argument("--eval-delay", default="30s", help="D：-rule.evalDelay（vmalert，預設 30s）")
+    ap.add_argument("--eval-delay", help="D：-rule.evalDelay（vmalert，預設 30s）")
     ap.add_argument("--query-step", default="5m", help="vmalert -datasource.queryStep（預設 5m）")
     ap.add_argument("--dedup-interval", help="VictoriaMetrics 的 -dedup.minScrapeInterval；大於 S 時實際間隔用它")
     ap.add_argument("--notify-within", help="X：使用者要求「X 內通知到人」；列出每條 critical rule 的最壞偵測時間 "
                                             "S + d + E（+ O／max(L, D)）+ ⌈for/E⌉·E + group_wait（推算）")
     ap.add_argument("--keep-range", action="append", default=[], help="這條 rule 的視窗是刻意選的，不要建議拉長（也可在 rule 加 annotation keep_range: \"true\"）")
+    ap.add_argument("--change-range", action="append", default=[],
+                    help="使用者說這條 rule 的短視窗不是刻意的：方案 A 才會寫進 --write-fitted（answers.yaml 的 keep_range: {rule: false} 相同）")
+    ap.add_argument("--original", nargs="+", default=[],
+                    help="使用者原本的 rule 檔：視窗和它不同、又沒有確認可以改的 rule 標「語意已改，未確認」（沒給時用 inventory 的 sources.original_rules）")
+    ap.add_argument("--answers", help="answers.yaml：version、latency、dedup_interval、eval_delay、keep_range、exporter_deadline（和 inventory.py 同一種讀法）")
+    ap.add_argument("--env", help="env/<name>.yaml：ruler 的 components[].version、latency 等（和 inventory.py 同一種讀法）")
     ap.add_argument("--out", required=True)
     ap.add_argument("--write-fitted", help="把方案 A 改好的 rule 寫到這個檔（不動原檔；註解不會保留；第 5 節的改法不寫）")
     a = ap.parse_args(argv)
@@ -1390,6 +1613,45 @@ def main(argv=None) -> int:
             a.config_kind = IU.val(ck)
         if a.prom_version is None and IU.val(st.get("version")) and (a.stack or "prometheus") == "prometheus":
             a.prom_version = str(IU.val(st["version"]))
+    import inventory_use as IU
+    a.answers_data = IU.load_answers(a.answers)
+    if inv is not None and not a.answers_data:
+        a.answers_data = IU.answers(inv)
+    facts = IU.facts(a.answers_data, IU.load_env(a.env), a.stack or IU.val(((inv or {}).get("stack") or {}).get("ruler")))
+    if a.stack is None and facts.get("ruler") in ("prometheus", "vmalert"):
+        a.stack = facts["ruler"]
+    if a.prom_version is None and facts.get("version") and (a.stack or "prometheus") == "prometheus":
+        a.prom_version = facts["version"]
+    a.src = {}
+    for k, flag in (("L", a.latency), ("D", a.eval_delay), ("dedup", a.dedup_interval)):
+        if flag is not None:
+            a.src[k] = "flag"
+    st_inv = (inv or {}).get("stack") or {}
+    for k, attr in (("latency", "latency"), ("eval_delay", "eval_delay"), ("dedup_interval", "dedup_interval")):
+        key = {"latency": "L", "eval_delay": "D", "dedup_interval": "dedup"}[k]
+        if getattr(a, attr) is None:
+            if facts.get(k):
+                setattr(a, attr, facts[k])
+                a.src[key] = f"user（{facts[k + '_src']}）"
+            elif IU.known(st_inv.get(k)):
+                setattr(a, attr, str(IU.val(st_inv[k])))
+                a.src[key] = "user（inventory）" if IU.is_user(st_inv[k]) else "file（inventory）"
+    if a.eval_delay is None:
+        a.eval_delay = "30s"
+        a.src["D"] = "default（-rule.evalDelay 預設 30s）"
+    keep_ans = a.answers_data.get("keep_range") or {}
+    a.keep_range = list(a.keep_range) + [str(k) for k, v in keep_ans.items() if IU.keep_state(v) is True]
+    a.change_range = list(a.change_range) + [str(k) for k, v in keep_ans.items() if IU.keep_state(v) is False]
+    if inv is not None:
+        a.change_range += IU.change_range(inv)
+    orig_files = list(a.original) or [f for f in ((inv or {}).get("sources") or {}).get("original_rules") or [] if os.path.exists(f)]
+    a.original_ranges = {}
+    for _, odoc in load(orig_files):
+        for g in odoc.get("groups", []) or []:
+            for r in g.get("rules", []) or []:
+                nm = r.get("alert") or r.get("record")
+                if nm:
+                    a.original_ranges.setdefault(nm, rule_ranges(str(r.get("expr", ""))))
     if a.stack is None:
         a.stack = "prometheus"
         a.assumptions.append("沒有 --stack，inventory 也不確定 ruler：當成 Prometheus；是 vmalert 時用 `--stack vmalert` 重跑")
@@ -1414,13 +1676,24 @@ def main(argv=None) -> int:
             ap.error(f"--job-exporter {j}={e}：不認得的 exporter（可用：{', '.join(EXPORTER_DEADLINE)}）")
     a.cfg_jobs = None
     a.sources_empty = load_sources(a.sources) if a.sources else {}
+    a.measured_tau = {}
+    for j, m in ((a.answers_data.get("measured") or {}).items()):
+        if isinstance(m, dict) and dur(m.get("tau")) is not None:
+            a.measured_tau[str(j)] = dur(m["tau"])
+    snap_origin(a, "flag")
     if inv is not None:
         apply_inventory(a, inv, user_only=True)
+        snap_origin(a, "user（inventory／answers）")
     if a.config:
         apply_config(a, a.config)
+        snap_origin(a, "file（--config）")
     if inv is not None:
         apply_inventory(a, inv, user_only=False)
+        snap_origin(a, "file（inventory）")
     apply_defaults(a)
+    snap_origin(a, "default（Prometheus／vmagent 預設）")
+    if a.stack == "vmalert" and a.latency is None:
+        a.src["L"] = "assumed（L = 該 job 的 S）"
     clamp_timeouts(a)
     if a.O is None:
         a.O = 0.0
@@ -1455,25 +1728,33 @@ def main(argv=None) -> int:
     with open(os.path.join(a.out, "contracts-fit.json"), "w", encoding="utf-8") as f:
         import json
         json.dump({"stack": a.stack, "S": a.S, "E": a.E, "assumptions": assumptions_for(a, rows, fors),
-                   "env_checks": [{"text": c[0], "ok": c[1], "contract": c[3]} for c in checks],
+                   "env_checks": [{"text": c[0], "ok": c[1], "contract": c[3], "remeasure": c[1] is None} for c in checks],
                    "rows": [{k: r.get(k) for k in ("file", "group", "rule", "metric", "func", "R", "need", "ok", "nodata",
-                                                    "job", "contract", "fit_R", "keep")} for r in rows],
+                                                    "job", "contract", "fit_R", "keep", "short", "semantic_changed",
+                                                    "original")}
+                            | {"status": status_of(r)} for r in rows],
+                   "keep_unknown": sorted({r["rule"] for r in rows if r.get("short") and r.get("keep") is None
+                                           and not r.get("nodata")}),
                    "for_checks": [{"rule": x["rule"], "job": x["job"], "R": x["R"]} for x in fors],
                    "prom_version": a.prom_version_text or None,
                    "notify_within": a.notify_within,
                    "notify": [{k: n[k] for k in ("rule", "total", "ok", "formula", "nodata", "total_join", "ok_join",
-                                                   "formula_join")} for n in nrows],
+                                                   "formula_join", "inputs", "sensitivity", "margin", "margin_warn",
+                                                   "remeasure")} for n in nrows],
                    "dms": {k: dms[k] for k in ("dms_min_wait", "dms_min_wait_seconds", "ok", "dedicated", "path", "basis")}
                    if dms else None},
                   f, ensure_ascii=False, indent=1)
     if a.write_fitted:
         groups = [g for _, doc in fitted for g in doc.get("groups", []) or []]
         with open(a.write_fitted, "w", encoding="utf-8") as f:
-            f.write("# 由 tools/fit_contracts.py 依目前環境調整視窗（方案 A）；原檔未改動；第 5 節（for 與 scrape 失敗）的改法沒有寫入。\n")
+            f.write("# 由 tools/fit_contracts.py 依目前環境調整視窗（方案 A）；原檔未改動；第 5 節（for 與 scrape 失敗）的改法沒有寫入。\n"
+                    "# 只有使用者確認「不是刻意的」（keep_range: false／--change-range）的視窗才改，改過的 rule 有 annotation "
+                    f"{ORIGINAL_RANGE_ANN}（原本的視窗）。\n"
+                    "# 還沒問過的短視窗沒有改，標 keep_range: unknown：先問「這個視窗是刻意的嗎？」。\n")
             yaml.safe_dump({"groups": groups}, f, allow_unicode=True, sort_keys=False, width=1000)
     bad = sum(1 for r in rows if not r["ok"] and not r.get("nodata"))
     nd = sum(1 for r in rows if r.get("nodata"))
-    env_bad = sum(1 for c in checks if not c[1])
+    env_bad = sum(1 for c in checks if c[1] is not True)
     print(f"建議：環境 {env_bad} 項、rule 視窗 {bad} 條、沒有資料 {nd} 條、`for` 與 scrape 失敗 {len(fors)} 條"
           f"（符合契約的 rule 視窗 {len(rows) - bad - nd} 條）→ {a.out}/contracts-fit.md 的「建議先做」")
     return 1 if bad or env_bad else 0

@@ -1472,3 +1472,20 @@ blind_spots:
     workaround: 告警後查 pg_stat_statements、pg_stat_activity 與 pg_blocking_pids()；計畫靠 auto_explain 寫進 log
     options: "建議：告警後查 pg_stat_statements 與 pg_blocking_pids()；auto_explain 的計畫交給 log 管線"
     section: targets/postgres.md#perf-slow-sql
+
+# 會改變結論的必問題（tools/inventory.py 在盤點裡有這張卡時優先問）。
+must_ask:
+  - id: collection-timeout
+    question: "postgres_exporter 啟動時有沒有設 `--collection-timeout`？設多少？（沒設就是預設 1m）"
+    why: >-
+      --collection-timeout 預設 1m、不讀 Prometheus 的 scrape timeout header；比 scrape_timeout 長時 Prometheus 先放棄，up=0、所有 pg_* 消失，
+      exporter-deadline 契約不成立
+    refs: [pg-timeout-flag, pg-timeout, bl-pg-ctx-background, bl-pg-coll-timeout-flag]
+    answer_key: exporter_deadline
+  - id: patroni-modes
+    question: "Patroni 有沒有開 failsafe_mode？有沒有同步複寫（synchronous_mode，或 synchronous_standby_names 不是空的）？"
+    why: >-
+      failsafe_mode 開著且成員都連得到時，主庫讀不到 DCS 也不降級（patroni_failsafe_mode_is_active == 1），「DCS 斷線 → 主庫降級」的判斷不成立；
+      同步複寫時同步 standby 消失會讓 commit 等待，PostgresSyncStandbyMissing 這類規則才適用
+    refs: [pg-asp-patroni-failsafe, pg-asp-patroni-doc-dcs, pg-asp-patroni-demote-dcs, pg-exp-target, pg-q-pg17-walsnd-quorum]
+    applies_when: patroni

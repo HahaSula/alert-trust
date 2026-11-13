@@ -68,13 +68,17 @@ python3 tools/fit_contracts.py --rules my-rules/*.yml --stack prometheus \
     - 方案 B：不改 rule，改環境。該 job 的 `scrape_interval` 至多多少，或加 `query_offset` ≥ 尖峰 scrape 耗時（Prometheus 2.53 起）。代價是 scrape 負載增加，或每條 rule 都晚判斷。
 4. **一次讓所有 rule 合格的環境設定**，依 job 分列。
 
-**視窗是刻意選的時候。**`[1m]` 這種短視窗常常就是要「最近 1 分鐘」的語意，拉長會改變 rule 的意思。在 rule 加 annotation `keep_range: "true"`，或用 `--keep-range <rule 名稱>`，方案 A 就不會改它，報告改列保留語意的做法：
+**視窗是刻意選的時候。**`[1m]` 這種短視窗常常就是要「最近 1 分鐘」的語意，拉長會改變 rule 的意思。視窗 ≤ 2 倍 `scrape_interval` 或短於契約最短值時，工具會先問「這個視窗是刻意的嗎？」，在回答前這一題一定排在前 3 題，報告先列保留語意的做法、再列改視窗，`--write-fitted` 也不會改這些 rule（標 `keep_range: unknown`）。和原檔不同的視窗一律標「語意已改，未確認」，不算符合。回答方式：rule 加 annotation `keep_range: "true"`、用 `--keep-range <rule 名稱>`，或在 answers 檔寫 `keep_range.<rule>: true／false`。保留時，報告列的做法：
 
 | 做法 | 效果 | 代價 |
 |---|---|---|
 | 縮短該 job 的 `scrape_interval` | 視窗內 sample 變多，「最近 R」才真的有 R 的精度 | scrape 負載與 sample 數增加 |
 | 加 `query_offset` ≥ d | 視窗不必多涵蓋 d | 每條 rule 晚 d 判斷 |
 | Prometheus 3.x `anchored`（實驗功能，`--enable-feature=promql-extended-range-selectors`） | `rate`、`increase`、`delta`、`changes`、`resets` 用視窗前的最後一個 sample 當起點，視窗內只要 1 個 sample；不外推，值是兩端的實際差 | 實驗功能，語法和行為可能改；只能在開了 flag 的 Prometheus 上用 |
+
+**回答會寫回去。**每個回答寫進 answers 檔或 `report/inventory.yaml`（標 `confirmed: true`），加 `--merge` 重跑後再看下一輪問題；答過的不會再問。問題依「答案可能推翻幾個結論 × 答錯的代價」排序，卡片上的 `must_ask`（例如 etcd 的 `--metrics`、exporter 的逾時 flag、vmalert 的資料延遲 L 與 dedup）只要環境裡有那個元件就會排在前面。
+
+**偵測時間估算。**`--notify-within` 會列出每個輸入值的來源（檔案、預設或假設）與敏感度（d、L、k 各多一步時總時間變多少），離需求不到 30 秒時警告；建議改了 `scrape_timeout` 時，舊的 scrape 耗時標「需要重新量」。ruler 是 vmalert 時，promtool 測試結果只代表 Prometheus 語意，`vmalert -dryRun` 只驗語法。
 
 視窗內實際看得到的 sample 數約是 R ÷ I。`scrape_interval` 比 R 的一半還長時，「最近 R」的精度其實由 `scrape_interval` 決定，不是由 R 決定。各函式需要幾個 sample 見[各 range 函式需要的視窗](../contracts.md#range-functions)。
 

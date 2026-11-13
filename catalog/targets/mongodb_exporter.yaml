@@ -773,3 +773,11 @@ blind_spots:
     workaround: 開 --collector.currentopmetrics 並調短 slow-time；或定期 db.currentOp() 進 log 管線
     options: "建議：開 --collector.currentopmetrics 並調短 slow-time；或定期 db.currentOp() 進 log 管線"
     section: targets/mongodb.md#workload
+
+# 會改變結論的必問題（tools/inventory.py 在盤點裡有這張卡時優先問）。
+must_ask:
+  - id: collector-flags
+    question: "mongodb_exporter 啟動時開了哪些 collector 旗標（`--collector.diagnosticdata`、`--collector.replicasetstatus`、`--compatible-mode`、`--collect-all`）？"
+    why: >-
+      預設什麼 collector 都不開，只輸出 mongodb_up；少一個旗標，讀 mongodb_ss_*、mongodb_rs_* 或 v1 舊名的規則回傳空
+    refs: [mg-exp, mx-flag-diag, mx-flag-rs, mx-flag-compat, mx-general-always]

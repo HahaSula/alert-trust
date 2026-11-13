@@ -51,7 +51,17 @@ class FitContractsTest(unittest.TestCase):
         self.assertTrue(by["RecordedWindow"]["ok"])                     # (1+1)*60 + 0 = 2m
         self.assertEqual(by["ErrorsHigh"]["func"], "rate")
         exprs = [r["expr"] for _, d in fitted for g in d["groups"] for r in g["rules"]]
-        self.assertIn('rate(http_errors_total{job="api"}[1m45s]) > 1', exprs)
+        # nobody said whether [1m] is intentional: not lengthened, marked keep_range: unknown
+        self.assertIn('rate(http_errors_total{job="api"}[1m]) > 1', exprs)
+        eh = next(r for _, d in fitted for g in d["groups"] for r in g["rules"] if r.get("alert") == "ErrorsHigh")
+        self.assertEqual(eh["annotations"]["keep_range"], "unknown")
+        self.assertIsNone(by["ErrorsHigh"]["keep"])
+        self.assertTrue(by["ErrorsHigh"]["short"])
+        # the user said it is not intentional: option A is written, with the original window recorded
+        _, fitted = F.analyze(self._args(change_range=["ErrorsHigh"]), F.load([RULES]))
+        eh = next(r for _, d in fitted for g in d["groups"] for r in g["rules"] if r.get("alert") == "ErrorsHigh")
+        self.assertEqual(eh["expr"], 'rate(http_errors_total{job="api"}[1m45s]) > 1')
+        self.assertEqual(eh["annotations"][F.ORIGINAL_RANGE_ANN], "[1m]")
 
     def test_offset_removes_d(self):
         rows, _ = F.analyze(self._args(O=10.0), F.load([RULES]))

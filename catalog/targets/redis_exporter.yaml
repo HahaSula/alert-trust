@@ -928,3 +928,13 @@ blind_spots:
     workaround: 離峰時 SCAN 加 TTL 抽樣，或離線分析 RDB
     options: "建議：離峰 SCAN 加 TTL 抽樣，或離線分析 RDB"
     section: targets/valkey.md#capacity
+
+# 會改變結論的必問題（tools/inventory.py 在盤點裡有這張卡時優先問）。
+must_ask:
+  - id: connection-timeout
+    question: "redis_exporter 啟動時有沒有設 `--connection-timeout`？設多少？（沒設就是預設 15s）"
+    why: >-
+      --connection-timeout（連線、讀、寫共用）預設 15s，比 scrape_timeout 長時伺服器忙就由 Prometheus 先放棄：up=0、redis_up 也消失，
+      讀 redis_up 的規則不響；設得比 scrape_timeout 短時 exporter 自己回 redis_up=0
+    refs: [vk-exp, rx-flag-timeout, rx-dial-timeouts]
+    answer_key: exporter_deadline

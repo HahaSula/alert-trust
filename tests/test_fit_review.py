@@ -186,7 +186,7 @@ class SubqueryTest(unittest.TestCase):
     """7. subqueries are ranges."""
 
     def test_rows(self):
-        by, _, fitted, fors, *_ = run(args(), [RULES])
+        by, _, fitted, fors, *_ = run(args(change_range=["ShortSubquery"]), [RULES])
         r = by["LeaderLostRecently"]
         self.assertEqual((r["R"], r["n"], r["I"], r["func"]), (900, 2, 60, "increase"))
         self.assertTrue(r["ok"])

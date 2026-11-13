@@ -111,7 +111,7 @@ VM 的 `peaks.json` 只有在各元件的 `/metrics` 有被抓進這個 VM 時�
 
 - `self_only`：卡片要求 `observer` 的訊號（例如 `vmalert-down`、`rule-errors`、`notifier-errors`）卻在同一套 VM／vmalert 上評估。vmalert 查詢失敗時這些規則跟著失效，要搬到不同故障域的觀察者。
 - `rule_no_data`：常見是 `job=~".*vmalert.*"` 這類依 job 名稱比對的上游規則與實際名稱不符，或 recording rule 才有的 `vmalert_recording_rules_errors_total` 不存在。
-- `missing`：用卡片訊號 `rules:` 指到的 `rules/victoriametrics/*.yml` 範本，請使用者用 `vmalert -dryRun -rule=<file>` 驗證。
+- `missing`：用卡片訊號 `rules:` 指到的 `rules/victoriametrics/*.yml` 範本，請使用者用 `vmalert -dryRun -rule=<file>` 驗證。`vmalert -dryRun` 的結果標「只驗語法」；用 `promtool test rules` 測行為時標「Prometheus 語意」（vmalert 的 queryStep、evalDelay、MetricsQL 用視窗前 sample 的行為不同，另外推算），不要說成 vmalert 上的行為已驗證。
 - `evaluate_on: inventory` 的訊號（`rules-loaded`、`resolve-settings`）由你直接用快照判斷：預期 rule 數對照 `rules.json`，flag 對照第 4 節。
 
 把結果交回 `selfcheck`。

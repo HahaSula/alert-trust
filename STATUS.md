@@ -50,7 +50,7 @@
 
 ## 進行中
 
-- 五段框架遷移（架構 → 正確使用 → 正確觀測 → 不正確使用時的觀測 → 目前無法觀測的痕跡）：第 1 步卡片欄位與驗證完成；第 2 步 19 張卡都已標 `section`、補 `usage`、blind_spots 加 `options`（含所有卡的 `bad_queries`）；第 3 步 `catalog/map.yaml`、元件頁改成五段、`docs/map.md` 完成；第 4 步拆成 11 個 plugin（`plugins/`，共用資料以 symlink 連到 repo 根目錄，從 git marketplace 安裝實測時會變成實體檔）、skill 依元件分、上層讀 `map.yaml` 匯集，完成；第 5 步盲測重跑
+- 五段框架遷移（架構 → 正確使用 → 正確觀測 → 不正確使用時的觀測 → 目前無法觀測的痕跡）：第 1 步卡片欄位與驗證完成；第 2 步 19 張卡都已標 `section`、補 `usage`、blind_spots 加 `options`（含所有卡的 `bad_queries`）；第 3 步 `catalog/map.yaml`、元件頁改成五段、`docs/map.md` 完成；第 4 步拆成 11 個 plugin（`plugins/`，共用資料以 symlink 連到 repo 根目錄，從 git marketplace 安裝實測時會變成實體檔）、skill 依元件分、上層讀 `map.yaml` 匯集，完成；第 5 步盲測重跑兩輪（45/48、43/48），第二輪的退步（刻意的短視窗沒問就改長）與漏問已修：短視窗必問、卡片 `must_ask`、回答寫回、偵測時間的假設與敏感度、vmalert 證據標示、Patroni job 判斷；修正後再針對退步的兩題重跑
 
 使用者同意的資料庫順序已全部完成；CockroachDB（專有授權）不做。資料庫架構頁依類型分頁：關聯式、記憶體 KV、共識（Raft）、分散式 SQL、分析型、文件型。
 

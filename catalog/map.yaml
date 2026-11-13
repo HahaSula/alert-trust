@@ -319,6 +319,15 @@ cards:
     blind:
     - 哪一條查詢佔滿 vmselect 的併發、或觸發 -search.max* 上限
     - Partial response 少的是哪些 series
+    must_ask:
+    - id: dedup-interval
+      question: VictoriaMetrics（vmstorage／vmselect／single）有沒有設 `-dedup.minScrapeInterval`？設多少？
+      why: dedup 大於 scrape_interval 時實際資料間隔是 dedup，視窗要依它算；縮短 scrape_interval 也不會讓視窗變短
+      refs:
+      - bl-vm-dedup-flag
+      - bl-vm-doc-dedup
+      - bl-vm-doc-dedup-vmagent
+      answer_key: dedup_interval
   victorialogs:
     name: VictoriaLogs＋vlagent
     kind: infra
@@ -403,6 +412,15 @@ cards:
     - 哪一條 rule 的查詢讓 vmselect 飽和或觸發 -search.max* 上限
     - 重啟後 `for` 有沒有還原成功
     - 視窗太短而永遠回空的 rule
+    must_ask:
+    - id: data-latency
+      question: 資料從 scrape 到 VictoriaMetrics 查得到，尖峰延遲 L 多久？（例如 vmagent remote write 的佇列延遲；不知道就說不知道，工具會用 L = S）
+      why: vm-range-window 與通知時間都用 max(L, D)：L 大於 eval_delay D 時視窗要更長、偵測更晚；用假設值 L = S 算出的時間可能少算
+      refs:
+      - exp-vm-matrix
+      - vma-evaldelay
+      - vms-latency
+      answer_key: latency
   grafana_alerting:
     name: Grafana Alerting
     kind: infra
@@ -735,6 +753,15 @@ cards:
     - 資料損毀
     - 哪個 client 開了大量 watch、lease 或送大範圍讀取
     - 單一 key 的值有多大、哪些 key 最大
+    must_ask:
+    - id: metrics-level
+      question: etcd 啟動時的 `--metrics` 是 basic 還是 extensive？版本是多少？（請貼 `ps` 或 manifest 裡的啟動參數，與 `etcd --version`）
+      why: 預設 basic 不註冊 server 端 gRPC histogram：grpc_server_handling_seconds_bucket 不存在，讀它的慢請求規則（mixin etcdGRPCRequestsSlow）回傳空； etcd_server_request_duration_seconds 3.7 才有
+      refs:
+      - etcd-exp-raw
+      - etcd-grpc-histogram-extensive
+      - ver-et37-metrics-flag
+      - ver-et37-request-duration
   mariadb:
     name: mysqld_exporter＋MariaDB
     kind: target
@@ -964,6 +991,16 @@ cards:
     - 哪個 namespace、哪種查詢形狀造成 collection scan 或 scanned／returned 偏高
     - 大文件（接近 16MB 上限）與過大的回應
     - 執行中的長操作（currentopmetrics 沒開時）
+    must_ask:
+    - id: collector-flags
+      question: mongodb_exporter 啟動時開了哪些 collector 旗標（`--collector.diagnosticdata`、`--collector.replicasetstatus`、`--compatible-mode`、`--collect-all`）？
+      why: 預設什麼 collector 都不開，只輸出 mongodb_up；少一個旗標，讀 mongodb_ss_*、mongodb_rs_* 或 v1 舊名的規則回傳空
+      refs:
+      - mg-exp
+      - mx-flag-diag
+      - mx-flag-rs
+      - mx-flag-compat
+      - mx-general-always
   mysql:
     name: mysqld_exporter＋MySQL
     kind: target
@@ -1241,6 +1278,26 @@ cards:
     - OOM kill 的原因（哪一條連線的 work_mem、哪個查詢）
     - base backup 的新鮮度
     - 慢 SQL 的執行計畫、參數值與鎖的阻擋者（誰擋住誰）
+    must_ask:
+    - id: collection-timeout
+      question: postgres_exporter 啟動時有沒有設 `--collection-timeout`？設多少？（沒設就是預設 1m）
+      why: --collection-timeout 預設 1m、不讀 Prometheus 的 scrape timeout header；比 scrape_timeout 長時 Prometheus 先放棄，up=0、所有 pg_* 消失， exporter-deadline 契約不成立
+      refs:
+      - pg-timeout-flag
+      - pg-timeout
+      - bl-pg-ctx-background
+      - bl-pg-coll-timeout-flag
+      answer_key: exporter_deadline
+    - id: patroni-modes
+      question: Patroni 有沒有開 failsafe_mode？有沒有同步複寫（synchronous_mode，或 synchronous_standby_names 不是空的）？
+      why: failsafe_mode 開著且成員都連得到時，主庫讀不到 DCS 也不降級（patroni_failsafe_mode_is_active == 1），「DCS 斷線 → 主庫降級」的判斷不成立； 同步複寫時同步 standby 消失會讓 commit 等待，PostgresSyncStandbyMissing 這類規則才適用
+      refs:
+      - pg-asp-patroni-failsafe
+      - pg-asp-patroni-doc-dcs
+      - pg-asp-patroni-demote-dcs
+      - pg-exp-target
+      - pg-q-pg17-walsnd-quorum
+      applies_when: patroni
   redis_exporter:
     name: redis_exporter＋Valkey／Redis
     kind: target
@@ -1340,6 +1397,15 @@ cards:
     - 慢指令或大請求是誰送的（slowlog／commandlog 條目裡的指令、參數與 client）
     - 還在執行中的長指令或 Lua script
     - 哪些 key 沒有 TTL
+    must_ask:
+    - id: connection-timeout
+      question: redis_exporter 啟動時有沒有設 `--connection-timeout`？設多少？（沒設就是預設 15s）
+      why: --connection-timeout（連線、讀、寫共用）預設 15s，比 scrape_timeout 長時伺服器忙就由 Prometheus 先放棄：up=0、redis_up 也消失， 讀 redis_up 的規則不響；設得比 scrape_timeout 短時 exporter 自己回 redis_up=0
+      refs:
+      - vk-exp
+      - rx-flag-timeout
+      - rx-dial-timeouts
+      answer_key: exporter_deadline
   tidb:
     name: TiDB（TiDB server、TiKV、PD；內建 /metrics）
     kind: target

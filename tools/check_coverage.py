@@ -21,6 +21,9 @@ Statuses
   rule_job_mismatch a rule with the template's name (or reading the signal's metric) exists, but its job matcher
                   cannot select the job env.yaml gives (targets[].job / components[].job); checked offline with
                   the same selector parser as check_metric_sources.py
+                  Signals whose metrics another job produces (SEPARATE_JOB_FEATURES: applies_when patroni →
+                  patroni_* from the Patroni REST API) are matched against that job: env.yaml
+                  targets[].feature_jobs.patroni, or the inventory job whose exporter is patroni; unknown → not judged
   rule_no_data    a rule exists but its selector matches no series (--live), or (--config) no scrape job has
                   the component's job
   partial         rules watch the signal but miss what the card requires: every `key_metrics` entry and one metric
@@ -169,39 +172,66 @@ def job_matches(expr: str, job: str) -> bool:
     return not sels or any(_sel_job_ok(x, job) for x in sels)
 
 
-def rule_match(signal: dict, rule: dict, comp: dict) -> str | None:
+# Features whose metrics come from a job of their own, not the target's exporter job: Patroni serves patroni_* on its
+# REST API (/metrics), scraped as a separate job. Signals with that applies_when match the job that produces those
+# metrics: env.yaml targets[].feature_jobs.<feature>, or the inventory job whose exporter is that producer.
+SEPARATE_JOB_FEATURES = {"patroni": "patroni_"}
+
+
+def separate_feature(signal: dict) -> str | None:
+    cond = str(signal.get("applies_when") or "").lower()
+    return next((f for f in SEPARATE_JOB_FEATURES if re.search(rf"\b{f}\b", cond)), None)
+
+
+def feature_job_list(comp: dict, feat: str, feature_jobs: dict | None) -> list[str]:
+    own = (comp.get("feature_jobs") or {}).get(feat)
+    return sorted(set([own] if isinstance(own, str) else own or []) | set((feature_jobs or {}).get(feat) or []))
+
+
+def rule_match(signal: dict, rule: dict, comp: dict, feature_jobs: dict | None = None) -> str | None:
     """None: the rule is not about this signal. "ok": it watches it. "job_mismatch": it is about this signal
     (same alert name as the template, or reads the signal's metric) but its job matcher cannot select the
-    component's job from env.yaml (targets[].job / components[].job), so it returns nothing."""
+    component's job from env.yaml (targets[].job / components[].job), so it returns nothing.
+    A signal whose metrics another job produces (SEPARATE_JOB_FEATURES, e.g. applies_when patroni) is matched
+    against that job (feature_jobs / targets[].feature_jobs); when that job is not known, the job is not judged."""
     expr = str(rule.get("query", ""))
     names = {r.split("#", 1)[1] for r in signal.get("rules", [])}
     metrics = set(signal.get("metrics", [])) - {"probe_success"}  # probes run in the blackbox job
     sels = MS.selectors(expr)
     rel = [x for x in sels if x["metric"] in metrics]
     by_name = rule.get("name") in names
+    jobs = [job_of(comp)]
     job_known = comp.get("job") is not None and signal["id"] not in OTHER_JOB_SIGNALS
-    job = job_of(comp)
+    feat = separate_feature(signal)
+    if feat:
+        fj = feature_job_list(comp, feat, feature_jobs)
+        jobs, job_known = (fj, True) if fj else (jobs, False)
+
+    def ok_job(x):
+        return any(_sel_job_ok(x, j) for j in jobs)
     if by_name:
         if not job_known:
             return "ok"
         check = [x for x in (rel or sels) if _has_job(x)]
-        if not check or any(_sel_job_ok(x, job) for x in (rel or sels)):
+        if not check or any(ok_job(x) for x in (rel or sels)):
             return "ok"
         return "job_mismatch"
     if not rel:
         return None
     if all(x["metric"] == "up" for x in rel):
         # up is shared by every job: only count rules whose job matcher selects this component
-        if any(_has_job(x) and _sel_job_ok(x, job) for x in rel):
+        if any(_has_job(x) and ok_job(x) for x in rel):
             return "ok"
         return None
-    if any(_sel_job_ok(x, job) for x in rel):
+    if not job_known and feat:
+        return "ok"
+    if any(ok_job(x) for x in rel):
         return "ok"
     return "job_mismatch" if job_known else None
 
 
-def rule_matches(signal: dict, rule: dict, comp: dict) -> bool:
-    return rule_match(signal, rule, comp) == "ok"
+def rule_matches(signal: dict, rule: dict, comp: dict, feature_jobs: dict | None = None) -> bool:
+    return rule_match(signal, rule, comp, feature_jobs) == "ok"
 
 
 def placement(ruler_id: str, ruler: dict, comp: dict) -> str:
@@ -543,7 +573,8 @@ def scrape_note(comp: dict, card_id: str, scrape_jobs: set[str] | None, unscrape
 
 
 def evaluate(env: dict, snapshot: str | None, tiers: set[int], live: bool, scrape_jobs: set[str] | None = None,
-             rules_override: dict | None = None, unscraped: list[dict] | None = None) -> list[dict]:
+             rules_override: dict | None = None, unscraped: list[dict] | None = None,
+             feature_jobs: dict | None = None) -> list[dict]:
     cards = {c["id"]: c for c in C.load_components()}
     rl = rulers(env)
     rules_by_ruler = {rid: (rules_override or {}).get(rid) if rid in (rules_override or {})
@@ -593,7 +624,7 @@ def evaluate(env: dict, snapshot: str | None, tiers: set[int], live: bool, scrap
             mismatched, foreign_wd = [], []
             for rid, rules in rules_by_ruler.items():
                 for r in rules:
-                    m = rule_match(s, r, comp)
+                    m = rule_match(s, r, comp, feature_jobs)
                     if m is None:
                         continue
                     entry = {"ruler": rid, "alert": r.get("name"), "placement": placement(rid, rl[rid], comp),
@@ -632,7 +663,11 @@ def evaluate(env: dict, snapshot: str | None, tiers: set[int], live: bool, scrap
             if not item["rules"]:
                 if mismatched:
                     names = "、".join(f"`{r['alert']}`" for r in mismatched[:4])
-                    push("rule_job_mismatch", f"{names} 的 job 條件選不到 env.yaml 的 job `{job_of(comp)}`，回傳空、不會響"
+                    fjob = separate_feature(s)
+                    want = "、".join(feature_job_list(comp, fjob, feature_jobs)) if fjob else ""
+                    push("rule_job_mismatch", f"{names} 的 job 條件選不到 "
+                         + (f"產生 {fjob} metric 的 job `{want}`" if want else f"env.yaml 的 job `{job_of(comp)}`")
+                         + "，回傳空、不會響"
                                               "（包在 absent() 裡的則一直在響）；把 job 條件改成實際的 job")
                 else:
                     push("missing")
@@ -748,6 +783,19 @@ def fill_versions(env: dict, by_job: dict[str, str]) -> None:
             t["version"] = by_job[t["job"]]
 
 
+def fill_ruler_versions(env: dict, inv: dict) -> None:
+    """Ruler components without an answered `version` take the inventory's stack.version when the user gave it
+    (answers.version) and the component is of the inventory's ruler kind; env.yaml wins when it has one."""
+    import inventory_use as IU
+    st = inv.get("stack") or {}
+    if not IU.is_user(st.get("version")):
+        return
+    kind = IU.val(st.get("ruler"))
+    for c in env.get("components") or []:
+        if c.get("type") == kind and not answered(c.get("version")):
+            c["version"] = str(IU.val(st["version"]))
+
+
 def inventory_rules(env: dict, inv: dict) -> dict[str, list[dict]]:
     """No snapshot: the inventory's rule files, evaluated by the env.yaml ruler of the inventory's ruler kind
     (the only ruler, or the first of that type)."""
@@ -814,6 +862,7 @@ def main(argv=None) -> int:
     ap.add_argument("--inventory", help="tools/inventory.py 的 env/<name>.inventory.yaml：scrape job、沒被抓的元件、rule 檔從這裡讀")
     ap.add_argument("--out", required=True)
     ap.add_argument("--live", action="store_true", help="query each ruler to check rule selectors match series")
+    ap.add_argument("--answers", help="answers.yaml：target_versions.<job>（和 inventory.py 同一種讀法；env.yaml 的 version 優先）")
     ap.add_argument("--tiers", default="1", help="comma-separated tiers, default 1")
     ap.add_argument("--config", action="append", default=[],
                     help="prometheus.yml of the scraping Prometheus (repeatable): flags components no job scrapes")
@@ -829,11 +878,17 @@ def main(argv=None) -> int:
             scrape_jobs = IU.job_names(inv)
         unscraped = IU.unscraped(inv)
         fill_versions(env, IU.target_versions(inv))
+        fill_ruler_versions(env, inv)
         if not a.snapshot:
             override = inventory_rules(env, inv)
+    if a.answers:
+        import inventory_use as IU
+        fill_versions(env, IU.facts(IU.load_answers(a.answers), None)["target_versions"])
     if not a.snapshot and override is None:
         ap.error("要給 --snapshot（或 --inventory）")
-    items = evaluate(env, a.snapshot, tiers, a.live, scrape_jobs, override, unscraped)
+    fjobs = {f: sorted({j["name"] for j in (inv or {}).get("jobs") or [] if (j.get("exporter") or {}).get("value") == f})
+             for f in SEPARATE_JOB_FEATURES}
+    items = evaluate(env, a.snapshot, tiers, a.live, scrape_jobs, override, unscraped, {k: v for k, v in fjobs.items() if v})
     deploy = deployment_rules(env, inv) if inv is not None else []
     os.makedirs(a.out, exist_ok=True)
     with open(os.path.join(a.out, "coverage.json"), "w", encoding="utf-8") as f:

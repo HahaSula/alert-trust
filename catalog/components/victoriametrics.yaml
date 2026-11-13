@@ -196,3 +196,12 @@ blind_spots:
     why: "`vm_partial_results_total` 只計次數，結果裡沒有標記少了哪一台 vmstorage 的資料"
     workaround: 對照 `vm_rpc_vmstorage_is_reachable` 找出失聯的節點
     options: "建議：關鍵 rule 用 deny_partial_response=1，讓不完整變成查詢失敗"
+
+# 會改變結論的必問題（tools/inventory.py 在盤點裡有這張卡時優先問）。
+must_ask:
+  - id: dedup-interval
+    question: "VictoriaMetrics（vmstorage／vmselect／single）有沒有設 `-dedup.minScrapeInterval`？設多少？"
+    why: >-
+      dedup 大於 scrape_interval 時實際資料間隔是 dedup，視窗要依它算；縮短 scrape_interval 也不會讓視窗變短
+    refs: [bl-vm-dedup-flag, bl-vm-doc-dedup, bl-vm-doc-dedup-vmagent]
+    answer_key: dedup_interval

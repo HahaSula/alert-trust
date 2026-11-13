@@ -88,6 +88,8 @@ def validate(root: str = C.ROOT) -> tuple[list[str], list[str]]:
         fs_errors, fs_missing = C.check_five_sections(card, all_refs)
         errors += fs_errors
         no_section += fs_missing
+        import check_coverage as CC
+        errors += C.check_must_ask(card, all_refs, set(CC.FEATURES))
         ids = signal_ids.setdefault(comp, set())
         for s in card.get("signals", []):
             sid = s.get("id", "")

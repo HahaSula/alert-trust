@@ -62,7 +62,7 @@ def run_inventory(a) -> dict:
     inv_path = os.path.join(a.out, "inventory.yaml")
     argv = ["--rules", *a.rules, "--out", inv_path, "--md", os.path.join(a.out, "inventory.md")]
     for flag, v in (("--config", a.config), ("--config-kind", a.config_kind), ("--alertmanager", a.alertmanager),
-                    ("--answers", a.answers), ("--merge", a.merge)):
+                    ("--answers", a.answers), ("--merge", a.merge), ("--env", a.env)):
         if v:
             argv += [flag, v]
     _quiet(INV.main, argv)
@@ -238,14 +238,23 @@ def offset_options(fit: dict | None) -> str:
 def item_contracts(fit: dict | None) -> dict | None:
     if not fit:
         return None
-    env_bad = [c for c in fit["env_checks"] if not c["ok"]]
+    env_bad = [c for c in fit["env_checks"] if c["ok"] is False]
+    remeasure = [c for c in fit["env_checks"] if c["ok"] is None]
     rows_bad = [r for r in fit["rows"] if not r["ok"] and not r.get("nodata")]
+    sem = sorted({r["rule"] for r in fit["rows"] if r.get("semantic_changed")})
+    unk = list(fit.get("keep_unknown") or [])
     fors = fit.get("for_checks") or []
-    if not env_bad and not rows_bad and not fors:
+    if not env_bad and not rows_bad and not fors and not sem and not unk and not remeasure:
         return None
     parts = []
+    if sem:
+        parts.append(f"{len(sem)} 條 rule 的視窗和原本的不同：**{FC.SEMANTIC_CHANGED}**，不算符合（{_names(sem, 4)}）")
+    if unk:
+        parts.append(f"{len(unk)} 條 rule 的視窗很短，先問「{FC.KEEP_Q}」（{_names(unk, 4)}）")
     if env_bad:
         parts.append(f"環境 {len(env_bad)} 項不符合（{'；'.join(c['text'] for c in env_bad[:2])}）")
+    if remeasure:
+        parts.append(f"{len(remeasure)} 項要用新的 τ 重新量（{'；'.join(c['text'] for c in remeasure[:2])}）：**需要重新量**")
     if rows_bad:
         parts.append(f"{len({r['rule'] for r in rows_bad})} 條 rule 的視窗太短（{_names([r['rule'] for r in rows_bad], 4)}）")
     if fors:
@@ -254,7 +263,9 @@ def item_contracts(fit: dict | None) -> dict | None:
         parts.append("（沒有 scrape config，用預設值算的）")
     return {"key": "contracts", "title": "時間契約不成立：" + "；".join(parts),
             "why": "視窗內 sample 不夠時查詢回空、`for` 歸零，尖峰時 alert 晚到或不響",
-            "advice": f"見 contracts-fit.md：方案 A 改 rule 視窗、{offset_options(fit)}；短視窗是刻意的就標 keep_range",
+            "advice": (f"見 contracts-fit.md：視窗可能是刻意的，回答「{FC.KEEP_Q}」之前先列保留視窗的做法（{offset_options(fit)}），"
+                       "和改視窗並列，不要先改視窗；答案寫進 answers.yaml 的 `keep_range`（true 保留、false 可以改）後用 `--merge` 重跑"
+                       if unk or sem else f"見 contracts-fit.md：{offset_options(fit)}，或方案 A 改 rule 視窗；短視窗是刻意的就標 keep_range"),
             "cost": "A 讓 rate 對短暫尖峰反應變慢；B 增加 scrape 量或讓每條 rule 晚判斷", "ref": "contracts-fit.md"}
 
 
@@ -310,6 +321,16 @@ def end_to_end(a, inv: dict, fit: dict | None, ms_rows: list[dict]) -> list[str]
             if worst:
                 det += (f"；推算最壞偵測＋第一次通知 {FC.fmt(worst['total'])}（`{worst['rule']}`：{worst['formula']}，推算）"
                         + (f"，{len(late)} 條超過 {X}（{_names([n['rule'] for n in late], 4)}）" if late else f"，都在 {X} 內"))
+                assumed = sorted({x["name"] for x in worst.get("inputs") or [] if str(x["source"]).startswith(("assumed", "default"))})
+                if assumed:
+                    det += f"；用了假設／預設值：{'、'.join(assumed)}（見 contracts-fit.md 第 6 節的來源與敏感度）"
+                warn = [n for n in nr if n.get("margin_warn")]
+                if warn:
+                    det += (f"；**警告：{_names([n['rule'] for n in warn], 4)} 離 {X} 不到 {FC.fmt(FC.MARGIN_WARN)}**"
+                            f"（最少剩 {FC.fmt(min(n['margin'] for n in warn))}）")
+                    partial.append(f"離 {X} 的邊際小於 {FC.fmt(FC.MARGIN_WARN)}")
+                if any(n.get("remeasure") is not None for n in nr):
+                    det += "；d_max 是在舊的 τ 下量的，需要重新量"
                 if late and len(late) == len(nr):
                     no.append(f"偵測就超過 {X}")
                 elif late:
@@ -446,9 +467,13 @@ def summary(a, inv, items, fit, ms_rows, lint_out, cov) -> str:
     if not a.config:
         asm.append("沒有 scrape config：job 名稱、`scrape_interval`、被丟掉的 metric 都沒有檢查")
     L += [f"- {x}" for x in asm] or ["- （沒有）"]
+    if (st.get("ruler") or {}).get("value") == "vmalert" or (fit or {}).get("stack") == "vmalert":
+        L += ["", "## 證據等級（ruler 是 vmalert）", "", f"- {FC.VMALERT_EVIDENCE}"]
     L += ["", "## 接下來想問（最多 3 題）", ""]
     qs = [q for q in inv.get("questions") or [] if q.get("ask_now")][:3]
-    L += [f"{n}. {q['q']}（會改變：{'、'.join(q['changes'])}；回答寫到 `{q['answer_key']}`）" for n, q in enumerate(qs, 1)] or ["- （沒有）"]
+    L += [f"{n}. {q['q']}（{'**必問**；' if q.get('mandatory') else ''}可能推翻 {q.get('overturns', '?')} 個結論 × 代價 "
+          f"{q.get('cost', '?')}：{'、'.join(q['changes'])}；回答寫到 `{q['answer_key']}`）" for n, q in enumerate(qs, 1)] or ["- （沒有）"]
+    L += ["", "每個回答都寫進 answers.yaml（或 inventory.yaml，加 `confirmed: true`），用 `--merge` 重跑後再回覆；回答過的題目不會再問。"]
     errors, advice = lint_out
     cnt: dict = {}
     for r in ms_rows:
@@ -460,8 +485,9 @@ def summary(a, inv, items, fit, ms_rows, lint_out, cov) -> str:
     if fit:
         bad = sum(1 for r in fit["rows"] if not r["ok"] and not r.get("nodata"))
         nd = sum(1 for r in fit["rows"] if r.get("nodata"))
-        L.append(f"- `contracts-fit.md`：環境 {sum(1 for c in fit['env_checks'] if not c['ok'])} 項、rule 視窗 {bad} 條不符合、"
-                 f"沒有資料 {nd} 條、`for` 與 scrape 失敗 {len(fit.get('for_checks') or [])} 條")
+        sem = len({r["rule"] for r in fit["rows"] if r.get("semantic_changed")})
+        L.append(f"- `contracts-fit.md`：環境 {sum(1 for c in fit['env_checks'] if c['ok'] is not True)} 項、rule 視窗 {bad} 條不符合、"
+                 f"{FC.SEMANTIC_CHANGED} {sem} 條、沒有資料 {nd} 條、`for` 與 scrape 失敗 {len(fit.get('for_checks') or [])} 條")
     if cov is not None:
         L.append(f"- `coverage/coverage.md`：{len(cov)} 個訊號，{sum(1 for i in cov if i['status'] in CC.ACTION)} 個建議處理")
     return "\n".join(L) + "\n"
@@ -475,6 +501,8 @@ def main(argv=None) -> int:
     ap.add_argument("--alertmanager")
     ap.add_argument("--answers")
     ap.add_argument("--merge", help="既有的 inventory（使用者改過的值保留）")
+    ap.add_argument("--original", nargs="+", default=[],
+                    help="使用者原本的 rule 檔（--rules 是提案時）：視窗改過、使用者沒確認的 rule 標「語意已改，未確認」")
     ap.add_argument("--env", help="env/<name>.yaml：給了才跑覆蓋檢查")
     ap.add_argument("--tiers", default="1")
     ap.add_argument("--notify-within", help="使用者要求的「X 內通知到人」（例如 5m）；沒給時用 --env 的 critical.notify_within")
@@ -492,7 +520,9 @@ def main(argv=None) -> int:
         ms_rows = json.load(f)["rows"]
     lint_out = lint(a.rules, a.out)
     rc, txt = _quiet(FC.main, ["--inventory", inv_path, "--sources", os.path.join(a.out, "metric-sources.json"), "--out", a.out]
-                     + (["--notify-within", FC.fmt(a.notify_within)] if a.notify_within else []))
+                     + (["--notify-within", FC.fmt(a.notify_within)] if a.notify_within else [])
+                     + (["--answers", a.answers] if a.answers else []) + (["--env", a.env] if a.env else [])
+                     + (["--original", *a.original] if a.original else []))
     fit = None
     fj = os.path.join(a.out, "contracts-fit.json")
     if os.path.exists(fj):

@@ -123,7 +123,7 @@ class MysqlScenario(unittest.TestCase):
         shutil.rmtree(tmp)
         self.assertNotIn("fires", rule(inv, "MySQLExporterDown"))
         self.assertEqual(rule(inv, "MySQLExporterDown")["jobs_matched"]["value"], ["mysql"])
-        self.assertEqual(inv["stack"]["version"], {"value": "3.5.0", "from": "user"})
+        self.assertEqual(inv["stack"]["version"], {"value": "3.5.0", "from": "user", "basis": "answers.version"})
         self.assertEqual(job(inv, "mysqld")["measured"]["from"], "user")
         self.assertEqual(rule(inv, "MySQLSlowQueriesBurst")["keep_range"], {"value": True, "from": "user"})
 

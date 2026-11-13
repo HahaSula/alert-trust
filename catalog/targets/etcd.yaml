@@ -772,3 +772,12 @@ blind_spots:
     workaround: 離峰時用 etcdctl get --prefix --keys-only 加抽樣；或應用端在寫入前檢查大小
     options: "建議：離峰時抽樣 key 大小；應用端在寫入前檢查值的大小"
     section: targets/etcd.md#workload
+
+# 會改變結論的必問題（tools/inventory.py 在盤點裡有這張卡時優先問）。
+must_ask:
+  - id: metrics-level
+    question: "etcd 啟動時的 `--metrics` 是 basic 還是 extensive？版本是多少？（請貼 `ps` 或 manifest 裡的啟動參數，與 `etcd --version`）"
+    why: >-
+      預設 basic 不註冊 server 端 gRPC histogram：grpc_server_handling_seconds_bucket 不存在，讀它的慢請求規則（mixin etcdGRPCRequestsSlow）回傳空；
+      etcd_server_request_duration_seconds 3.7 才有
+    refs: [etcd-exp-raw, etcd-grpc-histogram-extensive, ver-et37-metrics-flag, ver-et37-request-duration]

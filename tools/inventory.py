@@ -32,13 +32,22 @@ the rest. Sections:
                         rule_not_applicable (「這條 rule 不適用這個部署」: the rule assumes a feature — multi-target
                         /probe, heartbeat, semi-sync, Galera, Sentinel, Patroni ... (DEPLOY_NEEDS) — that the config
                         or answers.features / jobs[].features rule out, or groups by cluster / role that no target has)
-  questions             ranked by how many findings / rules the answer changes; at most 3 ask_now
+  facts                 facts.<card>.<id> for the must_ask questions of the cards present (fill them here or in answers)
+  questions             ranked by score = overturns × cost (how many conclusions the answer could overturn × the cost
+                        of being wrong), not by rules affected; at most 3 ask_now. 「這個視窗是刻意的嗎？」 (short windows:
+                        R ≤ 2×S or below the contract minimum, keep_range unknown) is mandatory and always in the first 3.
+                        The cards' must_ask questions (catalog/map.yaml) are asked for cards present in the inventory.
+                        A question answered in answers.yaml / env.yaml / the merged inventory (from: user, confirmed) or
+                        listed in answers.answered is not asked again; questions are computed after --merge.
 
 Answers file (env/<name>.sources.yaml) keys read here: job_names, producers, metrics, labels (as in
 check_metric_sources.py), plus version (the ruler's), target_versions.<job> (the database / server version behind a
 scrape job, e.g. mysql: "8.4.13"; check_coverage.py uses it for the cards' `versions`), ruler, external_observer,
-measured.<job>.{d_p99,d_max,up0_count}, keep_range.<rule>, features.<job> (list of check_coverage.FEATURES that exist;
-an edited jobs[].features in the --merge inventory counts too). The inventory is facts and questions; advice comes from the later tools.
+measured.<job>.{d_p99,d_max,up0_count,tau}, keep_range.<rule> (true: intentional, keep; false: may change),
+features.<job> (list of check_coverage.FEATURES that exist; an edited jobs[].features in the --merge inventory counts
+too), exporter_deadline.<job>, latency, dedup_interval, eval_delay, facts.<card>.<id>, answered: [question ids].
+--env env/<name>.yaml: the ruler version from components[] of the ruler's type, targets[].job / version, the same
+reading as the other tools (inventory_use.facts). The inventory is facts and questions; advice comes from the later tools.
 """
 from __future__ import annotations
 
@@ -57,6 +66,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import catalog as C  # noqa: E402
 import check_metric_sources as MS  # noqa: E402
 import fit_contracts as FC  # noqa: E402
+import inventory_use as IU  # noqa: E402
 
 # ---------- small helpers ----------
 
@@ -77,8 +87,13 @@ AM_DEFAULTS = {"group_wait": "30s", "group_interval": "5m", "repeat_interval": "
 # Default ports (hint only: a target on this port is probably this exporter / component)
 DEFAULT_PORTS = {"9100": "node_exporter", "9104": "mysqld_exporter", "9187": "postgres_exporter", "9121": "redis_exporter",
                  "9216": "mongodb_exporter", "9115": "blackbox_exporter", "9090": "prometheus", "9093": "alertmanager",
-                 "8429": "vmagent", "8428": "victoriametrics", "8880": "vmalert", "2379": "etcd"}
+                 "8429": "vmagent", "8428": "victoriametrics", "8880": "vmalert", "2379": "etcd", "8008": "patroni"}
+# Metric prefixes that name a producer which is not an exporter card: a job whose rule metrics carry this prefix is
+# that producer, never the card that merely lists those metrics (the postgres_exporter card lists patroni_* for
+# Patroni-backed clusters, but they come from the Patroni REST API /metrics, a job of its own).
+PREFIX_PRODUCER = {"patroni_": ("patroni", "patroni_ 前綴：Patroni REST API 的 /metrics，不是 postgres_exporter")}
 RULER_SELF = {"prometheus": (r".*prometheus.*", ":9090"), "vmalert": (r".*vmalert.*", ":8880")}
+ORIGINAL_RANGE_ANN = FC.ORIGINAL_RANGE_ANN
 
 
 def V(value, frm: str, **extra) -> dict:
@@ -885,6 +900,7 @@ WATCHDOG_NAME = re.compile(r"watchdog|dead.?man|dms\b", re.I)
 
 def build(a) -> dict:
     answers = (C._load(a.answers) or {}) if a.answers else {}
+    env = IU.load_env(getattr(a, "env", None))
     docs = load_rule_docs(a.rules)
     kind = guess_config_kind(a.config, a.config_kind)
     cfg = load_scrape(a.config, kind["value"]) if a.config else None
@@ -894,13 +910,27 @@ def build(a) -> dict:
 
     srcs = {"config": a.config, "config_kind": kind, "alertmanager": a.alertmanager, "rules": list(a.rules),
             "answers": a.answers}
-    srcs["sha256"] = {p: sha(p) for p in [a.config, a.alertmanager, a.answers, *a.rules] if p}
+    if getattr(a, "env", None):
+        srcs["env"] = a.env
+    srcs["sha256"] = {p: sha(p) for p in [a.config, a.alertmanager, a.answers, getattr(a, "env", None), *a.rules]
+                      if p and os.path.exists(p)}
     inv["sources"] = srcs
 
     # ---- stack ----
     ruler = infer_ruler(docs, kind["value"], answers)
+    facts = IU.facts(answers, env)
+    if ruler["from"] in ("hint", "unknown") and facts.get("ruler"):
+        ruler = V(facts["ruler"], "user", basis=facts.get("ruler_src"))
+    facts = IU.facts(answers, env, ruler["value"])
     stack = {"ruler": ruler,
-             "version": V(answers.get("version"), "user") if answers.get("version") else V(None, "unknown")}
+             "version": V(facts["version"], "user", basis=facts["version_src"]) if facts.get("version")
+             else V(None, "unknown")}
+    for c in facts["conflicts"]:
+        stack["version"].setdefault("note", c)
+    for k, note in (("latency", "資料延遲 L（vmalert）"), ("dedup_interval", "-dedup.minScrapeInterval"),
+                    ("eval_delay", "vmalert -rule.evalDelay")):
+        if facts.get(k):
+            stack[k] = V(facts[k], "user", basis=facts[k + "_src"], note=note)
     if cfg:
         stack["scrape_interval"] = V(fmt(cfg["gS"]), "file" if cfg["gS_raw"] else "default")
         stack["scrape_timeout"] = V(fmt(cfg["gT"]), "file" if cfg["gT_raw"] else "default")
@@ -945,10 +975,10 @@ def build(a) -> dict:
         for k in ("evaluation_interval", "rule_files_loaded", "alertmanagers"):
             stack[k] = V(None, "unknown")
         stack["rules_given_are_loaded"] = V("unknown", "unknown")
-    tv = answers.get("target_versions")
-    if isinstance(tv, dict) and tv:
-        stack["target_versions"] = V({str(k): str(v) for k, v in tv.items() if v is not None}, "user",
-                                     note="answers.target_versions：scrape job → 資料庫版本")
+    tv = facts["target_versions"]
+    if tv:
+        stack["target_versions"] = V(dict(tv), "user",
+                                     note="answers.target_versions 與 env.yaml targets[].version（env.yaml 優先）：scrape job → 資料庫版本")
     eo = answers.get("external_observer")
     stack["external_observer"] = V(eo, "user") if eo is not None else V("unknown", "unknown")
     inv["stack"] = stack
@@ -1071,8 +1101,15 @@ def build(a) -> dict:
             if j["rewrites_job"]:
                 out["rewrites_job"] = True
         prod = [p for p, js in producers.items() if name in js]
+        jm_names = sorted(job_metrics.get(name, ()))
+        pfx = {pp: sum(1 for m in jm_names if m.startswith(pp)) for pp in PREFIX_PRODUCER}
+        pfx_best = max(pfx, key=lambda pp: pfx[pp]) if pfx else None
+        distinctive = [m for m in jm_names if m.split("_", 1)[0] not in GENERIC_PREFIX and m != "up"]
         if prod:
             out["exporter"] = V(prod[0], "user")
+        elif pfx_best and pfx[pfx_best] and pfx[pfx_best] * 2 > len(distinctive):
+            comp, why = PREFIX_PRODUCER[pfx_best]
+            out["exporter"] = V(comp, "hint", basis=f"rule 讀這個 job 的 {pfx[pfx_best]} 個 metric 是 {why}")
         else:
             votes: dict[str, int] = {}
             for m in sorted(job_metrics.get(name, ())):
@@ -1093,7 +1130,13 @@ def build(a) -> dict:
                 out["exporter"] = V(None, "unknown")
         ex = out["exporter"]["value"]
         tau = dur(out["timeout"].get("effective") or out["timeout"]["value"]) if out["timeout"]["value"] else None
-        if ex in EXPORTER_DEADLINE:
+        xd_ans = (answers.get("exporter_deadline") or {}).get(name)
+        if IU.answered(xd_ans) and dur(xd_ans) is not None:
+            out["exporter_deadline"] = V(fmt(dur(xd_ans)), "user", basis="answers.exporter_deadline")
+            if tau is not None and dur(xd_ans) >= tau:
+                findings.append({"kind": "exporter_deadline_ge_timeout", "job": name,
+                                 "fact": f"job {name}：exporter 期限 {fmt(dur(xd_ans))} ≥ scrape_timeout {fmt(tau)}（使用者回答）"})
+        elif ex in EXPORTER_DEADLINE:
             f, why = EXPORTER_DEADLINE[ex]
             x = f(tau) if tau is not None else None
             if x is None and ex in ("redis_exporter", "postgres_exporter"):
@@ -1262,14 +1305,18 @@ def build(a) -> dict:
             if I and R is not None:
                 need = (rg["samples_needed"] + 1) * I + (T or 0)
                 rg["data_interval"] = fmt(I)
-                rg["short"] = R < need
-                rg["short_basis"] = f"(n+1)·I + τ = {fmt(need)}（k=1、d=τ 的保守值）"
+                rg["short"] = R < need or R <= 2 * I
+                rg["short_basis"] = (f"R ≤ 2 × S（{fmt(2 * I)}）" if R <= 2 * I and R >= need else
+                                     f"(n+1)·I + τ = {fmt(need)}（k=1、d=τ 的保守值）")
             else:
                 rg["short"] = None
         if e["ranges"]:
-            ka = keep_ans.get(name)
-            ann = (r.get("annotations") or {}).get("keep_range")
+            ka = IU.keep_state(keep_ans.get(name)) if name in keep_ans else None
+            ann = IU.keep_state((r.get("annotations") or {}).get("keep_range"))
             e["keep_range"] = V(ka, "user") if ka is not None else V(ann, "file") if ann is not None else V("unknown", "unknown")
+            orig = (r.get("annotations") or {}).get(ORIGINAL_RANGE_ANN)
+            if orig:
+                e["original_ranges"] = V(str(orig), "file", note="fit_contracts.py --write-fitted 改過視窗；原本的視窗")
         if e["kind"] == "alert":
             e["_lab"] = rule_labels(r, ext, series_labels(r_expr, r_sels, cfg_jobs, rule_jobs_used.get(name, set())))
             lo = {str(k): str(v) for k, v in (r.get("labels") or {}).items()}
@@ -1505,7 +1552,18 @@ def build(a) -> dict:
         seen.add(f["fact"])
         fl.append(f)
     inv["findings_from_files"] = fl
+    inv["facts"] = facts_section(inv, answers)
+    inv["answered"] = sorted({str(x) for x in answers.get("answered") or []})
+    inv["_qctx"] = {"cfg": cfg, "am": am}
     inv["questions"] = questions(inv, cfg, am, a, fl)
+    return inv
+
+
+def finish(inv: dict) -> dict:
+    """Recompute the questions on the final (merged) inventory, so a value answered in answers.yaml, env.yaml or
+    edited in the inventory is not asked again; drop the private keys."""
+    ctx = inv.pop("_qctx", None) or {}
+    inv["questions"] = questions(inv, ctx.get("cfg"), ctx.get("am"), None, inv.get("findings_from_files") or [])
     inv.pop("_deploy_ask", None)
     return inv
 
@@ -1526,7 +1584,99 @@ def single(labels: dict) -> dict:
 
 # ---------- questions ----------
 
+KEEP_RANGE_Q = "這個視窗是刻意的嗎？"
+# cost of being wrong when the answer is not known: 3 = a page is missed or the advice harms (a rule changed in
+# meaning, never fires), 2 = a time / option is wrong, 1 = a detail
+COST = {"job_names": 3, "--config": 3, "--alertmanager": 3, "version": 2, "external_observer": 2, "measured": 2,
+        "keep_range": 3, "producers": 2, "features": 2, "labels": 2, "must_ask": 3, "route_label": 3}
+
+
+def card_present(inv: dict) -> dict[str, str]:
+    """Cards the inventory shows (card id -> why): job exporters (hint or user), the ruler and its storage."""
+    import check_coverage as CC
+    ids = {os.path.splitext(f)[0] for d in ("components", "targets")
+           for f in os.listdir(os.path.join(C.ROOT, "catalog", d)) if f.endswith(".yaml")}
+    out = {}
+    for j in inv.get("jobs") or []:
+        ex = (j.get("exporter") or {}).get("value")
+        cid = CC.card_for(ex, ids) if ex else None
+        if cid in ids:
+            out.setdefault(cid, f"job {j['name']}")
+    st = inv.get("stack") or {}
+    rk = IU.val(st.get("ruler"))
+    if rk in ids:
+        out.setdefault(rk, "ruler")
+    if rk == "vmalert" or IU.val((inv.get("sources") or {}).get("config_kind")) == "vmagent":
+        out.setdefault("victoriametrics", "ruler 是 vmalert／scrape 設定是 vmagent")
+    return out
+
+
+def feature_present(inv: dict, feat: str) -> bool | None:
+    """True when a job's exporter is that producer or its features list it, False when every features list
+    leaves it out, None when nothing says."""
+    jobs = inv.get("jobs") or []
+    if any((j.get("exporter") or {}).get("value") == feat for j in jobs):
+        return True
+    lists = [IU.val(j.get("features")) for j in jobs if isinstance(IU.val(j.get("features")), list)]
+    if any(feat in fl for fl in lists):
+        return True
+    if any(n.get("feature") == feat for r in inv.get("rules") or [] for n in (r.get("deployment") or {}).get("needs") or []):
+        return None if not lists else False
+    return False if lists else None
+
+
+def must_ask_items(inv: dict) -> list[dict]:
+    """[{card, why_present, q}] for the card must_ask questions that apply to this inventory."""
+    cards = {c["id"]: c for c in C.load_components()}
+    out = []
+    for cid, why in sorted(card_present(inv).items()):
+        for q in (cards.get(cid) or {}).get("must_ask") or []:
+            if q.get("applies_when") and feature_present(inv, q["applies_when"]) is not True:
+                continue
+            out.append({"card": cid, "present": why, "q": q})
+    return out
+
+
+def must_ask_key(card: str, q: dict) -> str:
+    return q.get("answer_key") or f"facts.{card}.{q['id']}"
+
+
+def facts_section(inv: dict, answers: dict) -> dict:
+    """facts.<card>.<id> for every must_ask question that applies: the answer (answers.facts) or unknown, so the
+    user can fill it in inventory.yaml (kept by --merge)."""
+    given = {str(k): v for k, v in (answers.get("facts") or {}).items()}
+    out = {}
+    for it in must_ask_items(inv):
+        key = must_ask_key(it["card"], it["q"])
+        if not key.startswith("facts."):
+            continue
+        k = key[len("facts."):]
+        v = given.get(k)
+        out[k] = V(v, "user") if IU.answered(v) else V(None, "unknown", note=it["q"]["question"])
+    return out
+
+
+def must_ask_answered(inv: dict, card: str, q: dict) -> bool:
+    key = must_ask_key(card, q)
+    st = inv.get("stack") or {}
+    if key.startswith("facts."):
+        node = (inv.get("facts") or {}).get(key[len("facts."):])
+        return IU.is_user(node) and IU.answered(IU.val(node))
+    if key in ("latency", "dedup_interval", "eval_delay"):
+        return IU.is_user(st.get(key)) and IU.answered(IU.val(st.get(key)))
+    if key == "exporter_deadline":
+        js = [j for j in inv.get("jobs") or [] if (j.get("exporter") or {}).get("value") == card]
+        return bool(js) and all(IU.is_user(j.get("exporter_deadline")) for j in js)
+    return False
+
+
 def questions(inv, cfg, am, a, findings) -> list[dict]:
+    """Ranked by score = overturns × cost: how many conclusions the answer could overturn (findings it flips plus
+    the kinds of conclusion it changes) times the cost of being wrong (COST), not by how many rules it touches.
+    The intentional-window question 「這個視窗是刻意的嗎？」 is mandatory while unanswered: it always lands in the
+    first 3. Component questions from the cards' must_ask are asked for cards present in the inventory. A question
+    already answered (answers.yaml, env.yaml, an inventory value from: user / confirmed, or listed in answered) is
+    not asked again."""
     rules = [r for r in inv["rules"] if "jobs_used" in r]
     ranged = [r for r in rules if r.get("ranges")]
     qs = []
@@ -1536,49 +1686,55 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
     jnf = [f for f in findings if f["kind"] == "job_not_in_config"]
     if jnf:
         jobs = sorted(f["job"] + (f"（是 {f['closest']} 嗎？）" if f.get("closest") else "") for f in jnf)
-        qs.append({"q": f"rule 用的 {', '.join(jobs)} 在 config 裡對不到；實際的 job 名稱是什麼（relabel 之後）？",
+        qs.append({"id": "job_names", "q": f"rule 用的 {', '.join(jobs)} 在 config 裡對不到；實際的 job 名稱是什麼（relabel 之後）？",
                    "changes": ["rule 會不會響", "absent() 是否一直在響", "metric 來源"], "affects": len({n for f in jnf for n in f["rules"]}),
                    "findings": len(jnf) + cnt("never_fires", "always_fires", reason="job"),
                    "answer_key": "job_names"})
     if not cfg:
-        qs.append({"q": "可以給 prometheus.yml（或 vmagent 的 scrape 設定）嗎？", "changes": ["job 名稱", "scrape_interval／timeout",
+        qs.append({"id": "--config", "q": "可以給 prometheus.yml（或 vmagent 的 scrape 設定）嗎？", "changes": ["job 名稱", "scrape_interval／timeout",
                    "丟掉的 metric", "monitor of monitor"], "affects": len(rules), "answer_key": "--config"})
     if not am:
         alerts = [r for r in rules if r["kind"] == "alert"]
-        qs.append({"q": "可以給 alertmanager.yml 嗎？", "changes": ["每條 rule 送到哪個 receiver", "inhibit", "空 receiver"],
+        qs.append({"id": "--alertmanager", "q": "可以給 alertmanager.yml 嗎？", "changes": ["每條 rule 送到哪個 receiver", "inhibit", "空 receiver"],
                    "affects": len(alerts), "answer_key": "--alertmanager"})
-    if inv["stack"]["version"]["from"] == "unknown":
+    if not IU.known(inv["stack"].get("version")):
         rk = inv["stack"]["ruler"]["value"] or "Prometheus／vmalert"
         api = ("`curl -s <vmalert>/metrics | grep vm_app_version`" if rk == "vmalert" else
                "`curl -s <prometheus>/api/v1/status/buildinfo` 與 `curl -s <prometheus>/api/v1/status/flags`")
-        qs.append({"q": f"評估這些 rule 的 {rk} 是哪個版本？請直接貼 {api} 的輸出（唯讀；版本與旗標一次確認）",
+        qs.append({"id": "version", "q": f"評估這些 rule 的 {rk} 是哪個版本？請直接貼 {api} 的輸出（唯讀；版本與旗標一次確認）",
                    "changes": ["query_offset／eval_delay 可用與否", "anchored", "samples_needed（vmalert）"],
                    "affects": len(ranged) + 1, "findings": 0, "answer_key": "version"})
     if inv["stack"]["external_observer"]["from"] == "unknown":
         un = inv["unscraped_components"] if isinstance(inv["unscraped_components"], list) else []
-        qs.append({"q": "有沒有另一台（外部觀察者）在監控這台 ruler 和 Alertmanager？",
+        qs.append({"id": "external_observer", "q": "有沒有另一台（外部觀察者）在監控這台 ruler 和 Alertmanager？",
                    "changes": ["monitor of monitor", "Watchdog", *sorted({f"{u['component']} 沒被抓" for u in un})],
                    "affects": 1 + len(un), "findings": cnt("component_unscraped"),
                    "answer_key": "external_observer"})
     jobs_ranged = sorted({j for r in ranged for j in (r["jobs_matched"].get("value") or [])})
-    unmeasured = [j["name"] for j in inv["jobs"] if j["name"] in jobs_ranged and j["measured"]["from"] == "unknown"]
+    unmeasured = [j["name"] for j in inv["jobs"] if j["name"] in jobs_ranged and (j.get("measured") or {}).get("from") == "unknown"]
     if unmeasured:
         sel = "|".join(unmeasured)
-        qs.append({"q": f"{', '.join(unmeasured)} 的 scrape 耗時 p99／最大值與 up==0 次數（7 天）：請貼這三個查詢的輸出 "
+        qs.append({"id": "measured", "q": f"{', '.join(unmeasured)} 的 scrape 耗時 p99／最大值與 up==0 次數（7 天）：請貼這三個查詢的輸出 "
                         f"`max by (job) (quantile_over_time(0.99, scrape_duration_seconds{{job=~\"{sel}\"}}[7d]))`、"
                         f"`max by (job) (max_over_time(scrape_duration_seconds{{job=~\"{sel}\"}}[7d]))`、"
                         f"`sum by (job) (count_over_time((up{{job=~\"{sel}\"}} == 0)[7d:]))`",
                    "changes": ["scrape_timeout", "range 視窗", "k"], "affects": len(ranged),
                    "findings": cnt("timeout_gt_interval", "exporter_deadline_ge_timeout"), "answer_key": "measured"})
-    short = [r["name"] for r in ranged if any(g.get("short") for g in r["ranges"]) and r["keep_range"]["from"] == "unknown"]
+    short = [r for r in ranged if any(g.get("short") for g in r["ranges"])
+             and IU.keep_state(IU.val(r.get("keep_range"))) is None and not IU.is_user(r.get("keep_range"))]
     if short:
-        qs.append({"q": f"{', '.join(short[:5])}{' 等' if len(short) > 5 else ''} 的短視窗是刻意的嗎？",
-                   "changes": ["方案 A（改 rule）能不能用"], "affects": len(short), "answer_key": "keep_range"})
+        names = [r["name"] for r in short]
+        wins = sorted({f"{g['func']}[{g['range']}]" for r in short for g in r["ranges"] if g.get("short")})
+        qs.append({"id": "keep_range", "q": f"{'、'.join('`' + n + '`' for n in names[:5])}{' 等' if len(names) > 5 else ''} 的短視窗"
+                        f"（{'、'.join(wins[:4])}）：{KEEP_RANGE_Q}（例如就是要「最近 1 分鐘」）。"
+                        "回答前不會建議拉長視窗；在 answers.yaml 寫 `keep_range: {<rule>: true|false}`",
+                   "changes": ["視窗要保留還是可以改（方案 A 能不能用）", "rule 的語意", "保留視窗的做法（縮短該 job 的 S、query_offset、anchored）"],
+                   "affects": len(names), "findings": len(names), "answer_key": "keep_range", "mandatory": True})
     hinted = [j for j in inv["jobs"] if j["exporter"]["from"] == "hint"]
     if hinted:
         n = sum(1 for r in rules if set(r["jobs_matched"].get("value") or []) & {j["name"] for j in hinted})
         sel = "|".join(j["name"] for j in hinted)
-        qs.append({"q": "確認 exporter：" + "、".join(f"{j['name']} = {j['exporter']['value']}？" for j in hinted)
+        qs.append({"id": "producers", "q": "確認 exporter：" + "、".join(f"{j['name']} = {j['exporter']['value']}？" for j in hinted)
                         + f"請貼 `group by (job, __name__, version) ({{__name__=~\".+_build_info\", job=~\"{sel}\"}})` 的輸出"
                           "（一次確認 exporter 與版本；參數另外在 inventory.yaml 填）",
                    "changes": ["exporter 期限", "metric 來源", "目錄卡片"], "affects": n,
@@ -1592,7 +1748,8 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
             continue  # the expression drops the label: nothing to ask, the fix is in the rule or the route
         names = sorted({n for x in sib for n in x["rules"]})
         recv = sorted({n for x in sib for n in x["fallback"]})
-        qs.append({"q": f"route 要 `{f['label']}` label：exporter 會輸出 `{f['label']}` 嗎（沒有聚合的 rule 才用得到）？"
+        qs.append({"id": f"labels.{f['label']}", "cost_key": "route_label",
+                   "q": f"route 要 `{f['label']}` label：exporter 會輸出 `{f['label']}` 嗎（沒有聚合的 rule 才用得到）？"
                         f"還是要在 rule 的 labels 或 relabel 加？沒有的話 {len(names)} 條 rule 會送到 {'、'.join(recv)}",
                    "changes": ["每條 rule 送到哪個 receiver", "critical 會不會 page"], "affects": len(names),
                    "findings": len(sib) + cnt("critical_not_paging"), "answer_key": f"labels.{f['label']}"})
@@ -1600,7 +1757,7 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
     if da:
         names = sorted({n for v in da.values() for n in v})
         feats = "、".join(f"{f}（{FEATURE_TEXT.get(f, f)}）" for f in sorted(da))
-        qs.append({"q": f"這個部署有沒有：{feats}？在 inventory.yaml 的 jobs[].features（或 answers 的 `features.<job>: [...]`）"
+        qs.append({"id": "features", "q": f"這個部署有沒有：{feats}？在 inventory.yaml 的 jobs[].features（或 answers 的 `features.<job>: [...]`）"
                         "列出有的功能，一次填完",
                    "changes": ["這條 rule 適不適用這個部署"], "affects": len(names), "findings": 0, "answer_key": "features"})
     lbl = {}
@@ -1609,16 +1766,34 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
             if l["status"] in ("exporter_or_unknown", "unknown"):
                 lbl.setdefault(l["label"], set()).add(r["name"])
     if lbl:
-        qs.append({"q": "這些 label 從哪裡來（exporter 自己輸出、relabel、或根本沒有）：" + "、".join(sorted(lbl)) + "？",
+        qs.append({"id": "labels", "q": "這些 label 從哪裡來（exporter 自己輸出、relabel、或根本沒有）：" + "、".join(sorted(lbl)) + "？",
                    "changes": ["rule 會不會響", "拓撲（primary／cluster）"], "affects": len(set().union(*lbl.values())), "findings": 0,
                    "answer_key": "labels"})
     if cfg and inv["sources"]["config_kind"]["value"] == "prometheus" and (not cfg["has_rule_files"] or not cfg["alerting"]):
-        qs.append({"q": "config 沒有 rule_files 或 alerting：給的是完整的 config 嗎？", "changes": ["rule 有沒有被載入", "alert 送到哪裡"],
+        qs.append({"id": "--config-complete", "cost_key": "--config",
+                   "q": "config 沒有 rule_files 或 alerting：給的是完整的 config 嗎？", "changes": ["rule 有沒有被載入", "alert 送到哪裡"],
                    "affects": len(rules), "findings": cnt("config_missing"), "answer_key": "--config"})
+    for it in must_ask_items(inv):
+        c, q = it["card"], it["q"]
+        if must_ask_answered(inv, c, q):
+            continue
+        qs.append({"id": f"must_ask.{c}.{q['id']}", "cost_key": "must_ask",
+                   "q": f"{q['question']}（{c}：{q['why']}）", "changes": [f"{c} 的結論：{q['why']}"],
+                   "affects": 1, "findings": 2, "answer_key": must_ask_key(c, q), "refs": list(q["refs"]),
+                   "card": c, "present": it["present"]})
+    done = set(inv.get("answered") or [])
+    qs = [q for q in qs if q["id"] not in done and q["answer_key"] not in done]
     for q in qs:
         q.setdefault("findings", 0)
-    # answers that can overturn a finding first, then by the number of rules they change
-    qs.sort(key=lambda q: (-q["findings"], -q["affects"]))
+        q["overturns"] = q["findings"] + len(q["changes"])
+        q["cost"] = COST.get(q.pop("cost_key", None) or q["id"], 2)
+        q["score"] = q["overturns"] * q["cost"]
+    # answers that can overturn the most conclusions, weighted by the cost of being wrong; rules affected only breaks ties
+    qs.sort(key=lambda q: (-q["score"], -q["affects"]))
+    for m in [q for q in qs if q.get("mandatory")]:
+        i = qs.index(m)
+        if i > 2:
+            qs.insert(2, qs.pop(i))
     for i, q in enumerate(qs):
         q["ask_now"] = i < 3
     return qs
@@ -1673,7 +1848,10 @@ def markdown(inv) -> str:
           f"rule 檔 {len(s['rules'])} 個、answers `{s['answers'] or '（沒給）'}`", ""]
     L += ["## 先問這幾題", ""]
     for q in [q for q in inv["questions"] if q["ask_now"]]:
-        L.append(f"1. {q['q']}（會改變 {q['findings']} 項事實，影響 {q['affects']} 項：{'、'.join(q['changes'])}）")
+        L.append(f"1. {q['q']}（可能推翻 {q['overturns']} 個結論 × 錯了的代價 {q['cost']}"
+                 + ("，**必問**：回答前不改視窗" if q.get("mandatory") else "") + f"：{'、'.join(q['changes'])}）")
+    L += ["", "回答寫進 answers.yaml（或直接改 inventory.yaml，加 `confirmed: true`），用 `--merge` 重跑；回答過的題目不會再問。"
+          "答不出來的題目把 id 寫進 answers.yaml 的 `answered: [...]`。"]
     L += ["", "## 只看檔案就知道的事實", ""]
     L += [f"- {f['fact']}" for f in inv["findings_from_files"]] or ["- （沒有）"]
     st = inv["stack"]
@@ -1683,8 +1861,12 @@ def markdown(inv) -> str:
              "external_labels": "`external_labels`", "rule_query_offset": "`rule_query_offset`",
              "scrape_interval": "global `scrape_interval`", "scrape_timeout": "global `scrape_timeout`",
              "target_versions": "資料庫版本（依 job）"}
+    names.update({"latency": "資料延遲 L", "dedup_interval": "`-dedup.minScrapeInterval`", "eval_delay": "`eval_delay`"})
     for k, v in st.items():
         L.append(f"| {names.get(k, k)} | {_v(v)} |")
+    if inv.get("facts"):
+        L += ["", "## 元件的必問事實（卡片 must_ask）", "", "| key | 值 |", "|---|---|"]
+        L += [f"| `facts.{k}` | {_v(v)} |" for k, v in inv["facts"].items()]
     L += ["", "## Scrape job", "", "| job | `scrape_interval` | `scrape_timeout` | target | target label | 丟掉的 metric | exporter | exporter 期限 | 實測 d_p99／d_max／up0 |",
           "|---|---|---|---|---|---|---|---|---|"]
     for j in inv["jobs"]:
@@ -1740,7 +1922,8 @@ def markdown(inv) -> str:
     else:
         L.append(f"- {_v(amo)}")
     L += ["", "## 其他問題（之後再問）", ""]
-    L += [f"- {q['q']}（影響 {q['affects']} 項）" for q in inv["questions"] if not q["ask_now"]] or ["- （沒有）"]
+    L += [f"- {q['q']}（可能推翻 {q['overturns']} 個結論 × 代價 {q['cost']}；影響 {q['affects']} 條 rule）"
+          for q in inv["questions"] if not q["ask_now"]] or ["- （沒有）"]
     return "\n".join(L) + "\n"
 
 
@@ -1767,6 +1950,7 @@ def main(argv=None) -> int:
     ap.add_argument("--config-kind", choices=["prometheus", "vmagent"])
     ap.add_argument("--alertmanager")
     ap.add_argument("--answers")
+    ap.add_argument("--env", help="env/<name>.yaml：components[].version（ruler 版本）、targets[].job／version、latency 等事實")
     ap.add_argument("--merge", help="既有的 inventory：保留使用者改過或確認的值")
     ap.add_argument("--out", required=True)
     ap.add_argument("--md")
@@ -1775,7 +1959,15 @@ def main(argv=None) -> int:
     if a.merge and os.path.exists(a.merge):
         old = C._load(a.merge) or {}
         same = (old.get("sources") or {}).get("sha256") == inv["sources"]["sha256"]
+        answered = sorted(set(inv.get("answered") or []) | {str(x) for x in old.get("answered") or []})
+        os_ = old.get("sources") or {}
+        orig = os_.get("original_rules") or (os_.get("rules") if sorted(os_.get("rules") or []) != sorted(a.rules) else None)
         inv = merge(inv, old, same)
+        inv["answered"] = answered
+        if orig:
+            # the rules the user started with: fit_contracts.py reports a changed window as 「語意已改，未確認」
+            inv["sources"]["original_rules"] = list(orig)
+    inv = finish(inv)
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     with open(a.out, "w", encoding="utf-8") as f:
         f.write(dump(inv))

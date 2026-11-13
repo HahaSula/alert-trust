@@ -19,7 +19,10 @@ argument-hint: "<rule files...>"
 - 數字標來源：量到的、使用者說的、推算的、假設的。
 - **不要假定 metric 從哪裡來。**來源只能是：使用者給的 Prometheus config 裡的 scrape job、live 快照、使用者的回答。目錄卡片寫「這個 metric 通常由 mysqld_exporter 產生」只是提示。
 - **缺資料不要卡住。**用下面「不知道時的假設」先跑完，報告開頭寫明假設了什麼、補上哪一項會改變哪個結論。
-- **提問預算：每輪最多 3 個「單一問題」，不是 3 組題組。**一題只問一件使用者要想才答得出的事（例如「`[1m]` 是刻意的嗎？」）；「版本、旗標、dedup、有沒有 VL、Alertmanager 有沒有被抓」這樣的一串算 5 題。依「答案會改變幾個結論」排序，可以問任何一步的問題（例如第 4 步要的耗時數字，第一輪就可以問）。
+- **提問預算：每輪最多 3 個「單一問題」，不是 3 組題組。**一題只問一件使用者要想才答得出的事（例如「`[1m]` 是刻意的嗎？」）；「版本、旗標、dedup、有沒有 VL、Alertmanager 有沒有被抓」這樣的一串算 5 題。依「答案可能推翻幾個結論 × 錯了的代價」排序，**不是依影響幾條 rule**：只影響一兩條、卻會讓建議變成錯誤建議的題目（刻意的視窗、exporter 期限旗標、資料延遲 L）要排在前面。可以問任何一步的問題（例如第 4 步要的耗時數字，第一輪就可以問）。工具（`inventory.md`、`summary.md`）已經照這個分數排好，照它的前 3 題問。
+- **短視窗先問「這個視窗是刻意的嗎？」，回答前預設保留。**rule 的視窗很短（R ≤ 2 × `scrape_interval`，或低於契約要的長度）而使用者沒說過是不是刻意的時候：這一題一定在前 3 題；回答前**不要改視窗**，也不要把「改視窗」排在第一個建議。並列「保留視窗」的做法（縮短該 job 的 `scrape_interval`、`query_offset`、`anchored`，後兩者依版本）與「改視窗」，各附代價。`fit_contracts.py --write-fitted` 不會寫入拉長的視窗（那條 rule 標 `keep_range: unknown`）。視窗和使用者原本的 rule 不同、使用者又沒確認可以改的，報告寫「語意已改，未確認」，不能說「符合」（`review.py`／`fit_contracts.py --original <原檔>`，或 inventory 的 `sources.original_rules`）。
+- **元件的必問題**：`$AT/catalog/map.yaml` 的 `cards.<id>.must_ask`（例如 etcd 的 `--metrics`、postgres_exporter／redis_exporter 的期限旗標、vmalert 的資料延遲 L、VictoriaMetrics 的 dedup、mongodb_exporter 的 collector 旗標、Patroni 的 failsafe_mode／同步複寫）會改變結論；盤點裡有這張卡時，工具會把它排在前面，照問。
+- **每個回答都寫回，再重跑，才回覆。**使用者答了任何一題（版本、旗標、L、dedup、視窗是否刻意、exporter 期限、耗時），先寫進 `answers.yaml`（`version`、`target_versions.<job>`、`keep_range.<rule>: true|false`、`latency`、`dedup_interval`、`eval_delay`、`exporter_deadline.<job>`、`measured.<job>`、`facts.<卡片>.<id>`）或 inventory（值改好並加 `confirmed: true`），用 `--answers`／`--merge`（有 env 時加 `--env`）重跑，再寫下一次回覆。版本也可以寫在 `env/<name>.yaml` 的 `components[].version`，所有工具用同一種讀法。答過的題目不會再問；使用者說「不知道」的題目，把題目 id 寫進 `answers.yaml` 的 `answered: [...]`。交付的報告要和口頭結論一致。
 - **事實清單不要用問的，請使用者貼一次唯讀輸出或填 inventory.yaml。**版本、旗標、exporter、功能這類清單算一題，給確切的唯讀查詢，請對方原樣貼回：
   - Prometheus 版本與旗標：`curl -s <prometheus>/api/v1/status/buildinfo`、`curl -s <prometheus>/api/v1/status/flags`；vmalert：`curl -s <vmalert>/metrics | grep -E '^(vm_app_version|flag)'`
   - 實際載入的 rule：`curl -s <ruler>/api/v1/rules`（只要 group 名稱與 file）
@@ -29,7 +32,9 @@ argument-hint: "<rule files...>"
 - **版本決定能給哪些方案。**ruler 版本未知時，不要把 `query_offset`、`anchored` 當成一般選項：寫成「`query_offset`（需要 Prometheus ≥ 2.53（版本未知））」、「`anchored`（需要 Prometheus ≥ 3.x 實驗功能（版本未知））」，或先不列；工具的報告已經這樣標。vmalert 的 `eval_delay` 等旗標也先確認版本。
 - **交付的檔案要能直接驗證。**寫提案的 `alertmanager.yml`、scrape 設定時，佔位值要合法：URL 用 `https://dms.example.invalid/ping`、`https://pager.example.invalid/hook`，email 用 `oncall@example.invalid`，需要 SMTP 時補 `smtp_smarthost: smtp.example.invalid:587` 與 `smtp_from`；不要用 `<...>`。說「`amtool check-config`／`promtool check config` 通過」時，跑的必須是交付的那份檔案。
 - **「一次 scrape 失敗會讓 `for` 重新計時」要有對的證據。**用 promtool 測試時，scrape 失敗一定寫 `stale`，不要寫 `_`（`_` 只是沒有 sample，lookback 內仍看得到前一個值，原本的 rule 也不會重置）。測試要成對：原本的 rule 在 `stale` 下被重置、提案的 `last_over_time` 在 `stale` 下照常 firing。範本：`$AT/docs/tools/templates/for-reset.rules.yml`、`for-reset.test.yml`（說明見 `$AT/docs/tools/rule-review.md#for-reset-test`）。
-- 不合契約時給出路：在目前環境下成立的是哪些 → 方案 A 改 rule → 方案 B 改環境 → 視窗是刻意的時候怎麼保留語意，代價都寫出來。使用者沒選之前不要替他改檔。
+- 不合契約時給出路：在目前環境下成立的是哪些 → 保留視窗的做法（改環境：縮短該 job 的 S、`query_offset`、`anchored`）與方案 A 改 rule 並列 → 方案 B 一次改環境，代價都寫出來。視窗是否刻意還沒問過時，保留視窗排在前面。使用者沒選之前不要替他改檔。
+- **推算的時間要列出每個輸入的來源與敏感度。**`--notify-within` 的第 6 節列出 S、d、E、O／L、D、`for`、k、`group_wait` 各自來自 file／default／assumed／user，以及 L、d、k 各多一步時總時間多多少；離需求不到 30 秒時工具會警告，回覆裡要轉述「邊際只剩 X 秒」與還沒量的項目，不要只說「做得到」。提案改了 τ 時，舊 τ 下量到的 d_max 標「需要重新量」，不能拿來判「符合」。
+- **ruler 是 vmalert 時，標出證據的語意。**`promtool test rules` 的結果寫成「Prometheus 語意」（stale、lookback 是 Prometheus 的；vmalert 的 queryStep、evalDelay 另外推算）；`vmalert -dryRun` 寫成「只驗語法」。不能把兩者說成「vmalert 上的行為已驗證」。
 - 結論引用目錄：`$AT/catalog/` 的訊號 id、契約 id，網站連結 `https://hahasula.github.io/alert-trust/components/<卡片>/#<訊號>`、`https://hahasula.github.io/alert-trust/contracts/#<契約>`。
 
 ## 第 0 輪：只看檔案，第一次回覆就給
@@ -67,7 +72,8 @@ python3 "$AT/tools/review.py" --rules <rule 檔...> [--config prometheus.yml|vma
 4. **第一組問題**（最多 3 個單一問題，照「全程規則」的提問預算）。通常是：
    - 版本：請貼 `/api/v1/status/buildinfo` 與 `/api/v1/status/flags` 的輸出（算一題）。
    - 每個 job 的 scrape 耗時 p99／最大值與 `up == 0` 次數：請貼 `inventory.md` 問題裡的三個查詢的輸出（算一題）。
-   - 短視窗（例如 `[1m]`）是不是刻意的；有沒有外部觀察者。
+   - 「這個視窗是刻意的嗎？」（有短視窗時必問，一定在前 3 題）；有沒有外部觀察者。
+   - 元件卡的 `must_ask`（工具已排序；例如 etcd `--metrics`、exporter 期限旗標、vmalert 的 L）。
    檔案裡看得到的事（例如 job 名稱）不要問，寫在盤點摘要請對方確認即可。
 
 沒有 config 時，第 0 輪仍然可以給：presence 寫法、明顯太短的視窗（用假設的 S）、沒有自我監控的規則；並在問題裡要 config。
@@ -82,7 +88,8 @@ python3 "$AT/tools/review.py" --rules <rule 檔...> [--config prometheus.yml|vma
 | scrape 耗時 d | 最壞情況 d = S | 每條 rule 需要的最短視窗 |
 | 最長連續失敗 | k = 1 | 最短視窗 |
 | exporter 自己的期限 | 卡片寫的預設值 | exporter-deadline 是否成立 |
-| 視窗是否刻意 | 不是，但方案 A 要先問過 | 是否提方案 A |
+| 視窗是否刻意 | 未知：不改視窗（`keep_range: unknown`），保留視窗的做法與改視窗並列，保留排前面 | 是否提方案 A；回答前 `--write-fitted` 不拉長 |
+| vmalert 資料延遲 L | L = S（假設，工具標 assumed） | 視窗長度與通知時間；用 must_ask 問 |
 | 拓撲（複本、heartbeat、`/probe` 等） | 從 config 看得出的直接判斷（例如 job 直接抓 `host:9104`、沒有 `__param_target` → 多 target `/probe` 的 rule 不適用）；看不出的標「需要回答」，請使用者在 `inventory.yaml` 的 `jobs[].features` 一次填 | 哪些 rule 與訊號不適用 |
 
 ## 第 1 步：監控體系
@@ -122,17 +129,18 @@ python3 "$AT/tools/check_coverage.py" --env env/<name>.yaml --inventory report/i
 
 需要的數字：`scrape_interval`（S）、`scrape_timeout`（τ）、尖峰與平常的 scrape 耗時（d_max、p99）、最長連續失敗（k）、exporter 的期限（X）、`evaluation_interval`（E）、尖峰 group 耗時（T）；vmalert 另外要 `eval_delay`（D）與資料延遲（L）。S、τ 從 config 讀（`--config`）；其他問使用者或從快照取，拿不到就用假設。
 
-**先問視窗是不是刻意的，再跑工具**：像 `[1m]` 常常就是要「最近 1 分鐘」，拉長會改變語意。是的話加 `--keep-range <rule>`（或 rule 的 annotation `keep_range: "true"`）。
+**先問「這個視窗是刻意的嗎？」，再改任何視窗**：像 `[1m]` 常常就是要「最近 1 分鐘」，拉長會改變語意。答案寫進 answers.yaml 的 `keep_range: {<rule>: true|false}`（或 `--keep-range <rule>`、`--change-range <rule>`、annotation `keep_range: "true"`）後重跑。沒有答案時工具不寫拉長的視窗，報告把保留視窗的做法和改視窗並列。拿提案檔重跑時加 `--original <原本的 rule 檔>`（或用 `--merge` 舊 inventory，工具會記住原檔）：改過視窗、沒確認的 rule 是「語意已改，未確認」，不是「符合」。
 
 ```bash
 python3 "$AT/tools/fit_contracts.py" --inventory report/inventory.yaml [--job-duration <job>=<d_max>] \
     [--job-p99 <job>=<p99>] [--job-failrun <job>=<N>] [--exporter-deadline <job>=<X>] [--group-duration <T>] \
-    [--keep-range <rule>] [--prom-version <版本>] [--dedup-interval <dedup>] [--latency <L> --eval-delay <D>] \
+    [--keep-range <rule>] [--change-range <rule>] [--original <原本的 rule 檔...>] [--answers answers.yaml] [--env env/<name>.yaml] \
+    [--prom-version <版本>] [--dedup-interval <dedup>] [--latency <L> --eval-delay <D>] \
     --out report [--write-fitted report/fitted-rules.yml]
 ```
 
 - 使用者還沒有基準值（不知道 S、τ 該設多少）時，加 `--baseline`，依 `$AT/docs/tools/baseline.md` 由量到的耗時推出建議值。官方沒有 timeout 餘裕的建議；0.8、0.9 是 alert-trust 依契約訂的預警線，回報時說明。
-- 報告順序：環境本身（`d ≤ S`、`τ < S`、`X < τ`、耗時是否被 τ 截斷、p99、`E ≥ S`、`T ≤ E`、lookback）→ 在目前環境下成立的 rule → 不成立的 rule 的方案 A／B → 視窗要保留時的做法（縮短該 job 的 S、`query_offset`、Prometheus 3.x `anchored`）→ 一次讓所有 rule 成立的環境設定。
+- 報告順序：環境本身（`d ≤ S`、`τ < S`、`X < τ`、耗時是否被 τ 截斷、p99、`E ≥ S`、`T ≤ E`、lookback；提案改了 τ 時舊的 d_max 標「需要重新量」）→ 在目前環境下成立的 rule（「語意已改，未確認」另列，不算成立）→ 不成立的 rule 的方案 A／B → 保留視窗的做法（縮短該 job 的 S、`query_offset`、Prometheus 3.x `anchored`），和改視窗並列 → 一次讓所有 rule 成立的環境設定。
 - 沒有 range 的門檻 rule 加 `for` 時，一次 scrape 失敗就讓 series 變成 stale、`for` 重新計時；工具會提示，工具第 5 節會建議改用 `last_over_time(x[R])`（R 依 `range-window-1sample`）；`keep_firing_for` 只在已經 firing 之後才有幫助。這一項是推論。
 - 驗證這個推論時照「全程規則」：promtool 測試用 `stale` 模擬失敗，原本與提案成對（範本 `$AT/docs/tools/templates/for-reset.test.yml`）。
 - 代價一起說：A 視窗變長，短暫尖峰反應變慢、語意可能改變；B 的 `scrape_interval` 變短會增加 scrape 負載，`query_offset` 讓每條 rule 都晚判斷。
