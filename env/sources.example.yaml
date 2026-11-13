@@ -27,3 +27,20 @@ target_versions:
 # 每個 job 有哪些功能（決定哪些 rule 適用這個部署；詞彙見 env/env.example.yaml 的 features）。
 features:
   mysql: [replication-primary]
+
+# 以下是 rule-review 其他輪的回答（tools/inventory.py、fit_contracts.py、review.py 都讀同一份 answers）。數字都是例子。
+
+# 「這類故障要在幾分鐘內通知到人？」：有 critical rule 而沒有這一項時，盤點把它列為必問。
+notify_within: 5m
+
+# scrape 耗時（7 天）。k 的來源要分清楚：max_consecutive_failures 是量到的最長連續失敗（報告標「觀察到的連續失敗」）；
+# 只有 up0_count 或 failures_per_window（例如「任 5 分鐘最多 3 次」）時，k 只標「上限／假設」，盤點會問「最長連續失敗幾次？」。
+measured:
+  mysql: { d_p99: 4s, d_max: 7s, up0_count: 2, max_consecutive_failures: 1, tau: 10s }
+
+# 元件卡 must_ask 的回答（facts.<卡片>.<id>）。巢狀和扁平兩種寫法相同：
+#   facts: { etcd.metrics-level: basic }
+# 卡片的 must_ask[].effects 寫了回答會改變什麼（例如 basic 時讀 grpc_server_handling_seconds_bucket 的 rule「這個設定下沒有資料」）。
+facts:
+  etcd:
+    metrics-level: basic

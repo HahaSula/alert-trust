@@ -32,7 +32,10 @@ the rest. Sections:
                         rule_not_applicable (「這條 rule 不適用這個部署」: the rule assumes a feature — multi-target
                         /probe, heartbeat, semi-sync, Galera, Sentinel, Patroni ... (DEPLOY_NEEDS) — that the config
                         or answers.features / jobs[].features rule out, or groups by cluster / role that no target has)
-  facts                 facts.<card>.<id> for the must_ask questions of the cards present (fill them here or in answers)
+  facts                 facts.<card>.<id> for the must_ask questions of the cards present (fill them here or in answers;
+                        answers.yaml facts may be nested, facts: {etcd: {metrics-level: basic}}, or flat)
+  must_ask_effects      the cards' must_ask effects the answers trigger: rules reading those metrics are re-judged
+                        (fires never / partly_empty, finding must_ask_no_data 「這個設定下沒有資料」)
   questions             ranked by score = overturns × cost (how many conclusions the answer could overturn × the cost
                         of being wrong), not by rules affected; at most 3 ask_now. 「這個視窗是刻意的嗎？」 (short windows:
                         R ≤ 2×S or below the contract minimum, keep_range unknown) is mandatory and always in the first 3.
@@ -43,7 +46,9 @@ the rest. Sections:
 Answers file (env/<name>.sources.yaml) keys read here: job_names, producers, metrics, labels (as in
 check_metric_sources.py), plus version (the ruler's), target_versions.<job> (the database / server version behind a
 scrape job, e.g. mysql: "8.4.13"; check_coverage.py uses it for the cards' `versions`), ruler, external_observer,
-measured.<job>.{d_p99,d_max,up0_count,tau}, keep_range.<rule> (true: intentional, keep; false: may change),
+measured.<job>.{d_p99,d_max,up0_count,tau,max_consecutive_failures,failures_per_window} (k is 「觀察到的連續失敗」
+only with max_consecutive_failures; counts alone ask 「最長連續失敗幾次？」), notify_within (「X 內通知到人」; with
+critical rules and no notify_within, 「這類故障要在幾分鐘內通知到人？」 is mandatory), keep_range.<rule> (true: intentional, keep; false: may change),
 features.<job> (list of check_coverage.FEATURES that exist; an edited jobs[].features in the --merge inventory counts
 too), exporter_deadline.<job>, latency, dedup_interval, eval_delay, facts.<card>.<id>, answered: [question ids].
 --env env/<name>.yaml: the ruler version from components[] of the ruler's type, targets[].job / version, the same
@@ -981,6 +986,13 @@ def build(a) -> dict:
                                      note="answers.target_versions 與 env.yaml targets[].version（env.yaml 優先）：scrape job → 資料庫版本")
     eo = answers.get("external_observer")
     stack["external_observer"] = V(eo, "user") if eo is not None else V("unknown", "unknown")
+    nw = getattr(a, "notify_within", None)
+    if nw:
+        stack["notify_within"] = V(str(nw), "user", basis="--notify-within")
+    elif facts.get("notify_within"):
+        stack["notify_within"] = V(facts["notify_within"], "user", basis=facts["notify_within_src"])
+    else:
+        stack["notify_within"] = V(None, "unknown", note=NOTIFY_Q)
     inv["stack"] = stack
 
     # ---- jobs ----
@@ -1159,6 +1171,9 @@ def build(a) -> dict:
         ms = measured.get(name) or {}
         out["measured"] = ({"d_p99": ms.get("d_p99"), "d_max": ms.get("d_max"), "up0_count": ms.get("up0_count"), "from": "user"}
                            if ms else {"d_p99": None, "d_max": None, "up0_count": None, "from": "unknown"})
+        for mk in ("max_consecutive_failures", "failures_per_window", "tau"):
+            if ms.get(mk) is not None:
+                out["measured"][mk] = ms[mk]
         jobs_out.append(out)
     inv["jobs"] = jobs_out
 
@@ -1563,6 +1578,7 @@ def finish(inv: dict) -> dict:
     """Recompute the questions on the final (merged) inventory, so a value answered in answers.yaml, env.yaml or
     edited in the inventory is not asked again; drop the private keys."""
     ctx = inv.pop("_qctx", None) or {}
+    apply_must_ask_effects(inv)
     inv["questions"] = questions(inv, ctx.get("cfg"), ctx.get("am"), None, inv.get("findings_from_files") or [])
     inv.pop("_deploy_ask", None)
     return inv
@@ -1585,10 +1601,13 @@ def single(labels: dict) -> dict:
 # ---------- questions ----------
 
 KEEP_RANGE_Q = "這個視窗是刻意的嗎？"
+NOTIFY_Q = "這類故障要在幾分鐘內通知到人？"
+FAILRUN_Q = "最長連續失敗幾次？"
 # cost of being wrong when the answer is not known: 3 = a page is missed or the advice harms (a rule changed in
 # meaning, never fires), 2 = a time / option is wrong, 1 = a detail
 COST = {"job_names": 3, "--config": 3, "--alertmanager": 3, "version": 2, "external_observer": 2, "measured": 2,
-        "keep_range": 3, "producers": 2, "features": 2, "labels": 2, "must_ask": 3, "route_label": 3}
+        "keep_range": 3, "producers": 2, "features": 2, "labels": 2, "must_ask": 3, "route_label": 3, "notify_within": 3,
+        "failrun": 2}
 
 
 def card_present(inv: dict) -> dict[str, str]:
@@ -1627,7 +1646,7 @@ def feature_present(inv: dict, feat: str) -> bool | None:
 
 def must_ask_items(inv: dict) -> list[dict]:
     """[{card, why_present, q}] for the card must_ask questions that apply to this inventory."""
-    cards = {c["id"]: c for c in C.load_components()}
+    cards = {c["id"]: c for c in IU.cards()}
     out = []
     for cid, why in sorted(card_present(inv).items()):
         for q in (cards.get(cid) or {}).get("must_ask") or []:
@@ -1644,8 +1663,8 @@ def must_ask_key(card: str, q: dict) -> str:
 def facts_section(inv: dict, answers: dict) -> dict:
     """facts.<card>.<id> for every must_ask question that applies: the answer (answers.facts) or unknown, so the
     user can fill it in inventory.yaml (kept by --merge)."""
-    given = {str(k): v for k, v in (answers.get("facts") or {}).items()}
-    out = {}
+    given = IU.flat_facts(answers.get("facts"))  # nested (facts: {etcd: {metrics-level: basic}}) or flat keys
+    out = {k: V(v, "user") for k, v in given.items() if IU.answered(v)}
     for it in must_ask_items(inv):
         key = must_ask_key(it["card"], it["q"])
         if not key.startswith("facts."):
@@ -1653,7 +1672,62 @@ def facts_section(inv: dict, answers: dict) -> dict:
         k = key[len("facts."):]
         v = given.get(k)
         out[k] = V(v, "user") if IU.answered(v) else V(None, "unknown", note=it["q"]["question"])
+    out = dict(sorted(out.items()))
     return out
+
+
+def apply_must_ask_effects(inv: dict) -> None:
+    """Re-judge the rules with the cards' must_ask effects (catalog.py MUST_ASK_KEYS): an answered fact whose
+    effect is no_data makes the rules reading those metrics 「這個設定下沒有資料」. Every selector hit → fires never
+    (so fit_contracts.py / review.py count it as no data); some → partly_empty. Recorded in must_ask_effects and as a
+    finding (kind must_ask_no_data, from the answer, not the files)."""
+    inv["findings_from_files"] = [f for f in inv.get("findings_from_files") or [] if f.get("kind") != "must_ask_no_data"]
+    effects = IU.applied_effects(IU.fact_values(inv))
+    inv["must_ask_effects"] = []
+    if not effects:
+        inv.pop("must_ask_effects")
+        return
+    files = [f for f in (inv.get("sources") or {}).get("rules") or [] if os.path.exists(f)]
+    exprs = {r["name"]: r["expr"] for r in MS.load_rules(files)} if files else {}
+    by_name = {r["name"]: r for r in inv.get("rules") or []}
+    for e in effects:
+        hit = []
+        for name, expr in exprs.items():
+            sels = [x for x in MS.selectors(expr) if x.get("metric")]
+            nd = [x for x in sels if IU.effect_for_metric(x["metric"], [e])]
+            if not nd:
+                continue
+            hit.append(name)
+            r = by_name.get(name)
+            if r is None or e["verdict"] != "no_data":
+                continue
+            why = f"facts.{e['key']} = {e['answer']}"
+            if (r.get("fires") or {}).get("value") in ("never", "always"):
+                continue
+            others = [x for x in sels if not IU.effect_for_metric(x["metric"], [e])
+                      and not x["metric"].startswith("ALERTS")]
+            if not others:
+                r["fires"] = V("never", "user", why=[why], note=IU.effect_text(e))
+            else:
+                r["fires"] = V("partly_empty", "user", why=[why], note=IU.effect_text(e) + "；其他 selector 照常")
+        inv["must_ask_effects"].append({"key": e["key"], "answer": e["answer"], "verdict": e["verdict"], "metrics": e["metrics"],
+                                        "signals": e["signals"], "why": e["why"], "rules": sorted(hit)})
+        if e["verdict"] == "no_data" and hit:
+            inv["findings_from_files"].append({
+                "kind": "must_ask_no_data", "rules": sorted(hit), "key": e["key"],
+                "fact": f"使用者回答 facts.{e['key']} = {e['answer']}：{'、'.join(sorted(hit))} 讀的 "
+                        f"{'、'.join(e['metrics'])} 在這個設定下沒有資料（{e['why']}），這些 rule 不會響"})
+
+
+def effect_rule_hits(inv: dict, q: dict) -> list[str]:
+    """Rules reading a metric named in this must_ask question's effects: the answer decides whether they have data."""
+    ms = [m for e in q.get("effects") or [] for m in e.get("metrics") or []]
+    if not ms:
+        return []
+    files = [f for f in (inv.get("sources") or {}).get("rules") or [] if os.path.exists(f)]
+    fake = [{"metrics": ms, "verdict": "no_data"}]
+    return sorted({r["name"] for r in MS.load_rules(files)
+                   if any(IU.effect_for_metric(x.get("metric"), fake) for x in MS.selectors(r["expr"]))})
 
 
 def must_ask_answered(inv: dict, card: str, q: dict) -> bool:
@@ -1717,7 +1791,9 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
         qs.append({"id": "measured", "q": f"{', '.join(unmeasured)} 的 scrape 耗時 p99／最大值與 up==0 次數（7 天）：請貼這三個查詢的輸出 "
                         f"`max by (job) (quantile_over_time(0.99, scrape_duration_seconds{{job=~\"{sel}\"}}[7d]))`、"
                         f"`max by (job) (max_over_time(scrape_duration_seconds{{job=~\"{sel}\"}}[7d]))`、"
-                        f"`sum by (job) (count_over_time((up{{job=~\"{sel}\"}} == 0)[7d:]))`",
+                        f"`sum by (job) (count_over_time((up{{job=~\"{sel}\"}} == 0)[7d:]))`；"
+                        f"k 要的是連續失敗，次數不夠：再貼 `{FC.consecutive_query(sel, IU.val(next((j.get('interval') for j in inv['jobs'] if j['name'] == unmeasured[0]), None)) or '<S>', 2)}`"
+                        "（1 = 出現過連續 2 次失敗）",
                    "changes": ["scrape_timeout", "range 視窗", "k"], "affects": len(ranged),
                    "findings": cnt("timeout_gt_interval", "exporter_deadline_ge_timeout"), "answer_key": "measured"})
     short = [r for r in ranged if any(g.get("short") for g in r["ranges"])
@@ -1773,13 +1849,35 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
         qs.append({"id": "--config-complete", "cost_key": "--config",
                    "q": "config 沒有 rule_files 或 alerting：給的是完整的 config 嗎？", "changes": ["rule 有沒有被載入", "alert 送到哪裡"],
                    "affects": len(rules), "findings": cnt("config_missing"), "answer_key": "--config"})
+    crit = [r["name"] for r in rules if r["kind"] == "alert" and _sev_critical((r.get("labels_out") or {}).get("severity"))]
+    if crit and not IU.known((inv.get("stack") or {}).get("notify_within")):
+        qs.append({"id": "notify_within", "q": f"{NOTIFY_Q}（{len(crit)} 條 critical rule，例如 {'、'.join('`' + n + '`' for n in crit[:3])}；"
+                        "例如「5 分鐘」。沒有時限就只能說「會不會響」，不能說「來不來得及」）。在 answers.yaml 寫 `notify_within: 5m`",
+                   "changes": ["X 內會不會通知到人", "推算的最壞偵測＋通知時間是否超過要求", "for／視窗／group_wait 要不要改"],
+                   "affects": len(crit), "findings": 1, "answer_key": "notify_within", "mandatory": True,
+                   "mandatory_note": "沒有時限就無法判斷來不來得及"})
+    for j in inv["jobs"]:
+        m = j.get("measured") or {}
+        if m.get("from") != "user" or m.get("max_consecutive_failures") is not None or j["name"] not in jobs_ranged + [
+                x for r in rules if r.get("for") for x in (r["jobs_matched"].get("value") or [])]:
+            continue
+        if m.get("up0_count") is None and m.get("failures_per_window") is None:
+            continue
+        S = IU.val(j.get("interval")) or "S"
+        qs.append({"id": f"failrun.{j['name']}", "cost_key": "failrun",
+                   "q": f"{j['name']} 的 {FAILRUN_Q}（目前只有失敗次數，不是連續失敗；k 只能標成上限／假設）。請貼 "
+                        f"`{FC.consecutive_query(j['name'], S, 2)}` 的輸出（1 = 7 天內出現過連續 2 次失敗；把 2 換成 3 再查一次）",
+                   "changes": ["k（容忍連續失敗幾次）", "range 視窗要多長"], "affects": len(ranged), "findings": 0,
+                   "answer_key": f"measured.{j['name']}.max_consecutive_failures"})
     for it in must_ask_items(inv):
         c, q = it["card"], it["q"]
         if must_ask_answered(inv, c, q):
             continue
+        hits = effect_rule_hits(inv, q)
         qs.append({"id": f"must_ask.{c}.{q['id']}", "cost_key": "must_ask",
-                   "q": f"{q['question']}（{c}：{q['why']}）", "changes": [f"{c} 的結論：{q['why']}"],
-                   "affects": 1, "findings": 2, "answer_key": must_ask_key(c, q), "refs": list(q["refs"]),
+                   "q": f"{q['question']}（{c}：{q['why']}）", "changes": [f"{c} 的結論：{q['why']}"]
+                   + ([f"{'、'.join('`' + n + '`' for n in hits[:3])} 有沒有資料（卡片 effects）"] if hits else []),
+                   "affects": max(1, len(hits)), "findings": 2 + len(hits), "answer_key": must_ask_key(c, q), "refs": list(q["refs"]),
                    "card": c, "present": it["present"]})
     done = set(inv.get("answered") or [])
     qs = [q for q in qs if q["id"] not in done and q["answer_key"] not in done]
@@ -1790,10 +1888,12 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
         q["score"] = q["overturns"] * q["cost"]
     # answers that can overturn the most conclusions, weighted by the cost of being wrong; rules affected only breaks ties
     qs.sort(key=lambda q: (-q["score"], -q["affects"]))
-    for m in [q for q in qs if q.get("mandatory")]:
-        i = qs.index(m)
-        if i > 2:
-            qs.insert(2, qs.pop(i))
+    # mandatory questions always land in the first 3 (several mandatory ones push the others out, in score order)
+    mand = [q for q in qs if q.get("mandatory")]
+    if mand:
+        rest = [q for q in qs if not q.get("mandatory")]
+        top = sorted(mand + rest[:max(0, 3 - len(mand))], key=qs.index)
+        qs = top + [q for q in qs if q not in top]
     for i, q in enumerate(qs):
         q["ask_now"] = i < 3
     return qs
@@ -1849,7 +1949,7 @@ def markdown(inv) -> str:
     L += ["## 先問這幾題", ""]
     for q in [q for q in inv["questions"] if q["ask_now"]]:
         L.append(f"1. {q['q']}（可能推翻 {q['overturns']} 個結論 × 錯了的代價 {q['cost']}"
-                 + ("，**必問**：回答前不改視窗" if q.get("mandatory") else "") + f"：{'、'.join(q['changes'])}）")
+                 + (f"，**必問**：{q.get('mandatory_note') or '回答前不改視窗'}" if q.get("mandatory") else "") + f"：{'、'.join(q['changes'])}）")
     L += ["", "回答寫進 answers.yaml（或直接改 inventory.yaml，加 `confirmed: true`），用 `--merge` 重跑；回答過的題目不會再問。"
           "答不出來的題目把 id 寫進 answers.yaml 的 `answered: [...]`。"]
     L += ["", "## 只看檔案就知道的事實", ""]
@@ -1952,6 +2052,8 @@ def main(argv=None) -> int:
     ap.add_argument("--answers")
     ap.add_argument("--env", help="env/<name>.yaml：components[].version（ruler 版本）、targets[].job／version、latency 等事實")
     ap.add_argument("--merge", help="既有的 inventory：保留使用者改過或確認的值")
+    ap.add_argument("--notify-within", help="使用者要求的「X 內通知到人」（例如 5m）；沒給時讀 answers.notify_within／env.yaml critical.notify_within，"
+                                            "都沒有又有 critical rule 時列為必問")
     ap.add_argument("--out", required=True)
     ap.add_argument("--md")
     a = ap.parse_args(argv)

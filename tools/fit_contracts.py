@@ -193,6 +193,27 @@ def k_for(a, job) -> int:
     return max(a.k, int(a.job_failrun.get(job, 0)))
 
 
+def consecutive_query(job_re: str, S, n: int = 2, span: str = "7d") -> str:
+    """PromQL that answers 「最長連續失敗有沒有到 n 次」 for a job: 1 when some n scrapes in a row failed within span.
+    The inner subquery window is (n − ½)·S so it holds exactly n steps whether the range is left-open (3.x) or
+    closed (2.x); step S picks one sample per scrape (approximate when scrapes jitter)."""
+    sec = dur(S) if isinstance(S, str) and _DUR.fullmatch(S.strip() or "x") else (S if isinstance(S, (int, float)) else None)
+    w = fmt((n - 0.5) * sec) if sec else f"{n - 0.5}×S"
+    st = fmt(sec) if sec else "S"
+    return (f'max by (job) (max_over_time(min_over_time((up{{job=~"{job_re}"}} == bool 0)[{w}:{st}])[{span}:{st}]))')
+
+
+def k_label(a, job) -> str:
+    """Where k comes from: measured consecutive failures (--job-failrun / answers measured.<job>.max_consecutive_failures)
+    are 「觀察到的連續失敗」; per-window counts (failures_per_window / up0_count) only bound it: 上限／假設."""
+    if job in (getattr(a, "job_failrun", None) or {}) and job not in (getattr(a, "job_failrun_assumed", None) or {}):
+        return "觀察到的連續失敗"
+    up = (getattr(a, "job_fail_counts", None) or {}).get(job)
+    if up:
+        return f"上限／假設：只有失敗次數（{up}），不是連續失敗；問「最長連續失敗幾次？」"
+    return "假設（`--k`；沒有量連續失敗）"
+
+
 def latency(a, S: float | None) -> float:
     """vmalert data latency L: --latency, else L = S of the job (conservative; 0 would be optimistic)."""
     if a.latency is not None:
@@ -334,7 +355,8 @@ def job_params(a, job) -> dict:
         if d >= 0.95 * mt and tau > d:
             d, assumed = tau, "τ"  # the old d_max was cut off at the old τ: worst case under the new τ until re-measured
     return {"S": S, "d": d, "measured": measured, "assumed": assumed, "tau": tau,
-            "p99": a.job_p99.get(job, a.p99), "defaults": defaults, "remeasure": remeasure}
+            "p99": a.job_p99.get(job, a.p99), "defaults": defaults, "remeasure": remeasure,
+            "d_measured": a.job_duration.get(job)}
 
 
 def known_jobs(a) -> set | None:
@@ -379,22 +401,32 @@ def resolve_job(a, matchers) -> tuple:
 
 def s_floor(P: dict) -> tuple[float, str, float | None]:
     """Smallest feasible scrape_interval for a job (docs/tools/baseline.md steps 4–5): d_max ≤ S and S > τ, with
-    τ ≥ max(d_max / 0.9, p99 / 0.8) rounded up to whole seconds. Without measurements the current τ is the floor."""
+    τ ≥ max(d_max / 0.9, p99 / 0.8) rounded up to whole seconds. Without measurements the current τ is the floor.
+    A d_max measured under another τ (P["remeasure"], a proposal changed τ) never feeds d = τ back into a τ floor
+    (τ ≥ τ / 0.9 can never hold): a cut-off d_max gives no floor (「需要重新量」), an uncut one is used as measured."""
     parts, tau_need = [], 0.0
-    if P["measured"]:
+    rem = P.get("remeasure")
+    if rem is not None:
+        dm = P.get("d_measured")
+        if dm is not None and dm < 0.95 * rem:
+            tau_need = dm / 0.9
+            parts.append(f"舊 τ {fmt(rem)} 下量到的 d_max {fmt(dm)}")
+        else:
+            parts.append(f"d_max 被舊 τ {fmt(rem)} 截斷（**需要重新量**，不拿 d = τ 推 τ 的下限）")
+    elif P["measured"]:
         tau_need = P["d"] / 0.9
         parts.append(f"d_max {fmt(P['d'])}")
     if P["p99"]:
         if P["p99"] / 0.8 > tau_need:
             tau_need = P["p99"] / 0.8
         parts.append(f"p99 {fmt(P['p99'])}")
-    if not tau_need and P["tau"]:
+    if not tau_need and P["tau"] and rem is None:
         tau_need = P["tau"]
         parts.append(f"目前的 τ {fmt(P['tau'])}")
     if not tau_need:
-        return 0.0, "", None
+        return 0.0, "、".join(parts), None
     tau_i = float(math.ceil(tau_need - 1e-9))
-    smin = max(tau_i + 1, P["d"] if P["measured"] else 0.0)
+    smin = max(tau_i + 1, P["d"] if P["measured"] and rem is None else 0.0)
     return smin, f"{'、'.join(parts)} 要 τ ≥ {fmt(tau_i)}，`scrape_interval` 要 > τ，也就是至少 {fmt(smin)}", tau_i
 
 
@@ -406,6 +438,9 @@ def b_text(smax: float, P: dict, prefix: str = "") -> str:
     if smax < smin:
         return f"做不到：要 ≤ {fmt_max(smax)}，但 {why}；先降低 scrape 耗時，或用方案 A"
     out = prefix + fmt_max(smax)
+    if P.get("remeasure") is not None:
+        out += f"（d_max 是舊 τ {fmt(P['remeasure'])} 下量的：**需要重新量**，量完再定 τ）"
+        return out
     if tau_i is not None and P["tau"] is not None and P["tau"] >= math.floor(smax * 10) / 10:
         out += f"（τ 要降到 {fmt(tau_i)}～{fmt_max(smax - 1)}）"
     elif tau_i is not None and P["tau"] is not None and P["tau"] < tau_i:
@@ -765,7 +800,10 @@ def notify_checks(a, docs, inv: dict | None) -> list[dict]:
                 if fr:
                     inputs.append(("for", fr, "file（rule）"))
                 kk = max(getattr(a, "k", 1), int((getattr(a, "job_failrun", None) or {}).get(job, 0)))
-                inputs.append(("k", float(kk), "flag（--k／--job-failrun）" if kk != 1 else "default（k = 1）"))
+                inputs.append(("k", float(kk), ("measured（觀察到的連續失敗）" if k_label(a, job) == "觀察到的連續失敗"
+                                                else f"assumed（{k_label(a, job)}）") if kk != 1 or job in (getattr(a, "job_failrun", None) or {})
+                               else ("assumed（k = 1；" + k_label(a, job) + "）" if (getattr(a, "job_fail_counts", None) or {}).get(job)
+                                     else "default（k = 1）")))
                 parts.append(("⌈for/E⌉·E", for_eff))
                 parts_join = parts + [("group_interval", gi)]
                 parts = parts + [("group_wait", gw)]
@@ -1016,6 +1054,12 @@ def baseline(a) -> str:
         tau_now = a.job_timeout.get(j, a.timeout)
         if tau_now is not None and S0 is not None:
             tau_now = min(tau_now, S0)
+        mt = (getattr(a, "measured_tau", None) or {}).get(j)
+        if mt is not None and tau_now is not None and abs(mt - tau_now) > 1e-9 and dmax >= 0.95 * mt:
+            # measured under the old τ and cut off there: the true d_max is unknown; d = τ would ask for τ ≥ τ/0.9
+            out.append(f"| {j or '預設'} | {fmt(S0)} | {fmt(a.job_p99.get(j, a.p99) or dmax)}／{fmt(dmax)} | **需要重新量**：d_max 在舊 τ "
+                       f"{fmt(mt)} 下被截斷，現在的 τ 是 {fmt(tau_now)}；用新的 τ 量 7 天再推基準值 | | | | | | |" + ("" if vm else " |"))
+            continue
         cut = tau_now is not None and dmax >= 0.95 * tau_now
         S = S0 if dmax <= 0.8 * S0 else next((x for x in STD_INTERVALS if dmax <= 0.8 * x), math.ceil(dmax / 0.8))
         S = max(S, min(15.0, S0))
@@ -1058,6 +1102,42 @@ def status_of(r: dict) -> str:
 VMALERT_EVIDENCE = ("ruler 是 vmalert：`promtool test rules` 的結果標「Prometheus 語意」（stale、lookback 是 Prometheus 的，"
                     "vmalert 的 queryStep、evalDelay、MetricsQL 用視窗前的 sample 另外推算）；`vmalert -dryRun` 標「只驗語法」，"
                     "不能當成行為已被驗證的證據。")
+
+
+def local_promtool_version(flag: str | None = None) -> str | None:
+    """The promtool on this machine (--promtool-version / ALERT_TRUST_PROMTOOL_VERSION override, else `promtool --version`)."""
+    v = flag or os.environ.get("ALERT_TRUST_PROMTOOL_VERSION")
+    if v:
+        return None if v.strip().lower() in ("none", "") else v.strip()
+    import shutil
+    import subprocess
+    exe = shutil.which("promtool")
+    if not exe:
+        return None
+    try:
+        out = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    m = re.search(r"version (\d+\.\d+(?:\.\d+)?)", out.stdout + out.stderr)
+    return m.group(1) if m else None
+
+
+def promtool_warning(local: str | None, target: str | None, stack: str = "prometheus") -> str | None:
+    """Warn when `promtool test rules` here cannot stand for the target ruler: major version differs (2.x closed
+    range windows vs 3.x left-open), or the target version is unknown. vmalert has its own note (VMALERT_EVIDENCE)."""
+    if not local or stack != "prometheus":
+        return None
+    lv, tv = parse_version(local), parse_version(target)
+    if lv is None:
+        return None
+    if tv is None:
+        return (f"本機 promtool 是 {local}，目標 Prometheus 版本未知：`promtool test rules` 的結果是 {lv[0]}.x 的語意，"
+                "確認版本前不能當成目標環境的證據")
+    if lv[0] != tv[0]:
+        return (f"**版本不同**：本機 promtool {local}（{lv[0]}.x），目標 Prometheus {target}（{tv[0]}.x）。`promtool test rules` 的結果是 "
+                f"{lv[0]}.x 的語意，不一定反映目標的行為（例如 3.x 的 range 視窗左開、2.x 閉區間；見 "
+                "https://hahasula.github.io/alert-trust/contracts/#range-functions）。視窗邊界相關的測試要用同一個主版本的 promtool 重跑")
+    return None
 
 
 def escape_table_pipes(md: str) -> str:
@@ -1364,7 +1444,7 @@ def report(a, rows, checks, assumptions, fors=None, skipped=None) -> str:
             sels = "<br>".join(f"`{x}`" for x in f["selectors"][:3]) + (" 等" if len(f["selectors"]) > 3 else "")
             ex = f["selectors"][0]
             dflt = f"；用預設值：{'、'.join(f['defaults'])}" if f["defaults"] else ""
-            kk = f"k = {f['k']}" + ("（觀察到的連續失敗）" if f["failrun"] else "（`--k`）")
+            kk = f"k = {f['k']}（{k_label(a, f['job'])}）"
             out.append(f"| `{f['rule']}` | {fmt(f['for'])} | {sels} | {f['job'] or '—'}（{kk}{dflt}） "
                        f"| `last_over_time({ex}[{fmt(f['R'])}])`（[`range-window-1sample`](https://hahasula.github.io/alert-trust/contracts/#range-window-1sample)：(1+k)·I + max(0, d − O) = {fmt(f['need'])}） |")
         out.append("\n表格只寫出第一個 selector 的改法；同一條 rule 列出的每個 selector 都要包。"
@@ -1486,6 +1566,11 @@ def apply_inventory(a, inv: dict, user_only: bool) -> None:
                 a.measured_tau.setdefault(name, mt)
             if m.get("d_p99") and name not in a.job_p99:
                 a.job_p99[name] = dur(m["d_p99"])
+            if m.get("max_consecutive_failures") is not None and name not in a.job_failrun:
+                a.job_failrun[name] = int(m["max_consecutive_failures"])
+            elif m.get("failures_per_window") is not None or m.get("up0_count") is not None:
+                what = [f"{k} {m[k]}" for k in ("failures_per_window", "up0_count") if m.get(k) is not None]
+                a.job_fail_counts.setdefault(name, "、".join(what))
         if name in a.job_interval:
             used.append(name)
     if user_only:
@@ -1574,7 +1659,10 @@ def main(argv=None) -> int:
     ap.add_argument("--exporter-deadline", action="append", default=[], help="job=X，exporter 自己的查詢期限（優先於 exporter 預設值）")
     ap.add_argument("--job-exporter", action="append", default=[],
                     help=f"job=exporter（{'|'.join(EXPORTER_DEADLINE)}）；沒給時由 rule 的 metric 前綴推斷，用該 exporter 的預設期限")
-    ap.add_argument("--job-failrun", action="append", default=[], help="job=N，觀察到的最長連續失敗次數（k 至少取這個）")
+    ap.add_argument("--job-failrun", action="append", default=[],
+                    help="job=N，量到的最長連續失敗次數（k 至少取這個；標「觀察到的連續失敗」）。只有每個視窗的失敗次數時用 --job-k-assumed")
+    ap.add_argument("--job-k-assumed", action="append", default=[],
+                    help="job=N，k 的上限／假設（例如「任 5 分鐘最多 3 次」：次數不是連續失敗）；k 至少取這個，標「上限／假設」")
     ap.add_argument("--sources", help="check_metric_sources.py 的 metric-sources.json：選不到 series 的 selector 標「沒有資料」")
     ap.add_argument("--baseline", action="store_true", help="依量到的耗時輸出建議的 S、τ、X、E、R_min")
     ap.add_argument("--query-offset", help="O：全域 rule_query_offset（Prometheus；預設 0，或 --config 的值）")
@@ -1593,6 +1681,8 @@ def main(argv=None) -> int:
                     help="使用者原本的 rule 檔：視窗和它不同、又沒有確認可以改的 rule 標「語意已改，未確認」（沒給時用 inventory 的 sources.original_rules）")
     ap.add_argument("--answers", help="answers.yaml：version、latency、dedup_interval、eval_delay、keep_range、exporter_deadline（和 inventory.py 同一種讀法）")
     ap.add_argument("--env", help="env/<name>.yaml：ruler 的 components[].version、latency 等（和 inventory.py 同一種讀法）")
+    ap.add_argument("--promtool-version", help="本機 promtool 的版本（沒給時跑 `promtool --version`；none 表示沒有）："
+                                              "主版本和目標 Prometheus 不同時，報告警告 promtool test 的結果不代表目標的語意")
     ap.add_argument("--out", required=True)
     ap.add_argument("--write-fitted", help="把方案 A 改好的 rule 寫到這個檔（不動原檔；註解不會保留；第 5 節的改法不寫）")
     a = ap.parse_args(argv)
@@ -1667,6 +1757,18 @@ def main(argv=None) -> int:
     a.notify_within = dur(a.notify_within)
     a.job_timeout, a.job_p99, a.exporter_deadline = kv(a.job_timeout), kv(a.job_p99), kv(a.exporter_deadline)
     a.job_failrun = {k: int(v) for k, _, v in (x.partition("=") for x in a.job_failrun)}
+    a.job_failrun_assumed = {k: int(v) for k, _, v in (x.partition("=") for x in a.job_k_assumed)}
+    a.job_fail_counts = {k: f"--job-k-assumed {v}" for k, v in a.job_failrun_assumed.items()}
+    for j, m in ((a.answers_data.get("measured") or {}).items()):
+        if not isinstance(m, dict):
+            continue
+        if m.get("max_consecutive_failures") is not None and str(j) not in a.job_failrun:
+            a.job_failrun[str(j)] = int(m["max_consecutive_failures"])
+        elif m.get("failures_per_window") is not None or m.get("up0_count") is not None:
+            what = [f"{k} {m[k]}" for k in ("failures_per_window", "up0_count") if m.get(k) is not None]
+            a.job_fail_counts.setdefault(str(j), "、".join(what))
+    for j, v in a.job_failrun_assumed.items():
+        a.job_failrun[j] = max(a.job_failrun.get(j, 0), v)
     a.job_exporter = {k: v for k, _, v in (x.partition("=") for x in a.job_exporter)}
     a.job_exporter_flag = set(a.job_exporter)
     a.job_exporter_src = {}
@@ -1709,6 +1811,9 @@ def main(argv=None) -> int:
             a.assumptions.append("資料延遲 L 沒給，用保守假設 L = 該 job 的 S（不是 0）；量 vmagent 到 VM 的延遲後用 `--latency` 重跑")
         if a.dedup is None:
             a.assumptions.append("`-dedup.minScrapeInterval` 沒給，當成沒有 dedup；有設且大於 S 時實際間隔是 dedup，視窗要更長")
+    a.promtool_warning = promtool_warning(local_promtool_version(a.promtool_version), a.prom_version_text or None, a.stack)
+    if a.promtool_warning:
+        a.assumptions.append(a.promtool_warning)
     docs = load(a.rules)
     infer_exporters(a, docs)
     rows, fitted = analyze(a, docs)
@@ -1737,6 +1842,7 @@ def main(argv=None) -> int:
                                            and not r.get("nodata")}),
                    "for_checks": [{"rule": x["rule"], "job": x["job"], "R": x["R"]} for x in fors],
                    "prom_version": a.prom_version_text or None,
+                   "promtool_warning": a.promtool_warning,
                    "notify_within": a.notify_within,
                    "notify": [{k: n[k] for k in ("rule", "total", "ok", "formula", "nodata", "total_join", "ok_join",
                                                    "formula_join", "inputs", "sensitivity", "margin", "margin_warn",

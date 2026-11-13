@@ -762,6 +762,17 @@ cards:
       - etcd-grpc-histogram-extensive
       - ver-et37-metrics-flag
       - ver-et37-request-duration
+      effects:
+      - when: basic
+        verdict: no_data
+        metrics:
+        - grpc_server_handling_seconds_bucket
+        why: --metrics=basic 不註冊 server 端 gRPC histogram，讀它的 rule 回傳空
+      - when: extensive
+        verdict: available
+        metrics:
+        - grpc_server_handling_seconds_bucket
+        why: --metrics=extensive 會註冊 server 端 gRPC histogram
   mariadb:
     name: mysqld_exporter＋MariaDB
     kind: target

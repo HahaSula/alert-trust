@@ -204,14 +204,24 @@ def check_five_sections(card: dict, all_refs: dict) -> tuple[list[str], int]:
 
 
 # Optional card field (catalog/components/*.yaml, catalog/targets/*.yaml):
-#   must_ask: [{id, question, why, refs, applies_when?, answer_key?}]
+#   must_ask: [{id, question, why, refs, applies_when?, answer_key?, effects?}]
 # Component-specific questions whose answer changes conclusions (a flag that decides whether a metric exists, an
 # exporter deadline, the data latency of a ruler). tools/inventory.py asks them, ranked high, for every card present
 # in the inventory. id kebab-case and unique in the card; question / why non-empty strings; refs non-empty and
 # existing; applies_when (optional) a feature from tools/check_coverage.py FEATURES: only asked when the inventory
 # shows that feature (e.g. a patroni job); answer_key (optional) the answers.yaml key the answer goes to
 # (default facts.<card>.<id>).
-MUST_ASK_KEYS = {"id", "question", "why", "refs", "applies_when", "answer_key"}
+# effects (optional, needs a facts.* answer_key): how the answer changes conclusions, so a given answer re-judges the
+# rules and signals instead of leaving them as before:
+#   effects: [{when: <value or [values]>, verdict: no_data | available, metrics: [m, ...]?, signals: [signal id, ...]?,
+#              why: "..."?}]
+# `when` matches the answer case-insensitively, as the whole answer or one of its words (「basic（3.5.9）」 matches basic).
+# verdict no_data: rules reading those metrics (histogram _bucket/_sum/_count count as one family) are
+# 「這個設定下沒有資料」 (check_metric_sources.py status setting_absent → fit_contracts.py 沒有資料, review.py detection), and
+# the signals with rules become rule_no_data in check_coverage.py; available: the metrics exist (needs_input → confirmed).
+MUST_ASK_KEYS = {"id", "question", "why", "refs", "applies_when", "answer_key", "effects"}
+EFFECT_KEYS = {"when", "verdict", "metrics", "signals", "why"}
+EFFECT_VERDICTS = ("no_data", "available")
 _ANSWER_KEY_RE = re.compile(r"^[a-z_][a-z0-9_]*(\.[a-z0-9_.-]+)?$")
 
 
@@ -250,7 +260,59 @@ def check_must_ask(card: dict, all_refs: dict, features: set | None = None) -> l
         ak = q.get("answer_key")
         if ak is not None and (not isinstance(ak, str) or not _ANSWER_KEY_RE.match(ak)):
             errors.append(f"{at} answer_key 要是 answers.yaml 的 key（例如 latency、exporter_deadline）")
+        if "effects" in q:
+            errors += check_effects(card, q, at)
     return errors
+
+
+def check_effects(card: dict, q: dict, at: str) -> list[str]:
+    """Errors for must_ask[].effects (see MUST_ASK_KEYS above)."""
+    eff = q.get("effects")
+    if not isinstance(eff, list) or not eff:
+        return [f"{at} effects 要是非空清單（[{{when, verdict, metrics|signals}}]）"]
+    errors = []
+    ak = q.get("answer_key")
+    if ak is not None and not str(ak).startswith("facts."):
+        errors.append(f"{at} effects 只能用在 facts.* 的回答（answer_key {ak!r}）")
+    sids = {s.get("id") for s in card.get("signals") or []}
+    for i, e in enumerate(eff):
+        w = f"{at} effects[{i}]"
+        if not isinstance(e, dict):
+            errors.append(f"{w} 要是 {{when, verdict, metrics|signals}}")
+            continue
+        errors += [f"{w} 不認得 {k!r}（只有 {'、'.join(sorted(EFFECT_KEYS))}）" for k in e if k not in EFFECT_KEYS]
+        wh = e.get("when")
+        whs = wh if isinstance(wh, list) else [wh]
+        if not whs or not all(isinstance(x, (str, int, float)) and not isinstance(x, bool) and str(x).strip() for x in whs):
+            errors.append(f"{w} when 要是回答的值（字串或字串清單）")
+        if e.get("verdict") not in EFFECT_VERDICTS:
+            errors.append(f"{w} verdict 要是 {'／'.join(EFFECT_VERDICTS)}，不是 {e.get('verdict')!r}")
+        ms, ss = e.get("metrics"), e.get("signals")
+        if ms is None and ss is None:
+            errors.append(f"{w} 要有 metrics 或 signals（回答影響哪些 rule／訊號）")
+        if ms is not None and (not isinstance(ms, list) or not ms or not all(isinstance(m, str) and m for m in ms)):
+            errors.append(f"{w} metrics 要是非空的 metric 名稱清單")
+        if ss is not None:
+            if not isinstance(ss, list) or not ss or not all(isinstance(x, str) for x in ss):
+                errors.append(f"{w} signals 要是非空的訊號 id 清單")
+            else:
+                errors += [f"{w} 訊號 {x!r} 不在這張卡" for x in ss if x not in sids]
+        if "why" in e and (not isinstance(e["why"], str) or not e["why"].strip()):
+            errors.append(f"{w} why 要是非空字串")
+    return errors
+
+
+def effect_matches(when, answer) -> bool:
+    """must_ask effects `when` against an answer: case-insensitive, the whole answer or one of its words."""
+    if answer is None:
+        return False
+    a = str(answer).strip().lower()
+    words = set(re.split(r"[^0-9a-z_.\-]+", a)) - {""}
+    for w in (when if isinstance(when, list) else [when]):
+        w = str(w).strip().lower()
+        if w and (w == a or w in words):
+            return True
+    return False
 
 
 def runbook_url(component_id: str, signal_id: str) -> str:

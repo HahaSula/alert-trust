@@ -197,6 +197,7 @@ def facts(answers: dict | None, env: dict | None, ruler: str | None = None) -> d
       latency / dedup_interval / eval_delay   answers keys of the same name (vmalert data latency L, VictoriaMetrics
                        -dedup.minScrapeInterval, vmalert -rule.evalDelay), else env.yaml components[] fields
                        latency / dedup_interval / eval_delay
+      notify_within    answers.notify_within (「X 內通知到人」), else env.yaml critical.notify_within
     Values like unknown / 不知道 / empty are not answers."""
     answers, env = answers or {}, env or {}
     comps = [c for c in env.get("components") or [] if isinstance(c, dict)]
@@ -229,6 +230,10 @@ def facts(answers: dict | None, env: dict | None, ruler: str | None = None) -> d
         if isinstance(t, dict) and t.get("job") and answered(t.get("version")):
             tv[str(t["job"])] = str(t["version"])
     out["target_versions"] = tv
+    if answered(answers.get("notify_within")):
+        out["notify_within"], out["notify_within_src"] = str(answers["notify_within"]), "answers.notify_within"
+    elif answered((env.get("critical") or {}).get("notify_within")):
+        out["notify_within"], out["notify_within_src"] = str(env["critical"]["notify_within"]), "env.yaml critical.notify_within"
     for k in ("latency", "dedup_interval", "eval_delay"):
         if answered(answers.get(k)):
             out[k], out[k + "_src"] = str(answers[k]), f"answers.{k}"
@@ -250,3 +255,96 @@ def load_env(path: str | None) -> dict:
 def unscraped(inv: dict) -> list[dict]:
     u = inv.get("unscraped_components")
     return u if isinstance(u, list) else []
+
+
+# ---------- must_ask answers that change conclusions (card must_ask[].effects) ----------
+
+def flat_facts(d) -> dict:
+    """answers.yaml `facts`: nested keys (facts: {etcd: {metrics-level: basic}}) and flat ones
+    (facts: {etcd.metrics-level: basic}) are the same; returns {"etcd.metrics-level": "basic"}."""
+    out: dict = {}
+
+    def walk(node, prefix):
+        for k, v in (node or {}).items():
+            key = f"{prefix}.{k}" if prefix else str(k)
+            if isinstance(v, dict) and not ("value" in v and "from" in v):
+                walk(v, key)
+            else:
+                out[key] = val(v) if isinstance(v, dict) else v
+    if isinstance(d, dict):
+        walk(d, "")
+    return out
+
+
+def fact_values(inv: dict | None, answers: dict | None = None) -> dict:
+    """facts.<card>.<id> answers: the inventory's facts section (answered nodes) plus answers.yaml `facts`
+    (nested or flat; answers win)."""
+    out = {}
+    for k, node in ((inv or {}).get("facts") or {}).items():
+        if isinstance(node, dict) and "value" in node:
+            if is_user(node) and answered(val(node)):
+                out[str(k)] = val(node)
+        elif isinstance(node, dict):
+            out.update({f"{k}.{k2}": v for k2, v in flat_facts(node).items() if answered(v)})
+        elif answered(node):
+            out[str(k)] = node
+    out.update({k: v for k, v in flat_facts((answers or {}).get("facts")).items() if answered(v)})
+    return out
+
+
+_CARDS: dict = {}
+
+
+def cards() -> list[dict]:
+    """The catalog cards, loaded once per process (read-only use: must_ask questions and effects)."""
+    key = os.path.join(C.ROOT, "catalog")
+    if key not in _CARDS:
+        _CARDS[key] = C.load_components()
+    return _CARDS[key]
+
+
+def applied_effects(values: dict) -> list[dict]:
+    """The card must_ask effects whose `when` matches the given answer: [{card, id, key, answer, verdict, metrics,
+    signals, why, question}]. key is the facts.* key without the prefix (e.g. etcd.metrics-level)."""
+    out = []
+    if not values:
+        return out
+    for card in cards():
+        for q in card.get("must_ask") or []:
+            if not q.get("effects"):
+                continue
+            key = q.get("answer_key") or f"facts.{card['id']}.{q['id']}"
+            if not key.startswith("facts."):
+                continue
+            key = key[len("facts."):]
+            ans = values.get(key)
+            if not answered(ans):
+                continue
+            for e in q["effects"]:
+                if C.effect_matches(e.get("when"), ans):
+                    out.append({"card": card["id"], "id": q["id"], "key": key, "answer": str(ans), "verdict": e["verdict"],
+                                "metrics": list(e.get("metrics") or []), "signals": list(e.get("signals") or []),
+                                "why": e.get("why") or q.get("why", ""), "question": q.get("question", "")})
+    return out
+
+
+def _family(m: str) -> str:
+    import re
+    return re.sub(r"_(bucket|sum|count|total|created)$", "", m or "")
+
+
+def effect_for_metric(metric: str | None, effects: list[dict], verdict: str | None = None) -> dict | None:
+    """The first applied effect that names this metric (same histogram / counter family counts)."""
+    if not metric:
+        return None
+    for e in effects:
+        if verdict and e["verdict"] != verdict:
+            continue
+        if any(metric == m or _family(metric) == _family(m) for m in e["metrics"]):
+            return e
+    return None
+
+
+def effect_text(e: dict) -> str:
+    return f"這個設定下沒有資料（facts.{e['key']} = {e['answer']}：{e['why']}）" if e["verdict"] == "no_data" else \
+        f"這個設定下有資料（facts.{e['key']} = {e['answer']}：{e['why']}）"

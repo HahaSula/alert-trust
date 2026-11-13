@@ -24,6 +24,9 @@ Never guesses. For each (rule, metric selector) it reports one status:
                 only carry target labels and the config adds none, or the answers file says `labels.<l>: none`
   dropped       metric_relabel_configs in the matching job(s) drop this metric name
   live_missing  the live snapshot queried this metric and no matching job has it
+  setting_absent 「這個設定下沒有資料」: the answer to a card's must_ask question (answers.yaml facts.<card>.<id>, nested or
+                flat keys) says this metric does not exist under that setting (card must_ask[].effects, e.g. etcd
+                --metrics=basic has no grpc_server_handling_seconds_bucket)
                 (metrics the snapshot did not query fall back to the answers file)
   needs_input   cannot be decided from files: ask the person which job produces it, or where a required
                 non-job label comes from (static_configs labels / relabel target_label do not add it; the
@@ -32,7 +35,7 @@ Never guesses. For each (rule, metric selector) it reports one status:
 The catalog (catalog/components, catalog/targets) only suggests which exporter usually produces a
 metric; that is shown as a hint and never counts as a source. The report starts with advice
 (建議 / 代價), not a verdict. Exit code (for CI only): 1 when any row is always_fires, job_mismatch,
-label_mismatch, dropped, live_missing or no_source; 2 when only needs_input remains.
+label_mismatch, dropped, live_missing, no_source or setting_absent; 2 when only needs_input remains.
 """
 from __future__ import annotations
 
@@ -380,7 +383,7 @@ def load_rules(files: list[str]) -> list[dict]:
 
 
 ABSENT_FUNCS = {"absent", "absent_over_time"}
-EMPTY_STATUSES = {"job_mismatch", "dropped", "live_missing", "label_mismatch", "no_source"}
+EMPTY_STATUSES = {"job_mismatch", "dropped", "live_missing", "label_mismatch", "no_source", "setting_absent"}
 # Metric prefixes that name the component that exports them: (component, job/target regex, default ports).
 # A selector with such a prefix whose candidate jobs cannot be that component has no source.
 COMPONENT_PREFIX = [
@@ -432,7 +435,10 @@ def required_labels(matchers: list[tuple[str, str, str]]) -> list[str]:
     return out
 
 
-def check(rules: list[dict], jobs: list[dict], answers: dict, live: dict | None, root: str) -> list[dict]:
+def check(rules: list[dict], jobs: list[dict], answers: dict, live: dict | None, root: str,
+          effects: list[dict] | None = None) -> list[dict]:
+    """effects: the card must_ask effects the answers trigger (inventory_use.applied_effects): a metric that does
+    not exist under the answered setting is setting_absent 「這個設定下沒有資料」; one that does is confirmed."""
     recorded = {r["name"] for r in rules if r["kind"] == "record"}
     exact = catalog_hints(root)
     lhints = catalog_label_hints(root)
@@ -561,6 +567,13 @@ def check(rules: list[dict], jobs: list[dict], answers: dict, live: dict | None,
                         row.update(status="needs_input", ask="label")
                     row["detail"] = (row["detail"] + "；" if row["detail"] else "") + \
                         f"要 {', '.join('`' + l + '`' for l in row['labels_missing'])} label，config 沒有加"
+            if effects and metric and row["status"] in ("needs_input", "confirmed"):
+                import inventory_use as IU
+                e = IU.effect_for_metric(metric, effects)
+                if e and e["verdict"] == "no_data":
+                    row.update(status="setting_absent", ask="", effect=f"facts.{e['key']}", detail=IU.effect_text(e))
+                elif e and row["status"] == "needs_input" and row.get("ask") == "producer":
+                    row.update(status="confirmed", ask="", effect=f"facts.{e['key']}", detail=IU.effect_text(e))
             if in_absent and row["status"] in EMPTY_STATUSES:
                 row.update(status="always_fires", cause=row["status"],
                            detail=f"absent() 裡的 selector 選不到任何 series（{LABEL[row['status']]}：{row['detail']}），"
@@ -569,12 +582,13 @@ def check(rules: list[dict], jobs: list[dict], answers: dict, live: dict | None,
     return rows
 
 
-ORDER = ["always_fires", "job_mismatch", "no_source", "label_mismatch", "dropped", "live_missing", "needs_input", "confirmed", "live",
+ORDER = ["always_fires", "job_mismatch", "no_source", "setting_absent", "label_mismatch", "dropped", "live_missing", "needs_input", "confirmed", "live",
          "recording", "builtin"]
 LABEL = {"always_fires": "一直在響", "job_mismatch": "job 對不上", "no_source": "沒有來源", "label_mismatch": "label 不存在",
+         "setting_absent": "這個設定下沒有資料",
          "dropped": "被 relabel 丟掉", "live_missing": "live 查不到", "needs_input": "要問人", "confirmed": "使用者確認",
          "live": "live 看得到", "recording": "recording rule", "builtin": "內建"}
-ACTION = {"always_fires", "job_mismatch", "label_mismatch", "dropped", "live_missing", "no_source"}
+ACTION = {"always_fires", "job_mismatch", "label_mismatch", "dropped", "live_missing", "no_source", "setting_absent"}
 
 
 def _rules(rows: list[dict]) -> str:
@@ -615,6 +629,10 @@ def advice(rows: list[dict]) -> list[str]:
         out.append(f"- **{_rules(ns)} 不會響**：沒有來源（config 沒有抓 {'、'.join(comps)}）。"
                    f"**建議**：為 {'、'.join(comps)} 加 scrape job（最好由另一台外部觀察者抓），或把這些 rule 放到有抓它的那台。"
                    "**代價**：多一個 scrape job；自我監控放在被監控的同一台時，它停了就一起沉默。")
+    sa = [r for r in rows if r["status"] == "setting_absent"]
+    if sa:
+        out.append(f"- **{_rules(sa)} 不會響**：{'；'.join(sorted({r['detail'] for r in sa}))}。**建議**：改用這個設定下有的 metric，"
+                   "或改設定讓它有資料（見元件卡的 must_ask 與訊號說明）。**代價**：改設定通常要重啟、metric 數變多。")
     lv = [r for r in rows if r["status"] == "live_missing"]
     if lv:
         out.append(f"- **{_rules(lv)} 目前查不到資料**（live 快照）。**建議**：確認 exporter 有開對應 collector、job 名稱正確。")
@@ -724,7 +742,9 @@ def main(argv=None) -> int:
     if a.live:
         with open(a.live, encoding="utf-8") as f:
             live = {m: sorted(v) for m, v in json.load(f).items()}
-    rows = check(rules, jobs, answers, live, C.ROOT)
+    import inventory_use as IU
+    effects = IU.applied_effects(IU.fact_values(inv, answers))
+    rows = check(rules, jobs, answers, live, C.ROOT, effects)
     os.makedirs(a.out, exist_ok=True)
     with open(os.path.join(a.out, "metric-sources.md"), "w", encoding="utf-8") as f:
         f.write(report(rows, jobs, answer_versions(answers)))

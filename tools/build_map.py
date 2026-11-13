@@ -95,7 +95,7 @@ def card_entry(card: dict) -> dict:
         e["unsectioned"] = [s["id"] for s in sig[None]]
     if card.get("must_ask"):
         # questions that change conclusions for this component: tools/inventory.py asks them, ranked high
-        e["must_ask"] = [{k: q[k] for k in ("id", "question", "why", "refs", "applies_when", "answer_key") if k in q}
+        e["must_ask"] = [{k: q[k] for k in ("id", "question", "why", "refs", "applies_when", "answer_key", "effects") if k in q}
                          for q in card["must_ask"]]
     return e
 

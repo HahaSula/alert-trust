@@ -16,7 +16,10 @@ Runs, in this order, every tool on the same inventory (each reads it with --inve
 
 and writes <out>/summary.md. It opens with 「會不會（在 X 內）通知到人」: one sentence that answers end to end, then
 detection (rule logic), rule loading (rule_files), routing (Alertmanager) and self-monitoring (Watchdog / DMS /
-observer) separately; --notify-within X (or --env critical.notify_within) adds the worst-case times (推算). Then
+observer) separately; --notify-within X (or answers.yaml notify_within, or --env critical.notify_within) adds the
+worst-case times (推算) and flags each critical rule over X; without any, the inventory asks 「這類故障要在幾分鐘內通知到人？」
+(mandatory when critical rules exist). Rules a must_ask answer leaves without data (card must_ask effects) count as
+「這個設定下沒有資料」 in detection. A local promtool whose major version differs from the target is warned in 假設. Then
 「建議先處理的 3 件事」 ranked as
   1. rules that never fire / always fire (job, label, dropped metric, absent() on nothing)
   2. the monitoring stack itself: no Watchdog / dead man's switch, the ruler or Alertmanager not scraped
@@ -61,6 +64,8 @@ def _names(xs, n=6) -> str:
 def run_inventory(a) -> dict:
     inv_path = os.path.join(a.out, "inventory.yaml")
     argv = ["--rules", *a.rules, "--out", inv_path, "--md", os.path.join(a.out, "inventory.md")]
+    if getattr(a, "notify_within", None):
+        argv += ["--notify-within", FC.fmt(a.notify_within)]
     for flag, v in (("--config", a.config), ("--config-kind", a.config_kind), ("--alertmanager", a.alertmanager),
                     ("--answers", a.answers), ("--merge", a.merge), ("--env", a.env)):
         if v:
@@ -86,7 +91,7 @@ def item_firing(inv: dict, ms_rows: list[dict]) -> dict | None:
     never = [r["name"] for r in inv["rules"] if (r.get("fires") or {}).get("value") == "never"]
     always = [r["name"] for r in inv["rules"] if (r.get("fires") or {}).get("value") == "always"]
     always += [r["rule"] for r in ms_rows if r["status"] == "always_fires" and r["rule"] not in always]
-    bad = {"job_mismatch", "label_mismatch", "dropped", "no_source"}
+    bad = {"job_mismatch", "label_mismatch", "dropped", "no_source", "setting_absent"}
     never += [r["rule"] for r in ms_rows if r["status"] in bad and r["rule"] not in never and r["rule"] not in always
               and all(x["status"] in bad | {"builtin", "recording"} for x in ms_rows if x["rule"] == r["rule"])
               and any(x["status"] in bad for x in ms_rows if x["rule"] == r["rule"])]
@@ -103,11 +108,22 @@ def item_firing(inv: dict, ms_rows: list[dict]) -> dict | None:
     drops = [x for x in f if x["kind"] == "dropped_metric_used"]
     if drops:
         why.append(f"{len(drops)} 個 metric 被 metric_relabel_configs 丟掉")
+    for x in f:
+        if x["kind"] == "must_ask_no_data":
+            why.append(x["fact"])
+    sa = sorted({r["rule"] for r in ms_rows if r["status"] == "setting_absent"})
+    if sa and not any(x["kind"] == "must_ask_no_data" for x in f):
+        why.append(f"{_names(sa, 4)}：這個設定下沒有資料（{next(r['detail'] for r in ms_rows if r['status'] == 'setting_absent')}）")
     parts = []
     if never:
         parts.append(f"{len(set(never))} 條 rule 永遠不會響（{_names(never)}）")
     if always:
         parts.append(f"{len(set(always))} 條一直在響（{_names(always)}，`absent()` 裡的 selector 選不到任何 series）")
+    if not jobs and (sa or any(x["kind"] == "must_ask_no_data" for x in f)):
+        return {"key": "firing", "title": "；".join(parts), "why": "；".join(why),
+                "advice": "改用這個設定下有的 metric，或改設定讓它有資料（元件卡的 must_ask 與訊號說明有兩種做法）",
+                "cost": "改設定通常要重啟、metric 數變多；換 metric 要確認版本",
+                "ref": "metric-sources.md、inventory.md"}
     fix = ("把 rule 的 job 條件改成 config 裡實際的 job"
            + (f"（例如 `job=\"{jobs[0]['closest']}\"`）" if jobs and jobs[0].get("closest") else "")
            + "，或在 scrape config 用 relabel 改名；label、被丟掉的 metric 見 metric-sources.md") if jobs else \
@@ -297,16 +313,21 @@ def end_to_end(a, inv: dict, fit: dict | None, ms_rows: list[dict]) -> list[str]
     no, unk, partial, parts = [], [], [], []
     # 1. detection
     nodata = {r["name"] for r in inv["rules"] if (r.get("fires") or {}).get("value") == "never"}
-    bad = {"job_mismatch", "label_mismatch", "dropped", "no_source"}
+    bad = {"job_mismatch", "label_mismatch", "dropped", "no_source", "setting_absent"}
     nodata |= {r["rule"] for r in ms_rows if r["status"] in bad and r["rule"] in crit
                and all(x["status"] in bad | {"builtin", "recording"} for x in ms_rows if x["rule"] == r["rule"])}
     na = {n for x in f if x["kind"] == "rule_not_applicable" for n in x["rules"]}
+    setting = {r["rule"] for r in ms_rows if r["status"] == "setting_absent"} | \
+        {n for x in f if x["kind"] == "must_ask_no_data" for n in x["rules"]}
     cnd = [n for n in crit if n in nodata]
     if not crit:
         det = "沒有 severity critical 的 alert rule：沒有任何 alert 被標成要 page"
         no.append("沒有 critical rule")
     else:
         det = f"{len(crit)} 條 critical rule；{len(cnd)} 條永遠不會響（{_names(cnd, 4)}）" if cnd else f"{len(crit)} 條 critical rule 都讀得到資料（依檔案）"
+        sc = [n for n in cnd if n in setting]
+        if sc:
+            det += f"；其中 {_names(sc, 4)} 是使用者的回答造成的：這個設定下沒有資料"
         if len(cnd) == len(crit):
             no.append("critical rule 全部不會響")
         elif cnd:
@@ -337,6 +358,8 @@ def end_to_end(a, inv: dict, fit: dict | None, ms_rows: list[dict]) -> list[str]
                     partial.append(f"{len(late)} 條偵測超過 {X}")
         elif X:
             unk.append("偵測時間（沒有算出來）")
+        if not X:
+            det += f"；**沒有通知時限**：先問「{INV.NOTIFY_Q}」，回答後比對推算的最壞時間（寫進 answers.yaml 的 `notify_within`）"
     parts.append(("偵測（rule 的邏輯）", det))
     # 2. loading
     cm = [x["fact"] for x in f if x["kind"] in ("config_missing", "rules_not_loaded") and "rule_files" in x["fact"]]
@@ -466,6 +489,9 @@ def summary(a, inv, items, fit, ms_rows, lint_out, cov) -> str:
         asm.append("沒有 alertmanager.yml：沒有檢查 alert 送到哪裡、會不會 page")
     if not a.config:
         asm.append("沒有 scrape config：job 名稱、`scrape_interval`、被丟掉的 metric 都沒有檢查")
+    pw = (fit or {}).get("promtool_warning")
+    if pw and pw not in asm:
+        asm.append(pw)
     L += [f"- {x}" for x in asm] or ["- （沒有）"]
     if (st.get("ruler") or {}).get("value") == "vmalert" or (fit or {}).get("stack") == "vmalert":
         L += ["", "## 證據等級（ruler 是 vmalert）", "", f"- {FC.VMALERT_EVIDENCE}"]
@@ -505,7 +531,9 @@ def main(argv=None) -> int:
                     help="使用者原本的 rule 檔（--rules 是提案時）：視窗改過、使用者沒確認的 rule 標「語意已改，未確認」")
     ap.add_argument("--env", help="env/<name>.yaml：給了才跑覆蓋檢查")
     ap.add_argument("--tiers", default="1")
-    ap.add_argument("--notify-within", help="使用者要求的「X 內通知到人」（例如 5m）；沒給時用 --env 的 critical.notify_within")
+    ap.add_argument("--notify-within", help="使用者要求的「X 內通知到人」（例如 5m）；沒給時用 answers.yaml 的 notify_within，"
+                                            "再沒有用 --env 的 critical.notify_within；都沒有時盤點把「這類故障要在幾分鐘內通知到人？」列為必問")
+    ap.add_argument("--promtool-version", help="本機 promtool 版本（沒給時跑 `promtool --version`）；主版本和目標不同時在假設裡警告")
     ap.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     if not a.notify_within and a.env and os.path.exists(a.env):
@@ -514,6 +542,9 @@ def main(argv=None) -> int:
     os.makedirs(a.out, exist_ok=True)
     inv = run_inventory(a)
     inv_path = os.path.join(a.out, "inventory.yaml")
+    nw = (inv.get("stack") or {}).get("notify_within") or {}
+    if not a.notify_within and nw.get("from") == "user" and nw.get("value"):
+        a.notify_within = FC.dur(str(nw["value"]))  # answers.notify_within / env.yaml critical.notify_within
     ms_argv = ["--inventory", inv_path, "--out", a.out] + (["--answers", a.answers] if a.answers else [])
     _quiet(MS.main, ms_argv)
     with open(os.path.join(a.out, "metric-sources.json"), encoding="utf-8") as f:
@@ -522,7 +553,8 @@ def main(argv=None) -> int:
     rc, txt = _quiet(FC.main, ["--inventory", inv_path, "--sources", os.path.join(a.out, "metric-sources.json"), "--out", a.out]
                      + (["--notify-within", FC.fmt(a.notify_within)] if a.notify_within else [])
                      + (["--answers", a.answers] if a.answers else []) + (["--env", a.env] if a.env else [])
-                     + (["--original", *a.original] if a.original else []))
+                     + (["--original", *a.original] if a.original else [])
+                     + (["--promtool-version", a.promtool_version] if a.promtool_version else []))
     fit = None
     fj = os.path.join(a.out, "contracts-fit.json")
     if os.path.exists(fj):

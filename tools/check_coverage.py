@@ -25,7 +25,9 @@ Statuses
                   patroni_* from the Patroni REST API) are matched against that job: env.yaml
                   targets[].feature_jobs.patroni, or the inventory job whose exporter is patroni; unknown → not judged
   rule_no_data    a rule exists but its selector matches no series (--live), or (--config) no scrape job has
-                  the component's job
+                  the component's job, or a card must_ask answer (answers.yaml / inventory facts.<card>.<id>, nested
+                  or flat keys) says the metrics those rules read do not exist under that setting (card
+                  must_ask[].effects verdict no_data, or the effect lists the signal): 「這個設定下沒有資料」
   partial         rules watch the signal but miss what the card requires: every `key_metrics` entry and one metric
                   of each `metrics_any` group (e.g. etcd health-second-path without probe_success). A card with
                   neither field requires every listed `metrics` entry; slave/replica and master/source spellings
@@ -574,7 +576,8 @@ def scrape_note(comp: dict, card_id: str, scrape_jobs: set[str] | None, unscrape
 
 def evaluate(env: dict, snapshot: str | None, tiers: set[int], live: bool, scrape_jobs: set[str] | None = None,
              rules_override: dict | None = None, unscraped: list[dict] | None = None,
-             feature_jobs: dict | None = None) -> list[dict]:
+             feature_jobs: dict | None = None, effects: list[dict] | None = None) -> list[dict]:
+    import inventory_use as IU
     cards = {c["id"]: c for c in C.load_components()}
     rl = rulers(env)
     rules_by_ruler = {rid: (rules_override or {}).get(rid) if rid in (rules_override or {})
@@ -678,6 +681,21 @@ def evaluate(env: dict, snapshot: str | None, tiers: set[int], live: bool, scrap
             if not good:
                 push("self_only", "只有被監控的元件（或同一故障域的 ruler）在評估，它掛掉時這條規則也停")
                 continue
+            nd = [e for e in effects or [] if e["card"] == card_id and e["verdict"] == "no_data"]
+            if nd:
+                sig_e = next((e for e in nd if s["id"] in e["signals"]), None)
+                smetrics = set(s.get("metrics") or [])
+
+                def absent_only(r):
+                    names = {m for m in rule_metrics(r.get("query", ""))[0] if m in smetrics or
+                             any(IU._family(m) == IU._family(x) for x in smetrics)}
+                    return bool(names) and all(IU.effect_for_metric(m, nd) for m in names)
+                if sig_e or all(absent_only(r) for r in good):
+                    e = sig_e or next(IU.effect_for_metric(m, nd) for r in good for m in rule_metrics(r.get("query", ""))[0]
+                                      if IU.effect_for_metric(m, nd))
+                    item["effect"] = f"facts.{e['key']}"
+                    push("rule_no_data", IU.effect_text(e) + "；規則讀的 metric 在這個設定下不存在，改用有資料的 metric 或改設定")
+                    continue
             probes = related_probe_rules(s, comp, card_id, rules_by_ruler)
             gaps = missing_metrics(s, good + probes)
             if gaps:
@@ -888,7 +906,10 @@ def main(argv=None) -> int:
         ap.error("要給 --snapshot（或 --inventory）")
     fjobs = {f: sorted({j["name"] for j in (inv or {}).get("jobs") or [] if (j.get("exporter") or {}).get("value") == f})
              for f in SEPARATE_JOB_FEATURES}
-    items = evaluate(env, a.snapshot, tiers, a.live, scrape_jobs, override, unscraped, {k: v for k, v in fjobs.items() if v})
+    import inventory_use as IU
+    effects = IU.applied_effects(IU.fact_values(inv, IU.load_answers(a.answers)))
+    items = evaluate(env, a.snapshot, tiers, a.live, scrape_jobs, override, unscraped, {k: v for k, v in fjobs.items() if v},
+                     effects)
     deploy = deployment_rules(env, inv) if inv is not None else []
     os.makedirs(a.out, exist_ok=True)
     with open(os.path.join(a.out, "coverage.json"), "w", encoding="utf-8") as f:

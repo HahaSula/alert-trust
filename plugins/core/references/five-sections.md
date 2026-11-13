@@ -114,7 +114,11 @@ max_over_time(scrape_duration_seconds{job="<job>"}[7d])
 
 依「答案可能推翻幾個結論 × 錯了的代價」排序，不是依影響幾條 rule。卡片的 `must_ask`（`map.yaml` 的 `cards.<id>.must_ask`：`id`、`question`、`why`、`refs`）是這個元件會改變結論的必問題，先問；盤點（`inventory.md`）已經排好。
 規則有短視窗（R ≤ 2 × `scrape_interval`，或低於契約要的長度）時，「這個視窗是刻意的嗎？」一定在前 3 題；回答前不改視窗，保留視窗的做法（縮短該 job 的 `scrape_interval`、`query_offset`、`anchored`，依版本）和改視窗並列，保留排前面。視窗和使用者原本的 rule 不同又沒確認的，寫「語意已改，未確認」，不寫「符合」。
-每個回答寫進 `answers.yaml`（`facts.<卡片>.<id>`、`exporter_deadline.<job>`、`target_versions.<job>`、`keep_range.<rule>` 等）或 inventory（`confirmed: true`），用 `--merge` 重跑後再回覆；答過的題目不再問。
+照盤點排名的前 3 題問；換掉其中一題時，在回覆裡寫一句理由。有 critical rule、使用者沒給通知時限時，「這類故障要在幾分鐘內通知到人？」是必問（answers.yaml 的 `notify_within`）。
+每個回答寫進 `answers.yaml`（`facts.<卡片>.<id>`，巢狀 `facts: {<卡片>: {<id>: 值}}` 或扁平 `facts: {<卡片>.<id>: 值}` 都可以；`exporter_deadline.<job>`、`target_versions.<job>`、`keep_range.<rule>` 等）或 inventory（`confirmed: true`），用 `--merge` 重跑後再回覆；答過的題目不再問。
+**回答要改變結論**：卡片 `must_ask[].effects` 寫了回答對應哪些 metric 沒有資料（`verdict: no_data`）或有資料（`available`）；重跑後讀那些 metric 的 rule 標「這個設定下沒有資料」（`check_metric_sources.py` 的 `setting_absent`、`check_coverage.py` 的 `rule_no_data`），報告裡不能還寫「讀得到資料」。
+k（容忍連續失敗幾次）只有在量到最長連續失敗時才寫「觀察到的連續失敗」；只有次數時標「上限／假設」，並問「最長連續失敗幾次？」。
+說「可以動手」前，每個要改的檔都要放在 `proposed/` 並對它跑驗證；本機 promtool 主版本和目標不同（例如 2.x 對 3.x）時寫明測試結果不代表目標的語意；預期失敗的示範測試檔名用 `*.expect-fail.test.yml`、檔頭註解「預期失敗」。
 ruler 是 vmalert 時，`promtool test rules` 的結果標「Prometheus 語意」，`vmalert -dryRun` 標「只驗語法」。
 其他常見的題目：拓撲（決定 `applies_when` 與 component-count）；exporter 帳號權限（請使用者自己跑唯讀查詢，遮蔽後貼回）或有沒有 blackbox 探測健康端點；exporter 期限相關 flag 或 native endpoint 的開關。各 plugin 的 skill 會列這個資料庫的具體題目。
 

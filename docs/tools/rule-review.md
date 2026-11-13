@@ -76,9 +76,9 @@ python3 tools/fit_contracts.py --rules my-rules/*.yml --stack prometheus \
 | 加 `query_offset` ≥ d | 視窗不必多涵蓋 d | 每條 rule 晚 d 判斷 |
 | Prometheus 3.x `anchored`（實驗功能，`--enable-feature=promql-extended-range-selectors`） | `rate`、`increase`、`delta`、`changes`、`resets` 用視窗前的最後一個 sample 當起點，視窗內只要 1 個 sample；不外推，值是兩端的實際差 | 實驗功能，語法和行為可能改；只能在開了 flag 的 Prometheus 上用 |
 
-**回答會寫回去。**每個回答寫進 answers 檔或 `report/inventory.yaml`（標 `confirmed: true`），加 `--merge` 重跑後再看下一輪問題；答過的不會再問。問題依「答案可能推翻幾個結論 × 答錯的代價」排序，卡片上的 `must_ask`（例如 etcd 的 `--metrics`、exporter 的逾時 flag、vmalert 的資料延遲 L 與 dedup）只要環境裡有那個元件就會排在前面。
+**回答會寫回去。**每個回答寫進 answers 檔或 `report/inventory.yaml`（標 `confirmed: true`），加 `--merge` 重跑後再看下一輪問題；答過的不會再問。問題依「答案可能推翻幾個結論 × 答錯的代價」排序，卡片上的 `must_ask`（例如 etcd 的 `--metrics`、exporter 的逾時 flag、vmalert 的資料延遲 L 與 dedup）只要環境裡有那個元件就會排在前面。卡片的 `must_ask[].effects` 寫了回答會改變什麼：例如 etcd `--metrics` 答 basic 後，讀 `grpc_server_handling_seconds_bucket` 的 rule 標「這個設定下沒有資料」，時間契約算「沒有資料」，摘要的偵測那一列與覆蓋檢查也跟著改。answers 檔的 `facts` 可以寫巢狀（`facts: {etcd: {metrics-level: basic}}`）或扁平（`facts: {etcd.metrics-level: basic}`）。有 critical rule 而沒有給通知時限時，「這類故障要在幾分鐘內通知到人？」是必問；回答寫成 `notify_within: 5m`，摘要會把推算的最壞時間和它比，超過的逐條列出。
 
-**偵測時間估算。**`--notify-within` 會列出每個輸入值的來源（檔案、預設或假設）與敏感度（d、L、k 各多一步時總時間變多少），離需求不到 30 秒時警告；建議改了 `scrape_timeout` 時，舊的 scrape 耗時標「需要重新量」。ruler 是 vmalert 時，promtool 測試結果只代表 Prometheus 語意，`vmalert -dryRun` 只驗語法。
+**偵測時間估算。**`--notify-within` 會列出每個輸入值的來源（檔案、預設或假設）與敏感度（d、L、k 各多一步時總時間變多少），離需求不到 30 秒時警告；建議改了 `scrape_timeout` 時，舊的 scrape 耗時標「需要重新量」：舊的 d_max 被截斷時，工具不拿 d = τ 推新的 τ 下限（τ ≥ τ ÷ 0.9 永遠不成立），方案 B 與基準值都停在「需要重新量」。k 只有在量到最長連續失敗（answers 的 `measured.<job>.max_consecutive_failures` 或 `--job-failrun`）時才標「觀察到的連續失敗」；只有失敗次數（`up0_count`、`failures_per_window` 或 `--job-k-assumed`）時標「上限／假設」，盤點會問「最長連續失敗幾次？」並附查詢。本機 promtool 的主版本和目標 Prometheus 不同（例如 2.x 對 3.x）時，報告的假設會警告 promtool 測試的結果不代表目標的語意（3.x 的 range 視窗左開）。預期失敗的示範測試，檔名用 `*.expect-fail.test.yml`、檔頭註解「預期失敗」。ruler 是 vmalert 時，promtool 測試結果只代表 Prometheus 語意，`vmalert -dryRun` 只驗語法。
 
 視窗內實際看得到的 sample 數約是 R ÷ I。`scrape_interval` 比 R 的一半還長時，「最近 R」的精度其實由 `scrape_interval` 決定，不是由 R 決定。各函式需要幾個 sample 見[各 range 函式需要的視窗](../contracts.md#range-functions)。
 

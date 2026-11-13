@@ -54,6 +54,8 @@ docker run --rm -u $(id -u):$(id -g) -v "$PWD":/docs squidfunk/mkdocs-material:9
 
 使用者問「會不會告警／X 分鐘內會不會知道」時，第一句回答「X 內會不會有人被 page」，再分開列偵測（rule 邏輯）、載入（`rule_files`）、路由（Alertmanager）、自我監控（Watchdog／DMS／觀察者）；有時間要求時加 `--notify-within`。版本未知時，`query_offset`、`anchored` 只能標成「需要 Prometheus ≥ 2.53（版本未知）」「需要 Prometheus ≥ 3.x 實驗功能（版本未知）」。提案的設定檔用合法的佔位值（`https://dms.example.invalid/ping`），驗證跑交付的那份。「一次 scrape 失敗會重置 `for`」的 promtool 測試要用 `stale`、不是 `_`（範本 `docs/tools/templates/for-reset.test.yml`）。
 
+**問題用工具排的。**工具依「答案可能推翻幾個結論 × 答錯的代價」排序，前 3 題直接用；要換掉一題，回覆裡要說理由。卡片的 `must_ask`（附 `effects` 的會在回答後重判相關 rule）、短視窗是否刻意、有 critical rule 卻沒有通知時限（answers 的 `notify_within`）都會排進前面。每個回答寫進 answers 檔或 `inventory.yaml`，加 `--merge` 重跑後再回覆；答過的不再問。`--job-failrun` 只填量過的最長連續失敗次數，只有次數時用 `--job-k-assumed`，標成假設。說「可以動手」前，改過的檔案都放在 `proposed/` 並跑過驗證；本機 promtool 和目標 Prometheus 大版本不同時，promtool 結果要標成推論。
+
 先跑一鍵入口，它會先盤點再檢查：`python3 tools/review.py --rules <rule 檔...> [--config prometheus.yml] [--alertmanager alertmanager.yml] --out report`。盤點（`report/inventory.yaml`／`inventory.md`）是所有工具共同的事實基礎，第一次回覆要附上盤點摘要請使用者確認；單獨重跑工具時加 `--inventory report/inventory.yaml`。
 
 分析順序固定：

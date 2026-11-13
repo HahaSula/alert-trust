@@ -781,3 +781,12 @@ must_ask:
       預設 basic 不註冊 server 端 gRPC histogram：grpc_server_handling_seconds_bucket 不存在，讀它的慢請求規則（mixin etcdGRPCRequestsSlow）回傳空；
       etcd_server_request_duration_seconds 3.7 才有
     refs: [etcd-exp-raw, etcd-grpc-histogram-extensive, ver-et37-metrics-flag, ver-et37-request-duration]
+    effects:
+      - when: basic
+        verdict: no_data
+        metrics: [grpc_server_handling_seconds_bucket]
+        why: "--metrics=basic 不註冊 server 端 gRPC histogram，讀它的 rule 回傳空"
+      - when: extensive
+        verdict: available
+        metrics: [grpc_server_handling_seconds_bucket]
+        why: "--metrics=extensive 會註冊 server 端 gRPC histogram"
