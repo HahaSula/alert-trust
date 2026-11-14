@@ -1,0 +1,64 @@
+<svg viewBox="0 0 960 470" role="img" aria-label="兩個故障域：受測的 Prometheus 或 vmalert 放資料庫規則與 canary，觀察者放 meta 規則並走自己的通知路徑，兩邊的 Watchdog 都送到外部 dead man's switch">
+  <defs>
+    <marker id="ahmom" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+    <marker id="ahmomok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah-ok"/></marker>
+  </defs>
+
+  <!-- 故障域 A -->
+  <rect x="10" y="32" width="545" height="268" rx="10" class="box-out"/>
+  <text x="22" y="22" class="lbl-b">故障域 A：受測（實際監控業務與資料庫）</text>
+  <rect x="30" y="70" width="170" height="60" rx="8" class="b-node"/>
+  <text x="115" y="96" text-anchor="middle" class="lbl-b">資料庫、主機</text>
+  <text x="115" y="114" text-anchor="middle" class="lbl-s">exporter／原生 /metrics</text>
+  <path d="M200 100 H256" class="arrow" marker-end="url(#ahmom)"/>
+  <text x="228" y="92" text-anchor="middle" class="tl">scrape</text>
+  <rect x="260" y="58" width="275" height="84" rx="8" class="b-node-acc"/>
+  <text x="397" y="80" text-anchor="middle" class="lbl-b">受測 Prometheus／vmalert</text>
+  <text x="397" y="100" text-anchor="middle" class="tk">rules/targets/&lt;db&gt;.yml</text>
+  <text x="397" y="116" text-anchor="middle" class="tk">rules/prometheus/targets.yml</text>
+  <text x="397" y="132" text-anchor="middle" class="tk">rules/prometheus/canary.yml</text>
+  <path d="M397 142 V196" class="arrow" marker-end="url(#ahmom)"/>
+  <text x="405" y="174" class="tl">alert</text>
+  <rect x="260" y="200" width="275" height="60" rx="8" class="b-node"/>
+  <text x="397" y="225" text-anchor="middle" class="lbl-b">受測 Alertmanager</text>
+  <text x="397" y="243" text-anchor="middle" class="lbl-s">critical → 值班；Watchdog → DMS</text>
+
+  <!-- 故障域 B -->
+  <rect x="600" y="32" width="350" height="268" rx="10" class="box-out"/>
+  <text x="612" y="22" class="lbl-b">故障域 B：觀察者（監控 monitor）</text>
+  <rect x="650" y="58" width="290" height="84" rx="8" class="b-node-ok"/>
+  <text x="795" y="80" text-anchor="middle" class="lbl-b">觀察者 Prometheus／vmalert</text>
+  <text x="795" y="100" text-anchor="middle" class="tk">rules/prometheus/meta.yml</text>
+  <text x="795" y="116" text-anchor="middle" class="tk">rules/alertmanager/meta.yml</text>
+  <text x="795" y="132" text-anchor="middle" class="tk">victoriametrics、thanos、grafana 的 meta</text>
+  <path d="M650 84 H539" class="arrow" marker-end="url(#ahmom)"/>
+  <text x="625" y="78" text-anchor="middle" class="tl">/metrics</text>
+  <path d="M650 124 H539" class="arrow" marker-end="url(#ahmom)"/>
+  <text x="625" y="118" text-anchor="middle" class="tl">/federate</text>
+  <path d="M650 136 H642 V230 H539" class="arrow" marker-end="url(#ahmom)"/>
+  <text x="590" y="224" text-anchor="middle" class="tl">/metrics</text>
+  <path d="M795 142 V196" class="arrow" marker-end="url(#ahmom)"/>
+  <text x="803" y="174" class="tl">meta alert</text>
+  <rect x="650" y="200" width="290" height="60" rx="8" class="b-node"/>
+  <text x="795" y="225" text-anchor="middle" class="lbl-b">觀察者自己的通知路徑</text>
+  <text x="795" y="243" text-anchor="middle" class="lbl-s">另一台 Alertmanager 或直接 webhook</text>
+
+  <!-- 外部 -->
+  <rect x="20" y="370" width="250" height="60" rx="8" class="b-node-ok"/>
+  <text x="145" y="395" text-anchor="middle" class="lbl-b">外部 dead man's switch</text>
+  <text x="145" y="413" text-anchor="middle" class="lbl-s">等待時間照 deadman-wait 契約</text>
+  <rect x="340" y="370" width="280" height="60" rx="8" class="b-node-bad"/>
+  <text x="480" y="395" text-anchor="middle" class="lbl-b">值班（pager）</text>
+  <text x="480" y="413" text-anchor="middle" class="lbl-s">三條路都要能叫到人</text>
+
+  <path d="M300 260 L190 366" class="arrow-ok" marker-end="url(#ahmomok)"/>
+  <text x="196" y="314" class="tl">Watchdog</text>
+  <path d="M440 260 L465 366" class="arrow" marker-end="url(#ahmom)"/>
+  <text x="458" y="314" class="tl">critical</text>
+  <path d="M700 260 L600 366" class="arrow" marker-end="url(#ahmom)"/>
+  <text x="662" y="324" class="tl">meta 告警</text>
+  <path d="M920 260 V452 H145 V434" class="arrow-ok" marker-end="url(#ahmomok)"/>
+  <text x="560" y="446" text-anchor="middle" class="tl">觀察者自己的 Watchdog</text>
+  <path d="M270 400 H336" class="arrow" marker-end="url(#ahmom)"/>
+  <text x="303" y="392" text-anchor="middle" class="tl">沒收到</text>
+</svg>
