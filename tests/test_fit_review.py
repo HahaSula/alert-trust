@@ -78,7 +78,8 @@ class VmagentClampTest(unittest.TestCase):
         checks = F.env_checks(a)
         bad = [t for t, ok, *_ in checks if not ok]
         self.assertTrue(any("設定 20s > S 15s" in t and "有效 τ = 15s" in t for t in bad), bad)
-        self.assertTrue(any("d_max 18s ≥ 0.95 × τ（14.2s）" in t for t in bad), bad)   # truncated against 15s, not 20s
+        # compared against the effective 15s, not 20s: 18s cannot be one scrape under τ 15s → a contradiction to ask about
+        self.assertTrue(any("耗時數據和設定矛盾" in t and "d_max 18s > τ 15s" in t for t in bad), bad)
         self.assertEqual(F.s_floor(F.job_params(a, "pg"))[2], 20)
 
     def test_prometheus_kind_keeps_tau_and_flags_load_error(self):

@@ -210,8 +210,35 @@ def k_label(a, job) -> str:
         return "觀察到的連續失敗"
     up = (getattr(a, "job_fail_counts", None) or {}).get(job)
     if up:
+        if failrun_declined(a, job):
+            return f"上限／假設：只有失敗次數（{up}），不是連續失敗；使用者答不知道最長連續失敗，不再問"
         return f"上限／假設：只有失敗次數（{up}），不是連續失敗；問「最長連續失敗幾次？」"
     return "假設（`--k`；沒有量連續失敗）"
+
+
+def failrun_declined(a, job) -> bool:
+    """The user answered 「不知道」 to the consecutive-failures question (answers.unknown: failrun.<job>,
+    measured.<job>.max_consecutive_failures, or the bare failrun / max_consecutive_failures for every job)."""
+    unk = {str(x) for x in ((getattr(a, "answers_data", None) or {}).get("unknown") or [])}
+    return bool(unk & {f"failrun.{job}", f"measured.{job}.max_consecutive_failures", "failrun", "max_consecutive_failures"})
+
+
+def k_source(a, job, kk: int | None = None) -> str:
+    """Source text for k in the notify inputs. 「measured」 only when it comes from a measured longest failure run
+    (--job-failrun / measured.<job>.max_consecutive_failures); a measured 0 raised to the floor --k says so."""
+    kk = k_for(a, job) if kk is None else kk
+    fr = getattr(a, "job_failrun", None) or {}
+    assumed = getattr(a, "job_failrun_assumed", None) or {}
+    if job in fr and job not in assumed:
+        v = int(fr[job])
+        if v < kk:
+            return f"measured（最長連續失敗 {v} 次，取下限 k = {kk}）"
+        return f"measured（最長連續失敗 {v} 次）"
+    if job in assumed:
+        return f"assumed（--job-k-assumed {assumed[job]}；不是量到的連續失敗）"
+    if (getattr(a, "job_fail_counts", None) or {}).get(job):
+        return f"assumed（k = {kk}；{k_label(a, job)}）"
+    return f"default（k = {kk}）" if kk == 1 else f"flag（--k {kk}）"
 
 
 def latency(a, S: float | None) -> float:
@@ -221,12 +248,28 @@ def latency(a, S: float | None) -> float:
     return S if S is not None else (a.S or 0.0)
 
 
+def data_interval(stack: str | None, S: float, d: float, dedup: float | None = None) -> float:
+    """Effective data interval I for one job: eff_interval(S, d), and on vmalert (VictoriaMetrics) at least
+    -dedup.minScrapeInterval (one sample kept per dedup interval). Shared with inventory.py (short windows)."""
+    I = eff_interval(S, d)
+    if stack == "vmalert" and dedup:
+        I = max(I, dedup)
+    return I
+
+
+def window_need(stack: str | None, I: float, d: float, offset: float, k: int, n: int, L: float | None, D: float | None) -> float:
+    """Minimum window: Prometheus (n+k)·I + max(0, d − O); vmalert (n+k)·I + max(0, L − D).
+    The one formula fit_contracts.py and inventory.py (「視窗是刻意的嗎」) both use."""
+    if stack == "vmalert":
+        return (n + k) * I + max(0.0, (L or 0.0) - (D or 0.0))
+    return (n + k) * I + max(0.0, d - offset)
+
+
 def need_window(a, I: float, d: float, offset: float, k: int | None = None, n: int = 2, S: float | None = None) -> float:
     """range-window / range-window-1sample: (n+k)·I + max(0, d − O); vmalert: (n+k)·I + max(0, L − D)."""
     k = a.k if k is None else k
-    if a.stack == "vmalert":
-        return (n + k) * I + max(0.0, latency(a, S) - a.eval_delay)
-    return (n + k) * I + max(0.0, d - offset)
+    L = latency(a, S) if a.stack == "vmalert" else None
+    return window_need(a.stack, I, d, offset, k, n, L, a.eval_delay)
 
 
 def load(files: list[str]) -> list[tuple[str, dict]]:
@@ -530,9 +573,7 @@ def analyze(a, docs):
         if inv_nd and not nodata:
             nodata = True
             notes = notes + [inv_nd]
-        I = eff_interval(P["S"], P["d"])
-        if a.stack == "vmalert" and a.dedup:
-            I = max(I, a.dedup)  # VictoriaMetrics keeps one sample per -dedup.minScrapeInterval
+        I = data_interval(a.stack, P["S"], P["d"], a.dedup)  # VictoriaMetrics keeps one sample per dedup interval
         return P, P["S"], P["d"], I, k_for(a, job), src, job, defaults, notes, nodata
 
     for path, doc in docs:
@@ -645,6 +686,50 @@ _UP_ZERO = re.compile(r"(?<![\w:])up\s*(\{[^}]*\})?\s*==\s*0(?![\d.])")
 _ABSENCE_NAME = re.compile(r"(Missing|Absent|Disappear|Gone|NoData|Vanish)", re.I)
 
 
+_ABSENT_OPEN = re.compile(r"\babsent(_over_time)?\s*\(")
+
+
+def failure_path(expr: str, sel: dict) -> str | None:
+    """Why a selector's detection depends on a scrape failing (so its worst-case write time is τ, not the measured
+    d of a successful scrape), or None for a value path. `up` (up == 0, absent(up), count(up)) is written when the
+    scrape fails; inside absent()/absent_over_time() the rule waits for the series to disappear, which also needs
+    a failed scrape (or the staleness that follows it)."""
+    if (sel.get("metric") or "") == "up":
+        return "讀 `up`（scrape 失敗才變 0）"
+    for m in _ABSENT_OPEN.finditer(expr):
+        depth, i = 0, m.end() - 1
+        while i < len(expr):
+            if expr[i] == "(":
+                depth += 1
+            elif expr[i] == ")":
+                depth -= 1
+                if depth == 0:
+                    break
+            i += 1
+        if m.end() <= sel["pos"] < i:
+            return f"在 `{m.group(0).rstrip('(').strip()}` 裡（series 消失）"
+    return None
+
+
+def d_contradiction(P: dict) -> str | None:
+    """Measured d_max above the effective τ (or above S) cannot come from one scrape: the scrape is cut off at τ.
+    Returned as a question, never silently used (docs/tools/baseline.md step 3)."""
+    d, tau, S = P.get("d_measured"), P.get("tau"), P.get("S")
+    if d is None:
+        return None
+    if tau is not None and d > tau + 1e-9:
+        return (f"量到的 d_max {fmt(d)} > 有效 τ {fmt(tau)}：{D_CONTRADICTION}。先確認量的是哪一段時間、"
+                "當時的 `scrape_timeout`，以及 vmagent 是否把 τ 截成 S")
+    if S is not None and d > S + 1e-9:
+        return f"量到的 d_max {fmt(d)} > S {fmt(S)}：{D_CONTRADICTION}"
+    return None
+
+
+DEDUP_NOTIFY_NOTE = ("不加進總時間：持續的條件在有 dedup 時一樣快被 vmalert 看到（dedup 保留區間內最後一個 sample，進行中的區間就是最新的那個；"
+                     "lab/vm/dedup-notify 8 次相同）；但只持續一次 scrape 的條件，在同一個 dedup 區間有後一個 sample 時會被去掉，vmalert 看不到")
+D_CONTRADICTION = "量到的耗時超過期限，可能是 timeout 被截斷前的值或設定和實際不符"
+
+
 def detects_absence(rule: dict) -> str | None:
     """Why a rule is about missing data (so last_over_time would hide exactly what it looks for), or None."""
     expr = str(rule.get("expr", ""))
@@ -754,20 +839,24 @@ def notify_checks(a, docs, inv: dict | None) -> list[dict]:
                     continue
                 name = r["alert"]
                 worst, src, n_sel, n_empty = None, "預設", 0, 0
-                for sel in MS.selectors(str(r.get("expr", ""))):
+                expr_ = str(r.get("expr", ""))
+                for sel in MS.selectors(expr_):
                     n_sel += 1
                     job, jsrc, _, nodata = resolve_job(a, sel["matchers"])
                     if nodata or source_status(a, name, sel["metric"] or ""):
                         n_empty += 1
                         continue
                     P = job_params(a, job)
-                    t = P["S"] + P["d"]
+                    fp = failure_path(expr_, sel)
+                    # failure path: the scrape that fails can hang until τ before up=0 / staleness is written
+                    dd = max(P["tau"], P["d"]) if fp and P["tau"] is not None else P["d"]
+                    t = P["S"] + dd
                     if worst is None or t > worst[0]:
-                        worst, src = (t, P, job), jsrc
+                        worst, src = (t, P, job, fp, dd), jsrc
                 if worst is None:
                     P = job_params(a, None)
-                    worst = (P["S"] + P["d"], P, None)
-                S, d = worst[1]["S"], worst[1]["d"]
+                    worst = (P["S"] + P["d"], P, None, None, P["d"])
+                S, d, fpath = worst[1]["S"], worst[4], worst[3]
                 fr = dur(r.get("for")) or 0.0
                 for_eff = math.ceil(fr / E - 1e-9) * E if fr else 0.0
                 rt = (inv_rules.get(name) or {}).get("route") or {}
@@ -783,7 +872,15 @@ def notify_checks(a, docs, inv: dict | None) -> list[dict]:
                     gi, gi_src = AM_GROUP_INTERVAL_DEFAULT, ("Alertmanager 預設" if not am_known else "route 沒有設定，用預設")
                 parts = [("S", S), ("d", d), ("E", E)]
                 job = worst[2] if len(worst) > 2 else None
-                inputs = [("S", S, origin(a, "S", job, worst[1])), ("d", d, origin(a, "d", job, worst[1])),
+                contra = d_contradiction(worst[1])
+                if fpath and worst[1]["tau"] is not None:
+                    d_src = (f"τ（失敗路徑：{fpath}；target 沒有回應時要等 `scrape_timeout` 逾時才寫入，"
+                             f"connection refused 時幾乎立刻；量到的 d 只用在值路徑）")
+                else:
+                    d_src = origin(a, "d", job, worst[1]) + "（值路徑：成功 scrape 的耗時）"
+                if contra:
+                    d_src += f"；**矛盾，先確認**：{contra}"
+                inputs = [("S", S, origin(a, "S", job, worst[1])), ("d", d, d_src),
                           ("E", E, "file（group interval）" if g.get("interval") else origin(a, "E", None, None))]
                 L = None
                 if a.stack == "vmalert":
@@ -793,17 +890,17 @@ def notify_checks(a, docs, inv: dict | None) -> list[dict]:
                     inputs += [("L", L, src_.get("L", "flag" if a.latency is not None else "assumed（L = S）")),
                                ("D", a.eval_delay, src_.get("D", "default"))]
                     if getattr(a, "dedup", None):
-                        inputs.append(("dedup", a.dedup, src_.get("dedup", "user")))
+                        # not added to the total: lab/vm/dedup-notify (v1.155.0) saw the same alert time with dedup 30s
+                        # and without (S 15s, 8/8 trials); a condition lasting one scrape can be dropped instead
+                        inputs.append(("dedup", a.dedup, src_.get("dedup", "user") + "；" + DEDUP_NOTIFY_NOTE
+                                       if a.dedup > S else src_.get("dedup", "user")))
                 elif O:
                     parts.append(("O", O))
                     inputs.append(("O", O, "file（group query_offset）" if g.get("query_offset") is not None else origin(a, "O", None, None)))
                 if fr:
                     inputs.append(("for", fr, "file（rule）"))
                 kk = max(getattr(a, "k", 1), int((getattr(a, "job_failrun", None) or {}).get(job, 0)))
-                inputs.append(("k", float(kk), ("measured（觀察到的連續失敗）" if k_label(a, job) == "觀察到的連續失敗"
-                                                else f"assumed（{k_label(a, job)}）") if kk != 1 or job in (getattr(a, "job_failrun", None) or {})
-                               else ("assumed（k = 1；" + k_label(a, job) + "）" if (getattr(a, "job_fail_counts", None) or {}).get(job)
-                                     else "default（k = 1）")))
+                inputs.append(("k", float(kk), k_source(a, job, kk)))
                 parts.append(("⌈for/E⌉·E", for_eff))
                 parts_join = parts + [("group_interval", gi)]
                 parts = parts + [("group_wait", gw)]
@@ -819,7 +916,9 @@ def notify_checks(a, docs, inv: dict | None) -> list[dict]:
                 margin = a.notify_within - total
                 nd = (getattr(a, "nodata_rules", None) or {}).get(name) or \
                     ("selector 全部沒有資料" if n_sel and n_empty == n_sel else None)
-                out.append({"rule": name, "job_src": src, "parts": parts, "total": total, "gw_src": gw_src,
+                out.append({"rule": name, "job_src": src, "parts": parts, "path": "failure" if fpath else "value",
+                            "d_basis": "τ" if fpath and worst[1]["tau"] is not None else "measured d" if worst[1]["measured"] else "assumed d",
+                            "contradiction": contra, "total": total, "gw_src": gw_src,
                             "defaults": worst[1]["defaults"], "nodata": nd,
                             "ok": None if nd else total <= a.notify_within,
                             "formula": " + ".join(f"{k} {fmt(v)}" for k, v in parts) + f" = {fmt(total)}",
@@ -873,7 +972,8 @@ def notify_section(a, nrows: list[dict], dms: dict | None) -> list[str]:
            "**推算**，不是量到的：最壞情況下，從條件成立到 Alertmanager 第一次送出通知要多久。"
            + ("vmalert：`S + d + E + max(L, D) + ⌈for/E⌉·E + group_wait`。" if a.stack == "vmalert" else
               "Prometheus：`S + d + E + O + ⌈for/E⌉·E + group_wait`（O 是 `query_offset`，沒有設就是 0）。")
-           + "S + d：變化最多等一個 `scrape_interval` 才被抓到、再 d 才寫入；E：最多一個 `evaluation_interval` 才被評估；"
+           + "S + d：變化最多等一個 `scrape_interval` 才被抓到、再 d 才寫入（**值路徑**用量到的 d；**失敗路徑**——"
+             "`up == 0`、`absent(up)`、series 消失——用 d = τ：target 沒有回應時要等 `scrape_timeout` 逾時才寫入失敗）；E：最多一個 `evaluation_interval` 才被評估；"
              "`for` 只在評估時檢查，要 ⌈for/E⌉·E；`group_wait`：新 group 的第一次通知。"
              "`rate` 這類要視窗內多個 sample 才超過門檻的 rule 會更久。每條 rule 列兩行：**新 group**（`+ group_wait`）與"
              "**加入已在響的 group**（同一個 group 已經送過通知，要等下一個 `group_interval` tick，`+ group_interval`），"
@@ -886,8 +986,10 @@ def notify_section(a, nrows: list[dict], dms: dict | None) -> list[str]:
         for n in nrows:
             yn = lambda v: "沒有資料，不會響" if n["nodata"] else ("是" if v else "**否**")  # noqa: E731
             dflt = f"（用預設值：{'、'.join(n['defaults'])}）" if n["defaults"] else ""
-            out.append(f"| `{n['rule']}` | 新 group | {n['job_src']}{dflt} | {n['formula']} | {yn(n['ok'])} | {n['gw_src']} |")
-            out.append(f"| `{n['rule']}` | 加入已在響的 group | {n['job_src']}{dflt} | {n['formula_join']} | "
+            dtag = ("；d = τ（失敗路徑）" if n.get("d_basis") == "τ" else f"；d = {n.get('d_basis', 'd')}（值路徑）") + \
+                ("；**d 有矛盾**" if n.get("contradiction") else "")
+            out.append(f"| `{n['rule']}` | 新 group | {n['job_src']}{dflt}{dtag} | {n['formula']} | {yn(n['ok'])} | {n['gw_src']} |")
+            out.append(f"| `{n['rule']}` | 加入已在響的 group | {n['job_src']}{dflt}{dtag} | {n['formula_join']} | "
                        f"{yn(n['ok_join'])} | {n['gi_src']} |")
         out.append("\n**每個輸入的來源與敏感度**（file 從檔案、default 官方預設、assumed 假設、user 使用者／實測、flag 命令列）："
                    "推算值只和輸入一樣可靠，標 assumed／default 的先確認。\n")
@@ -945,7 +1047,15 @@ def env_checks(a) -> list[tuple]:
             else:
                 out.append((f"`scrape_timeout` 與 `scrape_interval`（{who}）：τ {fmt(tau)} < S {fmt(S)}", True, "",
                             "exporter-deadline", ""))
-            if measured and P.get("remeasure") is not None:
+            dm_ = a.job_duration.get(j)
+            mt_ = P.get("remeasure") if P.get("remeasure") is not None else tau
+            if measured and dm_ is not None and mt_ is not None and (dm_ > mt_ + 1e-9 or (S is not None and dm_ > S + 1e-9)):
+                lim = f"τ {fmt(mt_)}" if dm_ > mt_ + 1e-9 else f"S {fmt(S)}"
+                out.append((f"耗時數據和設定矛盾（{who}）：d_max {fmt(dm_)} > {lim}", False,
+                            f"{D_CONTRADICTION}。先問：這個 d_max 是在哪個 `scrape_timeout` 下、哪段時間量的？"
+                            "（vmagent 會把 τ 截成 S；Prometheus 在 τ 就放棄這次 scrape）確認前不要用它推 τ 或視窗",
+                            None, "要多量一次，或拿到當時的設定"))
+            elif measured and P.get("remeasure") is not None:
                 mt = P["remeasure"]
                 dm = a.job_duration.get(j, d)
                 out.append((f"耗時數據（{who}）：d_max {fmt(dm)} 是在 τ {fmt(mt)} 下量的，現在的 τ 是 {fmt(tau)}（提案改了 τ）", None,

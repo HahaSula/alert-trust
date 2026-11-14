@@ -1300,6 +1300,14 @@ cards:
       - bl-pg-ctx-background
       - bl-pg-coll-timeout-flag
       answer_key: exporter_deadline
+    - id: ha-manager
+      question: PostgreSQL 有沒有用 Patroni（或其他 HA 管理工具）？有的話 DCS 是 etcd 還是 Consul，這兩者有沒有自己的 scrape job？
+      why: Patroni 的 /metrics 由它自己的 REST API 產生，不經過 postgres_exporter，要有自己的 scrape job 與 rule（PatroniDown／PatroniMissing、leader、DCS）； DCS 整個掛掉時所有節點同時降級成唯讀，PostgreSQL 與 postgres_exporter 都正常（pg_up=1），只有 DCS（etcd 的 quorum／leader）自己的 job 與 rule 看得到
+      refs:
+      - pg-asp-patroni-metrics
+      - pg-asp-patroni-dcs-seen
+      - pg-asp-patroni-demote-dcs
+      - pg-asp-patroni-doc-dcs
     - id: patroni-modes
       question: Patroni 有沒有開 failsafe_mode？有沒有同步複寫（synchronous_mode，或 synchronous_standby_names 不是空的）？
       why: failsafe_mode 開著且成員都連得到時，主庫讀不到 DCS 也不降級（patroni_failsafe_mode_is_active == 1），「DCS 斷線 → 主庫降級」的判斷不成立； 同步複寫時同步 standby 消失會讓 commit 等待，PostgresSyncStandbyMissing 這類規則才適用
@@ -1418,6 +1426,31 @@ cards:
       - rx-flag-timeout
       - rx-dial-timeouts
       answer_key: exporter_deadline
+    - id: maxmemory-policy
+      question: '`maxmemory` 設多少、`maxmemory-policy` 是什麼？（請貼 `CONFIG GET maxmemory*` 的輸出，或 `redis_instance_info` 的 maxmemory_policy label）'
+      why: noeviction（以及沒有 TTL key 的 volatile-*）碰到 maxmemory 時不淘汰、直接拒絕寫入：SET／INCR 回 OOM，GET 照常，redis_up 仍是 1， redis_evicted_keys_total 一直是 0，只看淘汰的規則（例如 EvictingKeys）永遠不響；要看 redis_errors_total{err="OOM"}（writes-rejected）。 allkeys-* 才會淘汰，淘汰規則才有意義
+      refs:
+      - vk-exp
+      - vk-oom-reject
+      - vk-evict-noeviction
+      - vk-evict-nothing
+      - vk-cfg-maxmemory-policy
+      - rx-map-evicted
+      - rx-errorstats
+      effects:
+      - when: noeviction
+        verdict: no_data
+        metrics:
+        - redis_evicted_keys_total
+        why: noeviction 不淘汰，evicted_keys 一直是 0，讀它的淘汰規則不會響；寫入被拒要用 redis_errors_total{err="OOM"} 的規則（writes-rejected）
+      - when:
+        - allkeys-lru
+        - allkeys-lfu
+        - allkeys-random
+        verdict: available
+        metrics:
+        - redis_evicted_keys_total
+        why: allkeys-* 碰到 maxmemory 時淘汰 key，evicted_keys 會增加
   tidb:
     name: TiDB（TiDB server、TiKV、PD；內建 /metrics）
     kind: target

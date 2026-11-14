@@ -75,7 +75,7 @@ class ShortWindowQuestionTest(unittest.TestCase):
         lands in the first 3, with the exact wording."""
         with tempfile.TemporaryDirectory() as t:
             inv, _ = inventory(t, [MYSQL_RULES], MYSQL_PROM)
-        q = next(x for x in inv["questions"] if x["answer_key"] == "keep_range")
+        q = next(x for x in inv["questions"] if x["answer_key"].startswith("keep_range.") and x.get("mandatory"))
         self.assertIn("這個視窗是刻意的嗎？", q["q"])
         self.assertTrue(q["mandatory"])
         self.assertTrue(q["ask_now"])
@@ -86,7 +86,7 @@ class ShortWindowQuestionTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as t:
             ans = write(t, "a.yaml", {"keep_range": {"MySQLSlowQueriesBurst": True}})
             inv, _ = inventory(t, [MYSQL_RULES], MYSQL_PROM, answers=ans)
-        self.assertNotIn("keep_range", [x["answer_key"] for x in inv["questions"]])
+        self.assertNotIn("keep_range.MySQLSlowQueriesBurst", [x["answer_key"] for x in inv["questions"]])
         r = next(x for x in inv["rules"] if x["name"] == "MySQLSlowQueriesBurst")
         self.assertEqual(r["keep_range"], {"value": True, "from": "user"})
 
@@ -99,7 +99,7 @@ class ShortWindowQuestionTest(unittest.TestCase):
         r = next(x for x in inv["rules"] if x["name"] == "ErrorsBurst")
         self.assertEqual(r["keep_range"]["from"], "unknown")
         self.assertTrue(r["ranges"][0]["short"])
-        self.assertIn("keep_range", [x["answer_key"] for x in inv["questions"] if x["ask_now"]])
+        self.assertIn("keep_range.ErrorsBurst", [x["answer_key"] for x in inv["questions"] if x["ask_now"]])
 
 
 class FitKeepRangeTest(unittest.TestCase):

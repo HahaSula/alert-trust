@@ -1174,6 +1174,20 @@ def build(a) -> dict:
         for mk in ("max_consecutive_failures", "failures_per_window", "tau"):
             if ms.get(mk) is not None:
                 out["measured"][mk] = ms[mk]
+        dm = dur(out["measured"].get("d_max")) if out["measured"].get("d_max") is not None else None
+        S_ = dur(IU.val(out.get("interval"))) if isinstance(out.get("interval"), dict) else None
+        to = out.get("timeout") if isinstance(out.get("timeout"), dict) else {}
+        T_ = dur(to.get("effective") or IU.val(to)) if to and IU.known(to) else None
+        if T_ is not None and S_:
+            T_ = min(T_, S_)
+        if out["measured"].get("tau") is not None:
+            T_ = dur(out["measured"]["tau"])  # measured under that τ (answers measured.<job>.tau)
+        lim = (f"有效 τ {fmt(T_)}" if T_ is not None and dm is not None and dm > T_ + 1e-9 else
+               f"S {fmt(S_)}" if S_ and dm is not None and dm > S_ + 1e-9 else None)
+        if lim:
+            # a single scrape is cut off at τ: d_max above it is not one scrape's duration — ask, do not use silently
+            findings.append({"kind": "measured_contradiction", "job": name, "d_max": fmt(dm), "limit": lim,
+                             "fact": f"{name} 量到的 d_max {fmt(dm)} > {lim}：{FC.D_CONTRADICTION}"})
         jobs_out.append(out)
     inv["jobs"] = jobs_out
 
@@ -1209,9 +1223,13 @@ def build(a) -> dict:
         inv["placeholders"] = placeholders
 
     # ---- rules (second pass: labels, emptiness, keep_range, route) ----
+    short_dedup = dur(facts["dedup_interval"]) if facts.get("dedup_interval") else None
+    short_L = dur(facts["latency"]) if facts.get("latency") else None
+    short_D = dur(facts["eval_delay"]) if facts.get("eval_delay") else 30.0  # vmalert -rule.evalDelay default
     tree = route_tree(am) if am else None
     receivers = {r.get("name"): r for r in (am or {}).get("receivers") or []}
     keep_ans = answers.get("keep_range") or {}
+    unknown_ids = {str(x) for x in answers.get("unknown") or []}
     ignored: list[dict] = []
     ext = cfg["external_labels"] if cfg else {}
     fires_by: dict[tuple, list] = {}
@@ -1320,18 +1338,39 @@ def build(a) -> dict:
             if s["why"] == "dropped":
                 findings.append({"kind": "dropped_metric_used", "rule": name,
                                  "fact": f"{name} 讀的 {s['metric']} 被 metric_relabel_configs 丟掉（job {', '.join(s['jobs'])}）"})
-        # ranges: short windows (k=1, d=τ, conservative) and job interval
+        # ranges: short windows with fit_contracts' formula (FC.data_interval / FC.window_need: per-job S, dedup,
+        # vmalert L − D), conservative where unmeasured (d = τ, k = max(1, measured consecutive failures))
         for rg in e["ranges"]:
             js = [by_job[j] for j in rule_jobs_used.get(name, ()) if j in by_job]
-            I = max((dur(j["interval"]["value"]) for j in js), default=cfg["gS"] if cfg else None)
-            T = max((dur(j["timeout"]["effective"]) for j in js), default=cfg["gT"] if cfg else None)
             R = dur(rg["range"])
-            if I and R is not None:
-                need = (rg["samples_needed"] + 1) * I + (T or 0)
+            best = None
+            for j in js or [None]:
+                S = dur(IU.val(j["interval"])) if j else None
+                S = S or (cfg["gS"] if cfg else None)
+                T = (dur(j["timeout"].get("effective") or IU.val(j["timeout"])) if j and isinstance(j.get("timeout"), dict) else None) or \
+                    (cfg["gT"] if cfg else None)
+                if T is not None and S:
+                    T = min(T, S)
+                if not S:
+                    continue
+                m = (j or {}).get("measured") or {}
+                d = max(x for x in (T, dur(m["d_max"]) if m.get("d_max") is not None else None, 0.0) if x is not None)
+                k = max(1, int(m.get("max_consecutive_failures") or 0))
+                I = FC.data_interval(ruler["value"], S, d, short_dedup)
+                L = short_L if short_L is not None else S
+                need = FC.window_need(ruler["value"], I, d, 0.0, k, rg["samples_needed"], L, short_D)
+                if best is None or need > best[0]:
+                    best = (need, I, S, d, k, L)
+            if best and R is not None:
+                need, I, S, d, k, L = best
                 rg["data_interval"] = fmt(I)
                 rg["short"] = R < need or R <= 2 * I
-                rg["short_basis"] = (f"R ≤ 2 × S（{fmt(2 * I)}）" if R <= 2 * I and R >= need else
-                                     f"(n+1)·I + τ = {fmt(need)}（k=1、d=τ 的保守值）")
+                if ruler["value"] == "vmalert":
+                    how = (f"(n+k)·I + max(0, L − D) = {fmt(need)}（I = max(S {fmt(S)}, dedup "
+                           f"{fmt(short_dedup) if short_dedup else '沒給'}) = {fmt(I)}、L {fmt(L)}、D {fmt(short_D)}、k {k}）")
+                else:
+                    how = f"(n+k)·I + d = {fmt(need)}（I {fmt(I)}、d {fmt(d)}（未量時 d = τ）、k {k}；和 fit_contracts.py 同一個公式）"
+                rg["short_basis"] = f"R ≤ 2 × I（{fmt(2 * I)}）" if R <= 2 * I and R >= need else how
             else:
                 rg["short"] = None
         if not e["ranges"] and name in keep_ans:
@@ -1341,7 +1380,7 @@ def build(a) -> dict:
             ka = IU.keep_state(keep_ans.get(name)) if name in keep_ans else None
             ann = IU.keep_state((r.get("annotations") or {}).get("keep_range"))
             kv = keep_ans.get(name)
-            if ka is None and IU.declined(kv):
+            if ka is None and (IU.declined(kv) or f"keep_range.{name}" in unknown_ids):
                 # 「不知道」: not asked again; kept as intentional (the window is left alone, no option A)
                 e["keep_range"] = V("unknown", "user", declined=True, note=IU.declined_assumption("keep_range"))
             else:
@@ -1585,9 +1624,11 @@ def build(a) -> dict:
         fl.append(f)
     inv["findings_from_files"] = fl
     inv["unknown"] = declined_keys(answers)
+    inv["_unknown_explicit"] = sorted({str(x) for x in answers.get("unknown") or []})
     inv["facts"] = facts_section(inv, answers, set(inv["unknown"]))
     inv["answered"] = sorted({str(x) for x in answers.get("answered") or []})
     inv["deferred"] = sorted({str(x) for x in answers.get("deferred") or []})
+    inv["_deferred_explicit"] = list(inv["deferred"])
     appr = [x for x in answers.get("approved") or [] if isinstance(x, dict)]
     if appr:
         # 「同意提案的方向」: recorded as an approval, never as keep_range (that is only the answer to 「視窗是刻意的嗎？」)
@@ -1606,6 +1647,8 @@ def finish(inv: dict) -> dict:
     apply_must_ask_effects(inv)
     inv["questions"] = questions(inv, ctx.get("cfg"), ctx.get("am"), None, inv.get("findings_from_files") or [])
     inv.pop("_deploy_ask", None)
+    inv.pop("_unknown_explicit", None)
+    inv.pop("_deferred_explicit", None)
     return inv
 
 
@@ -1814,6 +1857,60 @@ def _default_of(inv: dict, q: dict):
     return None
 
 
+FAILRUN_ALIASES = {"failrun", "max_consecutive_failures"}
+# answer keys that are not question ids but are read from answers.yaml (a 「不知道」 there is a real answer)
+ANSWER_KEYS = {"job_names", "--config", "--alertmanager", "version", "external_observer", "measured", "producers",
+               "features", "labels", "--config-complete", "notify_within", "latency", "dedup_interval", "eval_delay",
+               "exporter_deadline", "ruler", "target_versions"} | FAILRUN_ALIASES
+# a bare `keep_range` in unknown is not applied to every rule (keep_range.<rule> is per rule): it is reported
+
+
+def known_ids(inv: dict, qs: list[dict]) -> set[str]:
+    """Every question id / answer key this inventory can produce (asked or not), for checking answers.yaml ids."""
+    out = set(ANSWER_KEYS)
+    for q in qs:
+        out |= {q["id"], q["answer_key"]}
+    for r in inv.get("rules") or []:
+        if r.get("ranges"):
+            out.add(f"keep_range.{r['name']}")
+    for j in inv.get("jobs") or []:
+        n = j["name"]
+        out |= {f"failrun.{n}", f"measured.{n}", f"measured.{n}.max_consecutive_failures", f"measured_check.{n}",
+                f"exporter_deadline.{n}", f"features.{n}", f"target_versions.{n}"}
+    for it in must_ask_items(inv):
+        out |= {f"must_ask.{it['card']}.{it['q']['id']}", must_ask_key(it["card"], it["q"])}
+    for k in inv.get("facts") or {}:
+        out.add(f"facts.{k}")
+    return out
+
+
+def unmatched_ids(inv: dict, qs: list[dict], unknown: set, done: set) -> None:
+    """answers.yaml unknown / deferred / answered / approved entries that match no question id: they would silently
+    do nothing (the question is asked again). Recorded in inv["ids_unmatched"] with near matches; printed by main."""
+    known = known_ids(inv, qs)
+    explicit = set(inv.get("_unknown_explicit") or unknown)
+    rules = {r["name"] for r in inv.get("rules") or []}
+    out = []
+
+    def near(x):
+        cand = sorted(k for k in known if x and (x in k or k.endswith("." + x)) and k != x)
+        cand += [k for k in difflib.get_close_matches(x, sorted(known), n=3, cutoff=0.6) if k not in cand]
+        return cand[:5]
+    deferred = set(inv.get("_deferred_explicit") or inv.get("deferred") or [])
+    for where, ids in (("unknown", explicit), ("deferred", deferred), ("answered", done)):
+        for x in sorted(ids):
+            if x in known or x.startswith("labels."):
+                continue
+            out.append({"where": where, "id": x, "near": near(x)})
+    for x in inv.get("approved") or []:
+        if x.get("rule") and x["rule"] not in rules:
+            out.append({"where": "approved", "id": str(x["rule"]), "near": difflib.get_close_matches(str(x["rule"]), sorted(rules), n=3, cutoff=0.6)})
+    if out:
+        inv["ids_unmatched"] = out
+    else:
+        inv.pop("ids_unmatched", None)
+
+
 def questions(inv, cfg, am, a, findings) -> list[dict]:
     """Ranked by score = overturns × cost: how many conclusions the answer could overturn (findings it flips plus
     the kinds of conclusion it changes) times the cost of being wrong (COST), not by how many rules it touches.
@@ -1866,16 +1963,26 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
                         "（1 = 出現過連續 2 次失敗）",
                    "changes": ["scrape_timeout", "range 視窗", "k"], "affects": len(ranged),
                    "findings": cnt("timeout_gt_interval", "exporter_deadline_ge_timeout"), "answer_key": "measured"})
+    for f in [f for f in findings if f["kind"] == "measured_contradiction"]:
+        qs.append({"id": f"measured_check.{f['job']}", "cost_key": "measured",
+                   "q": f"{f['job']} 量到的 d_max {f['d_max']} 大於 {f['limit']}：{FC.D_CONTRADICTION}。"
+                        "這個值是在哪個 `scrape_timeout`、哪段時間量的？當時的設定和現在一樣嗎？（確認前不用它推 τ、視窗與通知時間）",
+                   "changes": ["d（scrape 耗時）", "τ 要不要調", "通知時間"], "affects": len(ranged) or 1, "findings": 2,
+                   "answer_key": f"measured.{f['job']}"})
     short = [r for r in ranged if any(g.get("short") for g in r["ranges"])
              and IU.keep_state(IU.val(r.get("keep_range"))) is None and not IU.is_user(r.get("keep_range"))]
-    if short:
-        names = [r["name"] for r in short]
-        wins = sorted({f"{g['func']}[{g['range']}]" for r in short for g in r["ranges"] if g.get("short")})
-        qs.append({"id": "keep_range", "q": f"{'、'.join('`' + n + '`' for n in names[:5])}{' 等' if len(names) > 5 else ''} 的短視窗"
-                        f"（{'、'.join(wins[:4])}）：{KEEP_RANGE_Q}（例如就是要「最近 1 分鐘」）。"
-                        "回答前不會建議拉長視窗；在 answers.yaml 寫 `keep_range: {<rule>: true|false}`",
+    # one question per rule (keep_range.<rule>): a 「不知道」 for one rule does not suppress the others. The first one
+    # still open is mandatory each round (the rest follow by score, then become mandatory in later rounds).
+    for i, r in enumerate(short):
+        name = r["name"]
+        wins = sorted({f"{g['func']}[{g['range']}]" for g in r["ranges"] if g.get("short")})
+        basis = next((g.get("short_basis") for g in r["ranges"] if g.get("short") and g.get("short_basis")), None)
+        qs.append({"id": f"keep_range.{name}", "cost_key": "keep_range",
+                   "q": f"`{name}` 的短視窗（{'、'.join(wins[:4])}{'；需要 ≥ ' + basis if basis else ''}）："
+                        f"{KEEP_RANGE_Q}（例如就是要「最近 1 分鐘」）。"
+                        f"回答前不會建議拉長視窗；在 answers.yaml 寫 `keep_range: {{{name}: true|false}}`",
                    "changes": ["視窗要保留還是可以改（方案 A 能不能用）", "rule 的語意", "保留視窗的做法（縮短該 job 的 S、query_offset、anchored）"],
-                   "affects": len(names), "findings": len(names), "answer_key": "keep_range", "mandatory": True})
+                   "affects": 1, "findings": 1, "answer_key": f"keep_range.{name}", "mandatory": i == 0, "rule": name})
     hinted = [j for j in inv["jobs"] if j["exporter"]["from"] == "hint"]
     if hinted:
         n = sum(1 for r in rules if set(r["jobs_matched"].get("value") or []) & {j["name"] for j in hinted})
@@ -1951,7 +2058,11 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
                    "card": c, "present": it["present"]})
     done = set(inv.get("answered") or [])
     unknown = set(inv.get("unknown") or [])
-    declined = [q for q in qs if q["id"] in unknown or q["answer_key"] in unknown]
+    unmatched_ids(inv, qs, unknown, done)
+    # bare names for the consecutive-failures question (every job): failrun / max_consecutive_failures
+    fr_alias = bool(unknown & FAILRUN_ALIASES)
+    declined = [q for q in qs if q["id"] in unknown or q["answer_key"] in unknown
+                or (fr_alias and q["id"].startswith("failrun."))]
     # 「不知道／沒權限」: not asked again (also not in another wording: same answer_key); the assumption is stated
     inv["declined"] = [{"id": q["id"], "answer_key": q["answer_key"], "q": q["q"],
                         "assumption": IU.declined_assumption(q["id"], _default_of(inv, q))} for q in declined]
@@ -2057,6 +2168,10 @@ def markdown(inv) -> str:
                  else "效果照預設套用") for e in ma]
     if inv.get("placeholders"):
         L += ["", "## 佔位值（上線前要換）", ""] + [f"- {p['fact']}" for p in inv["placeholders"]]
+    if inv.get("ids_unmatched"):
+        L += ["", "## 沒有對到題目的 id（不會生效，題目會再問）", ""]
+        L += [f"- `{x['where']}` 的 `{x['id']}`" + (f"：是不是 {'、'.join('`' + n + '`' for n in x['near'])}？" if x["near"] else "：沒有相近的題目 id")
+              for x in inv["ids_unmatched"]]
     if inv.get("answers_ignored"):
         L += ["", "## 沒有採用的回答", ""] + [f"- `{x['key']}`：{x['why']}" for x in inv["answers_ignored"]]
     if inv.get("approved"):
@@ -2184,13 +2299,18 @@ def main(argv=None) -> int:
         inv = merge(inv, old, same)
         inv["answered"] = answered
         inv["unknown"] = unknown
+        inv["_unknown_explicit"] = sorted(set(inv.get("_unknown_explicit") or []) | {str(x) for x in old.get("unknown") or []})
         inv["deferred"] = sorted(deferred)
+        inv["_deferred_explicit"] = sorted(set(inv.get("_deferred_explicit") or []) | {str(x) for x in old.get("deferred") or []})
         if approved:
             inv["approved"] = approved
         if orig:
             # the rules the user started with: fit_contracts.py reports a changed window as 「語意已改，未確認」
             inv["sources"]["original_rules"] = list(orig)
     inv = finish(inv)
+    for x in inv.get("ids_unmatched") or []:
+        print(f"警告：answers.yaml 的 {x['where']} 裡的 `{x['id']}` 沒有對到任何題目 id，不會生效"
+              + (f"；是不是 {', '.join(x['near'])}？" if x["near"] else ""), file=sys.stderr)
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     with open(a.out, "w", encoding="utf-8") as f:
         f.write(dump(inv))

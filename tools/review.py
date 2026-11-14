@@ -510,6 +510,9 @@ def summary(a, inv, items, fit, ms_rows, lint_out, cov) -> str:
         asm.append(f"使用者答「不知道」：`{d['id']}` 不再問，改用假設：{d['assumption']}")
     for x in inv.get("answers_ignored") or []:
         asm.append(f"沒有採用 `{x['key']}`：{x['why']}")
+    for x in inv.get("ids_unmatched") or []:
+        asm.append(f"**answers.yaml 的 `{x['where']}` 裡的 `{x['id']}` 沒有對到任何題目 id，不會生效**"
+                   + (f"（是不是 {'、'.join('`' + n + '`' for n in x['near'])}？）" if x["near"] else ""))
     L += [f"- {x}" for x in asm] or ["- （沒有）"]
     if (st.get("ruler") or {}).get("value") == "vmalert" or (fit or {}).get("stack") == "vmalert":
         L += ["", "## 證據等級（ruler 是 vmalert）", "", f"- {FC.VMALERT_EVIDENCE}"]

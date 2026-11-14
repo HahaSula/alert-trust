@@ -1482,6 +1482,12 @@ must_ask:
       exporter-deadline 契約不成立
     refs: [pg-timeout-flag, pg-timeout, bl-pg-ctx-background, bl-pg-coll-timeout-flag]
     answer_key: exporter_deadline
+  - id: ha-manager
+    question: "PostgreSQL 有沒有用 Patroni（或其他 HA 管理工具）？有的話 DCS 是 etcd 還是 Consul，這兩者有沒有自己的 scrape job？"
+    why: >-
+      Patroni 的 /metrics 由它自己的 REST API 產生，不經過 postgres_exporter，要有自己的 scrape job 與 rule（PatroniDown／PatroniMissing、leader、DCS）；
+      DCS 整個掛掉時所有節點同時降級成唯讀，PostgreSQL 與 postgres_exporter 都正常（pg_up=1），只有 DCS（etcd 的 quorum／leader）自己的 job 與 rule 看得到
+    refs: [pg-asp-patroni-metrics, pg-asp-patroni-dcs-seen, pg-asp-patroni-demote-dcs, pg-asp-patroni-doc-dcs]
   - id: patroni-modes
     question: "Patroni 有沒有開 failsafe_mode？有沒有同步複寫（synchronous_mode，或 synchronous_standby_names 不是空的）？"
     why: >-

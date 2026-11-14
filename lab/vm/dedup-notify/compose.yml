@@ -1,0 +1,27 @@
+# dedup 對通知時間的影響：同一個 target，兩台 VM single（dedup 30s／沒有 dedup）各自 scrape 15s，各配一台 vmalert。5 個小容器。
+services:
+  target:
+    image: python:3.12.7-alpine
+    command: [python, -u, /app/target.py]
+    volumes: [./target.py:/app/target.py:ro]
+    ports: ["37010:8000"]
+  vm-dedup:
+    image: victoriametrics/victoria-metrics:v1.155.0
+    command: [-storageDataPath=/storage, -retentionPeriod=1d, -promscrape.config=/etc/scrape.yml, -dedup.minScrapeInterval=30s]
+    volumes: [./scrape.yml:/etc/scrape.yml:ro]
+    ports: ["37011:8428"]
+  vm-nodedup:
+    image: victoriametrics/victoria-metrics:v1.155.0
+    command: [-storageDataPath=/storage, -retentionPeriod=1d, -promscrape.config=/etc/scrape.yml]
+    volumes: [./scrape.yml:/etc/scrape.yml:ro]
+    ports: ["37012:8428"]
+  vmalert-dedup:
+    image: victoriametrics/vmalert:v1.155.0
+    command: [-datasource.url=http://vm-dedup:8428, -rule=/etc/rules.yml, -notifier.blackhole]
+    volumes: [./rules.yml:/etc/rules.yml:ro]
+    ports: ["37013:8880"]
+  vmalert-nodedup:
+    image: victoriametrics/vmalert:v1.155.0
+    command: [-datasource.url=http://vm-nodedup:8428, -rule=/etc/rules.yml, -notifier.blackhole]
+    volumes: [./rules.yml:/etc/rules.yml:ro]
+    ports: ["37014:8880"]

@@ -1,0 +1,11 @@
+groups:
+  - name: dedup-notify
+    interval: 15s
+    rules:
+      - alert: TDown          # 失敗路徑：scrape 回 500，up 寫成 0
+        expr: up{job="t"} == 0
+      - alert: TDownFor30s
+        expr: up{job="t"} == 0
+        for: 30s
+      - alert: TValue         # 值路徑：成功的 scrape 帶回新值
+        expr: lab_value{job="t"} > 0

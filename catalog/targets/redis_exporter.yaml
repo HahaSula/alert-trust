@@ -938,3 +938,19 @@ must_ask:
       讀 redis_up 的規則不響；設得比 scrape_timeout 短時 exporter 自己回 redis_up=0
     refs: [vk-exp, rx-flag-timeout, rx-dial-timeouts]
     answer_key: exporter_deadline
+  - id: maxmemory-policy
+    question: "`maxmemory` 設多少、`maxmemory-policy` 是什麼？（請貼 `CONFIG GET maxmemory*` 的輸出，或 `redis_instance_info` 的 maxmemory_policy label）"
+    why: >-
+      noeviction（以及沒有 TTL key 的 volatile-*）碰到 maxmemory 時不淘汰、直接拒絕寫入：SET／INCR 回 OOM，GET 照常，redis_up 仍是 1，
+      redis_evicted_keys_total 一直是 0，只看淘汰的規則（例如 EvictingKeys）永遠不響；要看 redis_errors_total{err="OOM"}（writes-rejected）。
+      allkeys-* 才會淘汰，淘汰規則才有意義
+    refs: [vk-exp, vk-oom-reject, vk-evict-noeviction, vk-evict-nothing, vk-cfg-maxmemory-policy, rx-map-evicted, rx-errorstats]
+    effects:
+      - when: noeviction
+        verdict: no_data
+        metrics: [redis_evicted_keys_total]
+        why: "noeviction 不淘汰，evicted_keys 一直是 0，讀它的淘汰規則不會響；寫入被拒要用 redis_errors_total{err=\"OOM\"} 的規則（writes-rejected）"
+      - when: [allkeys-lru, allkeys-lfu, allkeys-random]
+        verdict: available
+        metrics: [redis_evicted_keys_total]
+        why: "allkeys-* 碰到 maxmemory 時淘汰 key，evicted_keys 會增加"
