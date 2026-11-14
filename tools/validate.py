@@ -7,7 +7,7 @@
 
 Checks: required fields and enums, unique ids, every source/contract/rule reference resolves,
 every alerting rule has a runbook_url that points at an existing signal, every contract has an
-anchor in docs/contracts.md, catalog/map.yaml is current and every card has a plugin (build_map.py), the optional `versions` field on signals ({min, max, note, refs}; min inclusive,
+anchor in docs/contracts.md, every `evidence: tested` item cites a ref of kind experiment (E1), catalog/map.yaml is current and every card has a plugin (build_map.py), the optional `versions` field on signals ({min, max, note, refs}; min inclusive,
 max exclusive; refs must exist) and the rule annotation `alert_trust_min_version` (a version string).
 """
 from __future__ import annotations
@@ -154,6 +154,7 @@ def validate(root: str = C.ROOT) -> tuple[list[str], list[str]]:
     warnings += list(PENDING_ASPECTS)
     ref_errors, missing_refs = check_refs(components, contracts, root)
     errors += ref_errors
+    errors += check_tested_refs(components, contracts, all_refs)
     if missing_refs:
         warnings.append(f"{len(missing_refs)} 個項目標了實測或讀碼，但還沒有 refs（用 --refs 列出）")
     MISSING_REFS[:] = missing_refs
@@ -224,6 +225,30 @@ def check_refs(components: list[dict], contracts: dict, root: str) -> tuple[list
         for s in card.get("signals", []):
             check(f"{card['_path']}#{s['id']}", s)
     return errors, missing
+
+
+def check_tested_refs(components: list[dict], contracts: dict, refs: dict) -> list[str]:
+    """Gate E1: every item marked `evidence: tested` (signals, usage, silent_failures, any other card item, and
+    contracts) cites at least one ref whose kind is experiment. A code ref alone does not make it tested."""
+    errors: list[str] = []
+
+    def walk(obj, where: str) -> None:
+        if isinstance(obj, dict):
+            if obj.get("evidence") == "tested" and not any(
+                    (refs.get(r) or {}).get("kind") == "experiment" for r in obj.get("refs") or [] if isinstance(r, str)):
+                errors.append(f"{where}: evidence 是 tested，但 refs 裡沒有 kind: experiment 的參考（E1；沒有實驗就降級）")
+            for k, v in obj.items():
+                if not str(k).startswith("_"):
+                    walk(v, f"{where}.{k}")
+        elif isinstance(obj, list):
+            for i, x in enumerate(obj):
+                walk(x, f"{where}[{i}]" if not (isinstance(x, dict) and x.get("id")) else f"{where}[{x['id']}]")
+
+    for card in components:
+        walk({k: v for k, v in card.items() if k != "evidence"}, card.get("_path", card.get("id", "?")))
+    for cid, c in contracts.items():
+        walk(c, f"contracts.yaml#{cid}")
+    return errors
 
 
 def check_target_pattern(components: list[dict], root: str) -> list[str]:

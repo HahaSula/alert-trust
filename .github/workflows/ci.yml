@@ -17,6 +17,9 @@ jobs:
       - run: pip install pyyaml==6.0.2
       - name: Validate catalog and links
         run: python3 tools/validate.py
+      - name: Gap trace (report only, never fails)
+        continue-on-error: true
+        run: python3 tools/check_trace.py --summary >> "$GITHUB_STEP_SUMMARY" || true
       - name: Unit tests
         run: python3 -m unittest discover -s tests -v
       - name: promtool check rules (2.51.2 and 3.13.5)

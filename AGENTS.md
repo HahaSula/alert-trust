@@ -42,6 +42,7 @@ alert-trust 回答兩個問題：
 python3 tools/validate.py              # 0 個錯誤；--refs 列出還沒有參考的項目
 python3 tools/build_pages.py
 python3 -m unittest discover -s tests
+python3 tools/check_trace.py [--card X]       # 只報告：每張卡的 G3–G6 缺口計數與清單，不會失敗
 promtool check rules rules/**/*.yml    # vmalert 的 vlogs 規則用 vmalert -dryRun
 docker run --rm -u $(id -u):$(id -g) -v "$PWD":/docs squidfunk/mkdocs-material:9.5.39 build --strict -d /tmp/site
 ```
