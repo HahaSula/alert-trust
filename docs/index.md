@@ -7,7 +7,12 @@ alert-trust 回答兩個問題：
 1. **整條 alert 鏈壞在哪一段時，有沒有人知道？**這是 monitor of monitor。每個元件一張[元件卡](components/index.md)，列出分級的訊號：第 1 級少一項，那個元件壞掉時就沒有人會知道。
 2. **在實際尖峰下，rule 還能不能信？**這是[信任契約](contracts.md)：一組時間不等式，可以用[計算器](tools/calculator.md)代入自己的數字。
 
-每張卡都用同一個五段框架：架構 → 正確使用 → 正確觀測 → 不正確使用時的觀測 → 目前無法觀測的痕跡，範圍只到 exporter／endpoint 輸出的那一層。見[範圍與結構](map.md)。
+網站分成兩塊：
+
+- **Monitor of monitor**：監控系統本身（Prometheus、vmalert、Alertmanager、Thanos、Grafana Alerting、外部觀察者）能不能信。元件卡、信任契約、規則放在哪一台、從觸發到通知、檢查 rule 檔，都在這一塊。
+- **元件觀測**：被監控的元件（資料庫、主機）怎麼正確使用、怎麼知道它正常、誤用或接近極限時看得到什麼、哪些看不到。
+
+兩塊的每張卡都用同一個五段框架：架構 → 正確使用 → 正確觀測 → 不正確使用時的觀測 → 目前無法觀測的痕跡，範圍只到 exporter／endpoint 輸出的那一層。見[範圍與結構](map.md)。
 
 ## 怎麼用
 

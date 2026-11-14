@@ -58,25 +58,48 @@ nav:
       - 從哪裡開始: tools/start.md
       - 範圍與結構: map.md
       - 共同模型與檢查流程: model.md
-      - 檢查 rule 檔: tools/rule-review.md
-      - scrape 與 evaluation 的基準值: tools/baseline.md
-      - 契約計算器: tools/calculator.md
+      - 名詞：設定與 metric: reference/terms.md
+      - 來源: reference/sources.md
       - 參與與擴充: contributing.md
-  - 監控鏈:
+  - Monitor of monitor:
       - 總覽: components/index.md
-      - Prometheus: components/prometheus.md
-      - Thanos: components/thanos.md
-      - vmagent: components/vmagent.md
-      - VictoriaMetrics: components/victoriametrics.md
-      - VictoriaLogs: components/victorialogs.md
-      - vmalert: components/vmalert.md
-      - Grafana Alerting: components/grafana_alerting.md
-      - Alertmanager: components/alertmanager.md
-      - 外部觀察者: components/observer.md
-      - 主機與容器: components/host.md
-  - 資料庫:
+      - 元件:
+          - Prometheus: components/prometheus.md
+          - Thanos: components/thanos.md
+          - vmagent: components/vmagent.md
+          - VictoriaMetrics: components/victoriametrics.md
+          - VictoriaLogs: components/victorialogs.md
+          - vmalert: components/vmalert.md
+          - Grafana Alerting: components/grafana_alerting.md
+          - Alertmanager: components/alertmanager.md
+          - 外部觀察者: components/observer.md
+      - 規則放在哪一台: architecture/placement.md
+      - 從觸發到通知: architecture/alert-delivery.md
+      - 信任契約:
+          - 契約: contracts.md
+          - scrape 與 evaluation 的基準值: tools/baseline.md
+          - 契約計算器: tools/calculator.md
+      - 檢查 rule 檔: tools/rule-review.md
+      - 內部架構:
+          - 總覽：單序點對照: architecture/index.md
+          - Prometheus: architecture/prometheus.md
+          - Thanos: architecture/thanos.md
+          - vmagent: architecture/vmagent.md
+          - VictoriaMetrics: architecture/victoriametrics.md
+          - VictoriaLogs: architecture/victorialogs.md
+          - vmalert: architecture/vmalert.md
+          - Grafana Alerting: architecture/grafana-alerting.md
+          - Alertmanager: architecture/alertmanager.md
+      - 實驗報告:
+          - 總覽: reports/index.md
+          - Prometheus Rule 信任邊際: reports/prometheus-trust.md
+          - Alert Pending 抖動分析: reports/pending-jitter.md
+          - VictoriaMetrics Rule 信任邊際: reports/victoriametrics-trust.md
+          - Alertmanager 監控指南: reports/alertmanager.md
+  - 元件觀測:
       - 總覽: targets/index.md
       - 監控模型: targets/models.md
+      - 主機與容器: components/host.md
       - MySQL:
           - 怎麼監控: targets/mysql.md
           - 監控訊號: components/mysql.md
@@ -123,23 +146,8 @@ nav:
           - 監控訊號: components/mongodb_exporter.md
           - 原始碼到 metric: targets/mongodb-appendix.md
           - 版本差異: targets/versions/mongodb.md
-  - 原理:
-      - 信任契約: contracts.md
-      - 名詞：設定與 metric: reference/terms.md
-      - 內部架構:
-          - 總覽：單序點對照: architecture/index.md
-          - Prometheus: architecture/prometheus.md
-          - Thanos: architecture/thanos.md
-          - vmagent: architecture/vmagent.md
-          - VictoriaMetrics: architecture/victoriametrics.md
-          - VictoriaLogs: architecture/victorialogs.md
-          - vmalert: architecture/vmalert.md
-          - Grafana Alerting: architecture/grafana-alerting.md
-          - Alertmanager: architecture/alertmanager.md
-          - 從觸發到通知: architecture/alert-delivery.md
-          - 規則放在哪一台: architecture/placement.md
+      - 架構:
           - 資料庫 exporter: architecture/exporters.md
-      - 資料庫架構:
           - 關聯式: architecture/db-relational.md
           - 記憶體 KV: architecture/db-kv.md
           - 共識（Raft）: architecture/db-raft.md
@@ -147,10 +155,3 @@ nav:
           - 分析型: architecture/db-olap.md
           - 文件型: architecture/db-doc.md
           - 資源：池、執行緒與主機: architecture/db-resources.md
-      - 來源: reference/sources.md
-  - 實驗報告:
-      - 總覽: reports/index.md
-      - Prometheus Rule 信任邊際: reports/prometheus-trust.md
-      - Alert Pending 抖動分析: reports/pending-jitter.md
-      - VictoriaMetrics Rule 信任邊際: reports/victoriametrics-trust.md
-      - Alertmanager 監控指南: reports/alertmanager.md
