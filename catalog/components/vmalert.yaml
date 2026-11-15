@@ -272,6 +272,12 @@ blind_spots:
 
 # 會改變結論的必問題（tools/inventory.py 在盤點裡有這張卡時優先問）。
 must_ask:
+  - id: datasource
+    question: "vmalert 的 `-datasource.url` 指到哪裡（single、vmselect，或前面的 vmauth／負載平衡）？`-remoteWrite.url` 與 `-remoteRead.url` 有沒有設？"
+    why: >-
+      vmalert 是獨立行程，查詢、寫回狀態、通知各走一條網路路徑。查的是 vmselect 時，一台 vmstorage 掛掉會拿到不完整的答案（HTTP 200）；
+      沒有同時設 `-remoteWrite.url` 與 `-remoteRead.url` 時，重啟後 `for` 從頭計時
+    refs: [vma-rr-lookback, exp-vm-vl, exp-vm-faults, vms-partial]
   - id: data-latency
     question: "資料從 scrape 到 VictoriaMetrics 查得到，尖峰延遲 L 多久？（例如 vmagent remote write 的佇列延遲；不知道就說不知道，工具會用 L = S）"
     why: >-

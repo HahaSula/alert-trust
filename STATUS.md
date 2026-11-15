@@ -77,7 +77,9 @@
 
 v0.4.0 之後再補的（2026-11-15）：新發現 `critical_route_muted`（critical 走的 route 有 `mute_time_intervals`／`active_time_intervals`）與 Alertmanager 卡 usage `mute-intervals-critical`（讀碼）；etcd 卡必問題 `readyz-probe`（第二路徑）、MongoDB 卡必問題 `exporter-topology`（一個 exporter 抓全部）；config 在手上而且沒有改寫 `job` 的 relabel 時，job 名稱題改成假設、不佔前 3 題；skill：決定題不佔事實題的位置。
 
-以上修正都還沒有再盲測；那兩個保留情境已經用來改過工具，下一輪要另外準備新的。還沒處理：PostgreSQL 的 `--collection-timeout`（契約 exporter-deadline 不符只列在「之後再處理」）與 Patroni／DCS 沒有 scrape job 沒有拉到摘要的前 3 件事；`/scrapeall` 只有必問題、沒有從 `metrics_path` 自動判斷；工具的環境模型把 VictoriaMetrics 的 vmagent／儲存／vmalert 壓成一組（一個版本、一份 config），沒有分段列出。
+以上修正都還沒有再盲測；那兩個保留情境已經用來改過工具，下一輪要另外準備新的。還沒處理：PostgreSQL 的 `--collection-timeout`（契約 exporter-deadline 不符只列在「之後再處理」）與 Patroni／DCS 沒有 scrape job 沒有拉到摘要的前 3 件事；`/scrapeall` 只有必問題、沒有從 `metrics_path` 自動判斷。
+
+VictoriaMetrics 的環境模型改成三段（2026-11-15）：盤點多一個 `stages`（採集 vmagent、儲存與查詢、rule 評估 vmalert），各有自己的版本、寫到哪裡／查詢來源、有沒有被 scrape；三張卡各加一題必問題（`vmagent#remote-write-target`、`victoriametrics#mode`、`vmalert#datasource`）；vmagent 與儲存沒有 scrape job 時也算沒被抓；rule 檔是 vmalert 的而 config 只有 scrape 設定時當成 vmagent 的設定（原本只看檔名）。還沒做：single／cluster 的回答沒有接到「cluster 才有的 rule 不適用」的判斷；vmalert 查詢來源與 vmagent 寫入目的地是不是同一套只列出來、沒有比對；時間契約仍只用 L 與 dedup 兩個數字。
 
 Review 找到、還沒解決的問題：
 

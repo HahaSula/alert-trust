@@ -289,6 +289,13 @@ cards:
     blind:
     - 補回的資料 rule 不會補判
     - Buffer 丟掉的是哪一段時間的資料
+    must_ask:
+    - id: remote-write-target
+      question: vmagent 的 `-remoteWrite.url` 寫到哪裡（幾個目的地）？和 vmalert 查的是不是同一套 VictoriaMetrics？
+      why: 採集和儲存是兩個行程：每個 `-remoteWrite.url` 各自一個 queue 與磁碟 buffer，目的地跟不上時資料先堆在 vmagent， rule 只看到資料變舊、不會報錯；寫入和查詢不是同一套時 rule 查不到這些資料
+      refs:
+      - vmag-queues
+      - vmag-nodisk
   victoriametrics:
     name: VictoriaMetrics single／cluster
     kind: infra
@@ -321,6 +328,13 @@ cards:
     - 哪一條查詢佔滿 vmselect 的併發、或觸發 -search.max* 上限
     - Partial response 少的是哪些 series
     must_ask:
+    - id: mode
+      question: VictoriaMetrics 是 single 還是 cluster（vminsert／vmselect／vmstorage 各幾台、`-replicationFactor` 多少）？請回答 single 或 cluster
+      why: Cluster 多了「部分節點故障」這種狀態：RF=1 時一台 vmstorage 掛掉，vmselect 預設回傳不完整的答案、HTTP 200， 「數量太低」這類 rule 會假觸發；single 沒有這種狀態，但也沒有備援
+      refs:
+      - exp-vm-faults
+      - vms-partial
+      - vms-denypartial
     - id: dedup-interval
       question: VictoriaMetrics（vmstorage／vmselect／single）有沒有設 `-dedup.minScrapeInterval`？設多少？
       why: dedup 大於 scrape_interval 時實際資料間隔是 dedup，視窗要依它算；縮短 scrape_interval 也不會讓視窗變短
@@ -414,6 +428,14 @@ cards:
     - 重啟後 `for` 有沒有還原成功
     - 視窗太短而永遠回空的 rule
     must_ask:
+    - id: datasource
+      question: vmalert 的 `-datasource.url` 指到哪裡（single、vmselect，或前面的 vmauth／負載平衡）？`-remoteWrite.url` 與 `-remoteRead.url` 有沒有設？
+      why: vmalert 是獨立行程，查詢、寫回狀態、通知各走一條網路路徑。查的是 vmselect 時，一台 vmstorage 掛掉會拿到不完整的答案（HTTP 200）； 沒有同時設 `-remoteWrite.url` 與 `-remoteRead.url` 時，重啟後 `for` 從頭計時
+      refs:
+      - vma-rr-lookback
+      - exp-vm-vl
+      - exp-vm-faults
+      - vms-partial
     - id: data-latency
       question: 資料從 scrape 到 VictoriaMetrics 查得到，尖峰延遲 L 多久？（例如 vmagent remote write 的佇列延遲；不知道就說不知道，工具會用 L = S）
       why: vm-range-window 與通知時間都用 max(L, D)：L 大於 eval_delay D 時視窗要更長、偵測更晚；用假設值 L = S 算出的時間可能少算

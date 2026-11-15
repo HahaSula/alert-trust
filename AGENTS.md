@@ -63,7 +63,7 @@ docker run --rm -u $(id -u):$(id -g) -v "$PWD":/docs squidfunk/mkdocs-material:9
 
 分析順序固定：
 
-1. **監控體系**：Prometheus 還是 vmalert（版本）、資料從哪裡來、有沒有外部觀察者、告警走哪台 Alertmanager。能從檔案判斷就判斷。
+1. **監控體系**：Prometheus 還是 vmalert（版本）、資料從哪裡來、有沒有外部觀察者、告警走哪台 Alertmanager。能從檔案判斷就判斷。VictoriaMetrics 是三個行程：盤點的 `stages` 分列採集（vmagent）、儲存與查詢（single／cluster）、rule 評估（vmalert），各自的版本、寫到哪裡／從哪裡查、有沒有被 scrape；不要把一段的版本或結論套到另一段。
 2. **每個 metric 的來源**：**不要假定。**來源只能是 config 的 scrape job、live 快照或使用者的回答；目錄卡片只是提示。永遠不會響與一直在響的 rule 最先回報。
 3. **告警送不送得到**：Alertmanager 路由需要的 label、空的 receiver、沒有 `equal` 的 inhibit、dead man's switch 路由與 Watchdog rule。
 4. **監控基礎設施的覆蓋**：`tools/check_coverage.py --env env/<name>.yaml --inventory …`。依影響排序回報。

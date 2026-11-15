@@ -25,7 +25,8 @@ the rest. Sections:
                         then keeps depends_on_runtime_labels)), route_label_value_mismatch (close names, e.g.
                         job="etcd" vs kube-etcd), critical_not_paging (critical rules whose only receivers are
                         email / empty), routed_to_empty_receiver (grouped), inhibit_no_equal, dms_route_without_rule
-                        (an alertname="Watchdog" route but no such rule), no_watchdog_rule, critical_route_muted (the route a critical
+                        (an alertname="Watchdog" route but no such rule), no_watchdog_rule, stage_unscraped (VictoriaMetrics: no scrape job for the vmagent or
+                        storage stage), critical_route_muted (the route a critical
                         rule takes has mute_time_intervals / active_time_intervals), replica_label_on_alerts
                         (external_labels carries a replica label and alerting has no alert_relabel_configs),
                         watchdog_no_dedicated_route (the Watchdog rule, or the one we propose, falls into a route without
@@ -910,6 +911,11 @@ def build(a) -> dict:
     env = IU.load_env(getattr(a, "env", None))
     docs = load_rule_docs(a.rules)
     kind = guess_config_kind(a.config, a.config_kind)
+    if kind["from"] == "default" and infer_ruler(docs, None, answers)["value"] == "vmalert":
+        raw = C._load(a.config) or {}
+        if "rule_files" not in raw and "alerting" not in raw:
+            kind = V("vmagent", "hint", note="rule 檔是 vmalert 的，config 沒有 rule_files／alerting：當成 vmagent 的 scrape 設定"
+                                             "（不是的話用 --config-kind prometheus）")
     cfg = load_scrape(a.config, kind["value"]) if a.config else None
     am = (C._load(a.alertmanager) or {}) if a.alertmanager else None
     findings: list[dict] = []
@@ -1228,8 +1234,18 @@ def build(a) -> dict:
             if not hit:
                 unscraped.append({"component": rk, "target": None, "from": "file" if ruler["from"] == "file" else "hint",
                                   "fact": f"沒有 scrape job 在抓 ruler（{rk}）本身"})
+        if rk == "vmalert" or kind["value"] == "vmagent":
+            # VictoriaMetrics: the scraper and the storage are separate processes; each needs its own scrape job
+            for stage, label, card, pat, ports in VM_STAGES:
+                if stage == "rule" or any(re.fullmatch(pat, j["name"] or "") or any(str(t).endswith(ports) for t in j["static_targets"])
+                                          for j in cfg_jobs):
+                    continue
+                unscraped.append({"component": card, "target": None, "from": "file", "stage": stage,
+                                  "fact": f"沒有 scrape job 在抓{label}那一段（{card}）本身"})
         for u in unscraped:
-            findings.append({"kind": "component_unscraped", "fact": u["fact"]})
+            # a VictoriaMetrics stage without a scrape job is its own kind: it is listed with the other unscraped
+            # components but does not add weight to the external-observer question
+            findings.append({"kind": "stage_unscraped" if u.get("stage") else "component_unscraped", "fact": u["fact"]})
     inv["unscraped_components"] = unscraped if cfg else V(None, "unknown", note="沒有 config")
     if placeholders:
         inv["placeholders"] = placeholders
@@ -1686,6 +1702,8 @@ def build(a) -> dict:
     inv["unknown"] = declined_keys(answers)
     inv["_unknown_explicit"] = sorted({str(x) for x in answers.get("unknown") or []})
     inv["facts"] = facts_section(inv, answers, set(inv["unknown"]))
+    if is_vm_stack(inv):
+        inv["stages"] = vm_stages(inv, cfg_jobs if cfg else None)
     inv["answered"] = sorted({str(x) for x in answers.get("answered") or []})
     inv["deferred"] = sorted({str(x) for x in answers.get("deferred") or []})
     inv["_deferred_explicit"] = list(inv["deferred"])
@@ -1709,6 +1727,11 @@ def finish(inv: dict) -> dict:
     edited in the inventory is not asked again; drop the private keys."""
     ctx = inv.pop("_qctx", None) or {}
     apply_must_ask_effects(inv)
+    if is_vm_stack(inv):
+        cfg = ctx.get("cfg")
+        inv["stages"] = vm_stages(inv, cfg["jobs"] if cfg else None)
+    else:
+        inv.pop("stages", None)
     inv["questions"] = questions(inv, ctx.get("cfg"), ctx.get("am"), None, inv.get("findings_from_files") or [])
     inv.pop("_deploy_ask", None)
     inv.pop("_unknown_explicit", None)
@@ -1764,9 +1787,79 @@ def card_present(inv: dict) -> dict[str, str]:
     rk = IU.val(st.get("ruler"))
     if rk in ids:
         out.setdefault(rk, "ruler")
-    if rk == "vmalert" or IU.val((inv.get("sources") or {}).get("config_kind")) == "vmagent":
+    if is_vm_stack(inv):
+        out.setdefault("vmagent", "ruler 是 vmalert／scrape 設定是 vmagent")
         out.setdefault("victoriametrics", "ruler 是 vmalert／scrape 設定是 vmagent")
     return out
+
+
+def is_vm_stack(inv: dict) -> bool:
+    """VictoriaMetrics: scraping (vmagent), storage (single / cluster) and rule evaluation (vmalert) are separate
+    processes, unlike Prometheus where one process does all three."""
+    return (IU.val((inv.get("stack") or {}).get("ruler")) == "vmalert"
+            or IU.val((inv.get("sources") or {}).get("config_kind")) == "vmagent")
+
+
+# stage -> (card, job-name pattern, default ports of the component's own /metrics)
+VM_STAGES = (("scrape", "採集", "vmagent", r".*vmagent.*", (":8429",)),
+             ("storage", "儲存與查詢", "victoriametrics", r".*(victoria-?metrics|vmsingle|vmstorage|vmselect|vminsert).*",
+              (":8428", ":8480", ":8481", ":8482")),
+             ("rule", "rule 評估", "vmalert", r".*vmalert.*", (":8880",)))
+
+
+def vm_stages(inv: dict, cfg_jobs: list[dict] | None) -> list[dict]:
+    """The three stages of a VictoriaMetrics setup, each with its own version, where it writes to / reads from and
+    whether something scrapes it. Values come from the files, answers (facts.<card>.<id>, target_versions by job)
+    or are unknown; nothing is copied from one stage to another."""
+    st, facts = inv.get("stack") or {}, inv.get("facts") or {}
+    tv = IU.val(st.get("target_versions")) or {}
+
+    def fact(key: str) -> dict:
+        v = facts.get(key)
+        return v if isinstance(v, dict) and v.get("value") not in (None, "unknown") else V(None, "unknown")
+
+    out = []
+    for stage, label, card, pat, ports in VM_STAGES:
+        jobs = [j["name"] for j in cfg_jobs or [] if re.fullmatch(pat, j["name"] or "")
+                or any(str(t).endswith(ports) for t in j.get("static_targets") or [])]
+        e = {"stage": stage, "label": label, "component": card,
+             "scraped": V(None, "unknown", note="沒有 config") if cfg_jobs is None else
+             V(bool(jobs), "file", **({"jobs": jobs} if jobs else {}))}
+        ver = next((tv[j] for j in jobs if j in tv), None)
+        if stage == "rule":
+            e["version"] = dict(st.get("version") or V(None, "unknown"))
+            e["reads_from"] = fact("vmalert.datasource")
+            e["evaluation_interval"] = dict(st.get("evaluation_interval") or V(None, "unknown"))
+            e["latency"] = dict(st.get("latency") or V(None, "unknown", note="資料從 scrape 到查得到的延遲 L；未知時用 L = S"))
+        else:
+            e["version"] = V(ver, "user", basis="answers.target_versions") if ver else \
+                V(None, "unknown", note=f"寫在 answers.yaml 的 target_versions（job 名稱：版本）" + (f"，job 是 {'、'.join(jobs)}" if jobs else ""))
+        if stage == "scrape":
+            e["writes_to"] = fact("vmagent.remote-write-target")
+        if stage == "storage":
+            e["mode"] = fact("victoriametrics.mode")
+            e["dedup_interval"] = dict(st.get("dedup_interval") or V(None, "unknown"))
+        out.append(e)
+    return out
+
+
+def stages_md(stages: list[dict]) -> list[str]:
+    def other(e):
+        if e["stage"] == "scrape":
+            return f"寫到：{_v(e['writes_to'])}"
+        if e["stage"] == "storage":
+            return f"single／cluster：{_v(e['mode'])}；`-dedup.minScrapeInterval`：{_v(e['dedup_interval'])}"
+        return (f"查詢來源：{_v(e['reads_from'])}；`-evaluationInterval`：{_v(e['evaluation_interval'])}；"
+                f"資料延遲 L：{_v(e['latency'])}")
+    L = ["| 段 | 元件 | 版本 | 這一段的設定 | 有沒有被 scrape |", "|---|---|---|---|---|"]
+    for e in stages:
+        sc = e["scraped"]
+        scraped = "**未知**（沒有 config）" if sc["value"] is None else \
+            f"有（job {'、'.join(sc.get('jobs') or [])}）" if sc["value"] else "**沒有**"
+        L.append(f"| {e['label']} | {e['component']} | {_v(e['version'])} | {other(e)} | {scraped} |")
+    L += ["", "三段是三個行程，版本與故障各自獨立：採集停了，rule 只看到資料變舊；儲存回傳不完整的答案時 HTTP 仍是 200；"
+              "vmalert 停了，所有 rule 一起沉默。"]
+    return L
 
 
 def feature_present(inv: dict, feat: str) -> bool | None:
@@ -2020,7 +2113,9 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
         rk = inv["stack"]["ruler"]["value"] or "Prometheus／vmalert"
         api = ("`curl -s <vmalert>/metrics | grep vm_app_version`" if rk == "vmalert" else
                "`curl -s <prometheus>/api/v1/status/buildinfo` 與 `curl -s <prometheus>/api/v1/status/flags`")
-        q = {"id": "version", "q": f"評估這些 rule 的 {rk} 是哪個版本？請直接貼 {api} 的輸出（唯讀；版本與旗標一次確認）",
+        q = {"id": "version", "q": f"評估這些 rule 的 {rk} 是哪個版本？請直接貼 {api} 的輸出（唯讀；版本與旗標一次確認）"
+                                   + ("。這是 vmalert 的版本；vmagent 與 VictoriaMetrics 是另外兩個行程，版本寫在 answers.yaml 的 "
+                                      "`target_versions`（job 名稱：版本）" if rk == "vmalert" else ""),
              "changes": ["query_offset／eval_delay 可用與否", "anchored", "samples_needed（vmalert）"],
              "affects": len(ranged) + 1, "findings": 0, "answer_key": "version"}
         if inv["stack"]["ruler"]["value"] == "prometheus":
@@ -2034,7 +2129,8 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
                                                                "第 0 輪沒問到，這輪要問（不問就在 answers.yaml 的 unknown 寫明）"})
         qs.append(q)
     if inv["stack"]["external_observer"]["from"] == "unknown":
-        un = inv["unscraped_components"] if isinstance(inv["unscraped_components"], list) else []
+        un = [u for u in (inv["unscraped_components"] if isinstance(inv["unscraped_components"], list) else [])
+              if not u.get("stage")]
         qs.append({"id": "external_observer", "q": "有沒有另一台（外部觀察者）在監控這台 ruler 和 Alertmanager？",
                    "changes": ["monitor of monitor", "Watchdog", *sorted({f"{u['component']} 沒被抓" for u in un})],
                    "affects": 1 + len(un), "findings": cnt("component_unscraped"),
@@ -2294,6 +2390,8 @@ def markdown(inv) -> str:
     L += ["", "## 只看檔案就知道的事實", ""]
     L += [f"- {f['fact']}" for f in inv["findings_from_files"]] or ["- （沒有）"]
     st = inv["stack"]
+    if inv.get("stages"):
+        L += ["", "## VictoriaMetrics 的三段（採集 → 儲存 → rule 評估）", "", *stages_md(inv["stages"])]
     L += ["", "## 監控體系", "", "| 項目 | 值 |", "|---|---|"]
     names = {"ruler": "ruler", "version": "版本", "evaluation_interval": "`evaluation_interval`", "rule_files_loaded": "`rule_files`",
              "rules_given_are_loaded": "給的 rule 檔有被載入", "alertmanagers": "Alertmanager", "external_observer": "外部觀察者",
@@ -2301,6 +2399,8 @@ def markdown(inv) -> str:
              "scrape_interval": "global `scrape_interval`", "scrape_timeout": "global `scrape_timeout`",
              "target_versions": "資料庫版本（依 job）"}
     names.update({"latency": "資料延遲 L", "dedup_interval": "`-dedup.minScrapeInterval`", "eval_delay": "`eval_delay`"})
+    if inv.get("stages"):
+        names["version"] = "版本（vmalert）"
     for k, v in st.items():
         L.append(f"| {names.get(k, k)} | {_v(v)} |")
     if inv.get("facts"):

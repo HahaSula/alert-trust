@@ -153,3 +153,12 @@ blind_spots:
     why: "`vm_persistentqueue_bytes_dropped_total` 只有位元組數，沒有時間範圍"
     workaround: 記下 drop 開始增加的時間，對照 rule 視窗
     options: "建議：把 MetaVMAgentDataDropped 的觸發時間記進事件紀錄，事後查那段的 rule 結果"
+
+# 會改變結論的必問題（tools/inventory.py 在盤點裡有這張卡時優先問）。
+must_ask:
+  - id: remote-write-target
+    question: "vmagent 的 `-remoteWrite.url` 寫到哪裡（幾個目的地）？和 vmalert 查的是不是同一套 VictoriaMetrics？"
+    why: >-
+      採集和儲存是兩個行程：每個 `-remoteWrite.url` 各自一個 queue 與磁碟 buffer，目的地跟不上時資料先堆在 vmagent，
+      rule 只看到資料變舊、不會報錯；寫入和查詢不是同一套時 rule 查不到這些資料
+    refs: [vmag-queues, vmag-nodisk]

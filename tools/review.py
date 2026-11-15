@@ -483,7 +483,9 @@ def summary(a, inv, items, fit, ms_rows, lint_out, cov) -> str:
     L += ["", "## 這是我從檔案理解的環境，哪裡不對？", "",
           "標 **未知**／**推測** 的還沒確認。直接改 `inventory.yaml`（改過的值加 `confirmed: true`），用 `--merge` 重跑。", "",
           "| 項目 | 值 |", "|---|---|"]
-    for k, label in (("ruler", "ruler"), ("version", "版本"), ("evaluation_interval", "`evaluation_interval`"),
+    if inv.get("stages"):
+        L[-2:-2] = ["VictoriaMetrics 把採集、儲存、rule 評估拆成三個行程，下面分三段列：", "", *INV.stages_md(inv["stages"]), ""]
+    for k, label in (("ruler", "ruler"), ("version", "版本（vmalert）" if inv.get("stages") else "版本"), ("evaluation_interval", "`evaluation_interval`"),
                      ("scrape_interval", "global `scrape_interval`"), ("alertmanagers", "Alertmanager"),
                      ("external_labels", "`external_labels`"), ("external_observer", "外部觀察者"),
                      ("rules_given_are_loaded", "給的 rule 檔有被載入")):

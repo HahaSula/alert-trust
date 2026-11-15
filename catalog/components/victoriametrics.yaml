@@ -199,6 +199,12 @@ blind_spots:
 
 # 會改變結論的必問題（tools/inventory.py 在盤點裡有這張卡時優先問）。
 must_ask:
+  - id: mode
+    question: "VictoriaMetrics 是 single 還是 cluster（vminsert／vmselect／vmstorage 各幾台、`-replicationFactor` 多少）？請回答 single 或 cluster"
+    why: >-
+      Cluster 多了「部分節點故障」這種狀態：RF=1 時一台 vmstorage 掛掉，vmselect 預設回傳不完整的答案、HTTP 200，
+      「數量太低」這類 rule 會假觸發；single 沒有這種狀態，但也沒有備援
+    refs: [exp-vm-faults, vms-partial, vms-denypartial]
   - id: dedup-interval
     question: "VictoriaMetrics（vmstorage／vmselect／single）有沒有設 `-dedup.minScrapeInterval`？設多少？"
     why: >-

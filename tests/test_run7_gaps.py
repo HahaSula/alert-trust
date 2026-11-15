@@ -195,5 +195,92 @@ class NewMustAskTest(unittest.TestCase):
         self.assertIn("mute-intervals-critical", [u["id"] for u in cards["alertmanager"]["usage"]])
 
 
+VM_RULES = """groups:
+  - name: g
+    interval: 30s
+    concurrency: 2
+    rules:
+      - alert: PgDown
+        expr: pg_up{job="pg"} == 0
+        labels: {severity: critical}
+"""
+VM_SCRAPE = """global: {scrape_interval: 30s}
+scrape_configs:
+  - job_name: pg
+    static_configs: [{targets: ["db-1:9187"]}]
+  - job_name: agent
+    static_configs: [{targets: ["agent-1:8429"]}]
+"""
+
+
+def build_vm(answers: dict | None = None, cfg: str = VM_SCRAPE, name: str = "scrape.yml"):
+    import contextlib
+    import io
+    import yaml
+    d = tempfile.mkdtemp()
+    paths = {}
+    for n, text in ((name, cfg), ("rules.yml", VM_RULES), ("alertmanager.yml", AM)):
+        paths[n] = os.path.join(d, n)
+        with open(paths[n], "w", encoding="utf-8") as f:
+            f.write(text)
+    out = os.path.join(d, "inv.yaml")
+    md = os.path.join(d, "inv.md")
+    argv = ["--rules", paths["rules.yml"], "--config", paths[name], "--alertmanager", paths["alertmanager.yml"],
+            "--out", out, "--md", md]
+    if answers:
+        a = os.path.join(d, "answers.yaml")
+        with open(a, "w", encoding="utf-8") as f:
+            yaml.safe_dump(answers, f, allow_unicode=True)
+        argv += ["--answers", a]
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        I.main(argv)
+    with open(out, encoding="utf-8") as f, open(md, encoding="utf-8") as g:
+        return yaml.safe_load(f), g.read()
+
+
+class VictoriaMetricsStagesTest(unittest.TestCase):
+    """vmagent (scrape), VictoriaMetrics (storage) and vmalert (rule evaluation) are separate processes."""
+
+    def test_three_stages_from_files(self):
+        inv, md = build_vm()
+        # a vmalert rule file (group.concurrency) with a scrape-only config: not a prometheus.yml
+        self.assertEqual(inv["sources"]["config_kind"]["value"], "vmagent")
+        st = {e["stage"]: e for e in inv["stages"]}
+        self.assertEqual([e["component"] for e in inv["stages"]], ["vmagent", "victoriametrics", "vmalert"])
+        self.assertEqual(st["scrape"]["scraped"], {"value": True, "from": "file", "jobs": ["agent"]})   # by port 8429
+        self.assertFalse(st["storage"]["scraped"]["value"])
+        self.assertFalse(st["rule"]["scraped"]["value"])
+        for e in inv["stages"]:
+            self.assertEqual(e["version"]["from"], "unknown", e["stage"])
+        facts = " ".join(f["fact"] for f in inv["findings_from_files"]
+                         if f["kind"] in ("component_unscraped", "stage_unscraped"))
+        self.assertIn("儲存與查詢那一段（victoriametrics）", facts)
+        self.assertIn("ruler（vmalert）", facts)
+        self.assertNotIn("採集那一段", facts)
+        self.assertIn("## VictoriaMetrics 的三段", md)
+        self.assertIn("版本（vmalert）", md)
+        ids = [q["id"] for q in inv["questions"]]
+        for q in ("must_ask.vmalert.datasource", "must_ask.victoriametrics.mode", "must_ask.vmagent.remote-write-target"):
+            self.assertIn(q, ids)
+
+    def test_answers_fill_each_stage_separately(self):
+        inv, _ = build_vm({"version": "v1.155.0", "target_versions": {"agent": "v1.150.0"}, "dedup_interval": "30s",
+                           "facts": {"victoriametrics": {"mode": "cluster"},
+                                     "vmagent": {"remote-write-target": "vminsert"}}})
+        st = {e["stage"]: e for e in inv["stages"]}
+        self.assertEqual(st["rule"]["version"]["value"], "v1.155.0")
+        self.assertEqual(st["scrape"]["version"]["value"], "v1.150.0")
+        self.assertEqual(st["storage"]["version"]["from"], "unknown")      # the ruler's version is not copied over
+        self.assertEqual(st["storage"]["mode"]["value"], "cluster")
+        self.assertEqual(st["storage"]["dedup_interval"]["value"], "30s")
+        self.assertEqual(st["scrape"]["writes_to"]["value"], "vminsert")
+        self.assertEqual(st["rule"]["reads_from"]["from"], "unknown")
+
+    def test_prometheus_has_no_stages(self):
+        inv = build(config())
+        self.assertNotIn("stages", inv)
+        self.assertNotIn("must_ask.vmagent.remote-write-target", [q["id"] for q in inv["questions"]])
+
+
 if __name__ == "__main__":
     unittest.main()
