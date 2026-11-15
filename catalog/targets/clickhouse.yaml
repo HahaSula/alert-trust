@@ -680,6 +680,39 @@ signals:
     rules: [rules/targets/clickhouse.yml#CHDiskSpaceLow, rules/targets/clickhouse.yml#CHDiskFillingUp]
 
 # 寫得不好的查詢：每一種壞用法對應到哪些 misuse 訊號、看得到什麼、/metrics 看不到什麼。
+must_ask:
+  - id: heavy-metrics
+    question: "`asynchronous_metrics_enable_heavy_metrics` 有沒有設成 true？（`SELECT value FROM system.server_settings WHERE name = 'asynchronous_metrics_enable_heavy_metrics'`）"
+    why: >-
+      預設 false：NumberOfDetachedParts、NumberOfPendingMutations 不計算，/metrics 沒有這兩個名稱，讀它們的規則回傳空
+    refs: [ch-exp-raw, ch-ss-heavy-enable, ch-sam-heavy-gate]
+    default: "false"
+    effects:
+      - when: ["false", "0", "no", "沒有", "沒改", "預設"]
+        verdict: no_data
+        metrics: [ClickHouseAsyncMetrics_NumberOfDetachedParts, ClickHouseAsyncMetrics_NumberOfPendingMutations]
+        why: "asynchronous_metrics_enable_heavy_metrics=false 時不計算這兩個 heavy metric"
+      - when: ["true", "1", "yes", "有"]
+        verdict: available
+        metrics: [ClickHouseAsyncMetrics_NumberOfDetachedParts, ClickHouseAsyncMetrics_NumberOfPendingMutations]
+        why: "asynchronous_metrics_enable_heavy_metrics=true 時會計算"
+  - id: async-metric-key-form
+    question: "帶 key 的 async metric（DiskAvailable 這類）是 label 形式還是舊名稱？請回答 labels 或 legacy_names，並附 ClickHouse 版本（26.8 起預設是 label；26.3 以前，或 `asynchronous_metrics_key_values_mode=legacy_names` 時是 `DiskAvailable_<disk>`）"
+    why: >-
+      26.8 起 DiskAvailable{disk="default"} 取代 DiskAvailable_default；照舊名稱寫死的規則在新版回傳空。
+      預設值以這張卡核對的 26.10 為準，26.3 以前要回答 legacy_names
+    refs: [ch-exp-raw, ch-ss-kv-mode, ver-ch268-disk-label, ver-ch253-disk-suffix]
+    default: labels
+    effects:
+      - when: ["labels", "label"]
+        verdict: no_data
+        metrics: ["ClickHouseAsyncMetrics_DiskAvailable_*", "ClickHouseAsyncMetrics_DiskTotal_*", "ClickHouseAsyncMetrics_DiskUsed_*", "ClickHouseAsyncMetrics_DiskUnreserved_*"]
+        why: "label 形式下沒有 DiskAvailable_<disk> 這種帶後綴的名稱"
+      - when: ["legacy_names", "legacy"]
+        verdict: available
+        metrics: ["ClickHouseAsyncMetrics_DiskAvailable_*", "ClickHouseAsyncMetrics_DiskTotal_*", "ClickHouseAsyncMetrics_DiskUsed_*", "ClickHouseAsyncMetrics_DiskUnreserved_*"]
+        why: "舊名稱模式下每個 disk 一個帶後綴的名稱"
+
 bad_queries:
   - case: 大量小 insert（每次幾列）或 partition key 太細，part 數暴增
     signals: [parts-pressure, writes-rejected, merge-pool]

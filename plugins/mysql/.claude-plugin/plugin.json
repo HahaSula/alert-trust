@@ -1,7 +1,7 @@
 {
   "name": "alert-trust-mysql",
   "description": "alert-trust MySQL pack: checks the mysql card in five sections (architecture, usage, observe, misuse incl. bad queries, blind spots); depends on alert-trust-core",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "author": {
     "name": "HahaSula"
   },

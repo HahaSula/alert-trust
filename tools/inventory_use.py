@@ -372,13 +372,15 @@ def _family(m: str) -> str:
 
 
 def effect_for_metric(metric: str | None, effects: list[dict], verdict: str | None = None) -> dict | None:
-    """The first applied effect that names this metric (same histogram / counter family counts)."""
+    """The first applied effect that names this metric (same histogram / counter family counts; an entry ending
+    in `*` is a name prefix, e.g. mongodb_ss_*)."""
     if not metric:
         return None
     for e in effects:
         if verdict and e["verdict"] != verdict:
             continue
-        if any(metric == m or _family(metric) == _family(m) for m in e["metrics"]):
+        if any(metric.startswith(m[:-1]) if m.endswith("*") else metric == m or _family(metric) == _family(m)
+               for m in e["metrics"]):
             return e
     return None
 

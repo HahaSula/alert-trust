@@ -426,7 +426,8 @@ def check_tested_by(card: dict, all_refs: dict) -> list[str]:
 #   effects: [{when: <value or [values]>, verdict: no_data | available, metrics: [m, ...]?, signals: [signal id, ...]?,
 #              why: "..."?}]
 # `when` matches the answer case-insensitively, as the whole answer or one of its words (「basic（3.5.9）」 matches basic).
-# verdict no_data: rules reading those metrics (histogram _bucket/_sum/_count count as one family) are
+# verdict no_data: rules reading those metrics (histogram _bucket/_sum/_count count as one family; an entry ending in
+# `*` is a name prefix, e.g. mongodb_ss_*) are
 # 「這個設定下沒有資料」 (check_metric_sources.py status setting_absent → fit_contracts.py 沒有資料, review.py detection), and
 # the signals with rules become rule_no_data in check_coverage.py; available: the metrics exist (needs_input → confirmed).
 # default (optional, needs a facts.* answer_key): the documented default of the setting (e.g. etcd --metrics basic,

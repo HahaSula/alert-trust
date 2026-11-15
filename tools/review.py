@@ -411,6 +411,10 @@ def end_to_end(a, inv: dict, fit: dict | None, ms_rows: list[dict]) -> list[str]
     else:
         rv = sorted({x for r in inv["rules"] if r["name"] in crit for x in ((r.get("route") or {}).get("receivers") or [])})
         route = f"critical rule 會送到 {'、'.join(rv) or '—'}（依檔案；receiver 本身會不會通知到人要確認）"
+    for x in f:
+        if x["kind"] == "replica_label_on_alerts":
+            route += (f"；`external_labels` 的 {'、'.join(x['labels'])} 沒有在 `alert_relabel_configs` 去掉："
+                      "多台 Prometheus 評估同一份 rule 時，Alertmanager 會把每台送來的當成不同的 alert（重複）")
     parts.append(("路由（Alertmanager）", route))
     # 4. self-monitoring
     sm = []

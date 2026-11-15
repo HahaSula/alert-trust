@@ -25,7 +25,8 @@ the rest. Sections:
                         then keeps depends_on_runtime_labels)), route_label_value_mismatch (close names, e.g.
                         job="etcd" vs kube-etcd), critical_not_paging (critical rules whose only receivers are
                         email / empty), routed_to_empty_receiver (grouped), inhibit_no_equal, dms_route_without_rule
-                        (an alertname="Watchdog" route but no such rule), no_watchdog_rule,
+                        (an alertname="Watchdog" route but no such rule), no_watchdog_rule, replica_label_on_alerts
+                        (external_labels carries a replica label and alerting has no alert_relabel_configs),
                         watchdog_no_dedicated_route (the Watchdog rule, or the one we propose, falls into a route without
                         an alertname matcher and inherits its timings; alertmanager.watchdog_route has the timings, the
                         DMS lower bound of contract deadman-wait and a route template with a valid placeholder URL),
@@ -976,6 +977,14 @@ def build(a) -> dict:
                 stack["external_labels"] = V(cfg["external_labels"], "file")
             if cfg["alert_relabel"]:
                 stack["alert_relabel_configs"] = V(True, "file", note="送出前會改寫 alert label；路由結果可能不同")
+            rep_keys = sorted(k for k in cfg["external_labels"] if k in REPLICA_LABELS)
+            if rep_keys and not cfg["alert_relabel"]:
+                findings.append({"kind": "replica_label_on_alerts", "labels": rep_keys,
+                                 "fact": f"`external_labels` 有 {'、'.join(rep_keys)}，而 `alerting` 沒有 `alert_relabel_configs`："
+                                         "同一份 rule 由多台 Prometheus 評估時，每台送出的 alert 多一個不同的 label，"
+                                         "Alertmanager 依整組 label 判斷是不是同一個 alert，會當成不同的 alert（同一則通知裡重複列出，"
+                                         "較晚送到的那份在下一個 `group_interval` 再通知一次）。只有一台 Prometheus 時沒有影響；"
+                                         "多台時在 `alert_relabel_configs` 用 labeldrop 去掉這個 label"})
     else:
         for k in ("evaluation_interval", "rule_files_loaded", "alertmanagers"):
             stack[k] = V(None, "unknown")
@@ -1707,6 +1716,8 @@ NOTIFY_Q = "這類故障要在幾分鐘內通知到人？"
 FAILRUN_Q = "最長連續失敗幾次？"
 # cost of being wrong when the answer is not known: 3 = a page is missed or the advice harms (a rule changed in
 # meaning, never fires), 2 = a time / option is wrong, 1 = a detail
+# external_labels keys that tell HA replicas of one Prometheus apart (prometheus-operator uses prometheus_replica)
+REPLICA_LABELS = ("replica", "prometheus_replica", "__replica__")
 COST = {"version_gate": 3, "job_names": 3, "--config": 3, "--alertmanager": 3, "version": 2, "external_observer": 2, "measured": 2,
         "keep_range": 3, "producers": 2, "features": 2, "labels": 2, "must_ask": 3, "route_label": 3, "notify_within": 3,
         "failrun": 2}
@@ -1994,7 +2005,10 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
         qs.append({"id": "external_observer", "q": "有沒有另一台（外部觀察者）在監控這台 ruler 和 Alertmanager？",
                    "changes": ["monitor of monitor", "Watchdog", *sorted({f"{u['component']} 沒被抓" for u in un})],
                    "affects": 1 + len(un), "findings": cnt("component_unscraped"),
-                   "answer_key": "external_observer"})
+                   "answer_key": "external_observer",
+                   **({"mandatory": True, "mandatory_note": "沒有外部觀察者時，ruler 與 Alertmanager 自己停掉沒有人知道；"
+                                                            "前兩輪沒問到，這輪要問（不問就在 answers.yaml 的 unknown 寫明）"}
+                      if int(inv.get("round") or 0) >= 2 else {})})
     jobs_ranged = sorted({j for r in ranged for j in (r["jobs_matched"].get("value") or [])})
     unmeasured = [j["name"] for j in inv["jobs"] if j["name"] in jobs_ranged and (j.get("measured") or {}).get("from") == "unknown"]
     if unmeasured:

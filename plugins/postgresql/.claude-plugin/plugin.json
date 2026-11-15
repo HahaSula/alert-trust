@@ -1,7 +1,7 @@
 {
   "name": "alert-trust-postgresql",
   "description": "alert-trust PostgreSQL pack: checks the postgres_exporter card in five sections (architecture, usage, observe, misuse incl. bad queries, blind spots); depends on alert-trust-core",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "author": {
     "name": "HahaSula"
   },

@@ -776,8 +776,35 @@ blind_spots:
 
 # 會改變結論的必問題（tools/inventory.py 在盤點裡有這張卡時優先問）。
 must_ask:
-  - id: collector-flags
-    question: "mongodb_exporter 啟動時開了哪些 collector 旗標（`--collector.diagnosticdata`、`--collector.replicasetstatus`、`--compatible-mode`、`--collect-all`）？"
+  - id: diagnosticdata
+    question: "mongodb_exporter 啟動時有沒有加 `--collector.diagnosticdata`（或 `--collect-all`）？請回答有或沒有；知道的話順便列出所有 collector 旗標"
     why: >-
-      預設什麼 collector 都不開，只輸出 mongodb_up；少一個旗標，讀 mongodb_ss_*、mongodb_rs_* 或 v1 舊名的規則回傳空
-    refs: [mg-exp, mx-flag-diag, mx-flag-rs, mx-flag-compat, mx-general-always]
+      預設什麼 collector 都不開，只輸出 mongodb_up；沒有這個旗標時 mongodb_ss_*（serverStatus：角色、連線、WiredTiger、ticket）都不存在，
+      讀它們的規則回傳空，`unless` 右邊是它們的規則會一直響
+    refs: [mg-exp, mx-flag-diag, mx-general-always]
+    default: "no"
+    effects:
+      - when: ["no", "none", "false", "沒有", "沒開", "沒加"]
+        verdict: no_data
+        metrics: ["mongodb_ss_*"]
+        why: "沒有 --collector.diagnosticdata 時 exporter 不輸出 mongodb_ss_*"
+      - when: ["yes", "true", "有", "有開", "有加", "--collector.diagnosticdata", "--collect-all"]
+        verdict: available
+        metrics: ["mongodb_ss_*"]
+        why: "--collector.diagnosticdata 會輸出 serverStatus 的 mongodb_ss_*"
+  - id: replicasetstatus
+    question: "mongodb_exporter 啟動時有沒有加 `--collector.replicasetstatus`（或 `--collect-all`）？有沒有 `--compatible-mode`？"
+    why: >-
+      沒有這個旗標時 mongodb_rs_*（replSetGetStatus：member 狀態、optime、選舉）都不存在，複寫延遲與 member 健康的規則回傳空；
+      讀 v1 舊名（mongodb_mongod_*）的規則另外需要 --compatible-mode
+    refs: [mg-exp, mx-flag-rs, mx-flag-compat, mx-general-always]
+    default: "no"
+    effects:
+      - when: ["no", "none", "false", "沒有", "沒開", "沒加"]
+        verdict: no_data
+        metrics: ["mongodb_rs_*"]
+        why: "沒有 --collector.replicasetstatus 時 exporter 不輸出 mongodb_rs_*"
+      - when: ["yes", "true", "有", "有開", "有加", "--collector.replicasetstatus", "--collect-all"]
+        verdict: available
+        metrics: ["mongodb_rs_*"]
+        why: "--collector.replicasetstatus 會輸出 replSetGetStatus 的 mongodb_rs_*"

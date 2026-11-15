@@ -155,6 +155,7 @@ cards:
     - retention-config
     - restart-gap
     - gomaxprocs-251
+    - ha-replica-label
     - extra-scrape-metrics
     - k8s-selectors
     observe:
@@ -669,6 +670,68 @@ cards:
     - TLS 憑證到期
     - 慢磁碟、磁碟滿、檔案系統唯讀
     - Keeper 慢、ON CLUSTER DDL 佇列卡住
+    must_ask:
+    - id: heavy-metrics
+      question: '`asynchronous_metrics_enable_heavy_metrics` 有沒有設成 true？（`SELECT value FROM system.server_settings WHERE name = ''asynchronous_metrics_enable_heavy_metrics''`）'
+      why: 預設 false：NumberOfDetachedParts、NumberOfPendingMutations 不計算，/metrics 沒有這兩個名稱，讀它們的規則回傳空
+      refs:
+      - ch-exp-raw
+      - ch-ss-heavy-enable
+      - ch-sam-heavy-gate
+      effects:
+      - when:
+        - 'false'
+        - '0'
+        - 'no'
+        - 沒有
+        - 沒改
+        - 預設
+        verdict: no_data
+        metrics:
+        - ClickHouseAsyncMetrics_NumberOfDetachedParts
+        - ClickHouseAsyncMetrics_NumberOfPendingMutations
+        why: asynchronous_metrics_enable_heavy_metrics=false 時不計算這兩個 heavy metric
+      - when:
+        - 'true'
+        - '1'
+        - 'yes'
+        - 有
+        verdict: available
+        metrics:
+        - ClickHouseAsyncMetrics_NumberOfDetachedParts
+        - ClickHouseAsyncMetrics_NumberOfPendingMutations
+        why: asynchronous_metrics_enable_heavy_metrics=true 時會計算
+      default: 'false'
+    - id: async-metric-key-form
+      question: 帶 key 的 async metric（DiskAvailable 這類）是 label 形式還是舊名稱？請回答 labels 或 legacy_names，並附 ClickHouse 版本（26.8 起預設是 label；26.3 以前，或 `asynchronous_metrics_key_values_mode=legacy_names` 時是 `DiskAvailable_<disk>`）
+      why: 26.8 起 DiskAvailable{disk="default"} 取代 DiskAvailable_default；照舊名稱寫死的規則在新版回傳空。 預設值以這張卡核對的 26.10 為準，26.3 以前要回答 legacy_names
+      refs:
+      - ch-exp-raw
+      - ch-ss-kv-mode
+      - ver-ch268-disk-label
+      - ver-ch253-disk-suffix
+      effects:
+      - when:
+        - labels
+        - label
+        verdict: no_data
+        metrics:
+        - ClickHouseAsyncMetrics_DiskAvailable_*
+        - ClickHouseAsyncMetrics_DiskTotal_*
+        - ClickHouseAsyncMetrics_DiskUsed_*
+        - ClickHouseAsyncMetrics_DiskUnreserved_*
+        why: label 形式下沒有 DiskAvailable_<disk> 這種帶後綴的名稱
+      - when:
+        - legacy_names
+        - legacy
+        verdict: available
+        metrics:
+        - ClickHouseAsyncMetrics_DiskAvailable_*
+        - ClickHouseAsyncMetrics_DiskTotal_*
+        - ClickHouseAsyncMetrics_DiskUsed_*
+        - ClickHouseAsyncMetrics_DiskUnreserved_*
+        why: 舊名稱模式下每個 disk 一個帶後綴的名稱
+      default: labels
   etcd:
     name: etcd（內建 /metrics）
     kind: target
@@ -1005,15 +1068,71 @@ cards:
     - 大文件（接近 16MB 上限）與過大的回應
     - 執行中的長操作（currentopmetrics 沒開時）
     must_ask:
-    - id: collector-flags
-      question: mongodb_exporter 啟動時開了哪些 collector 旗標（`--collector.diagnosticdata`、`--collector.replicasetstatus`、`--compatible-mode`、`--collect-all`）？
-      why: 預設什麼 collector 都不開，只輸出 mongodb_up；少一個旗標，讀 mongodb_ss_*、mongodb_rs_* 或 v1 舊名的規則回傳空
+    - id: diagnosticdata
+      question: mongodb_exporter 啟動時有沒有加 `--collector.diagnosticdata`（或 `--collect-all`）？請回答有或沒有；知道的話順便列出所有 collector 旗標
+      why: 預設什麼 collector 都不開，只輸出 mongodb_up；沒有這個旗標時 mongodb_ss_*（serverStatus：角色、連線、WiredTiger、ticket）都不存在， 讀它們的規則回傳空，`unless` 右邊是它們的規則會一直響
       refs:
       - mg-exp
       - mx-flag-diag
+      - mx-general-always
+      effects:
+      - when:
+        - 'no'
+        - none
+        - 'false'
+        - 沒有
+        - 沒開
+        - 沒加
+        verdict: no_data
+        metrics:
+        - mongodb_ss_*
+        why: 沒有 --collector.diagnosticdata 時 exporter 不輸出 mongodb_ss_*
+      - when:
+        - 'yes'
+        - 'true'
+        - 有
+        - 有開
+        - 有加
+        - --collector.diagnosticdata
+        - --collect-all
+        verdict: available
+        metrics:
+        - mongodb_ss_*
+        why: --collector.diagnosticdata 會輸出 serverStatus 的 mongodb_ss_*
+      default: 'no'
+    - id: replicasetstatus
+      question: mongodb_exporter 啟動時有沒有加 `--collector.replicasetstatus`（或 `--collect-all`）？有沒有 `--compatible-mode`？
+      why: 沒有這個旗標時 mongodb_rs_*（replSetGetStatus：member 狀態、optime、選舉）都不存在，複寫延遲與 member 健康的規則回傳空； 讀 v1 舊名（mongodb_mongod_*）的規則另外需要 --compatible-mode
+      refs:
+      - mg-exp
       - mx-flag-rs
       - mx-flag-compat
       - mx-general-always
+      effects:
+      - when:
+        - 'no'
+        - none
+        - 'false'
+        - 沒有
+        - 沒開
+        - 沒加
+        verdict: no_data
+        metrics:
+        - mongodb_rs_*
+        why: 沒有 --collector.replicasetstatus 時 exporter 不輸出 mongodb_rs_*
+      - when:
+        - 'yes'
+        - 'true'
+        - 有
+        - 有開
+        - 有加
+        - --collector.replicasetstatus
+        - --collect-all
+        verdict: available
+        metrics:
+        - mongodb_rs_*
+        why: --collector.replicasetstatus 會輸出 replSetGetStatus 的 mongodb_rs_*
+      default: 'no'
   mysql:
     name: mysqld_exporter＋MySQL
     kind: target

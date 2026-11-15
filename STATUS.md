@@ -1,6 +1,6 @@
 # 狀態
 
-最後更新：2026-11-09。
+最後更新：2026-11-15（v0.4.0）。
 
 ## 現況
 
@@ -68,11 +68,20 @@
 - **P3**：研究流程盲測（從機制出發寫卡，不從 metric 清單）。**P4**：其他卡推廣，警告數只減不增。
 - 分工：格式、懸空 id、實測有沒有實驗、版本重疊、metric 存在、缺口計數由工具判；機制與失效模式、假設與實驗設計由 agent 研究；範圍、要不要補替代方案或 rule、門檻由人決定。不追求 100% 覆蓋。
 
+第七輪盲測（2026-11-15，commit 4b87e32，受測者與裁判都是 Sonnet）：原本四題 42／48（第五輪 45／48），另加兩個沒用來調過工具的保留情境 17／24。六題的第一句都直接回答了使用者的問題，沒有評分表列的錯誤建議。保留情境的得分率（71%）低於原四題（88%）：工具在沒調過的元件上較弱。依漏失做的通用修正（v0.4.0）：
+
+- 卡片 `must_ask` 的 `effects.metrics` 可以寫前綴（`mongodb_ss_*`）；MongoDB 的 collector 旗標拆成兩題是非題並加預設值，ClickHouse 加 heavy metric 與 async metric 名稱形式兩題：使用者還沒回答或回「不知道」時，讀那些 metric 的 rule 依卡片預設算成沒有資料（標假設）。
+- 「外部觀察者」的題目最晚第三輪進前 3 題（版本仍是第二輪）。
+- 新發現 `replica_label_on_alerts`：`external_labels` 有區分副本的 label 而沒有 `alert_relabel_configs`；Prometheus 卡的 usage `ha-replica-label`（讀碼）。
+- skill 與 AGENTS：事實題直接問事實，不要只要求貼指令輸出；有預設值的必問題在「不知道」時結論寫成條件式。
+
+這些修正還沒有再盲測；那兩個保留情境已經用來改過工具，下一輪要另外準備新的。還沒處理的漏失：blackbox `/readyz` 與第二路徑的題目沒有進前 3、PostgreSQL 的 `--collection-timeout` 與 Patroni／DCS 沒有 scrape job 沒有拉到摘要、`/scrapeall` 與 `mute_time_intervals` 蓋到 critical 路由沒有工具發現、受測者會問檔案裡看得到的 job 名稱。
+
 Review 找到、還沒解決的問題：
 
 - E1 很鬆：實測項目只靠少數實驗 ref，單一 ref 最多背 72 項。P2 的 `tested_by` 已能指到假設，但目前只有 MariaDB 卡的 11 項（G7 = 574 是剩下的量）。
 - 「訊號是實測」不等於「rule 被觸發過」：CI 對 rule 範本只驗語法，沒有 rule 的單元測試。
-- 盲測有過度擬合風險：六輪都用同 4 個情境、評分表到頂；要加 2 個沒用來調工具的保留情境，答案表沒寫的一律回「不知道」，保存完整對話。
+- 盲測的過度擬合：第七輪加了 2 個保留情境並保存逐字對話，結果見上；之後每輪都要有新的保留情境。
 - issue 試點（repo 外的 `drafts/`）：各元件「該如何／不該如何／怎麼監控」的素材，等 P1 欄位定了再進卡片；issue 的說法在釘到 commit 或小實驗重現前都是推論。
 - （已完成）Alertmanager 卡的 usage `ha-memberlist-034`：0.34.0–0.34.2 用 memberlist v0.6.0，push/pull 的 user state 超過寫死的 20 MiB 就被拒；0.33.1 與 0.35.0 用 v0.5.4，沒有這道檢查。只讀碼，叢集分裂的現象來自 issue 回報，沒有在 lab 重現。
 

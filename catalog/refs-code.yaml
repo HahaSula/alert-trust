@@ -813,3 +813,24 @@ refs:
     file: "storage/innobase/lock/lock0lock.cc"
     line: 6831
     url: "https://github.com/MariaDB/server/blob/mariadb-10.6.19/storage/innobase/lock/lock0lock.cc#L6831"
+  p313-notifier-external-labels:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "notifier/alert.go"
+    line: 77
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/notifier/alert.go#L77"
+  p313-notifier-relabel-after-external:
+    kind: code
+    project: "Prometheus"
+    version: "v3.13.5"
+    file: "notifier/alert.go"
+    line: 83
+    url: "https://github.com/prometheus/prometheus/blob/v3.13.5/notifier/alert.go#L83"
+  am034-alerts-put-fingerprint:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.34.2"
+    file: "provider/mem/mem.go"
+    line: 315
+    url: "https://github.com/prometheus/alertmanager/blob/v0.34.2/provider/mem/mem.go#L315"

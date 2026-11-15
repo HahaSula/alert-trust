@@ -694,5 +694,23 @@
   "mariadb-10.6.19",
   "storage/innobase/lock/lock0lock.cc",
   "lock_sys.deadlocks++"
+ ],
+ "p313-notifier-external-labels": [
+  "prometheus/prometheus",
+  "v3.13.5",
+  "notifier/alert.go",
+  "externalLabels.Range(func(l labels.Label) {"
+ ],
+ "p313-notifier-relabel-after-external": [
+  "prometheus/prometheus",
+  "v3.13.5",
+  "notifier/alert.go",
+  "keep := relabel.ProcessBuilder(lb, relabelConfigs...)"
+ ],
+ "am034-alerts-put-fingerprint": [
+  "prometheus/alertmanager",
+  "v0.34.2",
+  "provider/mem/mem.go",
+  "fp := alert.Fingerprint()"
  ]
 }

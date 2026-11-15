@@ -1,7 +1,7 @@
 {
   "name": "alert-trust-core",
   "description": "Interactive self-check of the alert chain (collect, write, query, evaluate, route, receive): env profile, read-only snapshot, metric-source check, coverage gaps, timing contracts with fix options, rule review, and component packs for Prometheus, Thanos, VictoriaMetrics, Grafana Alerting and Alertmanager; aggregates the database and host plugins (alert-trust-<db>) when installed",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "author": {
     "name": "HahaSula"
   },

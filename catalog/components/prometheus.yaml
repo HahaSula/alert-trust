@@ -118,6 +118,13 @@ usage:
       2.51 預設用節點核心數當 GOMAXPROCS；1 核 limit 下 throttling 37%，開 `--enable-feature=auto-gomaxprocs` 後 3%。開之前先看 runtimeinfo 與 throttling
     evidence: tested
     refs: [exp-prom-cpu]
+  - id: ha-replica-label
+    text: >-
+      多台 Prometheus 評估同一份 rule 時，`external_labels` 裡區分副本的 label（replica、prometheus_replica）要在
+      `alerting.alert_relabel_configs` 用 labeldrop 去掉：notifier 先補上 external labels 再跑 alert relabel，
+      Alertmanager 以整組 label 的 fingerprint 當 alert 的 key，label 不同就是不同的 alert，不會合併
+    evidence: code
+    refs: [p313-notifier-external-labels, p313-notifier-relabel-after-external, am034-alerts-put-fingerprint]
   - id: extra-scrape-metrics
     text: >-
       要直接算 scrape 對 timeout 的邊際，設 `extra_scrape_metrics: true` 才有 `scrape_timeout_seconds`（3.x 已是設定項）

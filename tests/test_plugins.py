@@ -58,7 +58,7 @@ class PluginLayoutTest(unittest.TestCase):
             else:
                 self.assertEqual(pj["dependencies"], [M.CORE])
         self.assertEqual(len(versions), 1, f"所有 plugin.json 的 version 要相同：{versions}")
-        self.assertRegex(versions.pop(), r"^0\.3\.\d+$")
+        self.assertRegex(versions.pop(), r"^0\.4\.\d+$")
 
     def test_skills_exist_and_named(self):
         for name, info in M.PLUGINS.items():
