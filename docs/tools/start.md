@@ -19,6 +19,8 @@ alert-trust 的輸出都是**建議**：哪個設定在什麼條件下會失效�
 ```promql
 max by (job) (quantile_over_time(0.99, scrape_duration_seconds[7d]))
 max by (job) (max_over_time(scrape_duration_seconds[7d]))
+# 尖峰是偶發還是常態：每小時最大值的中位數，和上一行的最大值比（不到一半是少數幾次尖峰，八成以上是每小時都這樣）
+max by (job) (quantile_over_time(0.5, (max_over_time(scrape_duration_seconds[1h]))[7d:1h]))
 sum by (job) (sum_over_time((up == bool 0)[7d:30s]))     # 30s 換成那個 job 的 scrape_interval
 ```
 

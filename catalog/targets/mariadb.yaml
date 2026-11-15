@@ -280,6 +280,48 @@ usage:
     evidence: tested
     refs: [my-q-exp, my-q-qe-expiration, my-q-qe-query-timestamp]
 
+  # 從 Jira 試點來的用法；只寫原始碼（11.4.13，另註明的除外）能證明的部分，issue 的敘述不算依據
+  - id: sysdate-not-constant
+    text: >-
+      `SYSDATE()` 每次呼叫重新取時間，不是常數（`NOW()` 在整句裡是同一個值）；要常數語意就用 `NOW()`，或啟動時設 `sysdate_is_now`
+    evidence: code
+    refs: [mdb114-sysdate-not-const, mdb114-sysdate-rand-table, mdb114-sysdate-is-now]
+  - id: parallel-apply-needs-group-commit
+    text: >-
+      開了 `slave_parallel_threads` 不保證平行：只有 binlog 事件帶 group commit id、而且是交易型的才會和前一批同時套用，其餘要等前面做完。
+      `SHOW SLAVE STATUS` 的 Slave_Transactional_Groups／Slave_Non_Transactional_Groups 依事件的旗標累加，可以用來確認有沒有在平行
+    evidence: code
+    refs: [mdb114-par-group-commit-id, mdb114-par-transactional, mdb114-trans-groups-count]
+  - id: semisync-wait-point-default
+    text: "`rpl_semi_sync_master_wait_point` 的預設是 AFTER_COMMIT，不是 AFTER_SYNC；要 AFTER_SYNC 得明寫"
+    evidence: code
+    refs: [mdb114-semisync-waitpoint-names, mdb114-semisync-waitpoint-default]
+  - id: redo-log-size-default
+    text: "`innodb_log_file_size` 的預設是固定的 96 MiB，不會隨 buffer pool 或寫入量調整；要多大得自己設"
+    evidence: code
+    refs: [mdb114-log-file-size-default]
+  - id: flush-method-default-changed
+    text: >-
+      `innodb_flush_method` 的預設在 10.5 是 fsync，10.6 起（非 Windows）是 O_DIRECT：跨過 10.6 升級時資料檔不再經過 page cache，
+      要保留原行為就明寫設定值
+    evidence: code
+    refs: [mdb105-flush-method-default, mdb106-flush-method-default, mdb114-flush-method-default]
+  - id: buffer-pool-size-max
+    text: >-
+      `SET GLOBAL innodb_buffer_pool_size` 能調到的上限是唯讀的 `innodb_buffer_pool_size_max`（11.4.13 在 64 位元預設 8 TiB）；
+      要線上調大到某個值，啟動時就要讓這個上限涵蓋它
+    evidence: code
+    refs: [mdb114-bp-size-max-default, mdb114-bp-size-max-readonly, mdb114-bp-size-max-val]
+  - id: open-files-shrinks-table-cache
+    text: >-
+      啟動時拿到的檔案數不夠時，server 會自動調低 `max_connections` 與 `table_open_cache`（最低 200），只在 `log_warnings` 大於 1 時記一行
+      Changed limits；設定值沒生效要先看 error log 與 `open_files_limit`（systemd 的 LimitNOFILE）
+    evidence: code
+    refs: [mdb114-tc-min, mdb114-tc-min-const, mdb114-tc-autosize, mdb114-changed-limits]
+  - id: temp-pool-default-off
+    text: "`--temp-pool` 在 11.4.13 預設關（而且標成 deprecated）：每個磁碟暫存表用 thread id 加計數器組成的獨一檔名，不重用固定的一組檔名"
+    evidence: code
+    refs: [mdb114-temp-pool-default, mdb114-temp-pool-slot, mdb114-temp-pool-unique]
 contracts:
   - scrape-within-interval
   - lookback
@@ -1436,6 +1478,27 @@ mechanisms:
     evidence: code
     refs: [my-trace-mdb-connerr-var, mariadb-conn-errors, spl-mdb114-threads-created]
 
+  - id: galera-replication
+    name: Galera 同步複寫（write set、certification、flow control）
+    resource: write set 大小、接收佇列
+    text: >-
+      交易在 commit 時把 write set 送給所有節點做 certification；節點套用跟不上時接收佇列變長，flow control 會暫停整個叢集的寫入
+    evidence: code
+    refs: [my-asp-gal-fc-paused, my-asp-gal-recv-queue, my-asp-gal-cert-failures]
+  - id: buffer-pool
+    name: InnoDB buffer pool
+    resource: free page、髒頁
+    text: >-
+      讀寫都要先拿到 buffer pool 的 page；沒有 free page 時前景執行緒要等刷頁或淘汰（Innodb_buffer_pool_wait_free），放不下工作集時讀取落到磁碟
+    evidence: code
+    refs: [my-asp-mdb-bp-wait-free, my-asp-mdb-bp-reads]
+  - id: binlog
+    name: Binary log
+    resource: binlog 檔案與磁碟、交易的 binlog cache（超過時寫到 tmpdir）
+    text: >-
+      每個交易的變更先進 binlog cache，commit 時寫進 binlog；舊檔依保留設定清除，清除前要確認沒有 replica 還需要
+    evidence: code
+    refs: [my-asp-mdb-purge-needs-slave, spl-mdb114-purge-check, my-asp-mdb-sync-binlog]
 failure_modes:
   - id: purge-blocked-by-read-view
     mechanism: purge
@@ -1557,6 +1620,61 @@ failure_modes:
     tested_by: ["exp-mysql-ha#s7a-max-connections"]
     refs: [exp-mysql-ha, my-trace-mdb-connerr-var]
 
+  # 第二批 Jira 試點（drafts/mariadb-jira/pilot-10-b.md）；都還沒釘 commit 或重現
+  - id: galera-writeset-too-large
+    mechanism: galera-replication
+    trigger: Galera 上單一交易改寫整張大表（issue：600 多萬列、2.3 GB 的表重編 id），write set 超過 `wsrep_max_ws_size`
+    effect: 交易被拒（ERROR 1105 Maximum writeset size exceeded）；exporter 的語句錯誤計數不分錯誤碼
+    detected_by: { signals: [statement-errors], blind_spots: [statement-error-code] }
+    distinguishes: false
+    evidence: inferred
+    sources: ["MDEV-37844"]
+  - id: galera-apply-stuck-on-certification
+    mechanism: galera-replication
+    trigger: "`wsrep_slave_threads` 大於 1 時，ALTER 與動到 FK 子表的 DML 同時進來"
+    effect: 節點停在 Waiting for certification，套用不前進
+    detected_by: { signals: [galera-flow-control, active-sessions] }
+    distinguishes: false
+    evidence: inferred
+    sources: ["MDEV-34784"]
+  - id: galera-sync-wait-lost-after-reset
+    mechanism: galera-replication
+    trigger: 連線池用 COM_CHANGE_USER 或 COM_RESET_CONNECTION 重置連線
+    effect: "`wsrep_sync_wait` 失效而沒有任何錯誤，之後的讀取可能拿到舊資料"
+    detected_by: { accepted: "不偵測：讀到舊資料不會留下任何計數；只能靠使用端確認版本或每次連線重設變數" }
+    evidence: inferred
+    sources: ["MDEV-41385"]
+  - id: buffer-pool-free-pages-exhausted
+    mechanism: buffer-pool
+    trigger: buffer pool 很大、背景刷頁沒有啟動，free page 快用完才開始淘汰
+    effect: 前景執行緒等 free page，出現停頓
+    detected_by: { signals: [innodb-pressure, throughput-drop] }
+    distinguishes: partial
+    evidence: inferred
+    sources: ["MDEV-33053"]
+  - id: binlog-not-purged-without-replica
+    mechanism: binlog
+    trigger: 升到 11.4 後沒有 replica 連著（`slave_connections_needed_for_purge` 預設 1）
+    effect: binlog 不再自動清除，手動 PURGE 也不動、沒有錯誤，磁碟慢慢被吃掉
+    detected_by: { signals: [binlog-growth, disk-space] }
+    evidence: code
+    refs: [my-asp-mdb-purge-needs-slave, spl-mdb114-purge-check]
+    sources: ["MDEV-34504"]
+  - id: binlog-cache-spill-with-full-tmpdir
+    mechanism: binlog
+    trigger: 交易超過 `binlog_cache_size` 而 tmpdir 滿了
+    effect: commit 寫出的 binlog 內容不完整，replica 套用時報錯停下
+    detected_by: { signals: [replication-error, disk-space], blind_spots: [disk-and-readonly-fs] }
+    distinguishes: false
+    evidence: inferred
+    sources: ["MDEV-37662"]
+  - id: thread-pool-threads-exhausted
+    mechanism: connections
+    trigger: "`thread_handling=pool-of-threads`，worker 都被卡住"
+    effect: thread 數很快衝到 `thread_pool_max_threads`，之後建不出 thread，新的工作排隊
+    detected_by: { accepted: "不偵測：卡片的連線訊號以預設的 one-thread-per-connection 為準，thread pool 的 status 沒有對應的訊號" }
+    evidence: inferred
+    sources: ["MDEV-26823"]
 bad_queries:
   - case: 全表掃描、缺索引
     signals: [slow-queries, slow-sql-visibility, buffer-pool-misses, throughput-drop]

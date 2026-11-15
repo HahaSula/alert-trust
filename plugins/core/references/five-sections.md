@@ -49,6 +49,8 @@ env 檔 target 的 `scraped_by` 是抓它的 ruler id。讀那個 ruler 的 `<sc
 count by (__name__) ({job="<job>"})                    # 現在有哪些 metric 族
 <collector_success_metric>{job="<job>"} == 0           # 哪個 collector 失敗；metric 名稱從卡片讀
 max_over_time(scrape_duration_seconds{job="<job>"}[7d])
+# 尖峰的形狀：每小時最大值的中位數；和上一行比，不到一半是少數幾次尖峰，八成以上是常態
+quantile_over_time(0.5, (max_over_time(scrape_duration_seconds{job="<job>"}[1h]))[7d:1h])
 ```
 
 ## 五段 {#sections}

@@ -25,7 +25,9 @@ the rest. Sections:
                         then keeps depends_on_runtime_labels)), route_label_value_mismatch (close names, e.g.
                         job="etcd" vs kube-etcd), critical_not_paging (critical rules whose only receivers are
                         email / empty), routed_to_empty_receiver (grouped), inhibit_no_equal, dms_route_without_rule
-                        (an alertname="Watchdog" route but no such rule), no_watchdog_rule, stage_unscraped (VictoriaMetrics: no scrape job for the vmagent or
+                        (an alertname="Watchdog" route but no such rule), no_watchdog_rule, rule_on_monitored_ruler / rule_needs_observer
+                        (placement: rules the catalog wants on an observer sit on the ruler they watch),
+                        stage_unscraped (VictoriaMetrics: no scrape job for the vmagent or
                         storage stage), critical_route_muted (the route a critical
                         rule takes has mute_time_intervals / active_time_intervals), replica_label_on_alerts
                         (external_labels carries a replica label and alerting has no alert_relabel_configs),
@@ -49,7 +51,7 @@ the rest. Sections:
 Answers file (env/<name>.sources.yaml) keys read here: job_names, producers, metrics, labels (as in
 check_metric_sources.py), plus version (the ruler's), target_versions.<job> (the database / server version behind a
 scrape job, e.g. mysql: "8.4.13"; check_coverage.py uses it for the cards' `versions`), ruler, external_observer,
-measured.<job>.{d_p99,d_max,up0_count,tau,max_consecutive_failures,failures_per_window} (k is 「觀察到的連續失敗」
+measured.<job>.{d_p99,d_max,up0_count,tau,max_consecutive_failures,failures_per_window,hourly_peak_p50,peak_hours} (k is 「觀察到的連續失敗」
 only with max_consecutive_failures; counts alone ask 「最長連續失敗幾次？」), notify_within (「X 內通知到人」; with
 critical rules and no notify_within, 「這類故障要在幾分鐘內通知到人？」 is mandatory), keep_range.<rule> (true: intentional, keep; false: may change),
 features.<job> (list of check_coverage.FEATURES that exist; an edited jobs[].features in the --merge inventory counts
@@ -1189,6 +1191,13 @@ def build(a) -> dict:
         ms = measured.get(name) or {}
         out["measured"] = ({"d_p99": ms.get("d_p99"), "d_max": ms.get("d_max"), "up0_count": ms.get("up0_count"), "from": "user"}
                            if ms else {"d_p99": None, "d_max": None, "up0_count": None, "from": "unknown"})
+        if ms and ms.get("hourly_peak_p50") is not None:
+            out["measured"]["hourly_peak_p50"] = ms["hourly_peak_p50"]
+            if ms.get("peak_hours") is not None:
+                out["measured"]["peak_hours"] = ms["peak_hours"]
+            shape = FC.peak_shape(ms.get("d_max"), ms["hourly_peak_p50"], ms.get("peak_hours"))
+            if shape:
+                out["measured"]["shape"] = shape
         for mk in ("max_consecutive_failures", "failures_per_window", "tau"):
             if ms.get(mk) is not None:
                 out["measured"][mk] = ms[mk]
@@ -1691,6 +1700,7 @@ def build(a) -> dict:
                                  + ("" if dms else "；alertmanager.yml 也沒有給 Watchdog 的 route" if am is not None else "")
                                  + "：ruler 或 Alertmanager 停掉時，沒有任何 alert 會說出來"})
 
+    inv["placement"] = placement_section(inv, answers, findings)
     # dedupe findings, drop internal keys
     seen, fl = set(), []
     for f in findings:
@@ -1761,13 +1771,20 @@ FAILRUN_Q = "最長連續失敗幾次？"
 # cost of being wrong when the answer is not known: 3 = a page is missed or the advice harms (a rule changed in
 # meaning, never fires), 2 = a time / option is wrong, 1 = a detail
 # external_labels keys that tell HA replicas of one Prometheus apart (prometheus-operator uses prometheus_replica)
+def _tau_of(inv: dict, job: str):
+    """The effective scrape_timeout of a job as written in the inventory (None when unknown)."""
+    j = next((j for j in inv.get("jobs") or [] if j["name"] == job), None)
+    t = (j or {}).get("timeout") or {}
+    return t.get("effective") or t.get("value")
+
+
 def job_label_rewritten(cfg: dict) -> bool:
     """True when some scrape job rewrites the `job` label (relabel to job, or honor_labels)."""
     return any(j.get("rewrites_job") for j in cfg.get("jobs") or [])
 
 
 REPLICA_LABELS = ("replica", "prometheus_replica", "__replica__")
-COST = {"version_gate": 3, "job_names": 3, "job_names_visible": 1, "--config": 3, "--alertmanager": 3, "version": 2, "external_observer": 2, "measured": 2,
+COST = {"version_gate": 3, "job_names": 3, "job_names_visible": 1, "placement": 2, "--config": 3, "--alertmanager": 3, "version": 2, "external_observer": 2, "measured": 2,
         "keep_range": 3, "producers": 2, "features": 2, "labels": 2, "must_ask": 3, "route_label": 3, "notify_within": 3,
         "failrun": 2}
 
@@ -1791,6 +1808,109 @@ def card_present(inv: dict) -> dict[str, str]:
         out.setdefault("vmagent", "ruler 是 vmalert／scrape 設定是 vmagent")
         out.setdefault("victoriametrics", "ruler 是 vmalert／scrape 設定是 vmagent")
     return out
+
+
+# ---------- placement: which ruler evaluates which rule file ----------
+# answers.yaml:
+#   rulers:    {<id>: {kind: prometheus | vmalert | thanos, observer: true|false}}   (optional)
+#   placement: {<rule file name or path>: <ruler id>}
+# Without an answer every rule file is assumed to be evaluated by one ruler (id `ruler`, assumed). A ruler marked
+# observer runs in another failure domain with its own notification path.
+# The catalog says where a signal has to be evaluated (signal.evaluate_on): `observer` signals of the ruler's own card
+# (is the ruler down, are its groups evaluated) cannot be judged by that ruler; `observer` signals of the other
+# components on the alert path (Alertmanager, vmagent, storage) need a ruler that still works when they fail.
+CHAIN_CARDS = ("prometheus", "vmalert", "thanos", "grafana_alerting", "alertmanager", "vmagent", "victoriametrics",
+               "victorialogs")
+DEFAULT_RULER = "ruler"
+
+
+def observer_rule_names() -> dict[str, dict]:
+    """alert name of a catalog rule template -> {card, signal} for signals that must be evaluated by an observer."""
+    out: dict[str, dict] = {}
+    for card in IU.cards():
+        if card["id"] not in CHAIN_CARDS:
+            continue
+        for s in card.get("signals") or []:
+            if s.get("evaluate_on") != "observer":
+                continue
+            for r in s.get("rules") or []:
+                out.setdefault(str(r).split("#")[-1], {"card": card["id"], "signal": s["id"]})
+    return out
+
+
+def placement_section(inv: dict, answers: dict, findings: list[dict]) -> dict:
+    kind = IU.val((inv.get("stack") or {}).get("ruler"))
+    rulers = {DEFAULT_RULER: {"kind": V(kind, (inv["stack"]["ruler"] or {}).get("from", "unknown")), "observer": False}}
+    for rid, r in (answers.get("rulers") or {}).items():
+        r = r if isinstance(r, dict) else {}
+        rulers[str(rid)] = {"kind": V(r.get("kind") or kind, "user" if r.get("kind") else "assumed"),
+                            "observer": bool(r.get("observer"))}
+    given = {str(k): str(v) for k, v in (answers.get("placement") or {}).items()}
+    files = []
+    for path in (inv.get("sources") or {}).get("rules") or []:
+        rid = given.get(path) or given.get(os.path.basename(path))
+        if rid:
+            rulers.setdefault(rid, {"kind": V(kind, "assumed"), "observer": False})
+            files.append({"file": path, "ruler": V(rid, "user")})
+        else:
+            files.append({"file": path, "ruler": V(DEFAULT_RULER, "assumed", note="沒有回答：假設所有 rule 檔由同一台 ruler 評估")})
+    used = {IU.val(f["ruler"]) for f in files}
+    rulers = {k: v for k, v in rulers.items() if k in used or k in (answers.get("rulers") or {})}
+    by_file = {f["file"]: IU.val(f["ruler"]) for f in files}
+    names = observer_rule_names()
+    job_pat = RULER_SELF.get(kind, (None, None))[0]
+    on_self, on_chain = [], []
+    for r in inv.get("rules") or []:
+        if r.get("kind") != "alert":
+            continue
+        rid = by_file.get(r.get("file"), DEFAULT_RULER)
+        ru = rulers.get(rid) or {"observer": False, "kind": V(kind, "assumed")}
+        if ru["observer"]:
+            continue
+        rkind = IU.val(ru["kind"])
+        hit = names.get(r["name"])
+        if hit and hit["card"] == rkind:
+            on_self.append({"rule": r["name"], "ruler": rid, **hit})
+        elif hit:
+            on_chain.append({"rule": r["name"], "ruler": rid, **hit})
+        elif job_pat and r.get("detects_absence") and any(re.fullmatch(job_pat, str(j) or "") for j in (IU.val(r.get("jobs_used")) if isinstance(r.get("jobs_used"), dict)
+                                                                     else r.get("jobs_used")) or []):
+            on_self.append({"rule": r["name"], "ruler": rid, "card": rkind, "signal": "（偵測 ruler 的 job 消失）"})
+    assumed = any(f["ruler"]["from"] == "assumed" for f in files)
+    # another ruler instance settles the `self` group only when the rule is not on a ruler of the same id it watches:
+    # with one (assumed) ruler every such rule sits on the ruler it monitors
+    single = len(used) <= 1
+    out = {"rulers": rulers, "files": files, "assumed": assumed}
+    if on_self and single:
+        out["on_monitored_ruler"] = on_self
+        ns = sorted({x["rule"] for x in on_self})
+        findings.append({"kind": "rule_on_monitored_ruler", "rules": ns, "assumed": assumed,
+                         "fact": f"{len(ns)} 條監控 ruler 自己的 rule 由同一台 ruler 評估"
+                                 + ("（假設：所有 rule 檔在同一台；沒有回答擺放）" if assumed else "")
+                                 + f"：這台停掉或評估卡住時，這些 rule 也一起停，不會響。卡片把這些訊號標成要由外部觀察者評估："
+                                   f"{', '.join(ns[:8])}{' 等' if len(ns) > 8 else ''}"})
+    if on_chain:
+        out["needs_observer"] = on_chain
+        ns = sorted({x["rule"] for x in on_chain})
+        cards = sorted({x["card"] for x in on_chain})
+        findings.append({"kind": "rule_needs_observer", "rules": ns, "cards": cards, "assumed": assumed,
+                         "fact": f"{len(ns)} 條監控 {'、'.join(cards)} 的 rule 放在不是外部觀察者的 ruler 上"
+                                 + ("（假設）" if assumed else "")
+                                 + f"：這些元件在告警的路徑上，它們壞了以後這台 ruler 的 alert 可能查不到資料或送不出去；"
+                                   f"卡片標成由外部觀察者評估：{', '.join(ns[:8])}{' 等' if len(ns) > 8 else ''}"})
+    return out
+
+
+def placement_md(pl: dict) -> list[str]:
+    L = ["| rule 檔 | 由哪台 ruler 評估 |", "|---|---|"]
+    L += [f"| {os.path.basename(f['file'])} | {_v(f['ruler'])} |" for f in pl["files"]]
+    L += ["", "| ruler | 種類 | 外部觀察者 |", "|---|---|---|"]
+    L += [f"| {rid} | {_v(r['kind'])} | {'是' if r['observer'] else '不是'} |" for rid, r in pl["rulers"].items()]
+    for key, text in (("on_monitored_ruler", "監控 ruler 自己、卻由同一台評估"), ("needs_observer", "監控告警路徑上的元件、卻不在外部觀察者上")):
+        if pl.get(key):
+            ns = sorted({x["rule"] for x in pl[key]})
+            L += ["", f"- {text}（{len(ns)} 條）：{', '.join(ns)}"]
+    return L
 
 
 def is_vm_stack(inv: dict) -> bool:
@@ -2025,7 +2145,7 @@ FAILRUN_ALIASES = {"failrun", "max_consecutive_failures"}
 # answer keys that are not question ids but are read from answers.yaml (a 「不知道」 there is a real answer)
 ANSWER_KEYS = {"job_names", "--config", "--alertmanager", "version", "external_observer", "measured", "producers",
                "features", "labels", "--config-complete", "notify_within", "latency", "dedup_interval", "eval_delay",
-               "exporter_deadline", "ruler", "target_versions"} | FAILRUN_ALIASES
+               "exporter_deadline", "ruler", "target_versions", "placement", "rulers"} | FAILRUN_ALIASES
 # a bare `keep_range` in unknown is not applied to every rule (keep_range.<rule> is per rule): it is reported
 
 
@@ -2138,6 +2258,17 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
                    **({"mandatory": True, "mandatory_note": "沒有外部觀察者時，ruler 與 Alertmanager 自己停掉沒有人知道；"
                                                             "前兩輪沒問到，這輪要問（不問就在 answers.yaml 的 unknown 寫明）"}
                       if int(inv.get("round") or 0) >= 2 else {})})
+    pl = inv.get("placement") or {}
+    if pl.get("assumed") and (pl.get("on_monitored_ruler") or pl.get("needs_observer")):
+        ns = sorted({x["rule"] for k in ("on_monitored_ruler", "needs_observer") for x in pl.get(k) or []})
+        fnames = "、".join(os.path.basename(f["file"]) for f in pl["files"])
+        qs.append({"id": "placement", "cost_key": "placement",
+                   "q": f"{fnames} 是同一台 ruler 在評估嗎？監控體系自己的 {len(ns)} 條 rule（例如 {'、'.join(ns[:3])}）"
+                        "有沒有放在另一台 ruler 或外部觀察者？在 answers.yaml 寫 "
+                        "`placement: {<rule 檔名>: <ruler 名稱>}`，外部觀察者另寫 `rulers: {<名稱>: {observer: true}}`",
+                   "changes": ["ruler 停掉時這些 rule 會不會響", "自我監控是不是真的獨立", "Watchdog 該放哪一台"],
+                   "affects": len(ns), "findings": cnt("rule_on_monitored_ruler", "rule_needs_observer"),
+                   "answer_key": "placement"})
     jobs_ranged = sorted({j for r in ranged for j in (r["jobs_matched"].get("value") or [])})
     unmeasured = [j["name"] for j in inv["jobs"] if j["name"] in jobs_ranged and (j.get("measured") or {}).get("from") == "unknown"]
     if unmeasured:
@@ -2147,8 +2278,13 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
                         f"`max by (job) (max_over_time(scrape_duration_seconds{{job=~\"{sel}\"}}[7d]))`、"
                         f"`sum by (job) (count_over_time((up{{job=~\"{sel}\"}} == 0)[7d:]))`；"
                         f"k 要的是連續失敗，次數不夠：再貼 `{FC.consecutive_query(sel, IU.val(next((j.get('interval') for j in inv['jobs'] if j['name'] == unmeasured[0]), None)) or '<S>', 2)}`"
-                        "（1 = 出現過連續 2 次失敗）",
-                   "changes": ["scrape_timeout", "range 視窗", "k"], "affects": len(ranged),
+                        "（1 = 出現過連續 2 次失敗）。"
+                        "一個最大值看不出尖峰是偶發還是常態，再貼每小時最大值的中位數 "
+                        f"`{FC.peak_shape_queries(sel, _tau_of(inv, unmeasured[0]))['hourly_peak_p50']}`"
+                        + (f"，與超過 0.8·τ 的小時數 `{FC.peak_shape_queries(sel, _tau_of(inv, unmeasured[0]))['peak_hours']}`"
+                           if "peak_hours" in FC.peak_shape_queries(sel, _tau_of(inv, unmeasured[0])) else "")
+                        + "（寫進 answers.yaml 的 `measured.<job>.hourly_peak_p50`、`peak_hours`）",
+                   "changes": ["scrape_timeout", "range 視窗", "k", "尖峰是偶發還是常態"], "affects": len(ranged),
                    "findings": cnt("timeout_gt_interval", "exporter_deadline_ge_timeout"), "answer_key": "measured"})
     for f in [f for f in findings if f["kind"] == "measured_contradiction"]:
         qs.append({"id": f"measured_check.{f['job']}", "cost_key": "measured",
@@ -2348,7 +2484,8 @@ def _v(node) -> str:
     s = "**不知道**" if v in (None, "unknown") else (", ".join(map(str, v)) if isinstance(v, list) else str(v))
     if v == []:
         s = "（空）"
-    tag = {"file": "檔案", "default": "預設", "hint": "**推測**", "user": "使用者", "unknown": "**未知**"}.get(node["from"], node["from"])
+    tag = {"file": "檔案", "default": "預設", "hint": "**推測**", "user": "使用者", "unknown": "**未知**",
+           "assumed": "**假設**"}.get(node["from"], node["from"])
     extra = f"，實際 {node['effective']}" if node.get("effective") and node["effective"] != v else ""
     return f"{s}{extra}（{tag}{'，已確認' if node.get('confirmed') else ''}）"
 
@@ -2417,6 +2554,12 @@ def markdown(inv) -> str:
         L.append(f"| {j['name']} | {_v(j['interval'])} | {_v(j['timeout'])} | {j.get('targets') if j.get('targets') is not None else '—'} | {lab} | "
                  f"{', '.join(j.get('dropped_metrics') or []) or '—'} | {_v(j['exporter'])} | {_v(j['exporter_deadline'])} | {meas} |")
     un = inv["unscraped_components"]
+    shapes = [(j["name"], j["measured"]["shape"]) for j in inv["jobs"] if (j.get("measured") or {}).get("shape")]
+    if shapes:
+        L += ["", "尖峰的形狀（一個最大值看不出偶發還是常態）：", ""]
+        L += [f"- {name}：{s['text']}" for name, s in shapes]
+    if inv.get("placement"):
+        L += ["", "## Rule 擺放（哪個 rule 檔由哪台 ruler 評估）", "", *placement_md(inv["placement"])]
     L += ["", "## 沒有被抓的元件", ""]
     if isinstance(un, list):
         L += [f"- {u['fact']}" for u in un] or ["- （沒有）"]

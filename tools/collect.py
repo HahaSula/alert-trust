@@ -192,6 +192,8 @@ def prom_peaks(w: str) -> dict[str, str]:
     """Peak queries against a Prometheus (ported from prometheus-selfcheck inventory)."""
     return {
         "scrape_duration_peak": f"max by (job) (max_over_time(scrape_duration_seconds[{w}]))",
+        # median of the hourly maxima: next to the single max it tells a rare spike from the daily norm
+        "scrape_duration_hourly_peak_p50": f"max by (job) (quantile_over_time(0.5, (max_over_time(scrape_duration_seconds[1h]))[{w}:1h]))",
         "scrape_duration_now": "max by (job) (scrape_duration_seconds)",
         "scrape_samples_peak": f"max by (job) (max_over_time(scrape_samples_scraped[{w}]))",
         "up_min": f"min by (job) (min_over_time(up[{w}]))",
@@ -241,6 +243,8 @@ def vm_peaks(w: str) -> dict[str, str]:
     """Peak queries against VictoriaMetrics. Results exist only for components whose /metrics are scraped into it."""
     return {
         "scrape_duration_peak": f"max by (job) (max_over_time(scrape_duration_seconds[{w}]))",
+        # median of the hourly maxima: next to the single max it tells a rare spike from the daily norm
+        "scrape_duration_hourly_peak_p50": f"max by (job) (quantile_over_time(0.5, (max_over_time(scrape_duration_seconds[1h]))[{w}:1h]))",
         "scrape_samples_peak": f"max by (job) (max_over_time(scrape_samples_scraped[{w}]))",
         "up_min": f"min by (job) (min_over_time(up[{w}]))",
         "vmalert_iteration_duration_peak": f'max by (group) (max_over_time(vmalert_iteration_duration_seconds{{quantile="1"}}[{w}]))',

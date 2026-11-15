@@ -282,5 +282,75 @@ class VictoriaMetricsStagesTest(unittest.TestCase):
         self.assertNotIn("must_ask.vmagent.remote-write-target", [q["id"] for q in inv["questions"]])
 
 
+SELF_RULES = """groups:
+  - name: meta
+    rules:
+      - alert: PrometheusDown
+        expr: up{job="prometheus"} == 0
+        labels: {severity: critical}
+      - alert: RuleEvaluationFailures
+        expr: increase(prometheus_rule_evaluation_failures_total[5m]) > 0
+        labels: {severity: critical}
+      - alert: AlertmanagerScrapeDown
+        expr: up{job="alertmanager"} == 0
+        labels: {severity: critical}
+      - alert: MyOwnSelfCheck
+        expr: absent(up{job="prometheus"})
+        labels: {severity: critical}
+"""
+SELF_CFG = """global: {scrape_interval: 30s, evaluation_interval: 30s}
+rule_files: [rules.yml]
+alerting:
+  alertmanagers: [{static_configs: [{targets: ["am:9093"]}]}]
+scrape_configs:
+  - job_name: prometheus
+    static_configs: [{targets: ["localhost:9090"]}]
+  - job_name: alertmanager
+    static_configs: [{targets: ["am:9093"]}]
+  - job_name: mongodb
+    static_configs: [{targets: ["mongo-1:9216"]}]
+"""
+
+
+class PlacementTest(unittest.TestCase):
+    def kinds(self, inv):
+        return {f["kind"]: f for f in inv["findings_from_files"] if f["kind"].startswith("rule_")}
+
+    def test_default_one_ruler_is_an_assumption(self):
+        inv = build(SELF_CFG, rules=SELF_RULES + RULES.split("rules:\n", 1)[1].join(["  - name: db\n    rules:\n", ""]))
+        pl = inv["placement"]
+        self.assertTrue(pl["assumed"])
+        self.assertEqual([f["ruler"] for f in pl["files"]], [{"value": "ruler", "from": "assumed",
+                                                              "note": "沒有回答：假設所有 rule 檔由同一台 ruler 評估"}])
+        k = self.kinds(inv)
+        # template names the catalog wants on an observer, plus a renamed rule that detects the ruler's job vanishing
+        self.assertEqual(k["rule_on_monitored_ruler"]["rules"], ["MyOwnSelfCheck", "PrometheusDown", "RuleEvaluationFailures"])
+        self.assertTrue(k["rule_on_monitored_ruler"]["assumed"])
+        self.assertEqual(k["rule_needs_observer"]["rules"], ["AlertmanagerScrapeDown"])
+        self.assertEqual(k["rule_needs_observer"]["cards"], ["alertmanager"])
+        self.assertNotIn("UpRule", k["rule_on_monitored_ruler"]["rules"])     # a database rule is fine on this ruler
+        self.assertIn("placement", [q["id"] for q in inv["questions"]])
+
+    def test_observer_placement_settles_both(self):
+        inv = build(SELF_CFG, {"rulers": {"meta": {"kind": "prometheus", "observer": True}},
+                               "placement": {"rules.yml": "meta"}}, rules=SELF_RULES)
+        self.assertEqual(self.kinds(inv), {})
+        self.assertFalse(inv["placement"]["assumed"])
+        self.assertTrue(inv["placement"]["rulers"]["meta"]["observer"])
+        self.assertNotIn("placement", [q["id"] for q in inv["questions"]])
+
+    def test_named_but_not_observer_keeps_the_findings(self):
+        inv = build(SELF_CFG, {"placement": {"rules.yml": "prom-a"}}, rules=SELF_RULES)
+        k = self.kinds(inv)
+        self.assertIn("rule_on_monitored_ruler", k)
+        self.assertFalse(k["rule_on_monitored_ruler"]["assumed"])
+        self.assertIn("rule_needs_observer", k)
+
+    def test_no_findings_without_chain_rules(self):
+        inv = build(config())
+        self.assertEqual(self.kinds(inv), {})
+        self.assertNotIn("placement", [q["id"] for q in inv["questions"]])
+
+
 if __name__ == "__main__":
     unittest.main()

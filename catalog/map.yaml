@@ -898,6 +898,14 @@ cards:
     - metadata-lock-info
     - query-exporter-account
     - query-exporter-expiration
+    - sysdate-not-constant
+    - parallel-apply-needs-group-commit
+    - semisync-wait-point-default
+    - redo-log-size-default
+    - flush-method-default-changed
+    - buffer-pool-size-max
+    - open-files-shrinks-table-cache
+    - temp-pool-default-off
     observe:
     - exporter-up
     - db-up

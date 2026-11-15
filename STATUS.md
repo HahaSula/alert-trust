@@ -81,6 +81,12 @@ v0.4.0 之後再補的（2026-11-15）：新發現 `critical_route_muted`（crit
 
 VictoriaMetrics 的環境模型改成三段（2026-11-15）：盤點多一個 `stages`（採集 vmagent、儲存與查詢、rule 評估 vmalert），各有自己的版本、寫到哪裡／查詢來源、有沒有被 scrape；三張卡各加一題必問題（`vmagent#remote-write-target`、`victoriametrics#mode`、`vmalert#datasource`）；vmagent 與儲存沒有 scrape job 時也算沒被抓；rule 檔是 vmalert 的而 config 只有 scrape 設定時當成 vmagent 的設定（原本只看檔名）。還沒做：single／cluster 的回答沒有接到「cluster 才有的 rule 不適用」的判斷；vmalert 查詢來源與 vmagent 寫入目的地是不是同一套只列出來、沒有比對；時間契約仍只用 L 與 dedup 兩個數字。
 
+Rule 擺放（2026-11-15）：盤點多一個 `placement`（每個 rule 檔由哪台 ruler 評估；沒有回答時假設同一台），依卡片的 `evaluate_on: observer` 找出兩類 rule：`rule_on_monitored_ruler`（監控 ruler 自己、卻由同一台評估）與 `rule_needs_observer`（監控告警路徑上的元件、卻不在外部觀察者上）；答案寫在 answers.yaml 的 `placement` 與 `rulers`。限制：靠 alert 名稱和範本相同來認（改過名字的只認得「偵測 ruler 的 job 消失」這一種）；只到 rule 檔，不到 group；ruler 的查詢來源與通知目的地還沒有進這一層；`check_coverage.py`（有 env.yaml 時）原本就有自己的擺放判斷，兩邊還沒有合併。
+
+Scrape 耗時的量法（2026-11-15）：原本只給 7 天的 p99 與一個 `max_over_time`，看不出尖峰是偶發還是常態。新增兩個查詢：每小時最大值的中位數、超過 0.8·τ 的小時數（`fit_contracts.peak_shape_queries`）；回答寫進 `measured.<job>.hourly_peak_p50`／`peak_hours` 後，盤點會寫出判讀（中位數不到最大值的一半是少數幾次尖峰，八成以上是常態）。`collect.py`、基準值頁、「從哪裡開始」、prometheus skill 都已更新。限制：判讀的門檻（50%、80%）是自訂的例子，沒有實驗依據；判讀還沒有接到 τ／S 的建議值；要看「發生在哪個時段」仍要自己畫圖。
+
+MariaDB 卡的 usage 與失效模式第二批（2026-11-15）：第一批 Jira 試點標「新 usage」的 8 筆，逐筆找原始碼依據後寫進卡片的 `usage`（23 個釘版本的參考，`gen_code_refs.py` 逐一核對過關鍵字）；每一筆都只留原始碼能證明的部分，issue 裡的效能數字、因果說法沒有寫進去。第二批 Jira 掃描（Galera、備份與 binlog、buffer pool 與暫存空間、thread pool，10 張，在 repo 外的 `drafts/`）加了 3 個機制（galera-replication、buffer-pool、binlog）與 7 個失效模式（6 個推論、1 個讀碼）。MariaDB 卡現在 9 個機制、21 個失效模式；G1 29 → 25，G2 1 → 3（兩條寫明接受不偵測：`wsrep_sync_wait` 失效、thread pool 用完）。還沒做：其他資料庫的同樣整理；14 個推論的失效模式要釘 commit 或做小 lab 才能升級；第二批的修正版本只看了 Jira 欄位。
+
 Review 找到、還沒解決的問題：
 
 - E1 很鬆：實測項目只靠少數實驗 ref，單一 ref 最多背 72 項。P2 的 `tested_by` 已能指到假設，但目前只有 MariaDB 卡的 11 項（G7 = 574 是剩下的量）。

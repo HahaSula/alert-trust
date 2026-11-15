@@ -36,7 +36,7 @@ argument-hint: "[snapshot-dir] [component-id]"
 沒有快照時，請使用者在 UI 查下面的查詢，一次一組：
 
 1. **規模與版本**：版本、部署方式與 CPU／memory limit、`prometheus_tsdb_head_series`、`rate(prometheus_tsdb_head_samples_appended_total[5m])`。
-2. **尖峰**（最重要）：`max by (job) (max_over_time(scrape_duration_seconds[7d]))`、`topk(10, max_over_time(prometheus_rule_group_last_duration_seconds[7d]))`、`sum by (rule_group) (increase(prometheus_rule_group_iterations_missed_total[7d])) > 0`，以及各 job 的 `scrape_interval`、各 group 的 `interval`。
+2. **尖峰**（最重要）：`max by (job) (max_over_time(scrape_duration_seconds[7d]))`，再加每小時最大值的中位數 `max by (job) (quantile_over_time(0.5, (max_over_time(scrape_duration_seconds[1h]))[7d:1h]))`（單一個最大值看不出偶發還是常態：中位數不到最大值的一半是少數幾次尖峰，八成以上是每小時都這樣；`collect.py` 的 `scrape_duration_hourly_peak_p50`）、`topk(10, max_over_time(prometheus_rule_group_last_duration_seconds[7d]))`、`sum by (rule_group) (increase(prometheus_rule_group_iterations_missed_total[7d])) > 0`，以及各 job 的 `scrape_interval`、各 group 的 `interval`。
 3. **Rule**：rule 檔或 `/api/v1/rules`，至少最重要的幾條。
 
 ## 0. 先決條件（不能跳過）

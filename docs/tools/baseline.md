@@ -78,6 +78,7 @@
 | 步驟 | 量什麼／算什麼 | 查詢或公式 |
 |---|---|---|
 | 1. 量耗時分布 | 每個 job 的 p50、p99、max | `quantile_over_time(0.99, scrape_duration_seconds[7d])`、`max_over_time(scrape_duration_seconds[7d])`，`max by (job)` |
+| 1b. 看尖峰的形狀 | 一個最大值看不出是偶發一次還是每天都有：每小時最大值的中位數、超過 0.8·τ 的小時數 | `quantile_over_time(0.5, (max_over_time(scrape_duration_seconds[1h]))[7d:1h])`；`count_over_time((max_over_time(scrape_duration_seconds[1h]) > <0.8·τ>)[7d:1h])`。中位數不到最大值的一半是少數幾次尖峰（先查是哪幾次）；到 80% 以上代表最大值就是日常，τ 與 S 照它定；要看時段就把 `max_over_time(scrape_duration_seconds[1h])` 畫成 7 天的圖 |
 | 2. 量失敗 | 逾時次數與最長連續失敗 | `sum_over_time((up == bool 0)[7d:30s])`（30s 換成這個 job 的 S）算次數；連續幾次看 `up` 的圖；exporter 自己的耗時（例如 `redis_exporter_last_scrape_duration_seconds`） |
 | 3. 檢查數據是否被截斷 | `d_max ≈ 現在的 τ` 代表那些 scrape 逾時了，真正的耗時不知道 | 先暫時放寬 τ（仍 < S）或看 exporter 自己的耗時 metric |
 | 4. 選 S | 從偵測速度與成本決定（下一節）；硬性條件 `d_max ≤ S`，建議 `d_max ≤ 0.8 S` | [`d ≤ S`](../contracts.md#scrape-within-interval) |

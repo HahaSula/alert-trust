@@ -442,6 +442,10 @@ def end_to_end(a, inv: dict, fit: dict | None, ms_rows: list[dict]) -> list[str]
     un = inv.get("unscraped_components")
     if isinstance(un, list) and un:
         sm.append("沒被抓：" + "、".join(u.get("target") or u["component"] for u in un))
+    for x in f:
+        if x["kind"] == "rule_on_monitored_ruler":
+            sm.append(f"{len(x['rules'])} 條監控 ruler 自己的 rule 和它放在同一台" + ("（假設）" if x.get("assumed") else "")
+                      + "：那台停了這些也不會響")
     parts.append(("自我監控（Watchdog／DMS／觀察者）", "；".join(sm) or "有 Watchdog 與專用 route（依檔案）"))
     if any(x["kind"] in ("no_watchdog_rule", "dms_route_without_rule") for x in f):
         partial.append("ruler 或 Alertmanager 停掉時沒有人知道")

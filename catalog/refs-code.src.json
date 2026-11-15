@@ -724,5 +724,143 @@
   "v0.34.2",
   "notify/mute.go",
   "func (tms TimeMuteStage) Exec("
+ ],
+ "mdb114-sysdate-not-const": [
+  "MariaDB/server",
+  "mariadb-11.4.13",
+  "sql/item_timefunc.h",
+  "bool const_item() const override { return 0; }"
+ ],
+ "mdb114-sysdate-rand-table": [
+  "MariaDB/server",
+  "mariadb-11.4.13",
+  "sql/item_timefunc.h",
+  "table_map used_tables() const override { return RAND_TABLE_BIT; }"
+ ],
+ "mdb114-sysdate-is-now": [
+  "MariaDB/server",
+  "mariadb-11.4.13",
+  "sql/sql_lex.cc",
+  "Item *item= global_system_variables.sysdate_is_now == 0 ?"
+ ],
+ "mdb114-par-group-commit-id": [
+  "MariaDB/server",
+  "mariadb-11.4.13",
+  "sql/rpl_parallel.cc",
+  "!(gtid_flags & Gtid_log_event::FL_GROUP_COMMIT_ID) ||"
+ ],
+ "mdb114-par-transactional": [
+  "MariaDB/server",
+  "mariadb-11.4.13",
+  "sql/rpl_parallel.cc",
+  "if (!(gtid_flags & Gtid_log_event::FL_TRANSACTIONAL) ||"
+ ],
+ "mdb114-trans-groups-count": [
+  "MariaDB/server",
+  "mariadb-11.4.13",
+  "sql/log_event_server.cc",
+  "mi->total_trans_groups++;"
+ ],
+ "mdb114-semisync-waitpoint-names": [
+  "MariaDB/server",
+  "mariadb-11.4.13",
+  "sql/sys_vars.cc",
+  "{\"AFTER_SYNC\", \"AFTER_COMMIT\", NullS}"
+ ],
+ "mdb114-semisync-waitpoint-default": [
+  "MariaDB/server",
+  "mariadb-11.4.13",
+  "sql/sys_vars.cc",
+  "repl_semisync_wait_point, DEFAULT(1),"
+ ],
+ "mdb114-semisync-cond-per-thd": [
+  "MariaDB/server",
+  "mariadb-11.4.13",
+  "sql/semisync_master.cc",
+  "THD_ENTER_COND(thd, &thd->COND_wakeup_ready, &LOCK_binlog,"
+ ],
+ "mdb114-log-file-size-default": [
+  "MariaDB/server",
+  "mariadb-11.4.13",
+  "storage/innobase/handler/ha_innodb.cc",
+  "96 << 20, 4 << 20, std::numeric_limits<ulonglong>::max(), 4096);"
+ ],
+ "mdb106-flush-method-default": [
+  "MariaDB/server",
+  "mariadb-10.6.28",
+  "storage/innobase/handler/ha_innodb.cc",
+  "NULL, NULL, IF_WIN(SRV_ALL_O_DIRECT_FSYNC, SRV_O_DIRECT),"
+ ],
+ "mdb105-flush-method-default": [
+  "MariaDB/server",
+  "mariadb-10.5.29",
+  "storage/innobase/handler/ha_innodb.cc",
+  "NULL, NULL, IF_WIN(SRV_ALL_O_DIRECT_FSYNC, SRV_FSYNC),"
+ ],
+ "mdb114-flush-method-default": [
+  "MariaDB/server",
+  "mariadb-11.4.13",
+  "storage/innobase/handler/ha_innodb.cc",
+  "static constexpr ulong innodb_flush_method_default = IF_WIN(6,4);"
+ ],
+ "mdb114-bp-size-max-default": [
+  "MariaDB/server",
+  "mariadb-11.4.13",
+  "storage/innobase/include/buf0buf.h",
+  "static constexpr size_t size_in_bytes_max_default{8ULL << 40},"
+ ],
+ "mdb114-bp-size-max-readonly": [
+  "MariaDB/server",
+  "mariadb-11.4.13",
+  "storage/innobase/handler/ha_innodb.cc",
+  "static MYSQL_SYSVAR_SIZE_T(buffer_pool_size_max, buf_pool.size_in_bytes_max,"
+ ],
+ "mdb114-bp-size-max-val": [
+  "MariaDB/server",
+  "mariadb-11.4.13",
+  "storage/innobase/handler/ha_innodb.cc",
+  "MYSQL_SYSVAR_NAME(buffer_pool_size).max_val= buf_pool.size_in_bytes_max;"
+ ],
+ "mdb114-tc-min": [
+  "MariaDB/server",
+  "mariadb-11.4.13",
+  "sql/mysqld.cc",
+  "min_tc_size= MY_MIN(tc_size, TABLE_OPEN_CACHE_MIN);"
+ ],
+ "mdb114-tc-min-const": [
+  "MariaDB/server",
+  "mariadb-11.4.13",
+  "sql/sql_const.h",
+  "#define TABLE_OPEN_CACHE_MIN    200"
+ ],
+ "mdb114-tc-autosize": [
+  "MariaDB/server",
+  "mariadb-11.4.13",
+  "sql/mysqld.cc",
+  "SYSVAR_AUTOSIZE_IF_CHANGED(tc_size,"
+ ],
+ "mdb114-changed-limits": [
+  "MariaDB/server",
+  "mariadb-11.4.13",
+  "sql/mysqld.cc",
+  "\"Changed limits: max_open_files:"
+ ],
+ "mdb114-temp-pool-default": [
+  "MariaDB/server",
+  "mariadb-11.4.13",
+  "sql/mysqld.cc",
+  "&use_temp_pool, &use_temp_pool, 0, GET_BOOL, NO_ARG, 0,"
+ ],
+ "mdb114-temp-pool-slot": [
+  "MariaDB/server",
+  "mariadb-11.4.13",
+  "sql/sql_select.cc",
+  "if (use_temp_pool && !(test_flags & TEST_KEEP_TMP_TABLES))"
+ ],
+ "mdb114-temp-pool-unique": [
+  "MariaDB/server",
+  "mariadb-11.4.13",
+  "sql/sql_select.cc",
+  "\"%s-%s-%lx-%llx-%x\""
  ]
 }

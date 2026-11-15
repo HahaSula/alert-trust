@@ -848,3 +848,164 @@ refs:
     file: "notify/mute.go"
     line: 141
     url: "https://github.com/prometheus/alertmanager/blob/v0.34.2/notify/mute.go#L141"
+  mdb114-sysdate-not-const:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-11.4.13"
+    file: "sql/item_timefunc.h"
+    line: 953
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/item_timefunc.h#L953"
+  mdb114-sysdate-rand-table:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-11.4.13"
+    file: "sql/item_timefunc.h"
+    line: 961
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/item_timefunc.h#L961"
+  mdb114-sysdate-is-now:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-11.4.13"
+    file: "sql/sql_lex.cc"
+    line: 9796
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sql_lex.cc#L9796"
+  mdb114-par-group-commit-id:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-11.4.13"
+    file: "sql/rpl_parallel.cc"
+    line: 3501
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/rpl_parallel.cc#L3501"
+  mdb114-par-transactional:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-11.4.13"
+    file: "sql/rpl_parallel.cc"
+    line: 3536
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/rpl_parallel.cc#L3536"
+  mdb114-trans-groups-count:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-11.4.13"
+    file: "sql/log_event_server.cc"
+    line: 3154
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/log_event_server.cc#L3154"
+  mdb114-semisync-waitpoint-names:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-11.4.13"
+    file: "sql/sys_vars.cc"
+    line: 3794
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sys_vars.cc#L3794"
+  mdb114-semisync-waitpoint-default:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-11.4.13"
+    file: "sql/sys_vars.cc"
+    line: 3803
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sys_vars.cc#L3803"
+  mdb114-semisync-cond-per-thd:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-11.4.13"
+    file: "sql/semisync_master.cc"
+    line: 900
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/semisync_master.cc#L900"
+  mdb114-log-file-size-default:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-11.4.13"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 19527
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/handler/ha_innodb.cc#L19527"
+  mdb106-flush-method-default:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-10.6.28"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 18934
+    url: "https://github.com/MariaDB/server/blob/mariadb-10.6.28/storage/innobase/handler/ha_innodb.cc#L18934"
+  mdb105-flush-method-default:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-10.5.29"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 19238
+    url: "https://github.com/MariaDB/server/blob/mariadb-10.5.29/storage/innobase/handler/ha_innodb.cc#L19238"
+  mdb114-flush-method-default:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-11.4.13"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 366
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/handler/ha_innodb.cc#L366"
+  mdb114-bp-size-max-default:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-11.4.13"
+    file: "storage/innobase/include/buf0buf.h"
+    line: 1175
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/include/buf0buf.h#L1175"
+  mdb114-bp-size-max-readonly:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-11.4.13"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 3599
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/handler/ha_innodb.cc#L3599"
+  mdb114-bp-size-max-val:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-11.4.13"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 3717
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/handler/ha_innodb.cc#L3717"
+  mdb114-tc-min:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-11.4.13"
+    file: "sql/mysqld.cc"
+    line: 4222
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L4222"
+  mdb114-tc-min-const:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-11.4.13"
+    file: "sql/sql_const.h"
+    line: 145
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sql_const.h#L145"
+  mdb114-tc-autosize:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-11.4.13"
+    file: "sql/mysqld.cc"
+    line: 4271
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L4271"
+  mdb114-changed-limits:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-11.4.13"
+    file: "sql/mysqld.cc"
+    line: 4282
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L4282"
+  mdb114-temp-pool-default:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-11.4.13"
+    file: "sql/mysqld.cc"
+    line: 7052
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/mysqld.cc#L7052"
+  mdb114-temp-pool-slot:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-11.4.13"
+    file: "sql/sql_select.cc"
+    line: 21882
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sql_select.cc#L21882"
+  mdb114-temp-pool-unique:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-11.4.13"
+    file: "sql/sql_select.cc"
+    line: 21891
+    url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sql_select.cc#L21891"

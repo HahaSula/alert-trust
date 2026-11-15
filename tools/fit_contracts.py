@@ -215,6 +215,47 @@ def consecutive_query(job_re: str, S, n: int = 2, span: str = "7d") -> str:
     return (f'max by (job) (max_over_time(min_over_time((up{{job=~"{job_re}"}} == bool 0)[{w}:{st}])[{span}:{st}]))')
 
 
+def peak_shape_queries(job_re: str, tau=None, span: str = "7d") -> dict[str, str]:
+    """PromQL that shows the shape of scrape-duration peaks, which one max_over_time over the whole span cannot:
+      hourly_peak_p50   median of the hourly maxima: what a typical hour's worst scrape looks like
+      peak_hours        how many hours of the span had a scrape above 0.8·τ (only when τ is known)
+    A max far above hourly_peak_p50 is a rare spike; a max close to it means every hour gets there."""
+    sel = f'scrape_duration_seconds{{job=~"{job_re}"}}'
+    out = {"hourly_peak_p50": f"max by (job) (quantile_over_time(0.5, (max_over_time({sel}[1h]))[{span}:1h]))"}
+    sec = dur(tau) if isinstance(tau, str) and _DUR.fullmatch(tau.strip() or "x") else (tau if isinstance(tau, (int, float)) else None)
+    if sec:
+        out["peak_hours"] = f"max by (job) (count_over_time((max_over_time({sel}[1h]) > {round(0.8 * sec, 3):g})[{span}:1h]))"
+    return out
+
+
+def peak_shape(d_max, hourly_p50, peak_hours=None, span_hours: int = 168) -> dict | None:
+    """Reading of the measured shape: {kind: rare | frequent | sustained, text}. rare: the typical hour stays under
+    half of the 7-day max; sustained: the typical hour reaches 80% of it; frequent: in between. peak_hours (hours
+    above 0.8·τ) is reported next to it when given. None when the numbers are missing."""
+    try:
+        dm = dur(d_max) if isinstance(d_max, str) else float(d_max)
+        hp = dur(hourly_p50) if isinstance(hourly_p50, str) else float(hourly_p50)
+    except (TypeError, ValueError):
+        return None
+    if not dm or hp is None:
+        return None
+    ratio = hp / dm
+    kind = "sustained" if ratio >= 0.8 else "rare" if ratio < 0.5 else "frequent"
+    text = {"sustained": "幾乎每個小時都到這個高度：最大值就是日常的樣子，τ 與 S 要照它定",
+            "frequent": "不少小時接近最大值：尖峰是常態的一部分，不能當成偶發事件忽略",
+            "rare": "多數小時遠低於最大值：最大值是少數幾次尖峰，先查那幾次發生在什麼時候、是不是同一種工作（備份、批次）"}[kind]
+    out = {"kind": kind, "ratio": round(ratio, 2),
+           "text": f"每小時最大值的中位數 {fmt(hp)}，是 7 天最大值 {fmt(dm)} 的 {round(ratio * 100)}%：{text}"}
+    if peak_hours is not None:
+        try:
+            ph = int(float(peak_hours))
+            out["peak_hours"] = ph
+            out["text"] += f"；{span_hours} 個小時裡有 {ph} 個小時出現超過 0.8·τ 的 scrape"
+        except (TypeError, ValueError):
+            pass
+    return out
+
+
 def k_label(a, job) -> str:
     """Where k comes from: measured consecutive failures (--job-failrun / answers measured.<job>.max_consecutive_failures)
     are 「觀察到的連續失敗」; per-window counts (failures_per_window / up0_count) only bound it: 上限／假設."""
