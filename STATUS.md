@@ -54,6 +54,24 @@
 
 使用者同意的資料庫順序已全部完成；CockroachDB（專有授權）不做。資料庫架構頁依類型分頁：關聯式、記憶體 KV、共識（Raft）、分散式 SQL、分析型、文件型。
 
+## Harness 計畫與 review（2026-11-15）
+
+目標：從 monitor of monitor 擴成「元件觀測與使用分析」，重用五段框架、證據等級、refs、lab、覆蓋檢查，不另起系統。
+
+- **P0（完成）**：`tools/check_trace.py` 缺口報告（G3 有訊號沒偵測、G4 metric 存在性、G5 有 rule 非實測、G6 元件不提供；G1／G2 等 P1）、`catalog/trace-baseline.json` 棘輪、`validate.py` 的 E1（實測一定要引用實驗 ref）。
+- **P1（未開始，MariaDB 試點）**：卡片加選填的 `mechanisms`（機制與資源）、`failure_modes`（連到訊號、blind spot 或寫明接受不偵測）；Gate T1 引用不懸空、T2 失效模式要有交代、T3 機制至少一個失效模式或寫明還沒研究。
+- **P2（未開始）**：實驗 ref 加 `hypotheses`（假設、版本、方法、預期出現／消失的訊號、結果、限制）；E1 升級成「實測要指到 result 為 pass 的假設」、E2 版本要重疊。
+- **P3**：研究流程盲測（從機制出發寫卡，不從 metric 清單）。**P4**：其他卡推廣，警告數只減不增。
+- 分工：格式、懸空 id、實測有沒有實驗、版本重疊、metric 存在、缺口計數由工具判；機制與失效模式、假設與實驗設計由 agent 研究；範圍、要不要補替代方案或 rule、門檻由人決定。不追求 100% 覆蓋。
+
+Review 找到、還沒解決的問題：
+
+- E1 很鬆：568 個實測項目只靠 73 個實驗 ref，單一 ref 最多背 72 項；要到 P2 才能追到「實驗裡的哪個假設」。
+- 「訊號是實測」不等於「rule 被觸發過」：CI 對 rule 範本只驗語法，沒有 rule 的單元測試。
+- 盲測有過度擬合風險：六輪都用同 4 個情境、評分表到頂；要加 2 個沒用來調工具的保留情境，答案表沒寫的一律回「不知道」，保存完整對話。
+- issue 試點（repo 外的 `drafts/`）：各元件「該如何／不該如何／怎麼監控」的素材，等 P1 欄位定了再進卡片；issue 的說法在釘到 commit 或小實驗重現前都是推論。
+- 待辦小項：Alertmanager 卡加版本注意事項（0.34.0–0.34.2 的 memberlist v0.6.0 把同步狀態上限寫死 20 MiB，超過後叢集永久分裂；0.35.0 退回 v0.5.4）。
+
 ## 待辦（依建議順序）
 
 1. **VM lab 沒重測到的項目**（`lab/vm/README.md`）：查詢飽和 429 與 `iteration_missed`、磁碟突然 0 byte 的 panic、vmalert／Alertmanager 本身停機、VL `allow_partial_response`、operator。相關說法已降為「推論」。注意這台機器 Docker 容器的單調時鐘比牆鐘慢約 30%，時間類數字要以牆鐘解讀。
