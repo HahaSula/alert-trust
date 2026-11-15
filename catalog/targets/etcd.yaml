@@ -791,3 +791,9 @@ must_ask:
         verdict: available
         metrics: [grpc_server_handling_seconds_bucket]
         why: "--metrics=extensive 會註冊 server 端 gRPC histogram"
+  - id: readyz-probe
+    question: "有沒有從另一條路徑（blackbox_exporter 或外部探測）探每台 etcd 的 `/readyz`？請回答有或沒有"
+    why: >-
+      「活著」要三條路一起看：`up`、`/readyz`、`etcd_server_has_leader`。只有 `/metrics` 時，網路分割下少數派那台 up 仍是 1，
+      Prometheus 自己被隔開時又分不出是 etcd 壞還是抓不到；/readyz 是 linearizable read，失去 quorum 時會失敗
+    refs: [etcd-exp-raw, etcd-h-readyz-linear, etcd-h-readcheck-ctx]

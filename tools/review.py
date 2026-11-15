@@ -412,6 +412,11 @@ def end_to_end(a, inv: dict, fit: dict | None, ms_rows: list[dict]) -> list[str]
         rv = sorted({x for r in inv["rules"] if r["name"] in crit for x in ((r.get("route") or {}).get("receivers") or [])})
         route = f"critical rule 會送到 {'、'.join(rv) or '—'}（依檔案；receiver 本身會不會通知到人要確認）"
     for x in f:
+        if x["kind"] == "critical_route_muted":
+            route += (f"；{len(x['rules'])} 條 critical rule 走的 route（→ {x['receiver']}）有靜音時段 {'、'.join(x['intervals'])}："
+                      "那些時段不會 page")
+            partial.append(f"靜音時段（{'、'.join(x['intervals'])}）內 critical 不會 page")
+    for x in f:
         if x["kind"] == "replica_label_on_alerts":
             route += (f"；`external_labels` 的 {'、'.join(x['labels'])} 沒有在 `alert_relabel_configs` 去掉："
                       "多台 Prometheus 評估同一份 rule 時，Alertmanager 會把每台送來的當成不同的 alert（重複）")

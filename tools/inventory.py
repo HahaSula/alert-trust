@@ -25,7 +25,8 @@ the rest. Sections:
                         then keeps depends_on_runtime_labels)), route_label_value_mismatch (close names, e.g.
                         job="etcd" vs kube-etcd), critical_not_paging (critical rules whose only receivers are
                         email / empty), routed_to_empty_receiver (grouped), inhibit_no_equal, dms_route_without_rule
-                        (an alertname="Watchdog" route but no such rule), no_watchdog_rule, replica_label_on_alerts
+                        (an alertname="Watchdog" route but no such rule), no_watchdog_rule, critical_route_muted (the route a critical
+                        rule takes has mute_time_intervals / active_time_intervals), replica_label_on_alerts
                         (external_labels carries a replica label and alerting has no alert_relabel_configs),
                         watchdog_no_dedicated_route (the Watchdog rule, or the one we propose, falls into a route without
                         an alertname matcher and inherits its timings; alertmanager.watchdog_route has the timings, the
@@ -1573,6 +1574,26 @@ def build(a) -> dict:
             findings.append({"kind": "critical_not_paging", "rules": names, "receivers": list(rv),
                              "fact": f"{len(names)} 條 severity critical 的 rule 只會送到 {what}，不會 page："
                                      f"{', '.join(names[:8])}{' 等' if len(names) > 8 else ''}"})
+        # critical alerts whose route is muted in some time interval (mute_time_intervals / active_time_intervals)
+        timed = {n["path"]: n for n in nodes if n["node"].get("mute_time_intervals") or n["node"].get("active_time_intervals")}
+        muted: dict[str, list] = {}
+        for e in alerts:
+            if not _sev_critical(e["labels_out"].get("severity")):
+                continue
+            for o in e["route"].get("matches") or []:
+                if o["path"] in timed:
+                    muted.setdefault(o["path"], []).append(e["name"])
+        for path, names in muted.items():
+            n = timed[path]["node"]
+            what = "、".join([f"`mute_time_intervals` {x}" for x in n.get("mute_time_intervals") or []]
+                            + [f"`active_time_intervals` {x}（以外的時間）" for x in n.get("active_time_intervals") or []])
+            findings.append({"kind": "critical_route_muted", "route": path, "rules": sorted(names),
+                             "receiver": timed[path]["eff"]["receiver"]["value"],
+                             "intervals": list(n.get("mute_time_intervals") or []) + list(n.get("active_time_intervals") or []),
+                             "fact": f"{len(names)} 條 severity critical 的 rule 走的 route（{mtext(timed[path]['matchers'])} → "
+                                     f"{timed[path]['eff']['receiver']['value']}）設了 {what}：這些時段內通知不會送出，不分 severity；"
+                                     "在這條 route 加 `continue` 不會讓被靜音的通知改送別處。要讓 critical 不受影響，"
+                                     f"把靜音移到只收 warning 的 route，或另開一條沒有靜音的 critical route：{', '.join(sorted(names)[:8])}{' 等' if len(names) > 8 else ''}"})
         # Watchdog / dead man's switch route without a Watchdog rule
         alert_names = [e["name"] for e in rules_out if e["kind"] == "alert"]
         for n in nodes:
@@ -1717,8 +1738,13 @@ FAILRUN_Q = "最長連續失敗幾次？"
 # cost of being wrong when the answer is not known: 3 = a page is missed or the advice harms (a rule changed in
 # meaning, never fires), 2 = a time / option is wrong, 1 = a detail
 # external_labels keys that tell HA replicas of one Prometheus apart (prometheus-operator uses prometheus_replica)
+def job_label_rewritten(cfg: dict) -> bool:
+    """True when some scrape job rewrites the `job` label (relabel to job, or honor_labels)."""
+    return any(j.get("rewrites_job") for j in cfg.get("jobs") or [])
+
+
 REPLICA_LABELS = ("replica", "prometheus_replica", "__replica__")
-COST = {"version_gate": 3, "job_names": 3, "--config": 3, "--alertmanager": 3, "version": 2, "external_observer": 2, "measured": 2,
+COST = {"version_gate": 3, "job_names": 3, "job_names_visible": 1, "--config": 3, "--alertmanager": 3, "version": 2, "external_observer": 2, "measured": 2,
         "keep_range": 3, "producers": 2, "features": 2, "labels": 2, "must_ask": 3, "route_label": 3, "notify_within": 3,
         "failrun": 2}
 
@@ -1972,10 +1998,17 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
     jnf = [f for f in findings if f["kind"] == "job_not_in_config" and not f.get("settled")]
     if jnf:
         jobs = sorted(f["job"] + (f"（是 {f['closest']} 嗎？）" if f.get("closest") else "") for f in jnf)
-        qs.append({"id": "job_names", "q": f"rule 用的 {', '.join(jobs)} 在 config 裡對不到；實際的 job 名稱是什麼（relabel 之後）？",
-                   "changes": ["rule 會不會響", "absent() 是否一直在響", "metric 來源"], "affects": len({n for f in jnf for n in f["rules"]}),
-                   "findings": len(jnf) + cnt("never_fires", "always_fires", reason="job"),
-                   "answer_key": "job_names"})
+        q = {"id": "job_names", "q": f"rule 用的 {', '.join(jobs)} 在 config 裡對不到；實際的 job 名稱是什麼（relabel 之後）？",
+             "changes": ["rule 會不會響", "absent() 是否一直在響", "metric 來源"], "affects": len({n for f in jnf for n in f["rules"]}),
+             "findings": len(jnf) + cnt("never_fires", "always_fires", reason="job"),
+             "answer_key": "job_names"}
+        if cfg and not job_label_rewritten(cfg):
+            # the scrape config is in hand and nothing in it rewrites `job`: the names are visible in the file, so
+            # this is stated as an assumption (the rule is wrong) and asked only after the questions files cannot answer
+            q.update({"q": q["q"] + "（config 沒有改寫 `job` 的 relabel：先假設 config 的名稱是對的、rule 寫錯；"
+                                    "只有實際跑的不是這份 config 時才需要回答）",
+                      "cost_key": "job_names_visible"})
+        qs.append(q)
     if not cfg:
         qs.append({"id": "--config", "q": "可以給 prometheus.yml（或 vmagent 的 scrape 設定）嗎？", "changes": ["job 名稱", "scrape_interval／timeout",
                    "丟掉的 metric", "monitor of monitor"], "affects": len(rules), "answer_key": "--config"})

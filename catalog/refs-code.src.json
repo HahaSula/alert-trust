@@ -712,5 +712,17 @@
   "v0.34.2",
   "provider/mem/mem.go",
   "fp := alert.Fingerprint()"
+ ],
+ "am034-route-mute-per-route": [
+  "prometheus/alertmanager",
+  "v0.34.2",
+  "dispatch/route.go",
+  "opts.MuteTimeIntervals = cr.MuteTimeIntervals"
+ ],
+ "am034-time-mute-stage": [
+  "prometheus/alertmanager",
+  "v0.34.2",
+  "notify/mute.go",
+  "func (tms TimeMuteStage) Exec("
  ]
 }

@@ -40,13 +40,13 @@ scrape_configs:
 """
 
 
-def build(cfg: str, answers: dict | None = None, rules: str = RULES):
+def build(cfg: str, answers: dict | None = None, rules: str = RULES, am: str | None = None):
     import contextlib
     import io
     import yaml
     d = tempfile.mkdtemp()
     paths = {}
-    for name, text in (("prometheus.yml", cfg), ("rules.yml", rules), ("alertmanager.yml", AM)):
+    for name, text in (("prometheus.yml", cfg), ("rules.yml", rules), ("alertmanager.yml", am or AM)):
         paths[name] = os.path.join(d, name)
         with open(paths[name], "w", encoding="utf-8") as f:
             f.write(text)
@@ -77,7 +77,9 @@ class PrefixEffectsTest(unittest.TestCase):
         for c in C.load_components():
             if c["id"] in ("mongodb_exporter", "clickhouse"):
                 self.assertEqual(C.check_must_ask(c, refs), [], c["id"])
-                self.assertTrue(all(q.get("default") is not None and q.get("effects") for q in c["must_ask"]), c["id"])
+                with_effects = [q for q in c["must_ask"] if q.get("effects")]
+                self.assertGreaterEqual(len(with_effects), 2, c["id"])
+                self.assertTrue(all(q.get("default") is not None for q in with_effects), c["id"])
 
 
 class MongoDefaultsTest(unittest.TestCase):
@@ -127,6 +129,70 @@ class ObserverQuestionTest(unittest.TestCase):
             src = f.read()
         self.assertIn('"answer_key": "external_observer",\n                   **({"mandatory": True', src)
         self.assertIn('if int(inv.get("round") or 0) >= 2 else {})})', src)   # version keeps round 1 (test_run6_gaps)
+
+
+AM_MUTED = """route:
+  receiver: chat
+  routes:
+    - matchers: ['severity="critical"']
+      receiver: pager
+      mute_time_intervals: [quiet-hours]
+    - matchers: ['severity="warning"']
+      receiver: chat
+      mute_time_intervals: [quiet-hours]
+time_intervals:
+  - name: quiet-hours
+    time_intervals: [{weekdays: ["saturday", "sunday"]}]
+receivers:
+  - {name: chat, webhook_configs: [{url: "http://chat.example.invalid/hook"}]}
+  - {name: pager, webhook_configs: [{url: "http://pager.example.invalid/hook"}]}
+"""
+
+
+class MutedCriticalRouteTest(unittest.TestCase):
+    def test_critical_route_with_mute_interval(self):
+        inv = build(config(), am=AM_MUTED)
+        f = [x for x in inv["findings_from_files"] if x["kind"] == "critical_route_muted"]
+        self.assertEqual(len(f), 1)                      # the warning route is muted too, but that is not a finding
+        self.assertEqual(f[0]["receiver"], "pager")
+        self.assertEqual(f[0]["intervals"], ["quiet-hours"])
+        self.assertEqual(f[0]["rules"], ["RsRule", "SsRule", "UpRule"])
+        self.assertIn("`continue` 不會讓被靜音的通知改送別處", f[0]["fact"])
+
+    def test_no_finding_without_intervals(self):
+        inv = build(config())
+        self.assertFalse([x for x in inv["findings_from_files"] if x["kind"] == "critical_route_muted"])
+
+
+WRONG_JOB = RULES.replace('job="mongodb"', 'job="mongo"')
+
+
+class JobNameQuestionTest(unittest.TestCase):
+    def top(self, inv):
+        return [q["id"] for q in inv["questions"] if q.get("ask_now")]
+
+    def test_not_in_first_three_when_config_shows_the_names(self):
+        inv = build(config(), rules=WRONG_JOB)
+        q = next(q for q in inv["questions"] if q["id"] == "job_names")
+        self.assertEqual(q["cost"], 1)
+        self.assertIn("先假設 config 的名稱是對的", q["q"])
+        self.assertNotIn("job_names", self.top(inv))
+
+    def test_still_asked_first_when_job_is_rewritten(self):
+        cfg = config().replace('static_configs: [{targets: ["mongo-1:9216"]}]',
+                               'static_configs: [{targets: ["mongo-1:9216"]}]\n'
+                               '    relabel_configs: [{source_labels: [__address__], target_label: job}]')
+        inv = build(cfg, rules=WRONG_JOB)
+        q = next(q for q in inv["questions"] if q["id"] == "job_names")
+        self.assertEqual(q["cost"], 3)
+
+
+class NewMustAskTest(unittest.TestCase):
+    def test_cards_ask_for_second_path_and_exporter_topology(self):
+        cards = {c["id"]: c for c in C.load_components()}
+        self.assertIn("readyz-probe", [q["id"] for q in cards["etcd"]["must_ask"]])
+        self.assertIn("exporter-topology", [q["id"] for q in cards["mongodb_exporter"]["must_ask"]])
+        self.assertIn("mute-intervals-critical", [u["id"] for u in cards["alertmanager"]["usage"]])
 
 
 if __name__ == "__main__":

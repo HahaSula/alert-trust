@@ -104,7 +104,10 @@ class MysqlScenario(unittest.TestCase):
     def test_questions(self):
         qs = self.inv["questions"]
         self.assertEqual(sum(q["ask_now"] for q in qs), 3)
-        self.assertEqual(qs[0]["answer_key"], "job_names")
+        # the config is in hand and nothing rewrites `job`: the job-name question is an assumption, not a top question
+        jq = next(q for q in qs if q["answer_key"] == "job_names")
+        self.assertFalse(jq["ask_now"])
+        self.assertIn("先假設 config 的名稱是對的", jq["q"])
         self.assertTrue(any(q["answer_key"] == "--alertmanager" for q in qs))
 
     def test_markdown(self):

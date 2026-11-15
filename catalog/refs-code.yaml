@@ -834,3 +834,17 @@ refs:
     file: "provider/mem/mem.go"
     line: 315
     url: "https://github.com/prometheus/alertmanager/blob/v0.34.2/provider/mem/mem.go#L315"
+  am034-route-mute-per-route:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.34.2"
+    file: "dispatch/route.go"
+    line: 140
+    url: "https://github.com/prometheus/alertmanager/blob/v0.34.2/dispatch/route.go#L140"
+  am034-time-mute-stage:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.34.2"
+    file: "notify/mute.go"
+    line: 141
+    url: "https://github.com/prometheus/alertmanager/blob/v0.34.2/notify/mute.go#L141"

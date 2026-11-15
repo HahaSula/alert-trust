@@ -75,7 +75,9 @@
 - 新發現 `replica_label_on_alerts`：`external_labels` 有區分副本的 label 而沒有 `alert_relabel_configs`；Prometheus 卡的 usage `ha-replica-label`（讀碼）。
 - skill 與 AGENTS：事實題直接問事實，不要只要求貼指令輸出；有預設值的必問題在「不知道」時結論寫成條件式。
 
-這些修正還沒有再盲測；那兩個保留情境已經用來改過工具，下一輪要另外準備新的。還沒處理的漏失：blackbox `/readyz` 與第二路徑的題目沒有進前 3、PostgreSQL 的 `--collection-timeout` 與 Patroni／DCS 沒有 scrape job 沒有拉到摘要、`/scrapeall` 與 `mute_time_intervals` 蓋到 critical 路由沒有工具發現、受測者會問檔案裡看得到的 job 名稱。
+v0.4.0 之後再補的（2026-11-15）：新發現 `critical_route_muted`（critical 走的 route 有 `mute_time_intervals`／`active_time_intervals`）與 Alertmanager 卡 usage `mute-intervals-critical`（讀碼）；etcd 卡必問題 `readyz-probe`（第二路徑）、MongoDB 卡必問題 `exporter-topology`（一個 exporter 抓全部）；config 在手上而且沒有改寫 `job` 的 relabel 時，job 名稱題改成假設、不佔前 3 題；skill：決定題不佔事實題的位置。
+
+以上修正都還沒有再盲測；那兩個保留情境已經用來改過工具，下一輪要另外準備新的。還沒處理：PostgreSQL 的 `--collection-timeout`（契約 exporter-deadline 不符只列在「之後再處理」）與 Patroni／DCS 沒有 scrape job 沒有拉到摘要的前 3 件事；`/scrapeall` 只有必問題、沒有從 `metrics_path` 自動判斷；工具的環境模型把 VictoriaMetrics 的 vmagent／儲存／vmalert 壓成一組（一個版本、一份 config），沒有分段列出。
 
 Review 找到、還沒解決的問題：
 

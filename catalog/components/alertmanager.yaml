@@ -84,6 +84,12 @@ usage:
       回報者看到 `alertmanager_cluster_members` 降到 1 且不會自行恢復（prometheus/alertmanager#5627，未在 lab 重現）；訊號 cluster-health 看得到
     evidence: code
     refs: [am033-gomod-memberlist, am0340-gomod-memberlist, am034-gomod-memberlist, am035-gomod-memberlist, ml060-userstate-limit, ml060-max-push-state, ml054-userstate-read, am034-delegate-localstate]
+  - id: mute-intervals-critical
+    text: >-
+      `mute_time_intervals`／`active_time_intervals` 掛在 route 上，對走這條 route 的所有 alert 生效，不分 severity；
+      每條 route 用自己設定的值，不從父 route 繼承。要讓夜間只靜音 warning，就把它放在只收 warning 的 route，critical 另走一條沒有靜音的 route
+    evidence: code
+    refs: [am034-route-mute-per-route, am034-time-mute-stage]
   - id: gomaxprocs-flag
     text: 升到 0.33 以上前，從啟動參數拿掉 `--enable-feature=auto-gomaxprocs`，否則啟動失敗
     evidence: tested

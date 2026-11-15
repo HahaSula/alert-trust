@@ -494,6 +494,7 @@ cards:
     - smtp-version
     - ha-peer-timeout
     - ha-memberlist-034
+    - mute-intervals-critical
     - gomaxprocs-flag
     observe:
     - alertmanager-down
@@ -838,6 +839,13 @@ cards:
         - grpc_server_handling_seconds_bucket
         why: --metrics=extensive 會註冊 server 端 gRPC histogram
       default: basic
+    - id: readyz-probe
+      question: 有沒有從另一條路徑（blackbox_exporter 或外部探測）探每台 etcd 的 `/readyz`？請回答有或沒有
+      why: 「活著」要三條路一起看：`up`、`/readyz`、`etcd_server_has_leader`。只有 `/metrics` 時，網路分割下少數派那台 up 仍是 1， Prometheus 自己被隔開時又分不出是 etcd 壞還是抓不到；/readyz 是 linearizable read，失去 quorum 時會失敗
+      refs:
+      - etcd-exp-raw
+      - etcd-h-readyz-linear
+      - etcd-h-readcheck-ctx
   mariadb:
     name: mysqld_exporter＋MariaDB
     kind: target
@@ -1068,6 +1076,14 @@ cards:
     - 大文件（接近 16MB 上限）與過大的回應
     - 執行中的長操作（currentopmetrics 沒開時）
     must_ask:
+    - id: exporter-topology
+      question: mongodb_exporter 是每個 member 一個，還是一個 exporter 抓全部 member（`/scrapeall` 或 `--mongodb.uri` 列多台）？
+      why: 一個 exporter 抓全部時，`/scrapeall` 在一個請求裡依序抓每個 URI、每個都給完整的期限：兩個 member 同時連不上，整個請求超過 `scrape_timeout`，三個 member 的 metric 一起消失，剛好在失去多數的時候什麼都看不到
+      refs:
+      - mg-exp
+      - mg-exp-a
+      - mx-scrapeall-loop
+      - mx-scrapeall-timeout
     - id: diagnosticdata
       question: mongodb_exporter 啟動時有沒有加 `--collector.diagnosticdata`（或 `--collect-all`）？請回答有或沒有；知道的話順便列出所有 collector 旗標
       why: 預設什麼 collector 都不開，只輸出 mongodb_up；沒有這個旗標時 mongodb_ss_*（serverStatus：角色、連線、WiredTiger、ticket）都不存在， 讀它們的規則回傳空，`unless` 右邊是它們的規則會一直響

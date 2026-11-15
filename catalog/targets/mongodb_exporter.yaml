@@ -776,6 +776,12 @@ blind_spots:
 
 # 會改變結論的必問題（tools/inventory.py 在盤點裡有這張卡時優先問）。
 must_ask:
+  - id: exporter-topology
+    question: "mongodb_exporter 是每個 member 一個，還是一個 exporter 抓全部 member（`/scrapeall` 或 `--mongodb.uri` 列多台）？"
+    why: >-
+      一個 exporter 抓全部時，`/scrapeall` 在一個請求裡依序抓每個 URI、每個都給完整的期限：兩個 member 同時連不上，整個請求超過
+      `scrape_timeout`，三個 member 的 metric 一起消失，剛好在失去多數的時候什麼都看不到
+    refs: [mg-exp, mg-exp-a, mx-scrapeall-loop, mx-scrapeall-timeout]
   - id: diagnosticdata
     question: "mongodb_exporter 啟動時有沒有加 `--collector.diagnosticdata`（或 `--collect-all`）？請回答有或沒有；知道的話順便列出所有 collector 旗標"
     why: >-
