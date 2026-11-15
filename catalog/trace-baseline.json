@@ -1,6 +1,8 @@
 {
  "cards": {
   "alertmanager": {
+   "G1": 0,
+   "G2": 0,
    "G3": 0,
    "G3.interview": 1,
    "G4.confirmed": 10,
@@ -12,6 +14,8 @@
    "G6": 0
   },
   "clickhouse": {
+   "G1": 0,
+   "G2": 0,
    "G3": 0,
    "G3.interview": 0,
    "G4.confirmed": 39,
@@ -23,6 +27,8 @@
    "G6": 2
   },
   "etcd": {
+   "G1": 0,
+   "G2": 0,
    "G3": 2,
    "G3.interview": 0,
    "G4.confirmed": 39,
@@ -34,6 +40,8 @@
    "G6": 5
   },
   "grafana_alerting": {
+   "G1": 0,
+   "G2": 0,
    "G3": 1,
    "G3.interview": 7,
    "G4.confirmed": 0,
@@ -45,6 +53,8 @@
    "G6": 0
   },
   "host": {
+   "G1": 0,
+   "G2": 0,
    "G3": 1,
    "G3.interview": 0,
    "G4.confirmed": 0,
@@ -56,6 +66,8 @@
    "G6": 0
   },
   "mariadb": {
+   "G1": 29,
+   "G2": 1,
    "G3": 2,
    "G3.interview": 1,
    "G4.confirmed": 64,
@@ -67,6 +79,8 @@
    "G6": 6
   },
   "mongodb_exporter": {
+   "G1": 0,
+   "G2": 0,
    "G3": 1,
    "G3.interview": 1,
    "G4.confirmed": 62,
@@ -78,6 +92,8 @@
    "G6": 4
   },
   "mysql": {
+   "G1": 0,
+   "G2": 0,
    "G3": 3,
    "G3.interview": 1,
    "G4.confirmed": 59,
@@ -89,6 +105,8 @@
    "G6": 3
   },
   "observer": {
+   "G1": 0,
+   "G2": 0,
    "G3": 3,
    "G3.interview": 4,
    "G4.confirmed": 0,
@@ -100,6 +118,8 @@
    "G6": 0
   },
   "postgres_exporter": {
+   "G1": 0,
+   "G2": 0,
    "G3": 1,
    "G3.interview": 0,
    "G4.confirmed": 66,
@@ -111,6 +131,8 @@
    "G6": 3
   },
   "prometheus": {
+   "G1": 0,
+   "G2": 0,
    "G3": 0,
    "G3.interview": 0,
    "G4.confirmed": 24,
@@ -122,6 +144,8 @@
    "G6": 0
   },
   "redis_exporter": {
+   "G1": 0,
+   "G2": 0,
    "G3": 1,
    "G3.interview": 1,
    "G4.confirmed": 75,
@@ -133,6 +157,8 @@
    "G6": 6
   },
   "thanos": {
+   "G1": 0,
+   "G2": 0,
    "G3": 1,
    "G3.interview": 4,
    "G4.confirmed": 0,
@@ -144,6 +170,8 @@
    "G6": 0
   },
   "tidb": {
+   "G1": 0,
+   "G2": 0,
    "G3": 0,
    "G3.interview": 0,
    "G4.confirmed": 35,
@@ -155,6 +183,8 @@
    "G6": 2
   },
   "victorialogs": {
+   "G1": 0,
+   "G2": 0,
    "G3": 0,
    "G3.interview": 0,
    "G4.confirmed": 0,
@@ -166,6 +196,8 @@
    "G6": 0
   },
   "victoriametrics": {
+   "G1": 0,
+   "G2": 0,
    "G3": 0,
    "G3.interview": 0,
    "G4.confirmed": 0,
@@ -177,6 +209,8 @@
    "G6": 0
   },
   "vmagent": {
+   "G1": 0,
+   "G2": 0,
    "G3": 1,
    "G3.interview": 0,
    "G4.confirmed": 0,
@@ -188,6 +222,8 @@
    "G6": 0
   },
   "vmalert": {
+   "G1": 0,
+   "G2": 0,
    "G3": 0,
    "G3.interview": 1,
    "G4.confirmed": 8,
@@ -199,6 +235,8 @@
    "G6": 0
   },
   "yugabytedb": {
+   "G1": 0,
+   "G2": 0,
    "G3": 1,
    "G3.interview": 0,
    "G4.confirmed": 30,
@@ -210,5 +248,5 @@
    "G6": 2
   }
  },
- "note": "check_trace.py 的缺口計數基準；tests/test_trace.py 在 G3、G5、G6、G4.not_in_list、G4.no_list 任何一項增加時失敗。更新：python3 tools/check_trace.py --write-baseline"
+ "note": "check_trace.py 的缺口計數基準；tests/test_trace.py 在 G1、G2、G3、G5、G6、G4.not_in_list、G4.no_list 任何一項增加時失敗。更新：python3 tools/check_trace.py --write-baseline"
 }

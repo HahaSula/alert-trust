@@ -682,5 +682,17 @@
   "v0.33.1",
   "go.mod",
   "github.com/hashicorp/memberlist v0.5.4"
+ ],
+ "mdb10618-deadlocks-in-find-cycle": [
+  "MariaDB/server",
+  "mariadb-10.6.18",
+  "storage/innobase/lock/lock0lock.cc",
+  "lock_sys.deadlocks++"
+ ],
+ "mdb10619-deadlocks-in-report": [
+  "MariaDB/server",
+  "mariadb-10.6.19",
+  "storage/innobase/lock/lock0lock.cc",
+  "lock_sys.deadlocks++"
  ]
 }

@@ -86,6 +86,7 @@ def validate(root: str = C.ROOT) -> tuple[list[str], list[str]]:
                 errors.append(f"{where}: silent_failures[{i}] source {sf.get('source')!r} 不存在")
 
         fs_errors, fs_missing = C.check_five_sections(card, all_refs)
+        errors += C.check_mechanisms(card, all_refs)
         errors += fs_errors
         no_section += fs_missing
         import check_coverage as CC

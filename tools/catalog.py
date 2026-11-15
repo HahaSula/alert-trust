@@ -203,6 +203,107 @@ def check_five_sections(card: dict, all_refs: dict) -> tuple[list[str], int]:
     return errors, missing
 
 
+# Optional card fields (P1 harness, piloted on catalog/targets/mariadb.yaml):
+#   mechanisms: [{id, name, resource, text, evidence, refs, not_studied?}]
+#       an internal mechanism and the resource it consumes, queues on or is blocked by; written from the source code,
+#       not from the metric list. evidence is one of EVIDENCE; refs are required unless evidence is inferred.
+#   failure_modes: [{id, mechanism, trigger, effect, detected_by: {signals?, blind_spots?, accepted?},
+#                    evidence, refs, distinguishes?, versions?, sources?}]
+#       one way a mechanism goes wrong (trigger = the usage or setting, effect = what happens inside) and how the card
+#       accounts for it: signal ids of this card, ids of this card's blind_spots, or `accepted` (a sentence saying why
+#       it is deliberately not detected). distinguishes (optional): true / false / "partial", whether the signals tell
+#       this cause from others showing on the same signal (a note, not checked further). versions: same shape as a
+#       signal's. sources: issue keys as plain text (not evidence). A claim taken from an issue stays `inferred` until
+#       it is pinned to a commit or reproduced in a lab.
+#   blind_spots[].id (optional, kebab-case, unique in the card): what failure_modes point at.
+# Gates: T1 every id pointed at exists (mechanism, signals, blind_spots, refs); T2 every failure mode is accounted
+# for (detected_by has signals, blind_spots or accepted); T3 every mechanism has a failure mode or `not_studied`.
+FAILURE_DETECTED_KEYS = ("signals", "blind_spots", "accepted")
+DISTINGUISHES = (True, False, "partial")
+
+
+def _ids(items: list, at: str, errors: list[str]) -> set[str]:
+    seen: set[str] = set()
+    for i, x in enumerate(items):
+        xid = x.get("id", "") if isinstance(x, dict) else ""
+        if not isinstance(xid, str) or not ID_RE.match(xid):
+            errors.append(f"{at}[{i}] id 要是 kebab-case")
+        elif xid in seen:
+            errors.append(f"{at}[{i}] id {xid!r} 重複")
+        seen.add(xid)
+    return seen
+
+
+def _evidence_refs(x: dict, at: str, all_refs: dict, errors: list[str]) -> None:
+    if x.get("evidence") not in EVIDENCE:
+        errors.append(f"{at} evidence 只能是 {'、'.join(EVIDENCE)}")
+    refs = x.get("refs") or []
+    if not refs and x.get("evidence") != "inferred":
+        errors.append(f"{at} 要有 refs（只有 evidence: inferred 可以沒有）")
+    for r in refs:
+        if r not in all_refs:
+            errors.append(f"{at} refs {r!r} 不存在")
+
+
+def check_mechanisms(card: dict, all_refs: dict) -> list[str]:
+    """Shape of mechanisms / failure_modes / blind_spots[].id and the gates T1–T3."""
+    where = card.get("_path", card.get("id", "?"))
+    errors: list[str] = []
+    mechs = card.get("mechanisms") or []
+    modes = card.get("failure_modes") or []
+    blind_ids = _ids([b for b in card.get("blind_spots") or [] if isinstance(b, dict) and "id" in b],
+                     f"{where}: blind_spots（有 id 的）", errors)
+    if not mechs and not modes:
+        return errors
+    sig_ids = {s.get("id") for s in card.get("signals", [])}
+    mech_ids = _ids(mechs, f"{where}: mechanisms", errors)
+    _ids(modes, f"{where}: failure_modes", errors)
+    used = set()
+    for i, f in enumerate(modes):
+        at = f"{where}: failure_modes[{f.get('id', i)}]"
+        for k in ("trigger", "effect"):
+            if not str(f.get(k, "")).strip():
+                errors.append(f"{at} 缺少 {k}")
+        if f.get("mechanism") not in mech_ids:
+            errors.append(f"{at} mechanism {f.get('mechanism')!r} 不在這張卡的 mechanisms（T1）")
+        used.add(f.get("mechanism"))
+        d = f.get("detected_by")
+        if not isinstance(d, dict) or not any(d.get(k) for k in FAILURE_DETECTED_KEYS):
+            errors.append(f"{at} detected_by 至少要有 signals、blind_spots 或 accepted（T2：每個失效模式都要有交代）")
+            d = {}
+        for k in d:
+            if k not in FAILURE_DETECTED_KEYS:
+                errors.append(f"{at} detected_by 不認得 {k!r}（只有 {'、'.join(FAILURE_DETECTED_KEYS)}）")
+        for sid in d.get("signals") or []:
+            if sid not in sig_ids:
+                errors.append(f"{at} detected_by.signals 的 {sid!r} 不在這張卡（T1）")
+        for bid in d.get("blind_spots") or []:
+            if bid not in blind_ids:
+                errors.append(f"{at} detected_by.blind_spots 的 {bid!r} 不是這張卡 blind_spots 的 id（T1）")
+        if "accepted" in d and not (isinstance(d["accepted"], str) and d["accepted"].strip()):
+            errors.append(f"{at} detected_by.accepted 要寫明為什麼接受不偵測")
+        if "distinguishes" in f and f["distinguishes"] not in DISTINGUISHES:
+            errors.append(f"{at} distinguishes 只能是 true、false 或 \"partial\"")
+        if "sources" in f and not (isinstance(f["sources"], list) and all(isinstance(x, str) for x in f["sources"])):
+            errors.append(f"{at} sources 要是字串清單（issue 編號）")
+        errors += [f"{at} {e}" for e in check_versions_field(f, all_refs)]
+        _evidence_refs(f, at, all_refs, errors)
+    for i, m in enumerate(mechs):
+        at = f"{where}: mechanisms[{m.get('id', i)}]"
+        for k in ("name", "resource", "text"):
+            if not str(m.get(k, "")).strip():
+                errors.append(f"{at} 缺少 {k}")
+        _evidence_refs(m, at, all_refs, errors)
+        studied, note = m.get("id") in used, m.get("not_studied")
+        if note is not None and not (isinstance(note, str) and note.strip()):
+            errors.append(f"{at} not_studied 要寫明還沒研究什麼")
+        elif not studied and not note:
+            errors.append(f"{at} 沒有任何 failure mode，也沒有 not_studied（T3）")
+        elif studied and note:
+            errors.append(f"{at} 已有 failure mode，拿掉 not_studied")
+    return errors
+
+
 # Optional card field (catalog/components/*.yaml, catalog/targets/*.yaml):
 #   must_ask: [{id, question, why, refs, applies_when?, answer_key?, effects?, default?}]
 # Component-specific questions whose answer changes conclusions (a flag that decides whether a metric exists, an

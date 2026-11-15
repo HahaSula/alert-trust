@@ -8,7 +8,9 @@
   python3 tools/check_trace.py --write-baseline   # rewrite catalog/trace-baseline.json (the ratchet; deliberate only)
 
 Gap classes (counts and lists only, no percentages):
-  G1/G2  need mechanism data (P1); not estimated here.
+  G1     misuse signal that no failure mode points at (detected_by.signals). Only for cards that have `mechanisms`
+         or `failure_modes` (P1; other cards count 0 and say so).
+  G2     failure mode with no signal: accounted for only by `accepted`, or by blind spots none of which has `options`.
   G3     signal with no rules and upstream.status no / missing (「有訊號、沒偵測」).
          G3.interview: the same, but evaluate_on is interview / inventory / external (問架構、盤點時檢查、外部服務:
          answered by asking or reading config, never by a rule on a ruler, as in check_coverage.py). Listed
@@ -49,7 +51,7 @@ import catalog as C  # noqa: E402
 import check_metric_sources as MS  # noqa: E402
 import check_metrics as CM  # noqa: E402
 
-GAPS = ("G3", "G4", "G5", "G6")
+GAPS = ("G1", "G2", "G3", "G4", "G5", "G6")
 G4_CLASSES = ("confirmed", "not_in_list", "no_list")
 G4_ALL = ("confirmed", "other_source", "not_in_list", "no_list", "external")
 G4_LABEL = {"confirmed": "已確認（附看到它的版本）", "other_source": "其他 exporter 產生（卡片自己的清單不會有）",
@@ -80,11 +82,12 @@ LIST_VERSION = {
 _VERSION = re.compile(r"\d+(?:\.\d+)+")
 BASELINE = os.path.join("catalog", "trace-baseline.json")
 # the classes the ratchet watches (tests/test_trace.py): a count above the baseline fails
-RATCHET = ("G3", "G5", "G6", "G4.not_in_list", "G4.no_list")
+RATCHET = ("G1", "G2", "G3", "G5", "G6", "G4.not_in_list", "G4.no_list")
 UPDATE_BASELINE = "python3 tools/check_trace.py --write-baseline"
-GAP_LABEL = {"G3": "有訊號、沒偵測（沒有 rules，上游也沒有）", "G4": "metric 存在性",
+GAP_LABEL = {"G1": "misuse 訊號沒有任何 failure mode 指到", "G2": "failure mode 沒有訊號，只靠接受不偵測或沒有方案的 blind spot",
+             "G3": "有訊號、沒偵測（沒有 rules，上游也沒有）", "G4": "metric 存在性",
              "G5": "有 rules，但 evidence 不是 tested", "G6": "blind_spots 是 database（元件本身沒提供）"}
-P1_NOTE = "G1/G2：需要 P1 的機制資料"
+P1_NOTE = "G1/G2：只算有 mechanisms／failure_modes 的卡（P1 試點）；其他卡是 0，代表還沒寫，不代表沒有缺口"
 # lab/targets/<dir> -> card id, when they differ
 LAB_DIR_CARD = {"valkey": "redis_exporter", "postgres": "postgres_exporter", "mongodb": "mongodb_exporter"}
 _NAME = re.compile(r"[a-zA-Z_:][a-zA-Z0-9_:]*")
@@ -238,9 +241,23 @@ def trace_card(card: dict, lists: dict, rmetrics: dict) -> dict:
         why = list(l["why"]) + ([f"沒有包含其他 exporter（{'、'.join(side)}）"] if side else [])
         info.append({"file": l["file"], "version": l["version"], "names": len(l["names"]), "partial": bool(why), "why": why})
     g6 = [{"what": b.get("what")} for b in card.get("blind_spots") or [] if b.get("category") == "database"]
+    g1, g2 = [], []
+    modes = card.get("failure_modes") or []
+    has_p1 = bool(modes or card.get("mechanisms"))
+    if has_p1:
+        pointed = {sid for f in modes for sid in (f.get("detected_by") or {}).get("signals") or []}
+        g1 = [{"signal": s.get("id"), "tier": s.get("tier")} for s in signals
+              if s.get("section") == "misuse" and s.get("id") not in pointed]
+        with_options = {b.get("id") for b in card.get("blind_spots") or [] if b.get("id") and b.get("options")}
+        for f in modes:
+            d = f.get("detected_by") or {}
+            if not d.get("signals") and not with_options & set(d.get("blind_spots") or []):
+                g2.append({"failure_mode": f.get("id"), "mechanism": f.get("mechanism"),
+                           "by": "accepted" if d.get("accepted") else "blind_spots"})
     return {"card": cid, "path": card.get("_path"), "signals": len(signals), "lists": saved["files"] if saved else [],
             "list_info": info, "lists_partial": bool(info) and all(x["partial"] for x in info),
-            "G3": g3, "G3.interview": g3i, "G4": g4, "G5": g5, "G6": g6}
+            "p1": has_p1, "mechanisms": len(card.get("mechanisms") or []), "failure_modes": len(modes),
+            "G1": g1, "G2": g2, "G3": g3, "G3.interview": g3i, "G4": g4, "G5": g5, "G6": g6}
 
 
 def trace(root: str = C.ROOT) -> list[dict]:
@@ -252,7 +269,7 @@ def trace(root: str = C.ROOT) -> list[dict]:
 
 def counts(t: dict) -> dict:
     """Counts derived from the item lists (G4 is the number of names outside confirmed and external)."""
-    return {"signals": t["signals"], "G3": len(t["G3"]), "G3.interview": len(t["G3.interview"]), "G5": len(t["G5"]),
+    return {"signals": t["signals"], "G1": len(t["G1"]), "G2": len(t["G2"]), "G3": len(t["G3"]), "G3.interview": len(t["G3.interview"]), "G5": len(t["G5"]),
             "G6": len(t["G6"]), **{f"G4.{k}": len(t["G4"][k]) for k in G4_ALL}}
 
 
@@ -288,20 +305,21 @@ def totals(result: list[dict]) -> dict:
     return out
 
 
-COLS = ("signals", "G3", "G3.interview", "G5", "G6", "G4.confirmed", "G4.other_source", "G4.not_in_list", "G4.no_list",
+COLS = ("signals", "G1", "G2", "G3", "G3.interview", "G5", "G6", "G4.confirmed", "G4.other_source", "G4.not_in_list", "G4.no_list",
         "G4.external")
 
 
 def render(result: list[dict], items: bool = True) -> str:
     lines = ["# check_trace（只報告，不判定）", "", P1_NOTE, "",
-             "| 卡 | 訊號 | G3 | G3 問架構 | G5 | G6 | G4 已確認 | G4 其他來源 | G4 不在清單 | G4 沒有清單 | G4 外部 | 清單 |",
-             "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|"]
+             "| 卡 | 訊號 | G1 | G2 | G3 | G3 問架構 | G5 | G6 | G4 已確認 | G4 其他來源 | G4 不在清單 | G4 沒有清單 | G4 外部 | 清單 |",
+             "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|"]
     for t in result + [{"card": "**合計**", "_totals": totals(result)}]:
         c = t.get("_totals") or counts(t)
         state = "" if "_totals" in t else "沒有" if not t["list_info"] else "部分" if t["lists_partial"] else \
             "完整" if not any(x["partial"] for x in t["list_info"]) else "有部分"
         lines.append(f"| {t['card']} | " + " | ".join(str(c[k]) for k in COLS) + f" | {state} |")
-    lines += ["", "G3 " + GAP_LABEL["G3"] + "；G3 問架構：同樣沒有 rules，但 evaluate_on 是 "
+    lines += ["", "G1 " + GAP_LABEL["G1"] + "；G2 " + GAP_LABEL["G2"] + "。",
+              "G3 " + GAP_LABEL["G3"] + "；G3 問架構：同樣沒有 rules，但 evaluate_on 是 "
               + "／".join(INTERVIEW_TYPES) + "（用問的或盤點，不算偵測缺口）；G5 " + GAP_LABEL["G5"] + "；G6 " + GAP_LABEL["G6"] + "。",
               "G4：" + "；".join(f"{k} {G4_LABEL[k]}" for k in G4_ALL) + "。",
               "清單：部分 = 這張卡的已存清單都不完整（存的時候用前綴過濾，或沒有包含其他 exporter）；不在清單的名稱要人工確認。"]
@@ -313,6 +331,12 @@ def render(result: list[dict], items: bool = True) -> str:
         for x in t["list_info"]:
             lines.append(f"  清單 {x['file']}（{x['version']}，{x['names']} 個名稱"
                          + (f"；部分：{'；'.join(x['why'])}" if x["partial"] else "") + "）")
+        if t["p1"]:
+            lines.append(f"  機制 {t['mechanisms']} 個、failure mode {t['failure_modes']} 個")
+        for g in t["G1"]:
+            lines.append(f"  G1 {t['card']}#{g['signal']} tier {g['tier']}")
+        for g in t["G2"]:
+            lines.append(f"  G2 {t['card']}: {g['failure_mode']}（機制 {g['mechanism']}，{g['by']}）")
         for g in t["G3"]:
             lines.append(f"  G3 {t['card']}#{g['signal']} tier {g['tier']} upstream {g['upstream']}")
         for g in t["G3.interview"]:

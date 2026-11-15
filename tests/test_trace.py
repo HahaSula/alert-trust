@@ -183,7 +183,7 @@ class RealCatalogTest(unittest.TestCase):
         result = T.trace()
         text = T.render(result)
         tot = T.totals(result)
-        for g in ("G3", "G5", "G6"):
+        for g in ("G1", "G2", "G3", "G5", "G6"):
             self.assertEqual(tot[g], sum(len(t[g]) for t in result))
             self.assertEqual(tot[g], sum(1 for line in text.splitlines() if line.startswith(f"  {g} ")))
         self.assertEqual(tot["G3.interview"], sum(1 for line in text.splitlines() if line.startswith("  G3.interview ")))

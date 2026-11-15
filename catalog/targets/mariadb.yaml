@@ -1387,6 +1387,165 @@ signals:
 
 # 不正確使用：應用送出寫得不好的 SQL 時，哪些訊號看得到（section: misuse）、哪些看不到（blind_spots）。
 # 依據是 lab/targets/mysql/perf、ha、ash 的實驗與原始碼；沒有依據的項目寫在 not_visible。
+# P1 試點：機制（從原始碼出發）與失效模式。issue 來的說法在釘到 commit 或 lab 重現前一律是 inferred。
+mechanisms:
+  - id: purge
+    name: Undo purge
+    resource: undo log（history list）
+    text: >-
+      每個寫入交易留下 undo 紀錄，purge 清掉沒有任何 read view 還需要的部分；清不掉的長度就是 Innodb_history_list_length
+    evidence: code
+    refs: [my-trace-mdb-histlen-var]
+  - id: redo-checkpoint
+    name: Redo log 與 checkpoint
+    resource: redo log 空間、頁面寫出的 IO
+    text: >-
+      redo 空間快用完時 checkpoint 必須往前推，page cleaner 要先把髒頁寫出去；寫不夠快時寫入的執行緒要等（MDEV-35155 維護者的說明，沒有讀碼）
+    evidence: inferred
+  - id: row-lock
+    name: InnoDB row lock
+    resource: 列鎖（等待佇列、deadlock 偵測）
+    text: >-
+      交易持有的列鎖到 commit 或 rollback 才放；等待者計入 Innodb_row_lock_current_waits，形成環時選一個 victim rollback 並計入 Innodb_deadlocks
+    evidence: code
+    refs: [my-trace-mdb-rowlock-var, my-trace-mdb-deadlock-inc]
+  - id: metadata-lock
+    name: Metadata lock（MDL）
+    resource: 每張表的 MDL 等待佇列
+    text: >-
+      讀寫語句對表持有共享 MDL 到交易結束；DDL 要排他 MDL，等待期間後到的語句排在它後面，state 是 Waiting for table metadata lock
+    evidence: code
+    refs: [my-perf-mdb-mdl-state, my-perf-mdb-lock-wait-timeout]
+  - id: replication-apply
+    name: 複寫套用（SQL thread 與 parallel worker）
+    resource: relay log 的套用進度、worker 佇列
+    text: >-
+      SQL thread（或 parallel worker）依序套用 relay log；遇到錯誤就停下並記在 Last_SQL_Errno，套用比 primary 寫入慢就是延遲
+    evidence: code
+    refs: [my-trace-mdb-last-sql-errno, my-trace-mdb-sbm-null]
+  - id: connections
+    name: 連線與 thread
+    resource: max_connections 名額、thread
+    text: >-
+      每條連線佔一個 max_connections 名額；滿了之後新連線被拒並計入 Connection_errors_max_connections，沒有可重用的 thread 時現開（Threads_created）
+    evidence: code
+    refs: [my-trace-mdb-connerr-var, mariadb-conn-errors, spl-mdb114-threads-created]
+
+failure_modes:
+  - id: purge-blocked-by-read-view
+    mechanism: purge
+    trigger: 交易開著不結束（含 consistent snapshot），read view 一直留著
+    effect: purge 過不了這個 read view，history list 變長（實驗 414，交易結束後降到 1）
+    detected_by: { signals: [undo-history, long-transactions] }
+    distinguishes: true
+    evidence: tested
+    refs: [exp-mysql-ha, my-trace-mdb-histlen-var]
+  - id: purge-outpaced-by-writes
+    mechanism: purge
+    trigger: 沒有長交易，但寫入負載不中斷（issue 用 sysbench-tpcc 60 分鐘）
+    effect: >-
+      undo 頁被小交易重複使用，rollback segment 釋放不了，history list 一直長；負載停幾秒就收掉。
+      issue 欄位寫修正在 10.6.17、10.11.7、11.4.1，沒有核對 commit
+    detected_by: { signals: [undo-history] }
+    distinguishes: partial
+    evidence: inferred
+    sources: ["MDEV-33213"]
+  - id: redo-log-too-small
+    mechanism: redo-checkpoint
+    trigger: 寫入量大而 innodb_log_file_size 相對太小（issue：buffer pool 188 GB、資料全在記憶體）
+    effect: >-
+      checkpoint 逼著大量刷頁，TPS 週期性下跌。卡片沒有 checkpoint age 的訊號；innodb-pressure 的 log_waits 量的是 log buffer，會不會動沒有實驗
+    detected_by: { signals: [throughput-drop] }
+    distinguishes: false
+    evidence: inferred
+    sources: ["MDEV-35155"]
+  - id: row-lock-held-by-open-transaction
+    mechanism: row-lock
+    trigger: 一個交易鎖住列之後不 commit，其他 session 更新同一列
+    effect: 等待者排隊到 innodb_lock_wait_timeout；實驗 8 條連線全部卡住時 current_waits 是 8
+    detected_by: { signals: [lock-waits, active-sessions], blind_spots: [row-lock-blocker] }
+    evidence: tested
+    refs: [exp-mysql-perf, exp-mysql-ha, my-trace-mdb-rowlock-var]
+  - id: deadlock-by-lock-order
+    mechanism: row-lock
+    trigger: 兩個交易以相反順序更新同兩列（實驗：id 10→11 與 11→10）
+    effect: 其中一個收到 1213 並 rollback，Innodb_deadlocks 增加
+    detected_by: { signals: [deadlocks, statement-errors] }
+    evidence: tested
+    refs: [exp-mysql-ha, my-trace-mdb-deadlock-inc]
+  - id: deadlock-by-fk-shared-lock
+    mechanism: row-lock
+    trigger: 同一交易先 INSERT 子表（FK 檢查對父列拿 S 鎖）再 UPDATE 同一筆父列，兩個 session 並行
+    effect: 兩邊都拿到 S 鎖、都等對方放，必定 deadlock；訊號看不出成因是 FK 檢查
+    detected_by: { signals: [deadlocks, statement-errors] }
+    distinguishes: false
+    evidence: inferred
+    sources: ["MDEV-36112"]
+  - id: scan-waits-on-rows-outside-range
+    mechanism: row-lock
+    trigger: >-
+      SKIP LOCKED 工作佇列裡，DELETE … WHERE id IN (…) 在小表被選成全表掃描（issue：11.0 以前的成本模型）
+    effect: 掃描讀到別的 worker 鎖住的列就等，到 lock wait timeout（1205）
+    detected_by: { signals: [lock-waits, statement-errors], blind_spots: [slow-query-plan] }
+    distinguishes: false
+    evidence: inferred
+    sources: ["MDEV-27999"]
+  - id: deadlock-counter-in-find-cycle
+    mechanism: row-lock
+    trigger: 版本在 10.6.19 以前（計數寫在 Deadlock::find_cycle 裡；10.6.19 移到 Deadlock::report）
+    effect: >-
+      issue 回報一次 deadlock 計數加 2（沒有在 lab 重現）；跨版本比較 deadlock 率會差一倍。
+      其他版本線的修正版（issue 欄位：10.11.9、11.4.3）沒有核對
+    detected_by: { accepted: "不另外偵測：卡片核對的版本都在修正之後；門檻跨版本比較時由使用者注意" }
+    evidence: code
+    refs: [mdb10618-deadlocks-in-find-cycle, mdb10619-deadlocks-in-report]
+    sources: ["MDEV-33935"]
+  - id: ddl-behind-open-transaction
+    mechanism: metadata-lock
+    trigger: 一個交易讀過某張表後不 commit，之後對同一張表下 ALTER TABLE
+    effect: ALTER 等 MDL，後到的語句全部排在它後面（實驗 10 秒內 9 個 session 在等，commit 速率從 320/s 到 0）
+    detected_by: { signals: [metadata-locks, long-transactions, throughput-drop], blind_spots: [mdl-holder] }
+    evidence: tested
+    refs: [exp-mysql-perf, my-perf-mdb-mdl-state]
+  - id: mdl-held-by-handler-open
+    mechanism: metadata-lock
+    trigger: 連線執行 HANDLER … OPEN 後不關（沒有交易，連線可以是閒置）
+    effect: 一直持有 MDL_SHARED_READ，擋住 LOCK TABLES WRITE 與 DDL；innodb_trx 沒有對應交易，長交易的訊號不會響
+    detected_by: { signals: [metadata-locks], blind_spots: [mdl-holder] }
+    distinguishes: partial
+    evidence: inferred
+    sources: ["MDEV-33498"]
+  - id: sql-thread-stopped-by-error
+    mechanism: replication-apply
+    trigger: replica 套用到衝突的事件（例如 1062 重複鍵）
+    effect: SQL thread 停下，不會自己恢復
+    detected_by: { signals: [replication-error, replication-running], blind_spots: [replica-error-text] }
+    evidence: tested
+    refs: [exp-mysql-ha, my-trace-mdb-last-sql-errno]
+  - id: optimistic-kill-misses-lock-wait
+    mechanism: replication-apply
+    trigger: slave_parallel_mode 是 optimistic 或 aggressive，worker 之間 row lock 衝突（issue 欄位：10.6.0 起，10.6.16 修）
+    effect: 被 kill 的交易沒有被打斷，平行複寫卡到 innodb_lock_wait_timeout 到期；Slave_SQL_Running 仍是 Yes
+    detected_by: { signals: [replication-lag, lock-waits] }
+    distinguishes: false
+    evidence: inferred
+    sources: ["MDEV-32096"]
+  - id: parallel-apply-not-parallelizable
+    mechanism: replication-apply
+    trigger: 開了 slave_parallel_threads，但 primary 的 binlog 給不出可平行的 group（issue：primary 是 10.0）
+    effect: worker 不能平行還多了排隊成本，延遲比單執行緒大
+    detected_by: { signals: [replication-lag] }
+    distinguishes: false
+    evidence: inferred
+    sources: ["MDEV-26196"]
+  - id: connections-exhausted
+    mechanism: connections
+    trigger: 連線數到 max_connections
+    effect: 新連線被拒，exporter 自己也連不進去，整組 metric 消失；計數要等連線降下來才抓得到（實驗 +2）
+    detected_by: { signals: [connections, connection-headroom, aborted-connects], blind_spots: [connections-at-saturation] }
+    evidence: tested
+    refs: [exp-mysql-ha, my-trace-mdb-connerr-var]
+
 bad_queries:
   - case: 全表掃描、缺索引
     signals: [slow-queries, slow-sql-visibility, buffer-pool-misses, throughput-drop]
@@ -1434,7 +1593,8 @@ bad_queries:
 
 # 目前無法監控的範圍。category：exporter（資料庫有、exporter 沒輸出）、database（資料庫本身沒提供）、other（要靠其他元件）。
 blind_spots:
-  - what: 連線打滿當下的連線數
+  - id: connections-at-saturation
+    what: 連線打滿當下的連線數
     category: exporter
     why: exporter 也被擋在外面，整組 metric 消失
     workaround: >-
@@ -1447,7 +1607,8 @@ blind_spots:
       metrics: [mysql_q_threads_connected, mysql_q_max_connections]
       rules: [MariaDBConnectionsExhausted]
       refs: [my-q-exp, my-q-exp-1, my-q-mdb-extra-scheduler, my-q-mdb-extra-max-default, my-q-qe-pool-persist, ver-mdb123-extra-port]
-  - what: errant GTID
+  - id: errant-gtid
+    what: errant GTID
     category: exporter
     why: "`gtid_binlog_pos`、`gtid_binlog_state` 是字串，exporter 跳過"
     workaround: >-
@@ -1461,7 +1622,8 @@ blind_spots:
       metrics: [mysql_q_gtid_binlog_state_seq, mysql_q_read_only]
       rules: [MariaDBErrantGtid]
       refs: [my-q-exp, my-q-mdb-binlog-state-pair, my-q-mdb-gtid-binlog-state, my-q-qe-row-map]
-  - what: Metadata lock 的細節（誰擋住誰）
+  - id: mdl-holder
+    what: Metadata lock 的細節（誰擋住誰）
     category: exporter
     why: 沒有 collector；performance_schema 預設關，`metadata_locks` 也看不到 PENDING
     workaround: >-
@@ -1475,13 +1637,15 @@ blind_spots:
       metrics: [mysql_q_mdl_waiting_sessions, mysql_q_mdl_oldest_wait_seconds, mysql_q_mdl_blocking_sessions, mysql_q_mdl_idle_blocking_sessions, mysql_q_mdl_blocker_age_seconds]
       rules: [MariaDBMetadataLockBlocker]
       refs: [my-q-exp, my-q-mdb-mli-granted, my-q-mdb-mli-time, my-q-qe-null-zero]
-  - what: Replica 的錯誤訊息與錯誤名稱
+  - id: replica-error-text
+    what: Replica 的錯誤訊息與錯誤名稱
     category: database
     why: "`Last_SQL_Error` 是字串；`replication_applier_status_by_worker` 只在 performance_schema=ON 且 slave_parallel_threads > 0 時有列，也沒有錯誤名稱表"
     workaround: 用 mysqld_exporter 的 `mysql_slave_status_last_sql_errno`；訊息看 `SHOW SLAVE STATUS`
     options: "建議：規則帶 last_sql_errno（MariaDBReplicationError）；訊息看 SHOW SLAVE STATUS"
     section: targets/mariadb.md#custom-queries
-  - what: 執行中語句的 digest、長尾延遲、CPU 時間
+  - id: running-statement-detail
+    what: 執行中語句的 digest、長尾延遲、CPU 時間
     category: database
     why: digest 在語句結束才寫入；沒有 quantile 與 `SUM_CPU_TIME`
     workaround: ASH 取樣器（資料庫內的 EVENT），用 query-exporter 輸出最近 60 秒的等待類別 × digest 平均；digest 仍只有已結束的語句，quantile 與 CPU 時間仍然沒有
@@ -1493,25 +1657,29 @@ blind_spots:
       metrics: [mysql_q_ash_active_sessions, mysql_q_ash_sampler_enabled, mysql_q_ash_sampler_last_run_age_seconds]
       rules: [MariaDBAshSamplerStopped, MariaDBRowLockActiveSessions]
       refs: [my-q-exp, my-asp-exp-ash, my-q-qe-expiration]
-  - what: 每帳號、每查詢統計（performance_schema 關著時）
+  - id: per-account-stats
+    what: 每帳號、每查詢統計（performance_schema 關著時）
     category: database
     why: performance_schema 五條線都預設 OFF
     workaround: 開 `performance_schema=ON`（要重啟，佔記憶體）
     options: "建議：開 performance_schema=ON（要重啟、佔記憶體）"
     section: targets/mariadb.md#blind-spots
-  - what: 頁面損毀
+  - id: page-corruption
+    what: 頁面損毀
     category: database
     why: 沒有 status 計數，只寫在 error log；`CHECK TABLE` 要讀整張表（並加鎖），不能放進每 15–60 秒的查詢
     workaround: log 管線對 error log 告警；離峰排程 `CHECK TABLE`／mariadb-check 寫 textfile（query-exporter 的 schedule 也能跑，但成本與鎖要自己評估，這裡不提供）
     options: "建議：log 管線對 error log 告警；離峰排程 CHECK TABLE 寫 textfile"
     section: targets/mariadb.md#blind-spots
-  - what: 真正的寫入是否成功
+  - id: write-probe
+    what: 真正的寫入是否成功
     category: database
     why: "`mysql_up` 只做 ping"
     workaround: heartbeat 寫入程式回報成功時間（pt-heartbeat ＋ --collect.heartbeat），或應用層探測；不建議讓監控帳號寫入，所以沒有放進自訂查詢
     options: "建議：heartbeat 寫入程式回報成功時間，或應用層探測"
     section: targets/mariadb.md#blind-spots
-  - what: 磁碟剩餘空間、檔案系統唯讀
+  - id: disk-and-readonly-fs
+    what: 磁碟剩餘空間、檔案系統唯讀
     category: other
     why: 不在資料庫裡；mysqld_exporter 沒有磁碟 metric
     workaround: >-
@@ -1525,7 +1693,8 @@ blind_spots:
       metrics: [node_filesystem_avail_bytes, node_filesystem_size_bytes, node_filesystem_files_free, node_filesystem_readonly]
       rules: [HostFilesystemAlmostFull, HostFilesystemFillingUp, HostInodesAlmostFull, HostFilesystemReadOnly, MariaDBDataDiskFilling, MariaDBDataDiskFillingSoon]
       refs: [res-nm-fs-filling, res-nm-fs-almost, res-nm-files, res-ne-fs-readonly, res-nm-fs-readonly]
-  - what: 行程 CPU、記憶體、OOM kill、fsync／磁碟延遲
+  - id: process-resources
+    what: 行程 CPU、記憶體、OOM kill、fsync／磁碟延遲
     category: other
     why: mysqld_exporter 沒有行程 CPU 與 fsync 延遲（10.11 起 `Innodb_data_pending_fsyncs` 連 redo log 都不算）；OOM kill 在資料庫裡只看得到 uptime 歸零
     workaround: node_exporter 的 PSI、MemAvailable、vmstat 與磁碟時間；容器用 cAdvisor 的節流、working set 與 OOM 事件。主機層規則只讀碼
@@ -1537,26 +1706,30 @@ blind_spots:
       metrics: [node_pressure_cpu_waiting_seconds_total, container_cpu_cfs_throttled_periods_total, node_memory_MemAvailable_bytes, node_vmstat_oom_kill, node_disk_write_time_seconds_total, node_disk_writes_completed_total]
       rules: [HostCPUPressure, ContainerCPUThrottled, HostMemoryLow, HostMemoryPressure, HostOOMKill, ContainerOOMEvent, ContainerOOMKilled, HostDiskWriteLatencyHigh, HostIOPressure]
       refs: [res-ne-psi-cpu, res-cadv-throttled, res-ne-mem-avail, res-ne-psi-mem, res-ne-vmstat-fields, res-cadv-oom, res-ksm-terminated, res-ne-disk-writetime, res-ne-disk-writes, res-ne-psi-io]
-  - what: 備份是否成功、多新
+  - id: backup-status
+    what: 備份是否成功、多新
     category: other
     why: 沒有備份 collector
     workaround: 備份 job 寫 textfile metric
     options: "建議：備份 job 成功後寫 textfile 時間戳（MariaDBBackupStale、MariaDBBackupMetricMissing）"
     section: targets/mariadb.md#protection
   # 寫得不好的 SQL：exporter 只看得到彙總，下面這些痕跡看不到（對照 bad_queries）
-  - what: 慢查詢的執行計畫、參數值與 slow log 原文
+  - id: slow-query-plan
+    what: 慢查詢的執行計畫、參數值與 slow log 原文
     category: exporter
     why: eventsstatements 只有已結束語句的 digest 彙總（要開 performance_schema、只取總耗時前 250 個、digest_text 截在 120 字），exporter 不讀 slow log、不跑 EXPLAIN
     workaround: 告警後查 `sys.statement_analysis`（要開 performance_schema）與 `EXPLAIN`；slow log 交給 log 管線
     options: "建議：告警帶出 digest，再查 sys.statement_analysis 與 EXPLAIN；slow log 交給 log 管線"
     section: targets/mariadb.md#perf-slow-sql
-  - what: Row lock 的阻擋者（誰擋住誰）
+  - id: row-lock-blocker
+    what: Row lock 的阻擋者（誰擋住誰）
     category: exporter
     why: 沒有 collector 讀 `information_schema.INNODB_LOCK_WAITS`；等 row lock 的 session 在 processlist 的 state 是 updating
     workaround: 告警後查 `information_schema.INNODB_LOCK_WAITS` 搭配 `INNODB_TRX`（這個查詢未實測）；ASH 取樣器有等 row lock 的 session 數
     options: "建議：告警後查 INNODB_LOCK_WAITS 與 INNODB_TRX（未實測）；ASH 取樣器給等待數"
     section: targets/mariadb.md#perf-row-lock
-  - what: 語句錯誤是哪一個錯誤碼
+  - id: statement-error-code
+    what: 語句錯誤是哪一個錯誤碼
     category: database
     why: eventsstatementssum 只有錯誤總數；MariaDB 沒有 `events_errors_summary_*` 表
     workaround: 應用端記錄錯誤碼，或 error log

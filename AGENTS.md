@@ -42,7 +42,7 @@ alert-trust 回答兩個問題：
 python3 tools/validate.py              # 0 個錯誤；--refs 列出還沒有參考的項目
 python3 tools/build_pages.py
 python3 -m unittest discover -s tests
-python3 tools/check_trace.py [--card X]       # 只報告：每張卡的 G3–G6 缺口計數與清單，不會失敗
+python3 tools/check_trace.py [--card X]       # 只報告：每張卡的 G1–G6 缺口計數與清單，不會失敗（G1、G2 只算有 mechanisms 的卡）
 # 缺口只能減少：tests/test_trace.py 比對 catalog/trace-baseline.json，任何一項增加就失敗。
 # 先把缺口修掉；確認是刻意的才更新基準：python3 tools/check_trace.py --write-baseline（diff 一起 commit）
 promtool check rules rules/**/*.yml    # vmalert 的 vlogs 規則用 vmalert -dryRun
@@ -75,6 +75,8 @@ docker run --rm -u $(id -u):$(id -g) -v "$PWD":/docs squidfunk/mkdocs-material:9
 ## 五段框架
 
 每張卡都回答：1 架構（會留下哪些痕跡）、2 正確使用（`usage`，只寫原始碼推理、本機小實驗或標明的官方文件）、3 正確觀測（訊號 `section: observe`）、4 不正確使用時的觀測（`section: misuse`，包含寫得不好的查詢：DB 的 SQL／命令、監控系統的 PromQL／MetricsQL／LogsQL 與 rule）、5 目前無法觀測的痕跡（`blind_spots`，方案 `options` 一行點到為止）。範圍只到 exporter／endpoint 實際輸出的那一層，不往下挖（例如主機只到 node_exporter、kube-state-metrics）。格式見 `docs/contributing.md#five-sections`。`catalog/map.yaml` 由 `tools/build_map.py`（`build_pages.py` 會呼叫）產生並 commit，記錄每張卡屬於哪個 plugin（`plugins.<name>.dir`、`skills`）、各段有哪些項目；上層 skill（selfcheck、rule-review）讀它把每個 target 分派給 `/alert-trust-<db>:<db>`，沒裝時只做通用的正確觀測檢查並提示安裝。`validate.py` 會檢查它是否過期，`tests/test_plugins.py` 檢查 plugin 目錄、版本與 symlink。
+
+機制與失效模式（P1 試點，目前只有 MariaDB 卡）：`mechanisms`、`failure_modes` 兩個選填欄位，格式與 T1–T3 檢查見 `docs/contributing.md#mechanisms`。從 issue 來的失效模式在釘到 commit 或 lab 重現前一律 `evidence: inferred`，issue 編號寫在 `sources`。
 
 ## 證據規則（最重要）
 

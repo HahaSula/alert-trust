@@ -22,6 +22,21 @@
 
 同一個主題同時有「量得準不準」和「數值異常」兩面時，拆成兩個訊號：例如「複寫延遲量的是不是真的」是 `observe`，「延遲太大」是 `misuse`。`validate.py` 會列出還沒有 `section` 的訊號數（遷移中只是警告）。
 
+## 機制與失效模式（試點） {#mechanisms}
+
+目前只有 MariaDB 卡有。目的是從「元件內部怎麼運作、會怎麼壞」出發檢查卡片，而不是從 metric 清單出發。兩個欄位都是選填。
+
+| 欄位 | 內容 |
+|---|---|
+| `mechanisms: [{id, name, resource, text, evidence, refs}]` | 一個內部機制，以及它會用完、排隊或被擋住的資源。還沒整理失效模式時寫 `not_studied`（一句話說還沒研究什麼） |
+| `failure_modes: [{id, mechanism, trigger, effect, detected_by, evidence, refs}]` | 機制的一種壞法：`trigger` 是用法或設定，`effect` 是內部結果。選填：`distinguishes`（`true`／`false`／`"partial"`，訊號分不分得出這個成因）、`versions`（格式同訊號）、`sources`（issue 編號，純文字，不算證據） |
+| `detected_by` | 至少一項：`signals`（這張卡的訊號 id）、`blind_spots`（這張卡 blind_spots 的 `id`）、`accepted`（一句話寫明為什麼接受不偵測） |
+| `blind_spots[].id` | 選填，kebab-case；要被 failure mode 指到的才需要 |
+
+`validate.py` 的三道檢查：T1 指到的 id 都存在；T2 每個失效模式都有交代；T3 每個機制至少一個失效模式，或有 `not_studied`。`evidence` 用一般的四級，只有 `inferred` 可以沒有 `refs`。從 issue 來的說法，在釘到 commit（原始碼參考）或 lab 重現之前一律是 `inferred`。
+
+`check_trace.py` 對有這兩個欄位的卡多報兩個缺口：G1 是沒有任何失效模式指到的 misuse 訊號；G2 是沒有訊號、只靠 `accepted` 或沒有 `options` 的 blind spot 交代的失效模式。兩者只報告，計數進基準檔，只能減少。
+
 ## 新增一個監控元件或 target
 
 1. 在 `catalog/components/`（監控元件）或 `catalog/targets/`（exporter 加上它背後的服務）新增 `<id>.yaml`，格式照 `catalog/components/prometheus.yaml`。必填：`id`、`name`、`kind`、`family`、`status`、`stages`、`role`、`signals`。

@@ -59,7 +59,9 @@
 目標：從 monitor of monitor 擴成「元件觀測與使用分析」，重用五段框架、證據等級、refs、lab、覆蓋檢查，不另起系統。
 
 - **P0（完成）**：`tools/check_trace.py` 缺口報告（G3 有訊號沒偵測、G4 metric 存在性、G5 有 rule 非實測、G6 元件不提供；G1／G2 等 P1）、`catalog/trace-baseline.json` 棘輪、`validate.py` 的 E1（實測一定要引用實驗 ref）。
-- **P1（未開始，MariaDB 試點）**：卡片加選填的 `mechanisms`（機制與資源）、`failure_modes`（連到訊號、blind spot 或寫明接受不偵測）；Gate T1 引用不懸空、T2 失效模式要有交代、T3 機制至少一個失效模式或寫明還沒研究。
+- **P1（MariaDB 試點完成第一版，2026-11-15）**：卡片加選填的 `mechanisms`、`failure_modes`、`blind_spots[].id`；`validate.py` 的 T1（引用不懸空）、T2（失效模式要有交代）、T3（機制至少一個失效模式或 `not_studied`）；`check_trace.py` 的 G1、G2（進基準檔）。格式見 `docs/contributing.md#mechanisms`。
+  MariaDB 卡：6 個機制（purge、redo／checkpoint、row lock、MDL、複寫套用、連線）、14 個失效模式（實測 5、讀碼 1、推論 8，推論的都來自 issue 試點）；G1 29（44 個 misuse 訊號裡 29 個還沒有失效模式指到，主要是 Galera、備份與保護、容量、buffer pool、暫存表）、G2 1。
+  還沒做：`bad_queries` 沒有併進來（P4 再決定）；元件頁不顯示這兩個欄位；`redo-checkpoint` 機制沒有讀碼（推論）；8 個推論的失效模式要釘 commit 或做小 lab 才能升級；`distinguishes` 只是說明欄。
 - **P2（未開始）**：實驗 ref 加 `hypotheses`（假設、版本、方法、預期出現／消失的訊號、結果、限制）；E1 升級成「實測要指到 result 為 pass 的假設」、E2 版本要重疊。
 - **P3**：研究流程盲測（從機制出發寫卡，不從 metric 清單）。**P4**：其他卡推廣，警告數只減不增。
 - 分工：格式、懸空 id、實測有沒有實驗、版本重疊、metric 存在、缺口計數由工具判；機制與失效模式、假設與實驗設計由 agent 研究；範圍、要不要補替代方案或 rule、門檻由人決定。不追求 100% 覆蓋。

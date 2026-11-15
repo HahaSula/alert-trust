@@ -799,3 +799,17 @@ refs:
     file: "go.mod"
     line: 31
     url: "https://github.com/prometheus/alertmanager/blob/v0.33.1/go.mod#L31"
+  mdb10618-deadlocks-in-find-cycle:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-10.6.18"
+    file: "storage/innobase/lock/lock0lock.cc"
+    line: 299
+    url: "https://github.com/MariaDB/server/blob/mariadb-10.6.18/storage/innobase/lock/lock0lock.cc#L299"
+  mdb10619-deadlocks-in-report:
+    kind: code
+    project: "MariaDB/server"
+    version: "mariadb-10.6.19"
+    file: "storage/innobase/lock/lock0lock.cc"
+    line: 6831
+    url: "https://github.com/MariaDB/server/blob/mariadb-10.6.19/storage/innobase/lock/lock0lock.cc#L6831"
