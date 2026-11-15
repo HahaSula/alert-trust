@@ -5,16 +5,27 @@
   python3 tools/check_trace.py --card mysql    # one card
   python3 tools/check_trace.py --summary       # count table only (CI step summary)
   python3 tools/check_trace.py --json out.json
+  python3 tools/check_trace.py --write-baseline   # rewrite catalog/trace-baseline.json (the ratchet; deliberate only)
 
 Gap classes (counts and lists only, no percentages):
   G1/G2  need mechanism data (P1); not estimated here.
   G3     signal with no rules and upstream.status no / missing (「有訊號、沒偵測」).
+         G3.interview: the same, but evaluate_on is interview / inventory / external (問架構、盤點時檢查、外部服務:
+         answered by asking or reading config, never by a rule on a ruler, as in check_coverage.py). Listed
+         separately and not counted as a detection gap.
   G4     metric existence: names a card's signals list (`metrics`, which contains `key_metrics` / `metrics_any`)
          plus the selectors of the PromQL rules those signals reference, against the metric-name lists saved in lab/:
-           confirmed    in a saved list of that card
+           confirmed    in a saved list of that card, with the versions (lists) it was seen in; lists of different
+                        versions are not merged: a name seen only in one version says so
+           other_source produced by another exporter the card also uses (query-exporter queries_* / custom-query
+                        prefixes mysql_q_ / pgq_ / chq_, patroni_*, pgbackrest_*, blackbox probe_*, OTHER_SOURCE
+                        below): the card's own lists cannot hold it
            not_in_list  the card has saved lists but the name is not in them (may be a counter that appears only after
-                        an event, or a list filtered by prefix: check by hand)
+                        an event, or a partial list: check by hand)
            no_list      no saved list for this card
+         A list is partial when it was saved with a name-prefix filter (every name starts with one prefix, as the
+         lab run.sh `__name__=~"mysql_.*"` queries do), or without the side exporters the card uses (the card has
+         other_source names), or is named in PARTIAL_LISTS.
          Names produced by the scraper or other exporters (check_metrics.EXTERNAL: up, scrape_*, ALERTS*, node_*...)
          and recording-rule outputs (names with ':') are counted as external and not checked.
   G5     signal with rules whose evidence is not tested.
@@ -40,8 +51,37 @@ import check_metrics as CM  # noqa: E402
 
 GAPS = ("G3", "G4", "G5", "G6")
 G4_CLASSES = ("confirmed", "not_in_list", "no_list")
-G4_LABEL = {"confirmed": "已確認", "not_in_list": "不在已存清單（可能是事件後才出現的 counter，要人工確認）",
+G4_ALL = ("confirmed", "other_source", "not_in_list", "no_list", "external")
+G4_LABEL = {"confirmed": "已確認（附看到它的版本）", "other_source": "其他 exporter 產生（卡片自己的清單不會有）",
+            "not_in_list": "不在已存清單（可能是事件後才出現的 counter，或清單不完整，要人工確認）",
             "no_list": "這張卡沒有已存清單", "external": "外部或 recording rule（不檢查）"}
+# evaluate_on values answered by asking / reading config / an external service, not by a rule (check_coverage.py)
+INTERVIEW_TYPES = ("interview", "inventory", "external")
+# names another exporter produces: (regex, source). Card-specific entries: {card: [(regex, source)]}
+OTHER_SOURCE = [
+    (r"^(queries_|query_(timestamp|interval|latency)|database_errors)", "query-exporter 本身"),
+    (r"^(mysql_q_|pgq_|chq_)", "query-exporter 自訂查詢"),
+    (r"^patroni_", "Patroni REST API /metrics"),
+    (r"^pgbackrest_", "pgbackrest_exporter"),
+    (r"^probe_", "blackbox_exporter"),
+    (r"^namedprocess_", "process-exporter"),
+]
+OTHER_SOURCE_CARD = {"yugabytedb": [(r"^pg_", "postgres_exporter（接 YSQL）")]}
+# explicit overrides: list file (repo-relative) -> why it is partial
+PARTIAL_LISTS: dict[str, str] = {}
+# list file stem -> version, where the file name has no version (from each lab's compose.yml / run.sh)
+LIST_VERSION = {
+    "names-my1": "MySQL 8.4.7", "names-my2": "MySQL 8.4.7", "names-mdb1": "MariaDB 11.4", "names-mdb2": "MariaDB 11.4",
+    "metric-names-normal": "MariaDB 11.4", "metric-names-noprocess": "MariaDB 11.4",
+    "names-e-p16": "PostgreSQL 16.15", "names-e-p17": "PostgreSQL 17.11",
+    "names-postgres": "PostgreSQL 16", "names-postgres-nomon": "PostgreSQL 16",
+    "names-e-vk1": "Valkey 9.1.3", "names-e-kg": "Valkey 9.1.3", "names-e-r72": "Redis 7.2.17", "names-e-r8": "Redis 8.10.3",
+}
+_VERSION = re.compile(r"\d+(?:\.\d+)+")
+BASELINE = os.path.join("catalog", "trace-baseline.json")
+# the classes the ratchet watches (tests/test_trace.py): a count above the baseline fails
+RATCHET = ("G3", "G5", "G6", "G4.not_in_list", "G4.no_list")
+UPDATE_BASELINE = "python3 tools/check_trace.py --write-baseline"
 GAP_LABEL = {"G3": "有訊號、沒偵測（沒有 rules，上游也沒有）", "G4": "metric 存在性",
              "G5": "有 rules，但 evidence 不是 tested", "G6": "blind_spots 是 database（元件本身沒提供）"}
 P1_NOTE = "G1/G2：需要 P1 的機制資料"
@@ -65,14 +105,46 @@ def _card_of_names_file(rel: str, cards: set[str]) -> str | None:
     return card if card in cards else None
 
 
+def list_version(rel: str) -> str:
+    """Version label of one saved list: LIST_VERSION by file stem, else the version in the file name, else the stem."""
+    stem = os.path.splitext(os.path.basename(rel))[0]
+    if stem in LIST_VERSION:
+        return LIST_VERSION[stem]
+    m = _VERSION.search(stem)
+    return m.group(0) if m else re.sub(r"^(metric-)?names-", "", stem)
+
+
+def prefix_filter(names: set[str]) -> str | None:
+    """`x_` when every name of a list starts with the same prefix (saved with a name filter), else None."""
+    heads = {n.split("_", 1)[0] for n in names if "_" in n}
+    if len(names) >= 5 and len(heads) == 1 and all("_" in n for n in names):
+        return next(iter(heads)) + "_"
+    return None
+
+
+def other_source(card: str, metric: str) -> str | None:
+    for pat, src in OTHER_SOURCE_CARD.get(card, []) + OTHER_SOURCE:
+        if re.match(pat, metric):
+            return src
+    return None
+
+
 def saved_lists(root: str, cards: set[str]) -> dict[str, dict]:
-    """{card: {"names": set, "files": [rel paths]}} from the metric-name lists saved in lab/."""
+    """{card: {"names": set (union, for a quick test), "files": [rel paths], "lists": [{file, version, names,
+    partial, why}]}} from the metric-name lists saved in lab/. Each list keeps its own version."""
     out: dict[str, dict] = {}
 
-    def add(card: str, rel: str, names: set[str]) -> None:
-        e = out.setdefault(card, {"names": set(), "files": []})
+    def add(card: str, rel: str, names: set[str], filtered: bool = True) -> None:
+        e = out.setdefault(card, {"names": set(), "files": [], "lists": []})
         e["names"] |= names
         e["files"].append(rel)
+        why = []
+        if rel in PARTIAL_LISTS:
+            why.append(PARTIAL_LISTS[rel])
+        pf = prefix_filter(names) if filtered else None  # check_metrics results hold only the card's own names
+        if pf:
+            why.append(f"只存了 `{pf}` 開頭的名稱")
+        e["lists"].append({"file": rel, "version": list_version(rel), "names": names, "partial": bool(why), "why": why})
 
     paths = glob.glob(os.path.join(root, "lab", "targets", "**", "names-*.txt"), recursive=True)
     paths += glob.glob(os.path.join(root, "lab", "targets", "**", "metric-names-*.txt"), recursive=True)
@@ -93,7 +165,7 @@ def saved_lists(root: str, cards: set[str]) -> dict[str, dict]:
             if r.get("status") == "found" and r.get("component") in cards:
                 by.setdefault(r["component"], set()).add(r["metric"])
         for card, names in by.items():
-            add(card, rel, names)
+            add(card, rel, names, filtered=False)
     return out
 
 
@@ -119,14 +191,18 @@ def _external(m: str) -> bool:
 def trace_card(card: dict, lists: dict, rmetrics: dict) -> dict:
     cid = card["id"]
     signals = card.get("signals", []) or []
-    g3, g5 = [], []
+    g3, g3i, g5 = [], [], []
     used: dict[str, set[str]] = {}  # metric -> where it is used
     for s in signals:
         sid = s.get("id")
         rules = s.get("rules") or []
         status = (s.get("upstream") or {}).get("status")
         if not rules and status in (None, "no", False):
-            g3.append({"signal": sid, "tier": s.get("tier"), "upstream": status or "missing"})
+            item = {"signal": sid, "tier": s.get("tier"), "upstream": status or "missing"}
+            if s.get("evaluate_on") in INTERVIEW_TYPES:
+                g3i.append(dict(item, evaluate_on=s.get("evaluate_on")))
+            else:
+                g3.append(item)
         if rules and s.get("evidence") != "tested":
             g5.append({"signal": sid, "tier": s.get("tier"), "evidence": s.get("evidence"), "rules": len(rules)})
         for m in s.get("metrics") or []:
@@ -135,18 +211,36 @@ def trace_card(card: dict, lists: dict, rmetrics: dict) -> dict:
             for m in rmetrics.get(r, ()):
                 used.setdefault(m, set()).add(f"{sid}（{r}）")
     saved = lists.get(cid)
-    g4: dict[str, list] = {k: [] for k in G4_CLASSES + ("external",)}
+    g4: dict[str, list] = {k: [] for k in G4_ALL}
+    lists = (saved or {}).get("lists") or []
     for m in sorted(used):
+        item = {"metric": m, "used_by": sorted(used[m])}
+        seen = [l["version"] for l in lists if CM.is_exposed(m, l["names"])]
+        src = other_source(cid, m)
         if _external(m):
             cls = "external"
+        elif seen:
+            cls = "confirmed"
+            item["versions"] = sorted(set(seen))
+            if len(set(seen)) < len({l["version"] for l in lists}):
+                item["not_in_versions"] = sorted({l["version"] for l in lists} - set(seen))
+        elif src:
+            cls = "other_source"
+            item["source"] = src
         elif saved is None:
             cls = "no_list"
         else:
-            cls = "confirmed" if CM.is_exposed(m, saved["names"]) else "not_in_list"
-        g4[cls].append({"metric": m, "used_by": sorted(used[m])})
+            cls = "not_in_list"
+        g4[cls].append(item)
+    side = sorted({g["source"] for g in g4["other_source"]})
+    info = []
+    for l in lists:
+        why = list(l["why"]) + ([f"沒有包含其他 exporter（{'、'.join(side)}）"] if side else [])
+        info.append({"file": l["file"], "version": l["version"], "names": len(l["names"]), "partial": bool(why), "why": why})
     g6 = [{"what": b.get("what")} for b in card.get("blind_spots") or [] if b.get("category") == "database"]
     return {"card": cid, "path": card.get("_path"), "signals": len(signals), "lists": saved["files"] if saved else [],
-            "G3": g3, "G4": g4, "G5": g5, "G6": g6}
+            "list_info": info, "lists_partial": bool(info) and all(x["partial"] for x in info),
+            "G3": g3, "G3.interview": g3i, "G4": g4, "G5": g5, "G6": g6}
 
 
 def trace(root: str = C.ROOT) -> list[dict]:
@@ -158,8 +252,32 @@ def trace(root: str = C.ROOT) -> list[dict]:
 
 def counts(t: dict) -> dict:
     """Counts derived from the item lists (G4 is the number of names outside confirmed and external)."""
-    return {"signals": t["signals"], "G3": len(t["G3"]), "G5": len(t["G5"]), "G6": len(t["G6"]),
-            **{f"G4.{k}": len(t["G4"][k]) for k in G4_CLASSES + ("external",)}}
+    return {"signals": t["signals"], "G3": len(t["G3"]), "G3.interview": len(t["G3.interview"]), "G5": len(t["G5"]),
+            "G6": len(t["G6"]), **{f"G4.{k}": len(t["G4"][k]) for k in G4_ALL}}
+
+
+def baseline_of(result: list[dict]) -> dict:
+    """What catalog/trace-baseline.json holds: counts per card and class."""
+    return {"note": f"check_trace.py 的缺口計數基準；tests/test_trace.py 在 {'、'.join(RATCHET)} 任何一項增加時失敗。"
+                    f"更新：{UPDATE_BASELINE}",
+            "cards": {t["card"]: {k: v for k, v in counts(t).items() if k != "signals"} for t in result}}
+
+
+def load_baseline(root: str = C.ROOT) -> dict:
+    with open(os.path.join(root, BASELINE), encoding="utf-8") as f:
+        return json.load(f)
+
+
+def ratchet(result: list[dict], base: dict) -> list[str]:
+    """Gap counts above the baseline, one line each (a card missing from the baseline counts from 0)."""
+    out = []
+    cards = base.get("cards") or {}
+    for t in result:
+        now, was = counts(t), cards.get(t["card"]) or {}
+        for k in RATCHET:
+            if now[k] > int(was.get(k, 0)):
+                out.append(f"{t['card']} {k}: {was.get(k, 0)} → {now[k]}")
+    return out
 
 
 def totals(result: list[dict]) -> dict:
@@ -170,25 +288,35 @@ def totals(result: list[dict]) -> dict:
     return out
 
 
-COLS = ("signals", "G3", "G5", "G6", "G4.confirmed", "G4.not_in_list", "G4.no_list", "G4.external")
+COLS = ("signals", "G3", "G3.interview", "G5", "G6", "G4.confirmed", "G4.other_source", "G4.not_in_list", "G4.no_list",
+        "G4.external")
 
 
 def render(result: list[dict], items: bool = True) -> str:
     lines = ["# check_trace（只報告，不判定）", "", P1_NOTE, "",
-             "| 卡 | 訊號 | G3 | G5 | G6 | G4 已確認 | G4 不在清單 | G4 沒有清單 | G4 外部 |",
-             "|---|---:|---:|---:|---:|---:|---:|---:|---:|"]
+             "| 卡 | 訊號 | G3 | G3 問架構 | G5 | G6 | G4 已確認 | G4 其他來源 | G4 不在清單 | G4 沒有清單 | G4 外部 | 清單 |",
+             "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|"]
     for t in result + [{"card": "**合計**", "_totals": totals(result)}]:
         c = t.get("_totals") or counts(t)
-        lines.append(f"| {t['card']} | " + " | ".join(str(c[k]) for k in COLS) + " |")
-    lines += ["", "G3 " + GAP_LABEL["G3"] + "；G5 " + GAP_LABEL["G5"] + "；G6 " + GAP_LABEL["G6"] + "。",
-              "G4：" + "；".join(f"{k} {G4_LABEL[k]}" for k in G4_CLASSES + ("external",)) + "。"]
+        state = "" if "_totals" in t else "沒有" if not t["list_info"] else "部分" if t["lists_partial"] else \
+            "完整" if not any(x["partial"] for x in t["list_info"]) else "有部分"
+        lines.append(f"| {t['card']} | " + " | ".join(str(c[k]) for k in COLS) + f" | {state} |")
+    lines += ["", "G3 " + GAP_LABEL["G3"] + "；G3 問架構：同樣沒有 rules，但 evaluate_on 是 "
+              + "／".join(INTERVIEW_TYPES) + "（用問的或盤點，不算偵測缺口）；G5 " + GAP_LABEL["G5"] + "；G6 " + GAP_LABEL["G6"] + "。",
+              "G4：" + "；".join(f"{k} {G4_LABEL[k]}" for k in G4_ALL) + "。",
+              "清單：部分 = 這張卡的已存清單都不完整（存的時候用前綴過濾，或沒有包含其他 exporter）；不在清單的名稱要人工確認。"]
     if not items:
         return "\n".join(lines) + "\n"
     for t in result:
         lines += ["", f"## {t['card']}（{t['path']}）",
-                  "已存 metric 清單：" + ("、".join(t["lists"]) if t["lists"] else "沒有")]
+                  "已存 metric 清單：" + ("" if t["list_info"] else "沒有")]
+        for x in t["list_info"]:
+            lines.append(f"  清單 {x['file']}（{x['version']}，{x['names']} 個名稱"
+                         + (f"；部分：{'；'.join(x['why'])}" if x["partial"] else "") + "）")
         for g in t["G3"]:
             lines.append(f"  G3 {t['card']}#{g['signal']} tier {g['tier']} upstream {g['upstream']}")
+        for g in t["G3.interview"]:
+            lines.append(f"  G3.interview {t['card']}#{g['signal']} tier {g['tier']} evaluate_on {g['evaluate_on']}")
         for g in t["G5"]:
             lines.append(f"  G5 {t['card']}#{g['signal']} tier {g['tier']} evidence {g['evidence']}，{g['rules']} 條 rule")
         for g in t["G6"]:
@@ -196,6 +324,12 @@ def render(result: list[dict], items: bool = True) -> str:
         for cls in ("not_in_list", "no_list"):
             for g in t["G4"][cls]:
                 lines.append(f"  G4.{cls} {t['card']}: {g['metric']} ← {'、'.join(g['used_by'])}")
+        for g in t["G4"]["other_source"]:
+            lines.append(f"  G4.other_source {t['card']}: {g['metric']}（{g['source']}）")
+        for g in t["G4"]["confirmed"]:
+            if g.get("not_in_versions"):
+                lines.append(f"  G4.confirmed {t['card']}: {g['metric']} 只在 {'、'.join(g['versions'])} 看到"
+                             f"（{'、'.join(g['not_in_versions'])} 的清單沒有）")
     return "\n".join(lines) + "\n"
 
 
@@ -204,8 +338,16 @@ def main() -> int:
     ap.add_argument("--card", help="只看這張卡（id）")
     ap.add_argument("--json", metavar="PATH", help="把完整結果寫成 JSON")
     ap.add_argument("--summary", action="store_true", help="只印計數表（CI step summary 用）")
+    ap.add_argument("--write-baseline", action="store_true",
+                    help=f"把目前的計數寫進 {BASELINE}（測試用它擋住缺口增加；只在確認過差異後更新）")
     a = ap.parse_args()
     result = trace()
+    if a.write_baseline:
+        with open(os.path.join(C.ROOT, BASELINE), "w", encoding="utf-8") as f:
+            json.dump(baseline_of(result), f, indent=1, ensure_ascii=False, sort_keys=True)
+            f.write("\n")
+        print(f"已寫入 {BASELINE}")
+        return 0
     if a.card:
         result = [t for t in result if t["card"] == a.card]
         if not result:

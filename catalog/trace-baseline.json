@@ -1,0 +1,214 @@
+{
+ "cards": {
+  "alertmanager": {
+   "G3": 0,
+   "G3.interview": 1,
+   "G4.confirmed": 10,
+   "G4.external": 1,
+   "G4.no_list": 0,
+   "G4.not_in_list": 0,
+   "G4.other_source": 0,
+   "G5": 3,
+   "G6": 0
+  },
+  "clickhouse": {
+   "G3": 0,
+   "G3.interview": 0,
+   "G4.confirmed": 39,
+   "G4.external": 3,
+   "G4.no_list": 0,
+   "G4.not_in_list": 6,
+   "G4.other_source": 16,
+   "G5": 6,
+   "G6": 2
+  },
+  "etcd": {
+   "G3": 2,
+   "G3.interview": 0,
+   "G4.confirmed": 39,
+   "G4.external": 3,
+   "G4.no_list": 0,
+   "G4.not_in_list": 5,
+   "G4.other_source": 1,
+   "G5": 11,
+   "G6": 5
+  },
+  "grafana_alerting": {
+   "G3": 1,
+   "G3.interview": 7,
+   "G4.confirmed": 0,
+   "G4.external": 1,
+   "G4.no_list": 16,
+   "G4.not_in_list": 0,
+   "G4.other_source": 0,
+   "G5": 5,
+   "G6": 0
+  },
+  "host": {
+   "G3": 1,
+   "G3.interview": 0,
+   "G4.confirmed": 0,
+   "G4.external": 44,
+   "G4.no_list": 2,
+   "G4.not_in_list": 0,
+   "G4.other_source": 4,
+   "G5": 10,
+   "G6": 0
+  },
+  "mariadb": {
+   "G3": 2,
+   "G3.interview": 1,
+   "G4.confirmed": 64,
+   "G4.external": 4,
+   "G4.no_list": 0,
+   "G4.not_in_list": 19,
+   "G4.other_source": 13,
+   "G5": 15,
+   "G6": 6
+  },
+  "mongodb_exporter": {
+   "G3": 1,
+   "G3.interview": 1,
+   "G4.confirmed": 62,
+   "G4.external": 3,
+   "G4.no_list": 0,
+   "G4.not_in_list": 4,
+   "G4.other_source": 0,
+   "G5": 8,
+   "G6": 4
+  },
+  "mysql": {
+   "G3": 3,
+   "G3.interview": 1,
+   "G4.confirmed": 59,
+   "G4.external": 4,
+   "G4.no_list": 0,
+   "G4.not_in_list": 27,
+   "G4.other_source": 11,
+   "G5": 16,
+   "G6": 3
+  },
+  "observer": {
+   "G3": 3,
+   "G3.interview": 4,
+   "G4.confirmed": 0,
+   "G4.external": 6,
+   "G4.no_list": 0,
+   "G4.not_in_list": 0,
+   "G4.other_source": 0,
+   "G5": 0,
+   "G6": 0
+  },
+  "postgres_exporter": {
+   "G3": 1,
+   "G3.interview": 0,
+   "G4.confirmed": 66,
+   "G4.external": 5,
+   "G4.no_list": 0,
+   "G4.not_in_list": 5,
+   "G4.other_source": 45,
+   "G5": 16,
+   "G6": 3
+  },
+  "prometheus": {
+   "G3": 0,
+   "G3.interview": 0,
+   "G4.confirmed": 24,
+   "G4.external": 11,
+   "G4.no_list": 0,
+   "G4.not_in_list": 14,
+   "G4.other_source": 0,
+   "G5": 4,
+   "G6": 0
+  },
+  "redis_exporter": {
+   "G3": 1,
+   "G3.interview": 1,
+   "G4.confirmed": 75,
+   "G4.external": 2,
+   "G4.no_list": 0,
+   "G4.not_in_list": 23,
+   "G4.other_source": 0,
+   "G5": 8,
+   "G6": 6
+  },
+  "thanos": {
+   "G3": 1,
+   "G3.interview": 4,
+   "G4.confirmed": 0,
+   "G4.external": 1,
+   "G4.no_list": 21,
+   "G4.not_in_list": 0,
+   "G4.other_source": 0,
+   "G5": 9,
+   "G6": 0
+  },
+  "tidb": {
+   "G3": 0,
+   "G3.interview": 0,
+   "G4.confirmed": 35,
+   "G4.external": 3,
+   "G4.no_list": 0,
+   "G4.not_in_list": 15,
+   "G4.other_source": 1,
+   "G5": 11,
+   "G6": 2
+  },
+  "victorialogs": {
+   "G3": 0,
+   "G3.interview": 0,
+   "G4.confirmed": 0,
+   "G4.external": 1,
+   "G4.no_list": 11,
+   "G4.not_in_list": 0,
+   "G4.other_source": 0,
+   "G5": 4,
+   "G6": 0
+  },
+  "victoriametrics": {
+   "G3": 0,
+   "G3.interview": 0,
+   "G4.confirmed": 0,
+   "G4.external": 1,
+   "G4.no_list": 10,
+   "G4.not_in_list": 0,
+   "G4.other_source": 0,
+   "G5": 1,
+   "G6": 0
+  },
+  "vmagent": {
+   "G3": 1,
+   "G3.interview": 0,
+   "G4.confirmed": 0,
+   "G4.external": 3,
+   "G4.no_list": 7,
+   "G4.not_in_list": 0,
+   "G4.other_source": 0,
+   "G5": 3,
+   "G6": 0
+  },
+  "vmalert": {
+   "G3": 0,
+   "G3.interview": 1,
+   "G4.confirmed": 8,
+   "G4.external": 2,
+   "G4.no_list": 0,
+   "G4.not_in_list": 2,
+   "G4.other_source": 0,
+   "G5": 1,
+   "G6": 0
+  },
+  "yugabytedb": {
+   "G3": 1,
+   "G3.interview": 0,
+   "G4.confirmed": 30,
+   "G4.external": 3,
+   "G4.no_list": 0,
+   "G4.not_in_list": 1,
+   "G4.other_source": 4,
+   "G5": 4,
+   "G6": 2
+  }
+ },
+ "note": "check_trace.py 的缺口計數基準；tests/test_trace.py 在 G3、G5、G6、G4.not_in_list、G4.no_list 任何一項增加時失敗。更新：python3 tools/check_trace.py --write-baseline"
+}

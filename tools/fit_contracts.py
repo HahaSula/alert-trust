@@ -177,15 +177,27 @@ ONE_SAMPLE = {f"{x}_over_time" for x in ("avg", "min", "max", "sum", "count", "s
 enclosing_func = MS.enclosing_func  # innermost function around a position (shared with check_metric_sources)
 
 
-def samples_needed(a, func: str, I: float, k: int) -> int:
-    if a.stack == "vmalert":
-        # MetricsQL uses the last sample before the window when it is within the query step
-        if func.endswith("_prometheus") or (1 + k) * I >= a.query_step:
+QUERY_STEP_DEFAULT = 300.0  # vmalert -datasource.queryStep default (5m)
+
+
+def samples_for(stack: str | None, func: str | None, I: float, k: int, query_step: float | None = None) -> int:
+    """n, the samples a window must hold. The only place n is decided (fit_contracts.py and inventory.py):
+    vmalert (MetricsQL) 1, because the last sample before the window is used when it is within the query step
+    (2 for the *_prometheus functions, or when (1+k)·I reaches the query step); Prometheus 1 for the
+    *_over_time functions, else 2 (TWO_SAMPLES, or an unknown wrapper: conservative)."""
+    func = func or ""
+    if stack == "vmalert":
+        qs = QUERY_STEP_DEFAULT if query_step is None else query_step
+        if func.endswith("_prometheus") or (1 + k) * I >= qs:
             return 2
         return 1
     if func in ONE_SAMPLE:
         return 1
-    return 2  # TWO_SAMPLES, or an unknown wrapper: conservative
+    return 2
+
+
+def samples_needed(a, func: str, I: float, k: int) -> int:
+    return samples_for(a.stack, func, I, k, getattr(a, "query_step", None))
 
 
 def k_for(a, job) -> int:
@@ -265,6 +277,56 @@ def window_need(stack: str | None, I: float, d: float, offset: float, k: int, n:
     return (n + k) * I + max(0.0, d - offset)
 
 
+def required_window(stack: str | None, func: str | None, I: float, d: float, offset: float, k: int,
+                    L: float | None = None, D: float | None = None, query_step: float | None = None) -> tuple[int, float]:
+    """(n, required window) for one range selector: samples_for + window_need. Every 「需要 ≥ …」 that
+    fit_contracts.py (contracts-fit) and inventory.py (the keep_range questions) print comes from this call."""
+    n = samples_for(stack, func, I, k, query_step)
+    return n, window_need(stack, I, d, offset, k, n, L, D)
+
+
+def window_short(R: float, need: float, I: float | None) -> bool:
+    """A window is short when it is below the required window or holds at most two data intervals."""
+    return R < need or (I is not None and R <= 2 * I)
+
+
+# dedup / L not known on vmalert: the values a short window is also checked against (stated as an assumption,
+# never used for the verdict): -dedup.minScrapeInterval = 2·S and data latency L = 3·S
+PLAUSIBLE_DEDUP_X = 2
+PLAUSIBLE_L_X = 3
+
+
+def plausible_window(func: str | None, S: float, d: float, k: int, dedup: float | None, L: float | None,
+                     D: float | None, query_step: float | None = None) -> tuple[float, str] | None:
+    """vmalert with dedup or L unknown: (required window, assumption text) under dedup = 2·S / L = 3·S for the
+    unknown ones (known values are kept). None when both are known."""
+    if dedup is not None and L is not None:
+        return None
+    said = []
+    if dedup is None:
+        dedup = PLAUSIBLE_DEDUP_X * S
+        said.append(f"dedup = {PLAUSIBLE_DEDUP_X}·S = {fmt(dedup)}")
+    if L is None:
+        L = PLAUSIBLE_L_X * S
+        said.append(f"L = {PLAUSIBLE_L_X}·S = {fmt(L)}")
+    I = data_interval("vmalert", S, d, dedup)
+    _, need = required_window("vmalert", func, I, d, 0.0, k, L, D, query_step)
+    return need, "、".join(said)
+
+
+def notify_parts(stack: str | None, S: float, d: float, E: float, O: float, L: float | None, D: float | None,
+                 for_: float) -> list[tuple[str, float]]:
+    """The detection part of notify-within (before Alertmanager's group_wait / group_interval), the only place it
+    is added up: Prometheus S + d + E + O + ⌈for/E⌉·E; vmalert S + d + E + max(L, D) + ⌈for/E⌉·E."""
+    parts = [("S", S), ("d", d), ("E", E)]
+    if stack == "vmalert":
+        parts.append(("max(L, D)", max(L or 0.0, D or 0.0)))
+    elif O:
+        parts.append(("O", O))
+    parts.append(("⌈for/E⌉·E", math.ceil(for_ / E - 1e-9) * E if for_ else 0.0))
+    return parts
+
+
 def need_window(a, I: float, d: float, offset: float, k: int | None = None, n: int = 2, S: float | None = None) -> float:
     """range-window / range-window-1sample: (n+k)·I + max(0, d − O); vmalert: (n+k)·I + max(0, L − D)."""
     k = a.k if k is None else k
@@ -301,6 +363,7 @@ ORIGINAL_RANGE_ANN = "alert_trust_original_range"
 KEEP_UNKNOWN = "unknown"
 SEMANTIC_CHANGED = "語意已改，未確認"
 KEEP_Q = "這個視窗是刻意的嗎？"
+KEEP_DECLINED_TEXT = "未確認，先保留原視窗"  # keep_range answered 「不知道」: kept, but nobody said it is intentional
 _RANGE_TXT = re.compile(r"\[\s*([0-9][0-9smhdwy.]*(?:\s*:\s*[0-9smhdwy.]*)?)\s*\]")
 
 
@@ -313,8 +376,8 @@ def keep_of(a, name: str, ann: dict) -> bool | None:
     """True: the window is intentional (keep). False: the user said it is not (option A may change it).
     None: nobody said (the default): option A is not written and 「保留視窗」 options come first."""
     import inventory_use as IU
-    if name in a.keep_range:
-        return True
+    if name in a.keep_range or name in (getattr(a, "keep_declined", None) or []):
+        return True  # 「不知道」 (keep_declined) keeps the window too; the report words it differently
     if name in getattr(a, "change_range", []):
         return False
     return IU.keep_state(ann.get("keep_range"))
@@ -637,14 +700,15 @@ def analyze(a, docs):
                                      job, defaults, notes, nodata, qoff, short))
                 for (text, rng, rtxt, func, P, S, d, I, k, src, job, defaults, notes, nodata, off, metric) in sq_cands + cands:
                     R = dur(rng)
-                    n = samples_needed(a, func, I, k)
-                    need = need_window(a, I, d, off, k, n, S)
+                    n, need = required_window(a.stack, func, I, d, off, k, latency(a, S) if a.stack == "vmalert" else None,
+                                              a.eval_delay, a.query_step)
                     row = {"file": path, "group": g.get("name"), "rule": name, "metric": metric, "func": func, "n": n,
                            "R": R, "S": S, "d": d, "I": I, "offset": off, "need": need, "src": src,
                            "ok": R >= need and not nodata, "nodata": nodata,
                            "job": job, "defaults": defaults, "notes": notes, "params": P, "k": k,
                            "contract": range_contract(a, n), "keep": keep,
-                           "short": (R < need or (S is not None and R <= 2 * S)) and not nodata,
+                           "short": window_short(R, need, I) and not nodata,
+                           "keep_declined": name in (getattr(a, "keep_declined", None) or []),
                            "semantic_changed": changed and keep is not False,
                            "original": orig if changed else None}
                     if a.stack == "prometheus" and func in ANCHORED_OK:
@@ -858,7 +922,6 @@ def notify_checks(a, docs, inv: dict | None) -> list[dict]:
                     worst = (P["S"] + P["d"], P, None, None, P["d"])
                 S, d, fpath = worst[1]["S"], worst[4], worst[3]
                 fr = dur(r.get("for")) or 0.0
-                for_eff = math.ceil(fr / E - 1e-9) * E if fr else 0.0
                 rt = (inv_rules.get(name) or {}).get("route") or {}
                 gws = [dur(m.get("group_wait")) for m in rt.get("matches") or [] if m.get("group_wait")]
                 gis = [dur(m.get("group_interval")) for m in rt.get("matches") or [] if m.get("group_interval")]
@@ -870,7 +933,6 @@ def notify_checks(a, docs, inv: dict | None) -> list[dict]:
                     gi, gi_src = max(gis), "alertmanager.yml（這條 rule 的 route）"
                 else:
                     gi, gi_src = AM_GROUP_INTERVAL_DEFAULT, ("Alertmanager 預設" if not am_known else "route 沒有設定，用預設")
-                parts = [("S", S), ("d", d), ("E", E)]
                 job = worst[2] if len(worst) > 2 else None
                 contra = d_contradiction(worst[1])
                 if fpath and worst[1]["tau"] is not None:
@@ -884,8 +946,7 @@ def notify_checks(a, docs, inv: dict | None) -> list[dict]:
                           ("E", E, "file（group interval）" if g.get("interval") else origin(a, "E", None, None))]
                 L = None
                 if a.stack == "vmalert":
-                    L = a.latency if a.latency is not None else S
-                    parts.append(("max(L, D)", max(L, a.eval_delay)))
+                    L = latency(a, S)
                     src_ = getattr(a, "src", {})
                     inputs += [("L", L, src_.get("L", "flag" if a.latency is not None else "assumed（L = S）")),
                                ("D", a.eval_delay, src_.get("D", "default"))]
@@ -895,13 +956,12 @@ def notify_checks(a, docs, inv: dict | None) -> list[dict]:
                         inputs.append(("dedup", a.dedup, src_.get("dedup", "user") + "；" + DEDUP_NOTIFY_NOTE
                                        if a.dedup > S else src_.get("dedup", "user")))
                 elif O:
-                    parts.append(("O", O))
                     inputs.append(("O", O, "file（group query_offset）" if g.get("query_offset") is not None else origin(a, "O", None, None)))
                 if fr:
                     inputs.append(("for", fr, "file（rule）"))
                 kk = max(getattr(a, "k", 1), int((getattr(a, "job_failrun", None) or {}).get(job, 0)))
                 inputs.append(("k", float(kk), k_source(a, job, kk)))
-                parts.append(("⌈for/E⌉·E", for_eff))
+                parts = notify_parts(a.stack, S, d, E, O, L, a.eval_delay, fr)
                 parts_join = parts + [("group_interval", gi)]
                 parts = parts + [("group_wait", gw)]
                 total = sum(v for _, v in parts)
@@ -1337,6 +1397,14 @@ def query_offset_available(a) -> bool:
     return v is None or v >= (2, 53)
 
 
+def qo_unavailable_text(a) -> str | None:
+    """Prometheus older than 2.53 (version known): the report says outright that `query_offset` does not exist."""
+    if getattr(a, "stack", None) == "vmalert" or query_offset_available(a):
+        return None
+    return (f"Prometheus {getattr(a, 'prom_version_text', '')} 沒有 `query_offset`／`rule_query_offset`（要 2.53 以上）："
+            "這個版本不能用它保留視窗，只能改該 job 的 `scrape_interval`／`scrape_timeout` 或改視窗；`anchored` 也沒有（3.x 實驗功能）")
+
+
 SITE = C.SITE_URL if hasattr(C, "SITE_URL") else "https://hahasula.github.io/alert-trust"
 COST_A = ("視窗變長，`rate` 對短暫尖峰的反應變慢（突波被稀釋成約 t/R），也可能改變 rule 的語意")
 COST_B = ("`scrape_interval` 變短，scrape 次數與 series 寫入量照比例增加；慢的 exporter 更容易逾時。"
@@ -1427,6 +1495,9 @@ def report(a, rows, checks, assumptions, fors=None, skipped=None) -> str:
         out.append("**假設**（沒有給的數字）：" + "；".join(assumptions) + "。拿到實際值後重跑。\n")
     if a.stack == "vmalert":
         out.append(f"**證據等級**：{VMALERT_EVIDENCE}\n")
+    na = qo_unavailable_text(a)
+    if na:
+        out.append(f"**版本**：{na}\n")
     out.append("## 建議先做\n")
     adv = advice(a, rows, checks, fors)
     out += adv or ["- 目前的規格下，環境與每條 rule 都符合契約。"]
@@ -1472,6 +1543,8 @@ def report(a, rows, checks, assumptions, fors=None, skipped=None) -> str:
                    "B 會檢查做不做得到：`scrape_interval` 要大於 τ，τ 要 ≥ max(d_max ÷ 0.9, p99 ÷ 0.8)"
                    "（[基準值](https://hahasula.github.io/alert-trust/tools/baseline/)）。\n")
         def A(r):  # noqa: N802
+            if r.get("keep") is True and r.get("keep_declined"):
+                return f"{KEEP_DECLINED_TEXT}，見下一節"
             if r.get("keep") is True:
                 return "保留（`keep_range`），見下一節"
             if r.get("keep") is None:
@@ -1505,7 +1578,7 @@ def report(a, rows, checks, assumptions, fors=None, skipped=None) -> str:
                    "`--change-range <rule>`），A 才會寫進去。")
         keep = [r for r in bad if r.get("keep") is not False]
         if keep:
-            out.append("\n### 保留視窗（視窗是刻意的，或還沒問）\n")
+            out.append("\n### 保留視窗（視窗是刻意的、未確認先保留，或還沒問）\n")
             out.append("視窗內實際看得到的 sample 數約是 R ÷ I；`scrape_interval` 比 R 的一半還長時，「最近 R」的精度其實由 "
                        "`scrape_interval` 決定，不是由 R 決定。保留語意的做法和改視窗並列；還沒問過的 rule 不要先建議改視窗：\n")
             if a.stack == "vmalert":
@@ -1514,7 +1587,8 @@ def report(a, rows, checks, assumptions, fors=None, skipped=None) -> str:
                 out.append("| rule | 函式 | R | 實際約幾個 sample | 保留：該 job `scrape_interval` 至多 | 保留：`query_offset` | "
                            "保留：`anchored`（Prometheus 3.x 實驗功能） | 改視窗（只在不是刻意時） |\n|---|---|---|---|---|---|---|---|")
             for r in keep:
-                chg = "—（使用者說是刻意的）" if r.get("keep") is True else f"`[{fmt(r['fit_R'])}]`（{COST_A}）"
+                chg = f"—（{KEEP_DECLINED_TEXT}）" if r.get("keep_declined") and r.get("keep") is True else \
+                    "—（使用者說是刻意的）" if r.get("keep") is True else f"`[{fmt(r['fit_R'])}]`（{COST_A}）"
                 bs = b_text(r["opt_b"]["scrape_interval"], r["params"])
                 if r["opt_b"].get("dedup_bound"):
                     bs = (f"縮短 S 沒有用（dedup {fmt(a.dedup)} > S）；`-dedup.minScrapeInterval` 至多 "
@@ -1727,6 +1801,9 @@ def apply_inventory(a, inv: dict, user_only: bool) -> None:
         names = IU.job_names(inv)
         a.cfg_jobs = names if a.cfg_jobs is None else set(a.cfg_jobs) | names
     a.keep_range = list(dict.fromkeys(list(a.keep_range) + IU.keep_range(inv)))
+    explicit = set(a.keep_range) | set(getattr(a, "change_range", None) or [])
+    a.keep_declined = [n for n in dict.fromkeys(list(getattr(a, "keep_declined", None) or []) + IU.keep_declined(inv))
+                       if n not in explicit]
     a.nodata_rules = dict(IU.nodata_rules(inv), **(getattr(a, "nodata_rules", None) or {}))
     ev = st.get("evaluation_interval") or {}
     if IU.has_config(inv) or IU.known(ev):
@@ -1880,6 +1957,10 @@ def main(argv=None) -> int:
     keep_ans = a.answers_data.get("keep_range") or {}
     a.keep_range = list(a.keep_range) + [str(k) for k, v in keep_ans.items() if IU.keep_state(v) is True]
     a.change_range = list(a.change_range) + [str(k) for k, v in keep_ans.items() if IU.keep_state(v) is False]
+    unk_ids = {str(x) for x in a.answers_data.get("unknown") or []}
+    a.keep_declined = [str(k) for k, v in keep_ans.items() if IU.keep_state(v) is None and IU.declined(v)] + \
+        sorted(x[len("keep_range."):] for x in unk_ids if x.startswith("keep_range."))
+    a.keep_declined = [n for n in dict.fromkeys(a.keep_declined) if n not in a.keep_range and n not in a.change_range]
     if inv is not None:
         a.change_range += IU.change_range(inv)
     orig_files = list(a.original) or [f for f in ((inv or {}).get("sources") or {}).get("original_rules") or [] if os.path.exists(f)]
@@ -1986,10 +2067,12 @@ def main(argv=None) -> int:
                    "env_checks": [{"text": c[0], "ok": c[1], "contract": c[3], "remeasure": c[1] is None} for c in checks],
                    "rows": [{k: r.get(k) for k in ("file", "group", "rule", "metric", "func", "R", "need", "ok", "nodata",
                                                     "job", "contract", "fit_R", "keep", "short", "semantic_changed",
-                                                    "original")}
+                                                    "original", "n", "I", "k", "keep_declined")}
                             | {"status": status_of(r)} for r in rows],
                    "keep_unknown": sorted({r["rule"] for r in rows if r.get("short") and r.get("keep") is None
                                            and not r.get("nodata")}),
+                   "keep_declined": sorted({r["rule"] for r in rows if r.get("keep_declined") and r.get("keep") is True}),
+                   "query_offset_unavailable": qo_unavailable_text(a),
                    "for_checks": [{"rule": x["rule"], "job": x["job"], "R": x["R"]} for x in fors],
                    "prom_version": a.prom_version_text or None,
                    "promtool_warning": a.promtool_warning,

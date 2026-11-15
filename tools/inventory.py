@@ -179,16 +179,16 @@ def subquery_ranges(expr: str) -> list[dict]:
     return out
 
 
-def range_entries(expr: str, sels: list[dict]) -> list[dict]:
+def range_entries(expr: str, sels: list[dict], ruler: str | None = None) -> list[dict]:
+    """Range selectors and subqueries of one expression. samples_needed comes from FC.samples_for (ruler-aware:
+    MetricsQL n = 1 on vmalert); the second pass of build() replaces it with the n of FC.required_window once the
+    job's data interval and k are known."""
     out = []
     items = [(s["range"], s["pos"], s.get("metric")) for s in sels if s.get("range")]
     items += [(q["range"], q["pos"], None) for q in subquery_ranges(expr)]
     for rng, pos, metric in sorted(items, key=lambda x: x[1]):
         func = MS.enclosing_func(expr, pos)
-        if func in FC.ONE_SAMPLE:
-            n = 1
-        else:
-            n = 2  # TWO_SAMPLES, or an unknown wrapper: conservative (fit_contracts.samples_needed)
+        n = FC.samples_for(ruler, func, 0.0, 0)
         e = {"func": func or None, "range": rng.split(":")[0], "samples_needed": n}
         if ":" in rng:
             e["subquery_step"] = rng.split(":", 1)[1] or None
@@ -1069,7 +1069,9 @@ def build(a) -> dict:
         entry["_jm"] = sorted(jms)
         entry["_expr"] = expr
         entry["_rule"] = r
-        entry["ranges"] = range_entries(expr, sels)
+        entry["ranges"] = range_entries(expr, sels, ruler["value"])
+        if g.get("query_offset") is not None:
+            entry["_qoff"] = dur(g.get("query_offset"))
         entry["detects_absence"] = detects_absence(expr, r)
         if r.get("for"):
             entry["for"] = r.get("for")
@@ -1340,6 +1342,11 @@ def build(a) -> dict:
                                  "fact": f"{name} 讀的 {s['metric']} 被 metric_relabel_configs 丟掉（job {', '.join(s['jobs'])}）"})
         # ranges: short windows with fit_contracts' formula (FC.data_interval / FC.window_need: per-job S, dedup,
         # vmalert L − D), conservative where unmeasured (d = τ, k = max(1, measured consecutive failures))
+        qoff = e.pop("_qoff", None)
+        if qoff is None:
+            qoff = (dur(IU.val(stack.get("rule_query_offset"))) or 0.0) if stack.get("rule_query_offset") else 0.0
+        if ruler["value"] == "prometheus" and (FC.parse_version(facts.get("version")) or (2, 53)) < (2, 53):
+            qoff = 0.0  # no query_offset before 2.53 (fit_contracts.query_offset_available)
         for rg in e["ranges"]:
             js = [by_job[j] for j in rule_jobs_used.get(name, ()) if j in by_job]
             R = dur(rg["range"])
@@ -1354,23 +1361,41 @@ def build(a) -> dict:
                 if not S:
                     continue
                 m = (j or {}).get("measured") or {}
-                d = max(x for x in (T, dur(m["d_max"]) if m.get("d_max") is not None else None, 0.0) if x is not None)
+                # d as fit_contracts.job_params: the measured d_max, else the worst case d = τ (else d = S)
+                d = dur(m["d_max"]) if m.get("d_max") is not None else T if T is not None else S
                 k = max(1, int(m.get("max_consecutive_failures") or 0))
                 I = FC.data_interval(ruler["value"], S, d, short_dedup)
-                L = short_L if short_L is not None else S
-                need = FC.window_need(ruler["value"], I, d, 0.0, k, rg["samples_needed"], L, short_D)
+                if rg.get("subquery_step"):
+                    I = max(I, dur(rg["subquery_step"]) or 0.0)
+                L = short_L if short_L is not None else S  # FC.latency: L unknown -> L = S
+                n, need = FC.required_window(ruler["value"], rg.get("func"), I, d, qoff, k, L, short_D)
+                plaus = FC.plausible_window(rg.get("func"), S, d, k, short_dedup, short_L, short_D) \
+                    if ruler["value"] == "vmalert" else None
                 if best is None or need > best[0]:
-                    best = (need, I, S, d, k, L)
+                    best = (need, I, S, d, k, L, n, plaus)
             if best and R is not None:
-                need, I, S, d, k, L = best
+                need, I, S, d, k, L, n, plaus = best
+                rg["samples_needed"] = n
                 rg["data_interval"] = fmt(I)
-                rg["short"] = R < need or R <= 2 * I
+                rg["required_window"] = fmt(need)
+                rg["short"] = FC.window_short(R, need, I)
                 if ruler["value"] == "vmalert":
-                    how = (f"(n+k)·I + max(0, L − D) = {fmt(need)}（I = max(S {fmt(S)}, dedup "
-                           f"{fmt(short_dedup) if short_dedup else '沒給'}) = {fmt(I)}、L {fmt(L)}、D {fmt(short_D)}、k {k}）")
+                    how = (f"(n+k)·I + max(0, L − D) = {fmt(need)}（n {n}、I = max(S {fmt(S)}, dedup "
+                           f"{fmt(short_dedup) if short_dedup else '沒給，當成沒有'}) = {fmt(I)}、L {fmt(L)}"
+                           f"{'' if short_L is not None else '（沒給，假設 L = S）'}、D {fmt(short_D)}、k {k}）")
                 else:
-                    how = f"(n+k)·I + d = {fmt(need)}（I {fmt(I)}、d {fmt(d)}（未量時 d = τ）、k {k}；和 fit_contracts.py 同一個公式）"
+                    how = (f"(n+k)·I + max(0, d − O) = {fmt(need)}（n {n}、I {fmt(I)}、d {fmt(d)}（未量時 d = τ）、"
+                           f"O {fmt(qoff)}、k {k}）")
                 rg["short_basis"] = f"R ≤ 2 × I（{fmt(2 * I)}）" if R <= 2 * I and R >= need else how
+                if not rg["short"] and plaus and FC.window_short(R, plaus[0], None):
+                    # dedup / L not known: not short under the values used for the verdict, short under plausible
+                    # ones. Asked in round 0 with the assumption stated (the verdict itself is unchanged)
+                    rg["short"] = True
+                    rg["short_conditional"] = True
+                    rg["short_assumption"] = plaus[1]
+                    rg["required_window_plausible"] = fmt(plaus[0])
+                    rg["short_basis"] = (f"{how}，目前的假設下夠長；但 dedup／L 還不知道，假設 {plaus[1]} 時需要 "
+                                         f"{fmt(plaus[0])}，視窗會不夠（保守假設，不是量到的值）")
             else:
                 rg["short"] = None
         if not e["ranges"] and name in keep_ans:
@@ -1451,6 +1476,11 @@ def build(a) -> dict:
                          + (f"；名稱最接近的是 {close[0]}" if close else "") + "）"}
             if not job_values_complete:
                 f["fact"] += "；relabel 會改寫 job，未確認"
+            if job_names_ans:
+                # the user already gave the job names: nothing left to ask, the rule itself has to change
+                f["settled"] = True
+                f["fact"] += (f"；使用者已回答 job 名稱（{', '.join(job_names_ans)}），這個 job 還是對不到：把 rule 的 job 改成 "
+                              f"{close[0] if close else '實際的名稱'}，或刪掉這條 rule")
             findings.append(f)
 
     for e in rules_out:
@@ -1636,6 +1666,10 @@ def build(a) -> dict:
     if ignored:
         inv["answers_ignored"] = ignored
     inv["_qctx"] = {"cfg": cfg, "am": am}
+    # round 0: nothing answered yet; main() counts on from the merged inventory's round
+    # (without --merge: any answer besides the setup facts ruler / target_versions means a round has passed)
+    inv["round"] = 1 if any(v not in (None, "", [], {}) for k, v in answers.items()
+                            if k not in ("ruler", "target_versions")) else 0
     inv["questions"] = questions(inv, cfg, am, a, fl)
     return inv
 
@@ -1673,7 +1707,7 @@ NOTIFY_Q = "這類故障要在幾分鐘內通知到人？"
 FAILRUN_Q = "最長連續失敗幾次？"
 # cost of being wrong when the answer is not known: 3 = a page is missed or the advice harms (a rule changed in
 # meaning, never fires), 2 = a time / option is wrong, 1 = a detail
-COST = {"job_names": 3, "--config": 3, "--alertmanager": 3, "version": 2, "external_observer": 2, "measured": 2,
+COST = {"version_gate": 3, "job_names": 3, "--config": 3, "--alertmanager": 3, "version": 2, "external_observer": 2, "measured": 2,
         "keep_range": 3, "producers": 2, "features": 2, "labels": 2, "must_ask": 3, "route_label": 3, "notify_within": 3,
         "failrun": 2}
 
@@ -1924,7 +1958,7 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
 
     def cnt(*kinds, reason=None):
         return sum(1 for f in findings if f["kind"] in kinds and (reason is None or reason in str(f.get("reason", ""))))
-    jnf = [f for f in findings if f["kind"] == "job_not_in_config"]
+    jnf = [f for f in findings if f["kind"] == "job_not_in_config" and not f.get("settled")]
     if jnf:
         jobs = sorted(f["job"] + (f"（是 {f['closest']} 嗎？）" if f.get("closest") else "") for f in jnf)
         qs.append({"id": "job_names", "q": f"rule 用的 {', '.join(jobs)} 在 config 裡對不到；實際的 job 名稱是什麼（relabel 之後）？",
@@ -1942,9 +1976,19 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
         rk = inv["stack"]["ruler"]["value"] or "Prometheus／vmalert"
         api = ("`curl -s <vmalert>/metrics | grep vm_app_version`" if rk == "vmalert" else
                "`curl -s <prometheus>/api/v1/status/buildinfo` 與 `curl -s <prometheus>/api/v1/status/flags`")
-        qs.append({"id": "version", "q": f"評估這些 rule 的 {rk} 是哪個版本？請直接貼 {api} 的輸出（唯讀；版本與旗標一次確認）",
-                   "changes": ["query_offset／eval_delay 可用與否", "anchored", "samples_needed（vmalert）"],
-                   "affects": len(ranged) + 1, "findings": 0, "answer_key": "version"})
+        q = {"id": "version", "q": f"評估這些 rule 的 {rk} 是哪個版本？請直接貼 {api} 的輸出（唯讀；版本與旗標一次確認）",
+             "changes": ["query_offset／eval_delay 可用與否", "anchored", "samples_needed（vmalert）"],
+             "affects": len(ranged) + 1, "findings": 0, "answer_key": "version"}
+        if inv["stack"]["ruler"]["value"] == "prometheus":
+            # the version gates every query_offset (≥ 2.53) / anchored (3.x) advice: wrong advice costs like a
+            # missed page, and the question may not slip past the second round (round ≥ 1: mandatory)
+            q.update({"q": q["q"] + "。2.53 以前沒有 `query_offset`，3.x 以前沒有 `anchored`：版本確認前這兩種做法只能標成條件式",
+                      "changes": ["`query_offset` 能不能用（≥ 2.53）", "`anchored` 能不能用（3.x 實驗功能）",
+                                  "promtool 測試結果能不能代表目標版本"], "cost_key": "version_gate", "gate": True})
+            if int(inv.get("round") or 0) >= 1:
+                q.update({"mandatory": True, "mandatory_note": "版本決定 `query_offset`／`anchored` 的建議能不能用；"
+                                                               "第 0 輪沒問到，這輪要問（不問就在 answers.yaml 的 unknown 寫明）"})
+        qs.append(q)
     if inv["stack"]["external_observer"]["from"] == "unknown":
         un = inv["unscraped_components"] if isinstance(inv["unscraped_components"], list) else []
         qs.append({"id": "external_observer", "q": "有沒有另一台（外部觀察者）在監控這台 ruler 和 Alertmanager？",
@@ -1971,6 +2015,10 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
                    "answer_key": f"measured.{f['job']}"})
     short = [r for r in ranged if any(g.get("short") for g in r["ranges"])
              and IU.keep_state(IU.val(r.get("keep_range"))) is None and not IU.is_user(r.get("keep_range"))]
+    # windows that are short whatever dedup / L turn out to be come first; the conditional ones (short only under
+    # the plausible dedup / L, FC.plausible_window) follow
+    short.sort(key=lambda r: all(g.get("short_conditional") for g in r["ranges"] if g.get("short")))
+    cond_short = [r["name"] for r in ranged if any(g.get("short_conditional") for g in r["ranges"])]
     # one question per rule (keep_range.<rule>): a 「不知道」 for one rule does not suppress the others. The first one
     # still open is mandatory each round (the rest follow by score, then become mandatory in later rounds).
     for i, r in enumerate(short):
@@ -2051,10 +2099,15 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
         if must_ask_answered(inv, c, q):
             continue
         hits = effect_rule_hits(inv, q)
+        # dedup / L decide whether the conditionally short windows are long enough: one conclusion per such rule
+        wins = cond_short if must_ask_key(c, q) in ("latency", "dedup_interval") else []
         qs.append({"id": f"must_ask.{c}.{q['id']}", "cost_key": "must_ask",
                    "q": f"{q['question']}（{c}：{q['why']}）", "changes": [f"{c} 的結論：{q['why']}"]
-                   + ([f"{'、'.join('`' + n + '`' for n in hits[:3])} 有沒有資料（卡片 effects）"] if hits else []),
-                   "affects": max(1, len(hits)), "findings": 2 + len(hits), "answer_key": must_ask_key(c, q), "refs": list(q["refs"]),
+                   + ([f"{'、'.join('`' + n + '`' for n in hits[:3])} 有沒有資料（卡片 effects）"] if hits else [])
+                   + ([f"{'、'.join('`' + n + '`' for n in wins[:3])}{' 等' if len(wins) > 3 else ''} 的視窗夠不夠長"
+                       f"（{len(wins)} 條；未知時判斷用「沒有 dedup、L = S」，另外用 dedup = {FC.PLAUSIBLE_DEDUP_X}·S、"
+                       f"L = {FC.PLAUSIBLE_L_X}·S 檢查短視窗）"] if wins else []),
+                   "affects": max(1, len(hits), len(wins)), "findings": 2 + len(hits) + len(wins), "answer_key": must_ask_key(c, q), "refs": list(q["refs"]),
                    "card": c, "present": it["present"]})
     done = set(inv.get("answered") or [])
     unknown = set(inv.get("unknown") or [])
@@ -2090,17 +2143,30 @@ def questions(inv, cfg, am, a, findings) -> list[dict]:
         q["score"] = q["overturns"] * q["cost"]
     # answers that can overturn the most conclusions, weighted by the cost of being wrong; rules affected only breaks ties
     qs.sort(key=lambda q: (-q["score"], -q["affects"]))
-    # mandatory questions always land in the first 3 (several mandatory ones push the others out, in score order)
-    mand = sorted([q for q in qs if q.get("mandatory")], key=lambda q: (not q.get("deferred"), qs.index(q)))
-    if mand:
-        rest = [q for q in qs if not q.get("mandatory")]
-        top = mand[:3] + sorted(rest[:max(0, 3 - len(mand))], key=qs.index)
-        if len(mand) <= 3:
-            top = sorted(top, key=lambda q: (not q.get("deferred"), qs.index(q)))
-        qs = top + [q for q in qs if q not in top]
+    qs = rank_top(qs)
     for i, q in enumerate(qs):
         q["ask_now"] = i < 3
     return qs
+
+
+def rank_top(qs: list[dict], slots: int = 3) -> list[dict]:
+    """Order score-sorted questions so the first `slots` are the ones to ask this round: mandatory ones first
+    (deferred before the others, then by score), then by score. At most one keep_range.<rule> question takes a
+    slot per round, so several short windows cannot crowd the cards' must_ask questions out; more only when
+    nothing else is pending."""
+    order = sorted([q for q in qs if q.get("mandatory")], key=lambda q: (not q.get("deferred"), qs.index(q))) + \
+        [q for q in qs if not q.get("mandatory")]
+    top, held = [], []
+    for q in order:
+        if len(top) >= slots:
+            break
+        if str(q["id"]).startswith("keep_range.") and any(str(x["id"]).startswith("keep_range.") for x in top):
+            held.append(q)
+            continue
+        top.append(q)
+    top += held[:max(0, slots - len(top))]  # nothing else pending: the remaining slots go to keep_range
+    top.sort(key=lambda q: (not q.get("deferred"), qs.index(q)))
+    return top + [q for q in qs if not any(q is t for t in top)]
 
 
 # ---------- merge ----------
@@ -2296,7 +2362,9 @@ def main(argv=None) -> int:
         approved = list(old.get("approved") or []) + [x for x in inv.get("approved") or [] if x not in (old.get("approved") or [])]
         os_ = old.get("sources") or {}
         orig = os_.get("original_rules") or (os_.get("rules") if sorted(os_.get("rules") or []) != sorted(a.rules) else None)
+        this_round = int(old.get("round") or 0) + 1
         inv = merge(inv, old, same)
+        inv["round"] = this_round
         inv["answered"] = answered
         inv["unknown"] = unknown
         inv["_unknown_explicit"] = sorted(set(inv.get("_unknown_explicit") or []) | {str(x) for x in old.get("unknown") or []})

@@ -495,6 +495,8 @@ def summary(a, inv, items, fit, ms_rows, lint_out, cov) -> str:
     if st.get("version", {}).get("from") == "unknown":
         asm.insert(0, "ruler 版本未知：用到 `query_offset` 的方案標「" + FC.QO_UNKNOWN + "」，`anchored` 標「"
                    + FC.ANCHORED_UNKNOWN + "」；貼 `/api/v1/status/buildinfo` 的輸出後重跑")
+    if (fit or {}).get("query_offset_unavailable"):
+        asm.insert(0, fit["query_offset_unavailable"])
     if (inv.get("alertmanager") or {}).get("from") == "unknown":
         asm.append("沒有 alertmanager.yml：沒有檢查 alert 送到哪裡、會不會 page")
     if not a.config:

@@ -158,9 +158,15 @@ def keep_state(v) -> bool | None:
 
 
 def keep_range(inv: dict) -> list[str]:
-    """Rules whose window is kept: answered intentional, or 「不知道」 (declined: kept, no option A)."""
-    return [r["name"] for r in inv.get("rules") or [] if keep_state(val(r.get("keep_range"))) is True
-            or (isinstance(r.get("keep_range"), dict) and r["keep_range"].get("declined"))]
+    """Rules whose window the user said is intentional (keep_range: true). 「不知道」 is keep_declined, not this."""
+    return [r["name"] for r in inv.get("rules") or [] if keep_state(val(r.get("keep_range"))) is True]
+
+
+def keep_declined(inv: dict) -> list[str]:
+    """Rules whose keep_range the user answered 「不知道」: the window is left alone (no option A) and reported as
+    「未確認，先保留原視窗」, never as 「使用者說是刻意的」."""
+    return [r["name"] for r in inv.get("rules") or [] if isinstance(r.get("keep_range"), dict)
+            and r["keep_range"].get("declined") and keep_state(val(r.get("keep_range"))) is not True]
 
 
 def change_range(inv: dict) -> list[str]:
@@ -406,7 +412,7 @@ DECLINED_ASSUMPTION = {
     "external_observer": "當成沒有外部觀察者：ruler／Alertmanager 停掉時沒有人知道",
     "measured": "d = τ、k = 1（保守假設，標 assumed）",
     "notify_within": "沒有通知時限：只回答會不會響，不判斷來不來得及",
-    "keep_range": "當成刻意的視窗：保留，不寫方案 A",
+    "keep_range": "未確認，先保留原視窗：不寫方案 A（不是「使用者說是刻意的」）",
     "producers": "exporter 用目錄的推測（標推測）",
     "job_names": "job 名稱用 config 裡的；對不到的 rule 當成不會響（最壞）",
     "--config": "沒有 scrape config：用 Prometheus 預設值，job 與丟掉的 metric 不檢查",

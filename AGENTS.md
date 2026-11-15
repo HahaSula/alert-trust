@@ -43,6 +43,8 @@ python3 tools/validate.py              # 0 個錯誤；--refs 列出還沒有參
 python3 tools/build_pages.py
 python3 -m unittest discover -s tests
 python3 tools/check_trace.py [--card X]       # 只報告：每張卡的 G3–G6 缺口計數與清單，不會失敗
+# 缺口只能減少：tests/test_trace.py 比對 catalog/trace-baseline.json，任何一項增加就失敗。
+# 先把缺口修掉；確認是刻意的才更新基準：python3 tools/check_trace.py --write-baseline（diff 一起 commit）
 promtool check rules rules/**/*.yml    # vmalert 的 vlogs 規則用 vmalert -dryRun
 docker run --rm -u $(id -u):$(id -g) -v "$PWD":/docs squidfunk/mkdocs-material:9.5.39 build --strict -d /tmp/site
 ```
@@ -55,7 +57,7 @@ docker run --rm -u $(id -u):$(id -g) -v "$PWD":/docs squidfunk/mkdocs-material:9
 
 使用者問「會不會告警／X 分鐘內會不會知道」時，第一句回答「X 內會不會有人被 page」，再分開列偵測（rule 邏輯）、載入（`rule_files`）、路由（Alertmanager）、自我監控（Watchdog／DMS／觀察者）；有時間要求時加 `--notify-within`。版本未知時，`query_offset`、`anchored` 只能標成「需要 Prometheus ≥ 2.53（版本未知）」「需要 Prometheus ≥ 3.x 實驗功能（版本未知）」。提案的設定檔用合法的佔位值（`https://dms.example.invalid/ping`），驗證跑交付的那份。「一次 scrape 失敗會重置 `for`」的 promtool 測試要用 `stale`、不是 `_`（範本 `docs/tools/templates/for-reset.test.yml`）。
 
-**問題用工具排的。**工具依「答案可能推翻幾個結論 × 答錯的代價」排序，前 3 題直接用；要換掉一題，回覆裡要說理由。卡片的 `must_ask`（附 `effects` 的會在回答後重判相關 rule）、每條短視窗各自一題是否刻意（`keep_range.<rule>`，判斷短不短時已計入 dedup 與 vmalert 的 L）、有 critical rule 卻沒有通知時限（answers 的 `notify_within`）都會排進前面。每個回答寫進 answers 檔或 `inventory.yaml`，加 `--merge` 重跑後再回覆；答過的不再問。使用者回「不知道／沒權限」記進 answers 的 `unknown`，不再問；延後的必問題留在下一輪前 3 題，回答前套用卡片的 `default` 並標成假設。同意提案記在 `approved`，不等於回答了視窗是否刻意（`keep_range` 只來自那一題）。通知時間：靠 scrape 失敗才成立的路徑（`up`、`absent`）用 τ 當 d，看數值的路徑用量到的 d；量到的 d 超過 τ 或 S 是矛盾，要問。dedup 不加進通知時間（`lab/vm/dedup-notify`），但只持續一次 scrape 的狀況可能被 dedup 去掉。`--job-failrun` 只填量過的最長連續失敗次數，只有次數時用 `--job-k-assumed`，標成假設。說「可以動手」前，改過的檔案都放在 `proposed/` 並跑過驗證；本機 promtool 和目標 Prometheus 大版本不同時，promtool 結果要標成推論。
+**問題用工具排的。**工具依「答案可能推翻幾個結論 × 答錯的代價」排序，前 3 題直接用；要換掉一題，回覆裡要說理由。卡片的 `must_ask`（附 `effects` 的會在回答後重判相關 rule）、每條短視窗各自一題是否刻意（`keep_range.<rule>`，每輪前 3 題最多佔一題；判斷短不短時已計入 dedup 與 vmalert 的 L，兩者未知時另用 dedup = 2·S、L = 3·S 檢查並寫明假設；答「不知道」的報告寫「未確認，先保留原視窗」）、ruler 是 Prometheus 而版本未知（最晚第二輪進前 3 題）、有 critical rule 卻沒有通知時限（answers 的 `notify_within`）都會排進前面。每個回答寫進 answers 檔或 `inventory.yaml`，加 `--merge` 重跑後再回覆；答過的不再問。使用者回「不知道／沒權限」記進 answers 的 `unknown`，不再問；延後的必問題留在下一輪前 3 題，回答前套用卡片的 `default` 並標成假設。同意提案記在 `approved`，不等於回答了視窗是否刻意（`keep_range` 只來自那一題）。通知時間：靠 scrape 失敗才成立的路徑（`up`、`absent`）用 τ 當 d，看數值的路徑用量到的 d；量到的 d 超過 τ 或 S 是矛盾，要問。dedup 不加進通知時間（`lab/vm/dedup-notify`），但只持續一次 scrape 的狀況可能被 dedup 去掉。`--job-failrun` 只填量過的最長連續失敗次數，只有次數時用 `--job-k-assumed`，標成假設。說「可以動手」前，改過的檔案都放在 `proposed/` 並跑過驗證；本機 promtool 和目標 Prometheus 大版本不同時，promtool 結果要標成推論。
 
 先跑一鍵入口，它會先盤點再檢查：`python3 tools/review.py --rules <rule 檔...> [--config prometheus.yml] [--alertmanager alertmanager.yml] --out report`。盤點（`report/inventory.yaml`／`inventory.md`）是所有工具共同的事實基礎，第一次回覆要附上盤點摘要請使用者確認；單獨重跑工具時加 `--inventory report/inventory.yaml`。
 

@@ -193,7 +193,9 @@ class ApprovalIsNotKeepRangeTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as t:
             inv = inventory(t, {"keep_range": {SLOW: "不知道"}})
         self.assertTrue(rule(inv, SLOW)["keep_range"]["declined"])
-        self.assertIn(SLOW, IU.keep_range(inv))
+        # 「不知道」 keeps the window but is not 「使用者說是刻意的」: reported separately (keep_declined)
+        self.assertNotIn(SLOW, IU.keep_range(inv))
+        self.assertIn(SLOW, IU.keep_declined(inv))
 
 
 PROPOSED_PROM = """global:
