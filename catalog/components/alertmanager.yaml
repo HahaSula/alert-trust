@@ -77,6 +77,13 @@ usage:
       HA 時第 N 順位先等 N × `--cluster.peer-timeout`（預設 15s）再查 nflog，通知延遲算進去
     evidence: code
     refs: [am-peertimeout, am-wait, ad-am-peer-timeout]
+  - id: ha-memberlist-034
+    text: >-
+      HA 不要停在 0.34.0–0.34.2：這三版用 memberlist v0.6.0，收到 push/pull 時 user state（所有 gossip 狀態合成的一包，含 nflog 與 silence）
+      超過寫死的 20 MiB 就回錯誤、不合併，沒有旗標可調；0.33.1 與 0.35.0 用 v0.5.4，讀 user state 前沒有這道檢查。
+      回報者看到 `alertmanager_cluster_members` 降到 1 且不會自行恢復（prometheus/alertmanager#5627，未在 lab 重現）；訊號 cluster-health 看得到
+    evidence: code
+    refs: [am033-gomod-memberlist, am0340-gomod-memberlist, am034-gomod-memberlist, am035-gomod-memberlist, ml060-userstate-limit, ml060-max-push-state, ml054-userstate-read, am034-delegate-localstate]
   - id: gomaxprocs-flag
     text: 升到 0.33 以上前，從啟動參數拿掉 `--enable-feature=auto-gomaxprocs`，否則啟動失敗
     evidence: tested

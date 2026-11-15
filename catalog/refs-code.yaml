@@ -743,3 +743,59 @@ refs:
     file: "mysqld_exporter.go"
     line: 67
     url: "https://github.com/prometheus/mysqld_exporter/blob/v0.21.0/mysqld_exporter.go#L67"
+  am034-gomod-memberlist:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.34.2"
+    file: "go.mod"
+    line: 33
+    url: "https://github.com/prometheus/alertmanager/blob/v0.34.2/go.mod#L33"
+  am0340-gomod-memberlist:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.34.0"
+    file: "go.mod"
+    line: 33
+    url: "https://github.com/prometheus/alertmanager/blob/v0.34.0/go.mod#L33"
+  am035-gomod-memberlist:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.35.0"
+    file: "go.mod"
+    line: 36
+    url: "https://github.com/prometheus/alertmanager/blob/v0.35.0/go.mod#L36"
+  ml060-userstate-limit:
+    kind: code
+    project: "hashicorp/memberlist"
+    version: "v0.6.0"
+    file: "net.go"
+    line: 1251
+    url: "https://github.com/hashicorp/memberlist/blob/v0.6.0/net.go#L1251"
+  ml060-max-push-state:
+    kind: code
+    project: "hashicorp/memberlist"
+    version: "v0.6.0"
+    file: "net.go"
+    line: 88
+    url: "https://github.com/hashicorp/memberlist/blob/v0.6.0/net.go#L88"
+  ml054-userstate-read:
+    kind: code
+    project: "hashicorp/memberlist"
+    version: "v0.5.4"
+    file: "net.go"
+    line: 1249
+    url: "https://github.com/hashicorp/memberlist/blob/v0.5.4/net.go#L1249"
+  am034-delegate-localstate:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.34.2"
+    file: "cluster/delegate.go"
+    line: 195
+    url: "https://github.com/prometheus/alertmanager/blob/v0.34.2/cluster/delegate.go#L195"
+  am033-gomod-memberlist:
+    kind: code
+    project: "Alertmanager"
+    version: "v0.33.1"
+    file: "go.mod"
+    line: 31
+    url: "https://github.com/prometheus/alertmanager/blob/v0.33.1/go.mod#L31"

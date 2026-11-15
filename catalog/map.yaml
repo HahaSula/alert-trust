@@ -492,6 +492,7 @@ cards:
     - failure-reason
     - smtp-version
     - ha-peer-timeout
+    - ha-memberlist-034
     - gomaxprocs-flag
     observe:
     - alertmanager-down
