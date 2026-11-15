@@ -37,6 +37,22 @@
 
 `check_trace.py` 對有這兩個欄位的卡多報兩個缺口：G1 是沒有任何失效模式指到的 misuse 訊號；G2 是沒有訊號、只靠 `accepted` 或沒有 `options` 的 blind spot 交代的失效模式。兩者只報告，計數進基準檔，只能減少。
 
+## 實驗的假設（試點） {#hypotheses}
+
+「實測」原本只指到整個實驗。一個實驗有很多情境，為了說清楚是哪個情境證明了哪句話，實驗參考可以列出假設，卡片項目再用 `tested_by` 指過去。目前只有 MariaDB 卡與它的兩個 lab 有。
+
+| 欄位 | 位置 | 內容 |
+|---|---|---|
+| `hypotheses: [{id, claim, versions, method, expect, result, limits}]` | `kind: experiment` 的參考 | `claim` 要證明的句子；`versions` 實際跑的版本（例如 `"MariaDB 11.4.13"`）；`method` 哪個情境、怎麼做；`expect.appear`／`expect.disappear` 預期出現或消失的訊號；`result` 是 `pass`／`fail`／`inconclusive`；`limits` 這個情境沒有證明什麼（選填） |
+| `tested_by: ["<實驗 ref>#<假設 id>"]` | 任何 `evidence: tested` 的卡片項目 | 這個項目靠哪些假設成立 |
+
+`validate.py` 對有 `tested_by` 的項目檢查：
+
+- **E1**：項目是 `tested`；實驗參考同時列在 `refs`；假設存在，而且每個都是 `pass`。沒有通過的假設不能當實測的依據，要降級。
+- **E2**：版本要重疊。卡片有 `versions_checked` 時，至少一個假設跑在其中一個版本上（只在 MySQL 跑過的情境不能支持 MariaDB 卡）；項目自己有 `versions` 範圍時，至少一個假設的版本在範圍內。
+
+還沒有 `tested_by` 的實測項目由 `check_trace.py` 計成 G7，進基準檔，只能減少。假設只寫 lab 結果檔裡實際有的數字；另一個版本的結果不同時寫在 `limits`，不要併進同一個假設。
+
 ## 新增一個監控元件或 target
 
 1. 在 `catalog/components/`（監控元件）或 `catalog/targets/`（exporter 加上它背後的服務）新增 `<id>.yaml`，格式照 `catalog/components/prometheus.yaml`。必填：`id`、`name`、`kind`、`family`、`status`、`stages`、`role`、`signals`。

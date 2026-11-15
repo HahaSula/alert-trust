@@ -304,6 +304,115 @@ def check_mechanisms(card: dict, all_refs: dict) -> list[str]:
     return errors
 
 
+# P2 harness (piloted on the MariaDB card and its two labs).
+# Optional field on an experiment ref (catalog/refs.yaml, refs.d/*.yaml):
+#   hypotheses: [{id, claim, versions, method, expect: {appear?, disappear?}, result, limits?}]
+#       what one scenario of the experiment set out to show: claim (the statement), versions (what it ran on, e.g.
+#       "MariaDB 11.4.13"), method (which scenario, how), expect.appear / expect.disappear (the metrics or states that
+#       should show up or vanish), result (pass / fail / inconclusive: was that seen), limits (what it does not show).
+# Optional field on any card item with evidence: tested (signal, usage, silent_failure, failure_mode ...):
+#   tested_by: ["<experiment ref key>#<hypothesis id>", ...]
+# Gates, applied to items that have tested_by (the others are counted by check_trace.py as G7):
+#   E1  the item is `tested`, each entry names an existing hypothesis of an experiment ref that is also in the item's
+#       refs, and every named hypothesis has result pass.
+#   E2  versions overlap: when the card has versions_checked, at least one named hypothesis ran on one of them (an
+#       entry of versions_checked starts with the hypothesis version, so "MariaDB 11.4.13" matches
+#       "MariaDB 11.4.13（lab 與原始碼參考）" and a MySQL-only run does not back a MariaDB card); when the item has a
+#       `versions` range, at least one hypothesis version is inside it.
+HYPOTHESIS_RESULTS = ("pass", "fail", "inconclusive")
+HYPOTHESIS_KEYS = {"id", "claim", "versions", "method", "expect", "result", "limits"}
+
+
+def check_hypotheses(all_refs: dict) -> list[str]:
+    """Shape of `hypotheses` on experiment refs."""
+    errors: list[str] = []
+    for key, ref in all_refs.items():
+        if not isinstance(ref, dict) or "hypotheses" not in ref:
+            continue
+        at = f"refs {key}"
+        if ref.get("kind") != "experiment":
+            errors.append(f"{at}: 只有 kind: experiment 的參考可以有 hypotheses")
+        hyps = ref["hypotheses"]
+        if not isinstance(hyps, list) or not hyps:
+            errors.append(f"{at}: hypotheses 要是非空清單")
+            continue
+        _ids(hyps, f"{at}: hypotheses", errors)
+        for i, h in enumerate(hyps):
+            if not isinstance(h, dict):
+                continue
+            hat = f"{at}: hypotheses[{h.get('id', i)}]"
+            errors += [f"{hat} 不認得 {k!r}" for k in h if k not in HYPOTHESIS_KEYS]
+            for k in ("claim", "method"):
+                if not str(h.get(k, "")).strip():
+                    errors.append(f"{hat} 缺少 {k}")
+            v = h.get("versions")
+            if not (isinstance(v, list) and v and all(isinstance(x, str) and parse_version(x) for x in v)):
+                errors.append(f"{hat} versions 要是非空的版本字串清單（例如 \"MariaDB 11.4.13\"）")
+            e = h.get("expect")
+            if not isinstance(e, dict) or not (e.get("appear") or e.get("disappear")) or set(e) - {"appear", "disappear"} \
+                    or not all(isinstance(x, str) for k in ("appear", "disappear") for x in e.get(k) or []):
+                errors.append(f"{hat} expect 要有 appear 或 disappear（字串清單：預期出現／消失的訊號）")
+            if h.get("result") not in HYPOTHESIS_RESULTS:
+                errors.append(f"{hat} result 只能是 {'、'.join(HYPOTHESIS_RESULTS)}")
+            if "limits" in h and not (isinstance(h["limits"], str) and h["limits"].strip()):
+                errors.append(f"{hat} limits 要是非空字串")
+    return errors
+
+
+def evidence_items(card: dict):
+    """(where, item) for every dict inside a card that carries `evidence` (signals, usage, failure_modes ...)."""
+    def walk(obj, where: str):
+        if isinstance(obj, dict):
+            if "evidence" in obj:
+                yield where, obj
+            for k, v in obj.items():
+                if not str(k).startswith("_"):
+                    yield from walk(v, f"{where}.{k}")
+        elif isinstance(obj, list):
+            for i, x in enumerate(obj):
+                yield from walk(x, f"{where}[{x['id']}]" if isinstance(x, dict) and x.get("id") else f"{where}[{i}]")
+    yield from walk({k: v for k, v in card.items() if k != "evidence"}, card.get("_path", card.get("id", "?")))
+
+
+def check_tested_by(card: dict, all_refs: dict) -> list[str]:
+    """Gates E1 / E2 for the card items that have `tested_by`."""
+    errors: list[str] = []
+    checked = [v for v in card.get("versions_checked") or [] if isinstance(v, str)]
+    for where, item in evidence_items(card):
+        if "tested_by" not in item:
+            continue
+        tb = item["tested_by"]
+        if not (isinstance(tb, list) and tb and all(isinstance(x, str) and x.count("#") == 1 for x in tb)):
+            errors.append(f"{where}: tested_by 要是「實驗 ref#假設 id」的非空清單")
+            continue
+        if item.get("evidence") != "tested":
+            errors.append(f"{where}: 有 tested_by 但 evidence 不是 tested")
+        versions: list[str] = []
+        for entry in tb:
+            key, hid = entry.split("#")
+            ref = all_refs.get(key)
+            hyp = next((h for h in (ref or {}).get("hypotheses") or [] if isinstance(h, dict) and h.get("id") == hid), None)
+            if ref is None or ref.get("kind") != "experiment":
+                errors.append(f"{where}: tested_by 的 {key!r} 不是實驗參考（E1）")
+            elif key not in (item.get("refs") or []):
+                errors.append(f"{where}: tested_by 的 {key!r} 要同時列在 refs（E1）")
+            elif hyp is None:
+                errors.append(f"{where}: tested_by 的 {entry!r}：{key} 沒有這個假設（E1）")
+            elif hyp.get("result") != "pass":
+                errors.append(f"{where}: tested_by 的 {entry!r} 結果是 {hyp.get('result')}，不是 pass（E1；沒有通過就降級）")
+            else:
+                versions += [v for v in hyp.get("versions") or [] if isinstance(v, str)]
+        if not versions:
+            continue
+        if checked and not any(c.startswith(v) for v in versions for c in checked):
+            errors.append(f"{where}: tested_by 的假設跑在 {'、'.join(versions)}，不在這張卡的 versions_checked（E2）")
+        rng = item.get("versions")
+        if isinstance(rng, dict) and not check_versions_field(item) and not any(version_in_range(v, rng) for v in versions):
+            errors.append(f"{where}: tested_by 的假設跑在 {'、'.join(versions)}，不在這個項目的版本範圍 "
+                          f"{version_range_text(rng)}（E2）")
+    return errors
+
+
 # Optional card field (catalog/components/*.yaml, catalog/targets/*.yaml):
 #   must_ask: [{id, question, why, refs, applies_when?, answer_key?, effects?, default?}]
 # Component-specific questions whose answer changes conclusions (a flag that decides whether a metric exists, an

@@ -32,6 +32,9 @@ Gap classes (counts and lists only, no percentages):
          and recording-rule outputs (names with ':') are counted as external and not checked.
   G5     signal with rules whose evidence is not tested.
   G6     blind_spots with category database (元件本身沒提供).
+  G7     item with evidence tested (signal, usage, silent failure, failure mode ...) and no `tested_by`: it cites an
+         experiment as a whole, not the hypothesis that showed it (P2). Counted for every card; the items are listed
+         only for cards that already use tested_by.
 Saved lists (SAVED_LISTS below): lab/targets/<dir>/**/names-*.txt (one name per line) and
 lab/targets/mysql/results/metric-names-*.txt (a Python list, MariaDB 11.4 per its compose.yml); the lab directory maps
 to a card through LAB_DIR_CARD. lab/metric-names/results/prom-*.json holds check_metrics.py results; the metrics it
@@ -51,7 +54,7 @@ import catalog as C  # noqa: E402
 import check_metric_sources as MS  # noqa: E402
 import check_metrics as CM  # noqa: E402
 
-GAPS = ("G1", "G2", "G3", "G4", "G5", "G6")
+GAPS = ("G1", "G2", "G3", "G4", "G5", "G6", "G7")
 G4_CLASSES = ("confirmed", "not_in_list", "no_list")
 G4_ALL = ("confirmed", "other_source", "not_in_list", "no_list", "external")
 G4_LABEL = {"confirmed": "已確認（附看到它的版本）", "other_source": "其他 exporter 產生（卡片自己的清單不會有）",
@@ -82,11 +85,12 @@ LIST_VERSION = {
 _VERSION = re.compile(r"\d+(?:\.\d+)+")
 BASELINE = os.path.join("catalog", "trace-baseline.json")
 # the classes the ratchet watches (tests/test_trace.py): a count above the baseline fails
-RATCHET = ("G1", "G2", "G3", "G5", "G6", "G4.not_in_list", "G4.no_list")
+RATCHET = ("G1", "G2", "G3", "G5", "G6", "G7", "G4.not_in_list", "G4.no_list")
 UPDATE_BASELINE = "python3 tools/check_trace.py --write-baseline"
 GAP_LABEL = {"G1": "misuse 訊號沒有任何 failure mode 指到", "G2": "failure mode 沒有訊號，只靠接受不偵測或沒有方案的 blind spot",
              "G3": "有訊號、沒偵測（沒有 rules，上游也沒有）", "G4": "metric 存在性",
-             "G5": "有 rules，但 evidence 不是 tested", "G6": "blind_spots 是 database（元件本身沒提供）"}
+             "G5": "有 rules，但 evidence 不是 tested", "G6": "blind_spots 是 database（元件本身沒提供）",
+             "G7": "實測項目沒有指到實驗裡的假設（tested_by）"}
 P1_NOTE = "G1/G2：只算有 mechanisms／failure_modes 的卡（P1 試點）；其他卡是 0，代表還沒寫，不代表沒有缺口"
 # lab/targets/<dir> -> card id, when they differ
 LAB_DIR_CARD = {"valkey": "redis_exporter", "postgres": "postgres_exporter", "mongodb": "mongodb_exporter"}
@@ -241,6 +245,8 @@ def trace_card(card: dict, lists: dict, rmetrics: dict) -> dict:
         why = list(l["why"]) + ([f"沒有包含其他 exporter（{'、'.join(side)}）"] if side else [])
         info.append({"file": l["file"], "version": l["version"], "names": len(l["names"]), "partial": bool(why), "why": why})
     g6 = [{"what": b.get("what")} for b in card.get("blind_spots") or [] if b.get("category") == "database"]
+    tested = [(w, x) for w, x in C.evidence_items(card) if x.get("evidence") == "tested"]
+    g7 = [{"item": w.split(": ", 1)[-1] if ": " in w else w} for w, x in tested if not x.get("tested_by")]
     g1, g2 = [], []
     modes = card.get("failure_modes") or []
     has_p1 = bool(modes or card.get("mechanisms"))
@@ -257,7 +263,8 @@ def trace_card(card: dict, lists: dict, rmetrics: dict) -> dict:
     return {"card": cid, "path": card.get("_path"), "signals": len(signals), "lists": saved["files"] if saved else [],
             "list_info": info, "lists_partial": bool(info) and all(x["partial"] for x in info),
             "p1": has_p1, "mechanisms": len(card.get("mechanisms") or []), "failure_modes": len(modes),
-            "G1": g1, "G2": g2, "G3": g3, "G3.interview": g3i, "G4": g4, "G5": g5, "G6": g6}
+            "G1": g1, "G2": g2, "G3": g3, "G3.interview": g3i, "G4": g4, "G5": g5, "G6": g6, "G7": g7,
+            "tested": len(tested), "p2": len(tested) > len(g7)}
 
 
 def trace(root: str = C.ROOT) -> list[dict]:
@@ -270,7 +277,7 @@ def trace(root: str = C.ROOT) -> list[dict]:
 def counts(t: dict) -> dict:
     """Counts derived from the item lists (G4 is the number of names outside confirmed and external)."""
     return {"signals": t["signals"], "G1": len(t["G1"]), "G2": len(t["G2"]), "G3": len(t["G3"]), "G3.interview": len(t["G3.interview"]), "G5": len(t["G5"]),
-            "G6": len(t["G6"]), **{f"G4.{k}": len(t["G4"][k]) for k in G4_ALL}}
+            "G6": len(t["G6"]), "G7": len(t["G7"]), **{f"G4.{k}": len(t["G4"][k]) for k in G4_ALL}}
 
 
 def baseline_of(result: list[dict]) -> dict:
@@ -305,14 +312,14 @@ def totals(result: list[dict]) -> dict:
     return out
 
 
-COLS = ("signals", "G1", "G2", "G3", "G3.interview", "G5", "G6", "G4.confirmed", "G4.other_source", "G4.not_in_list", "G4.no_list",
+COLS = ("signals", "G1", "G2", "G3", "G3.interview", "G5", "G6", "G7", "G4.confirmed", "G4.other_source", "G4.not_in_list", "G4.no_list",
         "G4.external")
 
 
 def render(result: list[dict], items: bool = True) -> str:
     lines = ["# check_trace（只報告，不判定）", "", P1_NOTE, "",
-             "| 卡 | 訊號 | G1 | G2 | G3 | G3 問架構 | G5 | G6 | G4 已確認 | G4 其他來源 | G4 不在清單 | G4 沒有清單 | G4 外部 | 清單 |",
-             "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|"]
+             "| 卡 | 訊號 | G1 | G2 | G3 | G3 問架構 | G5 | G6 | G7 | G4 已確認 | G4 其他來源 | G4 不在清單 | G4 沒有清單 | G4 外部 | 清單 |",
+             "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|"]
     for t in result + [{"card": "**合計**", "_totals": totals(result)}]:
         c = t.get("_totals") or counts(t)
         state = "" if "_totals" in t else "沒有" if not t["list_info"] else "部分" if t["lists_partial"] else \
@@ -320,7 +327,7 @@ def render(result: list[dict], items: bool = True) -> str:
         lines.append(f"| {t['card']} | " + " | ".join(str(c[k]) for k in COLS) + f" | {state} |")
     lines += ["", "G1 " + GAP_LABEL["G1"] + "；G2 " + GAP_LABEL["G2"] + "。",
               "G3 " + GAP_LABEL["G3"] + "；G3 問架構：同樣沒有 rules，但 evaluate_on 是 "
-              + "／".join(INTERVIEW_TYPES) + "（用問的或盤點，不算偵測缺口）；G5 " + GAP_LABEL["G5"] + "；G6 " + GAP_LABEL["G6"] + "。",
+              + "／".join(INTERVIEW_TYPES) + "（用問的或盤點，不算偵測缺口）；G5 " + GAP_LABEL["G5"] + "；G6 " + GAP_LABEL["G6"] + "；G7 " + GAP_LABEL["G7"] + "（清單只列已經開始用 tested_by 的卡）。",
               "G4：" + "；".join(f"{k} {G4_LABEL[k]}" for k in G4_ALL) + "。",
               "清單：部分 = 這張卡的已存清單都不完整（存的時候用前綴過濾，或沒有包含其他 exporter）；不在清單的名稱要人工確認。"]
     if not items:
@@ -345,6 +352,10 @@ def render(result: list[dict], items: bool = True) -> str:
             lines.append(f"  G5 {t['card']}#{g['signal']} tier {g['tier']} evidence {g['evidence']}，{g['rules']} 條 rule")
         for g in t["G6"]:
             lines.append(f"  G6 {t['card']}: {g['what']}")
+        if t["p2"]:
+            lines.append(f"  實測項目 {t['tested']} 個，其中 {t['tested'] - len(t['G7'])} 個指到假設")
+            for g in t["G7"]:
+                lines.append(f"  G7 {t['card']}: {g['item']}")
         for cls in ("not_in_list", "no_list"):
             for g in t["G4"][cls]:
                 lines.append(f"  G4.{cls} {t['card']}: {g['metric']} ← {'、'.join(g['used_by'])}")

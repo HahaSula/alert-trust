@@ -553,6 +553,7 @@ signals:
       - mysql_global_status_innodb_history_list_length
     evaluate_on: self
     evidence: tested
+    tested_by: ["exp-mysql-ha#s2-snapshot-blocks-purge"]
     source: art-mysql-ha
     refs: [exp-mysql-ha, my-trace-mdb-histlen-var, my-trace-mdb-histlen-export, ver-mdb114-history-len]
     upstream: { status: partial, note: "awesome 只寫 innodb_metrics 的名稱，沒開 collector 時不會響" }
@@ -570,6 +571,7 @@ signals:
       - mysql_global_status_innodb_deadlocks
     evaluate_on: self
     evidence: tested
+    tested_by: ["exp-mysql-ha#s3-opposite-order-deadlock"]
     source: art-mysql-ha
     refs: [exp-mysql-ha, mariadb-innodb-deadlocks, my-trace-mdb-deadlock-inc, my-trace-mdb-deadlock-mon]
     upstream: { status: no }
@@ -594,6 +596,7 @@ signals:
     evaluate_on: self
     silent_failure: 連線打滿時 exporter 一般帳號也連不上，mysql_up 變 0、threads_connected 消失，比例規則回傳空，只剩 MariaDBNotReachable
     evidence: tested
+    tested_by: ["exp-mysql-ha#s7a-max-connections"]
     source: art-mysql-ha
     refs: [exp-mysql-ha, mariadb-conn-errors, my-trace-mdb-connerr-var, my-q-exp]
     upstream: { status: partial, note: "awesome 有比例規則，沒有被拒絕的計數，也沒提到打滿時規則回傳空" }
@@ -812,6 +815,7 @@ signals:
       row lock 規則與長交易規則（> 300 秒）都看不到：擋住的交易只開了 25 秒。perf_schema.eventswaits 的 MDL instrument 預設沒開，一直是 0；
       performance_schema.metadata_locks 也查不到 PENDING。誰擋住要裝 metadata_lock_info plugin（見 blind_spots）
     evidence: tested
+    tested_by: ["exp-mysql-perf#s3-ddl-behind-open-transaction"]
     source: art-mysql-perf
     refs: [exp-mysql-perf, my-processlist-query, my-trace-ex-pl-sanitize, my-perf-mdb-mdl-state, my-perf-mdb-lock-wait-timeout, my-perf-ex-waits-query]
     upstream: { status: no }
@@ -915,6 +919,7 @@ signals:
     evaluate_on: self
     applies_when: replication
     evidence: tested
+    tested_by: ["exp-mysql-ha#s5b-conflict-stops-sql-thread"]
     source: art-mysql-ha
     refs: [exp-mysql-ha, my-slave-skip, my-trace-mdb-last-sql-errno]
     upstream: { status: no }
@@ -1439,6 +1444,7 @@ failure_modes:
     detected_by: { signals: [undo-history, long-transactions] }
     distinguishes: true
     evidence: tested
+    tested_by: ["exp-mysql-ha#s2-snapshot-blocks-purge"]
     refs: [exp-mysql-ha, my-trace-mdb-histlen-var]
   - id: purge-outpaced-by-writes
     mechanism: purge
@@ -1465,6 +1471,7 @@ failure_modes:
     effect: 等待者排隊到 innodb_lock_wait_timeout；實驗 8 條連線全部卡住時 current_waits 是 8
     detected_by: { signals: [lock-waits, active-sessions], blind_spots: [row-lock-blocker] }
     evidence: tested
+    tested_by: ["exp-mysql-perf#s2-row-lock-queue"]
     refs: [exp-mysql-perf, exp-mysql-ha, my-trace-mdb-rowlock-var]
   - id: deadlock-by-lock-order
     mechanism: row-lock
@@ -1472,6 +1479,7 @@ failure_modes:
     effect: 其中一個收到 1213 並 rollback，Innodb_deadlocks 增加
     detected_by: { signals: [deadlocks, statement-errors] }
     evidence: tested
+    tested_by: ["exp-mysql-ha#s3-opposite-order-deadlock"]
     refs: [exp-mysql-ha, my-trace-mdb-deadlock-inc]
   - id: deadlock-by-fk-shared-lock
     mechanism: row-lock
@@ -1506,6 +1514,7 @@ failure_modes:
     effect: ALTER 等 MDL，後到的語句全部排在它後面（實驗 10 秒內 9 個 session 在等，commit 速率從 320/s 到 0）
     detected_by: { signals: [metadata-locks, long-transactions, throughput-drop], blind_spots: [mdl-holder] }
     evidence: tested
+    tested_by: ["exp-mysql-perf#s3-ddl-behind-open-transaction"]
     refs: [exp-mysql-perf, my-perf-mdb-mdl-state]
   - id: mdl-held-by-handler-open
     mechanism: metadata-lock
@@ -1521,6 +1530,7 @@ failure_modes:
     effect: SQL thread 停下，不會自己恢復
     detected_by: { signals: [replication-error, replication-running], blind_spots: [replica-error-text] }
     evidence: tested
+    tested_by: ["exp-mysql-ha#s5b-conflict-stops-sql-thread"]
     refs: [exp-mysql-ha, my-trace-mdb-last-sql-errno]
   - id: optimistic-kill-misses-lock-wait
     mechanism: replication-apply
@@ -1544,6 +1554,7 @@ failure_modes:
     effect: 新連線被拒，exporter 自己也連不進去，整組 metric 消失；計數要等連線降下來才抓得到（實驗 +2）
     detected_by: { signals: [connections, connection-headroom, aborted-connects], blind_spots: [connections-at-saturation] }
     evidence: tested
+    tested_by: ["exp-mysql-ha#s7a-max-connections"]
     refs: [exp-mysql-ha, my-trace-mdb-connerr-var]
 
 bad_queries:

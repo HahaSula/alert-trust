@@ -45,6 +45,7 @@ def validate(root: str = C.ROOT) -> tuple[list[str], list[str]]:
             if "{#" + cid + "}" not in text:
                 errors.append(f"docs/contracts.md: 缺少契約 {cid} 的錨點 {{#{cid}}}")
 
+    errors += C.check_hypotheses(all_refs)
     no_section = 0
     signal_ids: dict[str, set[str]] = {}
     referenced_rules: set[str] = set()
@@ -87,6 +88,7 @@ def validate(root: str = C.ROOT) -> tuple[list[str], list[str]]:
 
         fs_errors, fs_missing = C.check_five_sections(card, all_refs)
         errors += C.check_mechanisms(card, all_refs)
+        errors += C.check_tested_by(card, all_refs)
         errors += fs_errors
         no_section += fs_missing
         import check_coverage as CC

@@ -60,15 +60,17 @@
 
 - **P0（完成）**：`tools/check_trace.py` 缺口報告（G3 有訊號沒偵測、G4 metric 存在性、G5 有 rule 非實測、G6 元件不提供；G1／G2 等 P1）、`catalog/trace-baseline.json` 棘輪、`validate.py` 的 E1（實測一定要引用實驗 ref）。
 - **P1（MariaDB 試點完成第一版，2026-11-15）**：卡片加選填的 `mechanisms`、`failure_modes`、`blind_spots[].id`；`validate.py` 的 T1（引用不懸空）、T2（失效模式要有交代）、T3（機制至少一個失效模式或 `not_studied`）；`check_trace.py` 的 G1、G2（進基準檔）。格式見 `docs/contributing.md#mechanisms`。
-  MariaDB 卡：6 個機制（purge、redo／checkpoint、row lock、MDL、複寫套用、連線）、14 個失效模式（實測 5、讀碼 1、推論 8，推論的都來自 issue 試點）；G1 29（44 個 misuse 訊號裡 29 個還沒有失效模式指到，主要是 Galera、備份與保護、容量、buffer pool、暫存表）、G2 1。
+  MariaDB 卡：6 個機制（purge、redo／checkpoint、row lock、MDL、複寫套用、連線）、14 個失效模式（實測 6、讀碼 1、推論 7，推論的都來自 issue 試點）；G1 29（44 個 misuse 訊號裡 29 個還沒有失效模式指到，主要是 Galera、備份與保護、容量、buffer pool、暫存表）、G2 1。
   還沒做：`bad_queries` 沒有併進來（P4 再決定）；元件頁不顯示這兩個欄位；`redo-checkpoint` 機制沒有讀碼（推論）；8 個推論的失效模式要釘 commit 或做小 lab 才能升級；`distinguishes` 只是說明欄。
-- **P2（未開始）**：實驗 ref 加 `hypotheses`（假設、版本、方法、預期出現／消失的訊號、結果、限制）；E1 升級成「實測要指到 result 為 pass 的假設」、E2 版本要重疊。
+- **P2（MariaDB 試點完成第一版，2026-11-15）**：實驗參考的 `hypotheses`、卡片項目的 `tested_by`；`validate.py` 的 E1（指到的假設要存在且 pass）、E2（假設的版本要和卡片的 `versions_checked`、項目的 `versions` 重疊）；`check_trace.py` 的 G7（實測但沒有 `tested_by`，進基準檔）。格式見 `docs/contributing.md#hypotheses`。
+  已寫 6 個假設（`exp-mysql-ha` 4 個、`exp-mysql-perf` 2 個），MariaDB 卡 11 個項目指過去（6 個失效模式、5 個訊號）。全目錄 G7 = 574，MariaDB 卡 68。
+  還沒做：E1、E2 只管有 `tested_by` 的項目，舊項目靠 G7 棘輪慢慢收；假設沒有連到結果檔的段落；`result` 是人填的，工具沒有去讀結果檔核對；rule 有沒有被觸發仍然沒有檢查（review 的第二點）。
 - **P3**：研究流程盲測（從機制出發寫卡，不從 metric 清單）。**P4**：其他卡推廣，警告數只減不增。
 - 分工：格式、懸空 id、實測有沒有實驗、版本重疊、metric 存在、缺口計數由工具判；機制與失效模式、假設與實驗設計由 agent 研究；範圍、要不要補替代方案或 rule、門檻由人決定。不追求 100% 覆蓋。
 
 Review 找到、還沒解決的問題：
 
-- E1 很鬆：568 個實測項目只靠 73 個實驗 ref，單一 ref 最多背 72 項；要到 P2 才能追到「實驗裡的哪個假設」。
+- E1 很鬆：實測項目只靠少數實驗 ref，單一 ref 最多背 72 項。P2 的 `tested_by` 已能指到假設，但目前只有 MariaDB 卡的 11 項（G7 = 574 是剩下的量）。
 - 「訊號是實測」不等於「rule 被觸發過」：CI 對 rule 範本只驗語法，沒有 rule 的單元測試。
 - 盲測有過度擬合風險：六輪都用同 4 個情境、評分表到頂；要加 2 個沒用來調工具的保留情境，答案表沒寫的一律回「不知道」，保存完整對話。
 - issue 試點（repo 外的 `drafts/`）：各元件「該如何／不該如何／怎麼監控」的素材，等 P1 欄位定了再進卡片；issue 的說法在釘到 commit 或小實驗重現前都是推論。

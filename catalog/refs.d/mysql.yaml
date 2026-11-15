@@ -152,3 +152,37 @@ refs:
     kind: experiment
     title: "MySQL 8.4／MariaDB 11.4 實驗：replication 中斷、延遲、failover、連線打滿、長交易"
     url: "https://github.com/HahaSula/alert-trust/blob/main/lab/targets/mysql/ha/results/run-20261108.md"
+    hypotheses:
+      - id: s2-snapshot-blocks-purge
+        claim: consistent snapshot 的交易開著時 purge 被擋住，history list 變長；交易結束後降回
+        versions: ["MariaDB 11.4.13"]
+        method: "run.sh s2：START TRANSACTION WITH CONSISTENT SNAPSHOT 開 40 秒，同時送 400 句 UPDATE"
+        expect:
+          appear: ["mysql_global_status_innodb_history_list_length 上升", "mysql_info_schema_innodb_trx_oldest_transaction_age_seconds 有值"]
+        result: pass
+        limits: "history 到 414、結束後 1。MySQL 8.4.7 沒有 Innodb_history_list_length 這個 status，交易結束後 innodb_metrics 的值仍是 500，不算在這個假設裡"
+      - id: s3-opposite-order-deadlock
+        claim: 兩個交易以相反順序更新同兩列時發生一次 deadlock，Innodb_deadlocks 加 1
+        versions: ["MariaDB 11.4.13"]
+        method: "run.sh s3：兩個 session 分別更新 id 10→11 與 11→10，中間 SLEEP(2)"
+        expect:
+          appear: ["mysql_global_status_innodb_deadlocks +1"]
+        result: pass
+        limits: "只做一次；MySQL 8.4.7 沒有 Innodb_deadlocks 這個 status"
+      - id: s5b-conflict-stops-sql-thread
+        claim: replica 套用到重複鍵時 SQL thread 停下並留下 errno
+        versions: ["MariaDB 11.4.13", "MySQL 8.4.7"]
+        method: "run.sh s5b：replica 先寫 id=1000，primary 再寫同一個 id"
+        expect:
+          appear: ["mysql_slave_status_last_sql_errno = 1062", "mysql_slave_status_slave_sql_running = 0"]
+        result: pass
+        limits: "沒有測它會不會自己恢復；規則只看到 pending（for 比情境長）"
+      - id: s7a-max-connections
+        claim: 連線到 max_connections 時 exporter 也連不進去，需要連線的 metric 消失；拒絕的計數等連線降下來才看得到
+        versions: ["MariaDB 11.4.13", "MySQL 8.4.7"]
+        method: "run.sh s7a：max_connections=30，app 帳號開 32 條 SLEEP(40)，exporter 沒有 CONNECTION_ADMIN"
+        expect:
+          appear: ["mysql_up = 0", "事後 mysql_global_status_connection_errors_total{error=\"max_connections\"} 增加"]
+          disappear: ["mysql_global_status_threads_connected"]
+        result: pass
+        limits: "計數 MariaDB +2、MySQL +10；extra_port 不在這個情境"

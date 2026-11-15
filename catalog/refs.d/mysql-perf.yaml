@@ -208,3 +208,20 @@ refs:
     kind: experiment
     title: "MySQL 8.4／MariaDB 11.4 效能與故障情境：慢查詢、row lock、metadata lock、purge、CPU、buffer pool、暫存表、redo、連線風暴、磁碟滿、OOM"
     url: "https://github.com/HahaSula/alert-trust/tree/main/lab/targets/mysql/perf"
+    hypotheses:
+      - id: s2-row-lock-queue
+        claim: 一個交易鎖住列不 commit 時，更新同一批列的 session 全部排隊，current_waits 最多等於連線數
+        versions: ["MariaDB 11.4.13", "MySQL 8.4.7"]
+        method: "perf s2：UPDATE ... WHERE id <= 50000 後不 commit 35 秒，8 條工作連線"
+        expect:
+          appear: ["mysql_global_status_innodb_row_lock_current_waits = 8", "1205 錯誤", "commit 速率下降"]
+        result: pass
+        limits: "看不到阻擋者是誰；門檻 > 10 在 8 條連線時不會響"
+      - id: s3-ddl-behind-open-transaction
+        claim: 交易讀過表後不 commit，ALTER TABLE 等 metadata lock，後到的語句全部排在後面
+        versions: ["MariaDB 11.4.13", "MySQL 8.4.7"]
+        method: "perf s3：一個交易讀一列後不 commit，3 秒後 ALTER TABLE ... ADD COLUMN"
+        expect:
+          appear: ["mysql_info_schema_processlist_threads{state=\"waiting_for_table_metadata_lock\"} = 9", "commit 速率到 0"]
+        result: pass
+        limits: "innodb_row_lock_current_waits 是 0；MariaDB 查不到持有者（MySQL 的 metadata_locks 查得到）"
