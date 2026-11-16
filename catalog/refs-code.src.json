@@ -862,5 +862,199 @@
   "mariadb-11.4.13",
   "sql/sql_select.cc",
   "\"%s-%s-%lx-%llx-%x\""
+ ],
+ "pg18-hash-increase-batch-size": [
+  "postgres/postgres",
+  "REL_18_7",
+  "src/backend/executor/nodeHash.c",
+  "ExecHashIncreaseBatchSize(HashJoinTable hashtable)"
+ ],
+ "pg18-hash-budget-comment": [
+  "postgres/postgres",
+  "REL_18_7",
+  "src/backend/executor/nodeHash.c",
+  "usage under the budget (work_mem * hash_mem_multiplier)"
+ ],
+ "pg17-hash-choose-size": [
+  "postgres/postgres",
+  "REL_17_11",
+  "src/backend/executor/nodeHash.c",
+  "ExecChooseHashTableSize(double ntuples"
+ ],
+ "pg17-multixact-offset-buffers-guc": [
+  "postgres/postgres",
+  "REL_17_11",
+  "src/backend/utils/misc/guc_tables.c",
+  "&multixact_offset_buffers,"
+ ],
+ "pg16-multixact-offset-buffers-const": [
+  "postgres/postgres",
+  "REL_16_16",
+  "src/include/access/multixact.h",
+  "#define NUM_MULTIXACTOFFSET_BUFFERS"
+ ],
+ "pg17-logical-stream-or-spill": [
+  "postgres/postgres",
+  "REL_17_11",
+  "src/backend/replication/logical/reorderbuffer.c",
+  "ReorderBufferCanStartStreaming(rb) &&",
+  2
+ ],
+ "pg17-logical-spill-path": [
+  "postgres/postgres",
+  "REL_17_11",
+  "src/backend/replication/logical/reorderbuffer.c",
+  "pg_replslot/%s/xid-%u-lsn-%X-%X.spill"
+ ],
+ "pg17-logical-decoding-work-mem-guc": [
+  "postgres/postgres",
+  "REL_17_11",
+  "src/backend/utils/misc/guc_tables.c",
+  "\"logical_decoding_work_mem\", PGC_USERSET"
+ ],
+ "patroni415-leader-version-lsn": [
+  "patroni/patroni",
+  "v4.1.5",
+  "patroni/dcs/__init__.py",
+  "leader_patroni_version < (4, 0, 0)"
+ ],
+ "patroni415-release-mixed-setups": [
+  "patroni/patroni",
+  "v4.1.5",
+  "docs/releases.rst",
+  "Fix issue with mixed setups"
+ ],
+ "pg16-autovac-reload-in-delay": [
+  "postgres/postgres",
+  "REL_16_16",
+  "src/backend/commands/vacuum.c",
+  "if (ConfigReloadPending && IsAutoVacuumWorkerProcess())"
+ ],
+ "pg17-autovac-reload-in-delay": [
+  "postgres/postgres",
+  "REL_17_11",
+  "src/backend/commands/vacuum.c",
+  "if (ConfigReloadPending && AmAutoVacuumWorkerProcess())"
+ ],
+ "pg15-autovac-reload-between-tables": [
+  "postgres/postgres",
+  "REL_15_20",
+  "src/backend/postmaster/autovacuum.c",
+  "ProcessConfigFile(PGC_SIGHUP)",
+  2
+ ],
+ "pg17-work-mem-guc": [
+  "postgres/postgres",
+  "REL_17_11",
+  "src/backend/utils/misc/guc_tables.c",
+  "\"work_mem\", PGC_USERSET"
+ ],
+ "pg17-work-mem-each-sort-hash": [
+  "postgres/postgres",
+  "REL_17_11",
+  "src/backend/utils/misc/guc_tables.c",
+  "This much memory can be used by each internal"
+ ],
+ "pg17-jit-guc": [
+  "postgres/postgres",
+  "REL_17_11",
+  "src/backend/utils/misc/guc_tables.c",
+  "\"jit\", PGC_USERSET"
+ ],
+ "pg17-temp-file-limit-guc": [
+  "postgres/postgres",
+  "REL_17_11",
+  "src/backend/utils/misc/guc_tables.c",
+  "\"temp_file_limit\", PGC_SUSET"
+ ],
+ "pg17-temp-files-size-per-process": [
+  "postgres/postgres",
+  "REL_17_11",
+  "src/backend/storage/file/fd.c",
+  "static uint64 temporary_files_size = 0;"
+ ],
+ "pg17-temp-shared-not-counted": [
+  "postgres/postgres",
+  "REL_17_11",
+  "src/backend/storage/file/fd.c",
+  "another backend.  Files opened this way don't count against the"
+ ],
+ "my84-prefer-ordering-index-default": [
+  "mysql/mysql-server",
+  "mysql-8.4.7",
+  "sql/sys_vars.cc",
+  "OPTIMIZER_SWITCH_PREFER_ORDERING_INDEX |"
+ ],
+ "my84-optimizer-switch-hint-updateable": [
+  "mysql/mysql-server",
+  "mysql-8.4.7",
+  "sql/sys_vars.cc",
+  "HINT_UPDATEABLE SESSION_VAR(optimizer_switch)"
+ ],
+ "my84-prefer-ordering-index-use": [
+  "mysql/mysql-server",
+  "mysql-8.4.7",
+  "sql/sql_optimizer.cc",
+  "if (thd->optimizer_switch_flag(OPTIMIZER_SWITCH_PREFER_ORDERING_INDEX) ||"
+ ],
+ "my84-gr-compare-transaction-sets": [
+  "mysql/mysql-server",
+  "mysql-8.4.7",
+  "plugin/group_replication/src/gcs_event_handlers.cc",
+  "group_data_compatibility = compare_member_transaction_sets();"
+ ],
+ "my84-gr-joiner-not-subset": [
+  "mysql/mysql-server",
+  "mysql-8.4.7",
+  "plugin/group_replication/src/gcs_event_handlers.cc",
+  "if (!local_member_set.is_subset(&group_set)) {"
+ ],
+ "my84-temptable-use-mmap-default": [
+  "mysql/mysql-server",
+  "mysql-8.4.7",
+  "sql/sys_vars.cc",
+  "GLOBAL_VAR(temptable_use_mmap), CMD_LINE(OPT_ARG), DEFAULT(false),"
+ ],
+ "my84-temptable-mmap-threshold": [
+  "mysql/mysql-server",
+  "mysql-8.4.7",
+  "storage/temptable/include/temptable/allocator.h",
+  "if (MemoryMonitor::MMAP::consumption() < MemoryMonitor::MMAP::threshold()) {"
+ ],
+ "my84-redo-log-capacity-default": [
+  "mysql/mysql-server",
+  "mysql-8.4.7",
+  "storage/innobase/handler/ha_innodb.cc",
+  "nullptr, innodb_redo_log_capacity_update, 100 * 1024 * 1024,"
+ ],
+ "my84-dedicated-capacity-is-set": [
+  "mysql/mysql-server",
+  "mysql-8.4.7",
+  "storage/innobase/handler/ha_innodb.cc",
+  "bool capacity_set = innodb_redo_log_capacity_is_set();"
+ ],
+ "my84-dedicated-update-default": [
+  "mysql/mysql-server",
+  "mysql-8.4.7",
+  "storage/innobase/handler/ha_innodb.cc",
+  "innodb_redo_log_capacity_update_default(srv_redo_log_capacity);"
+ ],
+ "my84-redo-capacity-def-val": [
+  "mysql/mysql-server",
+  "mysql-8.4.7",
+  "storage/innobase/handler/ha_innodb.cc",
+  "mysql_sysvar_redo_log_capacity.def_val = new_def;"
+ ],
+ "my84-temptable-agg-file-full": [
+  "mysql/mysql-server",
+  "mysql-8.4.7",
+  "sql/iterators/composite_iterators.cc",
+  "(error HA_ERR_RECORD_FILE_FULL checked in create_ondisk_from_heap()),"
+ ],
+ "my84-temptable-agg-move-to-disk": [
+  "mysql/mysql-server",
+  "mysql-8.4.7",
+  "sql/iterators/composite_iterators.cc",
+  "if (move_table_to_disk(error, /*insert_operation=*/false)) {"
  ]
 }

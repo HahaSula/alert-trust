@@ -87,6 +87,8 @@ Scrape 耗時的量法（2026-11-15）：原本只給 7 天的 p99 與一個 `ma
 
 MariaDB 卡的 usage 與失效模式第二批（2026-11-15）：第一批 Jira 試點標「新 usage」的 8 筆，逐筆找原始碼依據後寫進卡片的 `usage`（23 個釘版本的參考，`gen_code_refs.py` 逐一核對過關鍵字）；每一筆都只留原始碼能證明的部分，issue 裡的效能數字、因果說法沒有寫進去。第二批 Jira 掃描（Galera、備份與 binlog、buffer pool 與暫存空間、thread pool，10 張，在 repo 外的 `drafts/`）加了 3 個機制（galera-replication、buffer-pool、binlog）與 7 個失效模式（6 個推論、1 個讀碼）。MariaDB 卡現在 9 個機制、21 個失效模式；G1 29 → 25，G2 1 → 3（兩條寫明接受不偵測：`wsrep_sync_wait` 失效、thread pool 用完）。還沒做：其他資料庫的同樣整理；14 個推論的失效模式要釘 commit 或做小 lab 才能升級；第二批的修正版本只看了 Jira 欄位。
 
+PostgreSQL 與 MySQL 卡的 usage（2026-11-16）：兩張卡第一批試點裡標「新 usage」的候選，逐筆找原始碼依據後寫進 `usage`。PostgreSQL 7 筆（19 個參考，PostgreSQL 17.11，版本差異另對 15、16、18；Patroni 一筆對 v4.1.5）；MySQL 9 筆候選裡寫進 5 筆（13 個參考，MySQL 8.4.7），另外 4 筆依據不足沒有放（一筆只有文件、一筆無法佐證、兩筆只是修正事實而不是用法）。每一筆都只留原始碼能證明的部分。MySQL 的候選這次用原始頁面重讀，試點紀錄有 6 處和原文不符（在 repo 外的 `drafts/mysql-issues/usage-candidates.md`），試點檔本身還沒改。PostgreSQL 的 committer 名單沒有核對到（wiki 頁已搬走）。還沒做：這兩張卡的機制與失效模式；其他資料庫。
+
 Review 找到、還沒解決的問題：
 
 - E1 很鬆：實測項目只靠少數實驗 ref，單一 ref 最多背 72 項。P2 的 `tested_by` 已能指到假設，但目前只有 MariaDB 卡的 11 項（G7 = 574 是剩下的量）。

@@ -1009,3 +1009,227 @@ refs:
     file: "sql/sql_select.cc"
     line: 21891
     url: "https://github.com/MariaDB/server/blob/mariadb-11.4.13/sql/sql_select.cc#L21891"
+  pg18-hash-increase-batch-size:
+    kind: code
+    project: "postgres/postgres"
+    version: "REL_18_7"
+    file: "src/backend/executor/nodeHash.c"
+    line: 998
+    url: "https://github.com/postgres/postgres/blob/REL_18_7/src/backend/executor/nodeHash.c#L998"
+  pg18-hash-budget-comment:
+    kind: code
+    project: "postgres/postgres"
+    version: "REL_18_7"
+    file: "src/backend/executor/nodeHash.c"
+    line: 869
+    url: "https://github.com/postgres/postgres/blob/REL_18_7/src/backend/executor/nodeHash.c#L869"
+  pg17-hash-choose-size:
+    kind: code
+    project: "postgres/postgres"
+    version: "REL_17_11"
+    file: "src/backend/executor/nodeHash.c"
+    line: 675
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/executor/nodeHash.c#L675"
+  pg17-multixact-offset-buffers-guc:
+    kind: code
+    project: "postgres/postgres"
+    version: "REL_17_11"
+    file: "src/backend/utils/misc/guc_tables.c"
+    line: 2333
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/misc/guc_tables.c#L2333"
+  pg16-multixact-offset-buffers-const:
+    kind: code
+    project: "postgres/postgres"
+    version: "REL_16_16"
+    file: "src/include/access/multixact.h"
+    line: 33
+    url: "https://github.com/postgres/postgres/blob/REL_16_16/src/include/access/multixact.h#L33"
+  pg17-logical-stream-or-spill:
+    kind: code
+    project: "postgres/postgres"
+    version: "REL_17_11"
+    file: "src/backend/replication/logical/reorderbuffer.c"
+    line: 3813
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/replication/logical/reorderbuffer.c#L3813"
+  pg17-logical-spill-path:
+    kind: code
+    project: "postgres/postgres"
+    version: "REL_17_11"
+    file: "src/backend/replication/logical/reorderbuffer.c"
+    line: 4790
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/replication/logical/reorderbuffer.c#L4790"
+  pg17-logical-decoding-work-mem-guc:
+    kind: code
+    project: "postgres/postgres"
+    version: "REL_17_11"
+    file: "src/backend/utils/misc/guc_tables.c"
+    line: 2477
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/misc/guc_tables.c#L2477"
+  patroni415-leader-version-lsn:
+    kind: code
+    project: "patroni/patroni"
+    version: "v4.1.5"
+    file: "patroni/dcs/__init__.py"
+    line: 1251
+    url: "https://github.com/patroni/patroni/blob/v4.1.5/patroni/dcs/__init__.py#L1251"
+  patroni415-release-mixed-setups:
+    kind: code
+    project: "patroni/patroni"
+    version: "v4.1.5"
+    file: "docs/releases.rst"
+    line: 502
+    url: "https://github.com/patroni/patroni/blob/v4.1.5/docs/releases.rst#L502"
+  pg16-autovac-reload-in-delay:
+    kind: code
+    project: "postgres/postgres"
+    version: "REL_16_16"
+    file: "src/backend/commands/vacuum.c"
+    line: 2401
+    url: "https://github.com/postgres/postgres/blob/REL_16_16/src/backend/commands/vacuum.c#L2401"
+  pg17-autovac-reload-in-delay:
+    kind: code
+    project: "postgres/postgres"
+    version: "REL_17_11"
+    file: "src/backend/commands/vacuum.c"
+    line: 2407
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/commands/vacuum.c#L2407"
+  pg15-autovac-reload-between-tables:
+    kind: code
+    project: "postgres/postgres"
+    version: "REL_15_20"
+    file: "src/backend/postmaster/autovacuum.c"
+    line: 2381
+    url: "https://github.com/postgres/postgres/blob/REL_15_20/src/backend/postmaster/autovacuum.c#L2381"
+  pg17-work-mem-guc:
+    kind: code
+    project: "postgres/postgres"
+    version: "REL_17_11"
+    file: "src/backend/utils/misc/guc_tables.c"
+    line: 2448
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/misc/guc_tables.c#L2448"
+  pg17-work-mem-each-sort-hash:
+    kind: code
+    project: "postgres/postgres"
+    version: "REL_17_11"
+    file: "src/backend/utils/misc/guc_tables.c"
+    line: 2450
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/misc/guc_tables.c#L2450"
+  pg17-jit-guc:
+    kind: code
+    project: "postgres/postgres"
+    version: "REL_17_11"
+    file: "src/backend/utils/misc/guc_tables.c"
+    line: 1925
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/misc/guc_tables.c#L1925"
+  pg17-temp-file-limit-guc:
+    kind: code
+    project: "postgres/postgres"
+    version: "REL_17_11"
+    file: "src/backend/utils/misc/guc_tables.c"
+    line: 2505
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/utils/misc/guc_tables.c#L2505"
+  pg17-temp-files-size-per-process:
+    kind: code
+    project: "postgres/postgres"
+    version: "REL_17_11"
+    file: "src/backend/storage/file/fd.c"
+    line: 239
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/storage/file/fd.c#L239"
+  pg17-temp-shared-not-counted:
+    kind: code
+    project: "postgres/postgres"
+    version: "REL_17_11"
+    file: "src/backend/storage/file/fd.c"
+    line: 1896
+    url: "https://github.com/postgres/postgres/blob/REL_17_11/src/backend/storage/file/fd.c#L1896"
+  my84-prefer-ordering-index-default:
+    kind: code
+    project: "mysql/mysql-server"
+    version: "mysql-8.4.7"
+    file: "sql/sys_vars.cc"
+    line: 214
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/sys_vars.cc#L214"
+  my84-optimizer-switch-hint-updateable:
+    kind: code
+    project: "mysql/mysql-server"
+    version: "mysql-8.4.7"
+    file: "sql/sys_vars.cc"
+    line: 3287
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/sys_vars.cc#L3287"
+  my84-prefer-ordering-index-use:
+    kind: code
+    project: "mysql/mysql-server"
+    version: "mysql-8.4.7"
+    file: "sql/sql_optimizer.cc"
+    line: 2490
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/sql_optimizer.cc#L2490"
+  my84-gr-compare-transaction-sets:
+    kind: code
+    project: "mysql/mysql-server"
+    version: "mysql-8.4.7"
+    file: "plugin/group_replication/src/gcs_event_handlers.cc"
+    line: 1755
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/plugin/group_replication/src/gcs_event_handlers.cc#L1755"
+  my84-gr-joiner-not-subset:
+    kind: code
+    project: "mysql/mysql-server"
+    version: "mysql-8.4.7"
+    file: "plugin/group_replication/src/gcs_event_handlers.cc"
+    line: 1931
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/plugin/group_replication/src/gcs_event_handlers.cc#L1931"
+  my84-temptable-use-mmap-default:
+    kind: code
+    project: "mysql/mysql-server"
+    version: "mysql-8.4.7"
+    file: "sql/sys_vars.cc"
+    line: 5130
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/sys_vars.cc#L5130"
+  my84-temptable-mmap-threshold:
+    kind: code
+    project: "mysql/mysql-server"
+    version: "mysql-8.4.7"
+    file: "storage/temptable/include/temptable/allocator.h"
+    line: 226
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/temptable/include/temptable/allocator.h#L226"
+  my84-redo-log-capacity-default:
+    kind: code
+    project: "mysql/mysql-server"
+    version: "mysql-8.4.7"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 22830
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/handler/ha_innodb.cc#L22830"
+  my84-dedicated-capacity-is-set:
+    kind: code
+    project: "mysql/mysql-server"
+    version: "mysql-8.4.7"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 4661
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/handler/ha_innodb.cc#L4661"
+  my84-dedicated-update-default:
+    kind: code
+    project: "mysql/mysql-server"
+    version: "mysql-8.4.7"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 4686
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/handler/ha_innodb.cc#L4686"
+  my84-redo-capacity-def-val:
+    kind: code
+    project: "mysql/mysql-server"
+    version: "mysql-8.4.7"
+    file: "storage/innobase/handler/ha_innodb.cc"
+    line: 22834
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/storage/innobase/handler/ha_innodb.cc#L22834"
+  my84-temptable-agg-file-full:
+    kind: code
+    project: "mysql/mysql-server"
+    version: "mysql-8.4.7"
+    file: "sql/iterators/composite_iterators.cc"
+    line: 3920
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/iterators/composite_iterators.cc#L3920"
+  my84-temptable-agg-move-to-disk:
+    kind: code
+    project: "mysql/mysql-server"
+    version: "mysql-8.4.7"
+    file: "sql/iterators/composite_iterators.cc"
+    line: 3924
+    url: "https://github.com/mysql/mysql-server/blob/mysql-8.4.7/sql/iterators/composite_iterators.cc#L3924"

@@ -236,6 +236,36 @@ usage:
     evidence: tested
     refs: [my-q-exp, my-q-qe-expiration, my-q-qe-query-timestamp]
 
+  # 從 bug tracker 試點來的用法；只寫原始碼（8.4.7）能證明的部分，bug 報告裡的耗時與因果不算依據
+  - id: prefer-ordering-index
+    text: >-
+      `optimizer_switch` 的 `prefer_ordering_index` 預設開：有 ORDER BY … LIMIT 時 optimizer 會考慮改走能提供排序的索引。
+      某一句因此選到慢的計畫時，可以只對那一句用 SET_VAR hint 關掉，不必改全域
+    evidence: code
+    refs: [my84-prefer-ordering-index-default, my84-optimizer-switch-hint-updateable, my84-prefer-ordering-index-use]
+  - id: gr-joiner-gtid-subset
+    text: >-
+      加入 Group Replication 的成員，自己的 GTID 集合必須是群組的子集；本地多出交易時加入會被拒，沒有可以略過這個檢查的選項。
+      加入前先確認沒有只在這台執行過的交易
+    evidence: code
+    refs: [my84-gr-compare-transaction-sets, my84-gr-joiner-not-subset]
+  - id: temptable-no-mmap
+    text: >-
+      8.4.7 的 TempTable 預設不用 mmap 檔（`temptable_use_mmap` 預設關）：記憶體用到 `temptable_max_ram` 時配置器回報表滿，
+      由執行端把暫存表搬到磁碟再重試；`temptable_max_ram` 太小時暫存表會頻繁落到磁碟
+    evidence: code
+    refs: [my84-temptable-use-mmap-default, my84-temptable-mmap-threshold, my84-temptable-agg-file-full, my84-temptable-agg-move-to-disk]
+  - id: redo-log-capacity
+    text: "`innodb_redo_log_capacity` 的預設是固定的 100 MiB，可以用 SET GLOBAL 線上調整；要多大得自己設"
+    evidence: code
+    refs: [my84-redo-log-capacity-default]
+  - id: dedicated-server-only-when-unset
+    text: >-
+      `innodb_dedicated_server` 只在 `innodb_redo_log_capacity` 沒有明確設定時才套用它算出來的值，並把那個值當成該變數的預設；
+      已經明寫設定的變數不會被它覆蓋
+    evidence: code
+    refs: [my84-dedicated-capacity-is-set, my84-dedicated-update-default, my84-redo-capacity-def-val]
+
 contracts:
   - scrape-within-interval
   - lookback

@@ -189,6 +189,47 @@ usage:
     evidence: doc
     refs: [pg-q-qe-pool-default]
 
+  # 從郵件論壇與 issue 試點來的用法；只寫原始碼能證明的部分（17.11，另註明的除外），討論串裡的數字與因果不算依據
+  - id: work-mem-per-operation
+    text: >-
+      `work_mem` 是每個內部排序與 hash table 各自的額度，不是每個查詢或每條連線的上限；一個查詢可以同時用很多份。`jit` 預設開
+    evidence: code
+    refs: [pg17-work-mem-guc, pg17-work-mem-each-sort-hash, pg17-jit-guc]
+  - id: hash-join-batch-budget-18
+    text: >-
+      18 起 hash join 決定大小時把每個 batch 的檔案緩衝也算進 `work_mem` × `hash_mem_multiplier` 的預算，並重新權衡 batch 數
+      （17 沒有 ExecHashIncreaseBatchSize 這段）；升到 18 後同一個 `work_mem` 下的 batch 數可能不同，用 EXPLAIN (ANALYZE) 的 Batches 確認
+    evidence: code
+    refs: [pg18-hash-increase-batch-size, pg18-hash-budget-comment, pg17-hash-choose-size]
+  - id: temp-file-limit-per-process
+    text: >-
+      `temp_file_limit` 是每個 process 各自累計的上限：別的 backend 建立、這裡只是開啟的共用暫存檔不算進來，
+      所以一個平行查詢寫出的暫存檔總量可以超過設定值
+    evidence: code
+    refs: [pg17-temp-file-limit-guc, pg17-temp-files-size-per-process, pg17-temp-shared-not-counted]
+  - id: logical-decoding-spill
+    text: >-
+      logical decoding 中的交易超過 `logical_decoding_work_mem` 時，能串流就送給訂閱端，否則寫到 `pg_replslot/<slot>/` 底下的 .spill 檔；
+      slot 目錄變大不一定是 WAL 被留住，也可能是大交易的 spill 檔
+    evidence: code
+    refs: [pg17-logical-stream-or-spill, pg17-logical-spill-path, pg17-logical-decoding-work-mem-guc]
+  - id: autovacuum-cost-reload-16
+    text: >-
+      16 起 autovacuum worker 在每次 cost delay 時就會處理 reload、套用新的 cost 設定；15 以前只在處理下一張表之前才讀新設定，
+      所以調高 cost limit 對正在處理的那張表沒有作用
+    evidence: code
+    refs: [pg16-autovac-reload-in-delay, pg17-autovac-reload-in-delay, pg15-autovac-reload-between-tables]
+  - id: multixact-offset-buffers-17
+    text: "`multixact_offset_buffers` 17 起才是可以設定的參數；16 以前 multixact offset 的快取大小是編譯期常數，調不了"
+    evidence: code
+    refs: [pg17-multixact-offset-buffers-guc, pg16-multixact-offset-buffers-const]
+  - id: patroni-mixed-version-slots
+    text: >-
+      Patroni 滾動升級時不要讓新舊版長時間並存：leader 還在 4.0.0 之前的版本時，新版成員推進 replication slot 的方式不同
+      （4.x 的發行說明列為 mixed setups 的修正）；升級要連 leader 一起完成
+    evidence: code
+    refs: [patroni415-leader-version-lsn, patroni415-release-mixed-setups]
+
 contracts: [exporter-deadline]
 
 signals:

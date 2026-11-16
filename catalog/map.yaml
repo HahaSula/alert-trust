@@ -1203,6 +1203,11 @@ cards:
     - ddl-lock-wait-timeout
     - query-exporter-account
     - query-exporter-expiration
+    - prefer-ordering-index
+    - gr-joiner-gtid-subset
+    - temptable-no-mmap
+    - redo-log-capacity
+    - dedicated-server-only-when-unset
     observe:
     - exporter-up
     - db-up
@@ -1340,6 +1345,13 @@ cards:
     - query-exporter-expiration
     - query-exporter-version-dsn
     - query-exporter-connections
+    - work-mem-per-operation
+    - hash-join-batch-budget-18
+    - temp-file-limit-per-process
+    - logical-decoding-spill
+    - autovacuum-cost-reload-16
+    - multixact-offset-buffers-17
+    - patroni-mixed-version-slots
     observe:
     - exporter-up
     - custom-queries
